@@ -7,7 +7,7 @@ const config = {
   kit: {
     adapter: adapter({
       // Render all routes as serverless functions by default
-      runtime: 'nodejs18.x'
+      runtime: 'nodejs20.x'
     })
   }
 };
