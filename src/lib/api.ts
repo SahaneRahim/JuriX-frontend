@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 /**
  * Centralized API routing configuration.
  */
