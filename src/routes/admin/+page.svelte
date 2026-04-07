@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, API_BASE_URL } from '$lib/api';
   import StatsCard from "$lib/components/admin/StatsCard.svelte";
   import { onMount } from "svelte";
   import { tr } from "$lib/stores/language";
@@ -12,16 +12,16 @@ let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
   onMount(async () => {
     try {
       const [overviewRes, usageRes, searchRes] = await Promise.all([
-        fetch(`${API_URL}/api/v1/analytics/overview`),
-        fetch(`${API_URL}/api/v1/analytics/usage`),
-        fetch(`${API_URL}/api/v1/analytics/search`),
+        fetch(`${API_BASE_URL}/analytics/overview`),
+        fetch(`${API_BASE_URL}/analytics/usage`),
+        fetch(`${API_BASE_URL}/analytics/search`),
       ]);
 
       if (overviewRes.ok) {
         overview = await overviewRes.json();
         // Fallback for latest_laws if API doesn't provide it directly in overview yet
         if (!overview.latest_laws) {
-          const lawsRes = await fetch(`${API_URL}/api/v1/laws?limit=4`);
+          const lawsRes = await fetch(`${API_BASE_URL}/laws?limit=4`);
           if (lawsRes.ok) {
             overview.latest_laws = await lawsRes.json();
           } else {

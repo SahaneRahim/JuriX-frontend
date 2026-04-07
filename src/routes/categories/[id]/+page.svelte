@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, API_BASE_URL } from '$lib/api';
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { language, tr } from "$lib/stores/language";
@@ -38,7 +38,7 @@
   // Fetch categories and find the ID for the current slug
   async function getCategoryIdFromName(slug: string): Promise<number | null> {
     try {
-      const response = await fetch("${API_URL}/api/v1/categories");
+      const response = await fetch(`${API_BASE_URL}/categories`);
       if (!response.ok) return null;
 
       const categories = await response.json();
@@ -123,7 +123,7 @@
           searchBody.filters = { language: language };
         }
 
-        const response = await fetch(`${API_URL}/api/v1/search`, {
+        const response = await fetch(`${API_BASE_URL}/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(searchBody),
@@ -137,7 +137,7 @@
       }
 
       // 2. Fetch laws using the ID and language
-      let url = `${API_URL}/api/v1/laws?category_id=${backendId}&limit=50`;
+      let url = `${API_BASE_URL}/laws?category_id=${backendId}&limit=50`;
       if (language !== "all") {
         url += `&language=${language}`;
       }

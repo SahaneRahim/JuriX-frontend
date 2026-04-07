@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, API_BASE_URL } from '$lib/api';
   import { onMount, tick } from "svelte";
   import { language, tr } from "$lib/stores/language";
 
@@ -81,10 +81,14 @@
     await scrollToBottom();
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/ai/chat`, {
+      const response = await fetch(`${API_BASE_URL}/rag/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: query }),
+        body: JSON.stringify({ 
+          question: query,
+          persona: "citoyen", // Default persona for general chat
+          language: $language.current
+        }),
       });
 
       if (response.ok) {
@@ -93,7 +97,7 @@
           id: chatMessages.length + 1,
           type: "assistant",
           content:
-            data.response ||
+            data.answer ||
             ($language.current === "fr"
               ? "Je n'ai pas pu traiter votre demande."
               : "I couldn't process your request."),

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, API_BASE_URL } from '$lib/api';
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { language, switchLanguage } from "$lib/stores/language";
@@ -88,7 +88,7 @@
     isLoading = true;
     error = "";
     try {
-      const response = await fetch(`${API_URL}/api/v1/laws/${id}`);
+      const response = await fetch(`${API_BASE_URL}/laws/${id}`);
       if (!response.ok) throw new Error("Document non trouvé");
       law = await response.json();
       parseContent(law.content);

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, API_BASE_URL } from '$lib/api';
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
@@ -73,7 +73,7 @@
     errorMessage = "";
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/search/`, {
+      const response = await fetch(`${API_BASE_URL}/search/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

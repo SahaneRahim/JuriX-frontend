@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL, WS_URL } from '$lib/api';
+  import { API_URL, WS_URL, API_BASE_URL, WS_BASE_URL } from '$lib/api';
 	import { onMount, onDestroy } from "svelte";
 	import { goto } from "$app/navigation";
 	import { language, tr } from "$lib/stores/language";
@@ -37,8 +37,7 @@
 	// WebSocket connection
 	function connectWebSocket() {
 		sessionId = crypto.randomUUID();
-		const wsUrl = `${WS_URL}/admin/batch/ws/${sessionId}`;
-
+		const wsUrl = `${WS_BASE_URL}/batch-upload/ws/${sessionId}`;
 		ws = new WebSocket(wsUrl);
 
 		ws.onopen = () => {
@@ -154,7 +153,7 @@
 
 		try {
 			const response = await fetch(
-				`${API_URL}/admin/batch/upload?session_id=${sessionId}`,
+				`${API_BASE_URL}/batch-upload/upload?session_id=${sessionId}`,
 				{
 					method: "POST",
 					body: formData,
@@ -180,8 +179,8 @@
 		try {
 			const url =
 				statusFilter === "all"
-					? "${API_URL}/admin/batch/status"
-					: `${API_URL}/admin/batch/status?status=${statusFilter}`;
+					? `${API_BASE_URL}/batch-upload/status`
+					: `${API_BASE_URL}/batch-upload/status?status=${statusFilter}`;
 
 			const response = await fetch(url);
 			const data = await response.json();

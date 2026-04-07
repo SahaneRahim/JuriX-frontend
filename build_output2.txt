@@ -1,0 +1,376 @@
+﻿[36mvite v5.4.21 [32mbuilding SSR bundle for production...[36m[39m
+transforming...
+node.exe : 1:24:37 AM 
+[vite-plugin-svelte] C:/
+Users/PC/OneDrive/Bureau
+/JuriX/frontend/src/rout
+es/(main)/+page.svelte:1
+56:8 A11y: Avoid using 
+autofocus
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo      
+        : NotSpecified  
+  : (1:24:37 AM [vit.   
+ ..using autofocus:S    
+tring) [], RemoteEx    
+ception
+    + FullyQualifiedErr 
+   orId : NativeComman  
+  dError
+ 
+154:         placeholder
+={$tr("search.placeholde
+r")}
+155:         
+class="w-full 
+bg-transparent 
+border-none text-lg 
+text-slate-800 
+dark:text-white 
+placeholder-slate-400 
+focus:ring-0 px-4 py-3"
+156:         autofocus
+             ^
+157:       />
+158:       <button
+1:24:37 AM 
+[vite-plugin-svelte] C:/
+Users/PC/OneDrive/Bureau
+/JuriX/frontend/src/rout
+es/admin/documents/batch
+-upload/+page.svelte:180
+:3 A11y: <div> with 
+drop, dragover, 
+dragleave handlers must 
+have an ARIA role
+178: 
+179:       <!-- Drag 
+and Drop Zone -->
+180:       <div
+           ^
+181:         
+class="border-2 
+border-dashed 
+rounded-lg p-12 
+text-center 
+transition-colors 
+{isDragging
+182:           ? 
+'border-blue-500 
+bg-blue-50'
+1:24:38 AM 
+[vite-plugin-svelte] C:/
+Users/PC/OneDrive/Bureau
+/JuriX/frontend/src/lib/
+components/admin/EditMod
+al.svelte:102:4 A11y: 
+Non-interactive element 
+<div> should not be 
+assigned mouse or 
+keyboard event 
+listeners.
+100:   >
+101:     <!-- 
+svelte-ignore a11y-no-st
+atic-element-interaction
+s -->
+102:     <div 
+         ^
+103:       
+class="w-full max-w-4xl 
+rounded-2xl bg-white 
+shadow-2xl" 
+104:       
+on:click|stopPropagation
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (6:23): 
+"untrack" is not 
+exported by "node_module
+s/svelte/src/runtime/ssr
+.js", imported by "node_
+modules/@sveltejs/kit/sr
+c/runtime/client/client.
+js".
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (328:15): 
+"fork" is not exported 
+by "node_modules/svelte/
+src/runtime/ssr.js", 
+imported by "node_module
+s/@sveltejs/kit/src/runt
+ime/client/client.js".
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (333:26): 
+"fork" is not exported 
+by "node_modules/svelte/
+src/runtime/ssr.js", 
+imported by "node_module
+s/@sveltejs/kit/src/runt
+ime/client/client.js".
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (1170:30): 
+"settled" is not 
+exported by "node_module
+s/svelte/src/runtime/ssr
+.js", imported by "node_
+modules/@sveltejs/kit/sr
+c/runtime/client/client.
+js".
+[32mΓ£ô[39m 121 modules transformed.
+rendering chunks...
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+1:24:39 AM 
+[vite-plugin-svelte] C:/
+Users/PC/OneDrive/Bureau
+/JuriX/frontend/src/rout
+es/(main)/+page.svelte:1
+56:8 A11y: Avoid using 
+autofocus
+154:         placeholder
+={$tr("search.placeholde
+r")}
+155:         
+class="w-full 
+bg-transparent 
+border-none text-lg 
+text-slate-800 
+dark:text-white 
+placeholder-slate-400 
+focus:ring-0 px-4 py-3"
+156:         autofocus
+             ^
+157:       />
+158:       <button
+1:24:39 AM 
+[vite-plugin-svelte] C:/
+Users/PC/OneDrive/Bureau
+/JuriX/frontend/src/rout
+es/admin/documents/batch
+-upload/+page.svelte:180
+:3 A11y: <div> with 
+drop, dragover, 
+dragleave handlers must 
+have an ARIA role
+178: 
+179:       <!-- Drag 
+and Drop Zone -->
+180:       <div
+           ^
+181:         
+class="border-2 
+border-dashed 
+rounded-lg p-12 
+text-center 
+transition-colors 
+{isDragging
+182:           ? 
+'border-blue-500 
+bg-blue-50'
+1:24:40 AM 
+[vite-plugin-svelte] C:/
+Users/PC/OneDrive/Bureau
+/JuriX/frontend/src/lib/
+components/admin/EditMod
+al.svelte:102:4 A11y: 
+Non-interactive element 
+<div> should not be 
+assigned mouse or 
+keyboard event 
+listeners.
+100:   >
+101:     <!-- 
+svelte-ignore a11y-no-st
+atic-element-interaction
+s -->
+102:     <div 
+         ^
+103:       
+class="w-full max-w-4xl 
+rounded-2xl bg-white 
+shadow-2xl" 
+104:       
+on:click|stopPropagation
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (5:23): 
+"untrack" is not 
+exported by "node_module
+s/svelte/src/runtime/ind
+ex.js", imported by "nod
+e_modules/@sveltejs/kit/
+src/runtime/client/clien
+t.js".
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (327:15): 
+"fork" is not exported 
+by "node_modules/svelte/
+src/runtime/index.js", 
+imported by "node_module
+s/@sveltejs/kit/src/runt
+ime/client/client.js".
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (332:26): 
+"fork" is not exported 
+by "node_modules/svelte/
+src/runtime/index.js", 
+imported by "node_module
+s/@sveltejs/kit/src/runt
+ime/client/client.js".
+node_modules/@sveltejs/k
+it/src/runtime/client/cl
+ient.js (1169:30): 
+"settled" is not 
+exported by "node_module
+s/svelte/src/runtime/ind
+ex.js", imported by "nod
+e_modules/@sveltejs/kit/
+src/runtime/client/clien
+t.js".
+[32mΓ£ô[39m 104 modules transformed.
+rendering chunks...
+computing gzip size...
+[2m.svelte-kit/output/client/[22m[32m_app/version.json                       [39m[1m[2m 0.03 kB[22m[1m[22m[2m Γöé gzip:  0.05 kB[22m
+[2m.svelte-kit/output/client/[22m[32m.vite/manifest.json                     [39m[1m[2m 8.32 kB[22m[1m[22m[2m Γöé gzip:  1.01 kB[22m
+[2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/12.CLXz-dyG.css   [39m[1m[2m 0.11 kB[22m[1m[22m[2m Γöé gzip:  0.12 kB[22m
+[2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/2.CiCPsnrO.css    [39m[1m[2m 0.22 kB[22m[1m[22m[2m Γöé gzip:  0.14 kB[22m
+[2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/app.uRQ4UyVU.css  [39m[1m[2m90.95 kB[22m[1m[22m[2m Γöé gzip: 13.18 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/q6Nf2KYh.js       [39m[1m[2m 0.12 kB[22m[1m[22m[2m Γöé gzip:  0.11 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/entry/start.cHSgjOBu.js  [39m[1m[2m 0.12 kB[22m[1m[22m[2m Γöé gzip:  0.11 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/B1THkQu6.js       [39m[1m[2m 0.23 kB[22m[1m[22m[2m Γöé gzip:  0.16 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/0.C8oqsLN_.js      [39m[1m[2m 0.64 kB[22m[1m[22m[2m Γöé gzip:  0.41 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/1.xK_GP2vh.js      [39m[1m[2m 0.82 kB[22m[1m[22m[2m Γöé gzip:  0.51 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/CqBrbMkM.js       [39m[1m[2m 0.84 kB[22m[1m[22m[2m Γöé gzip:  0.52 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/BOyLvJyP.js       [39m[1m[2m 0.91 kB[22m[1m[22m[2m Γöé gzip:  0.42 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/DTIAY4BT.js       [39m[1m[2m 0.92 kB[22m[1m[22m[2m Γöé gzip:  0.57 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/BJDBeNTI.js       [39m[1m[2m 1.15 kB[22m[1m[22m[2m Γöé gzip:  0.51 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/B_51aFvM.js       [39m[1m[2m 5.71 kB[22m[1m[22m[2m Γöé gzip:  2.80 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/Cubu0JBv.js       [39m[1m[2m 5.73 kB[22m[1m[22m[2m Γöé gzip:  2.67 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/3.CXCQZaUb.js      [39m[1m[2m 7.67 kB[22m[1m[22m[2m Γöé gzip:  2.73 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/4.DHjgm-sw.js      [39m[1m[2m 8.49 kB[22m[1m[22m[2m Γöé gzip:  3.25 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/DZx69_d8.js       [39m[1m[2m 8.58 kB[22m[1m[22m[2m Γöé gzip:  3.40 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/6.oSV81oYw.js      [39m[1m[2m10.08 kB[22m[1m[22m[2m Γöé gzip:  3.74 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/entry/app.BSewJFay.js    [39m[1m[2m10.09 kB[22m[1m[22m[2m Γöé gzip:  3.34 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/5.CEp1kFTZ.js      [39m[1m[2m13.07 kB[22m[1m[22m[2m Γöé gzip:  4.80 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/7.CTw4jn1d.js      [39m[1m[2m15.82 kB[22m[1m[22m[2m Γöé gzip:  5.49 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/2.Cx-nc1yt.js      [39m[1m[2m16.84 kB[22m[1m[22m[2m Γöé gzip:  5.40 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/10.KWkuN0hB.js     [39m[1m[2m17.90 kB[22m[1m[22m[2m Γöé gzip:  6.40 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/CbjPri1I.js       [39m[1m[2m18.78 kB[22m[1m[22m[2m Γöé gzip:  5.68 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/9.BMmCG7ZV.js      [39m[1m[2m18.92 kB[22m[1m[22m[2m Γöé gzip:  6.92 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/B9Qz0JxZ.js       [39m[1m[2m21.29 kB[22m[1m[22m[2m Γöé gzip:  8.37 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/11.CEwdyyVq.js     [39m[1m[2m31.96 kB[22m[1m[22m[2m Γöé gzip: 11.29 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/12.CrOZhW-R.js     [39m[1m[2m38.12 kB[22m[1m[22m[2m Γöé gzip: 11.38 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/8.4Xcde7Xa.js      [39m[1m[2m49.70 kB[22m[1m[22m[2m Γöé gzip: 15.53 kB[22m
+[32mΓ£ô built in 1.38s[39m
+[2m.svelte-kit/output/server/[22m[32m.vite/manifest.json                                         [39m[1m[2m  6.87 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_page.CLXz-dyG.css                    [39m[1m[2m  0.11 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_layout.CiCPsnrO.css                  [39m[1m[2m  0.22 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/app.DxcNOa4n.css                      [39m[1m[2m 90.08 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/api.js                                               [39m[1m[2m  0.07 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/ssr2.js                                              [39m[1m[2m  0.10 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36minternal.js                                                 [39m[1m[2m  0.33 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/state.svelte.js                                      [39m[1m[2m  0.38 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/_layout.svelte.js                             [39m[1m[2m  0.44 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/fallbacks/error.svelte.js                           [39m[1m[2m  0.47 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/environment.js                                       [39m[1m[2m  0.62 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/stores.js                                            [39m[1m[2m  0.67 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/utils.js                                             [39m[1m[2m  1.15 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/theme.js                                             [39m[1m[2m  1.28 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/index.js                                             [39m[1m[2m  2.58 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/about/_page.svelte.js                         [39m[1m[2m  4.49 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/admin/_layout.svelte.js                       [39m[1m[2m  4.57 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/ssr.js                                               [39m[1m[2m  4.77 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/(main)/chat/_page.svelte.js                   [39m[1m[2m  5.51 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/exports.js                                           [39m[1m[2m  5.52 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/(main)/_page.svelte.js                        [39m[1m[2m  6.36 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/admin/_page.svelte.js                         [39m[1m[2m  7.17 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/internal.js                                          [39m[1m[2m  7.28 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/admin/documents/batch-upload/_page.svelte.js  [39m[1m[2m  7.33 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/categories/_id_/_page.svelte.js               [39m[1m[2m 12.56 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/admin/documents/_page.svelte.js               [39m[1m[2m 16.79 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/shared.js                                            [39m[1m[2m 17.74 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/laws/_id_/_page.svelte.js                     [39m[1m[2m 17.95 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mremote-entry.js                                             [39m[1m[2m 18.83 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/(main)/_layout.svelte.js                      [39m[1m[2m 22.17 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/language.js                                          [39m[1m[2m 22.56 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/search/_page.svelte.js                        [39m[1m[2m 39.34 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mindex.js                                                    [39m[1m[2m126.63 kB[22m[1m[22m
+[32mΓ£ô built in 5.21s[39m
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-vercel
+[31merror during build:
+Error: EPERM: operation 
+not permitted, symlink 
+'![-]\catchall.func' -> 
+'C:\Users\PC\OneDrive\Bu
+reau\JuriX\frontend\.ver
+cel\output\functions\(ma
+in).func'
+    at 
+Object.symlinkSync 
+(node:fs:1879:11)
+    at adapt (file:///C:
+/Users/PC/OneDrive/Burea
+u/JuriX/frontend/node_mo
+dules/@sveltejs/adapter-
+vercel/index.js:477:9)
+    at async adapt (file
+:///C:/Users/PC/OneDrive
+/Bureau/JuriX/frontend/n
+ode_modules/@sveltejs/ki
+t/src/core/adapt/index.j
+s:41:2)
+    at async finalise (f
+ile:///C:/Users/PC/OneDr
+ive/Bureau/JuriX/fronten
+d/node_modules/@sveltejs
+/kit/src/exports/vite/in
+dex.js:1326:7)
+    at async 
+Object.handler (file:///
+C:/Users/PC/OneDrive/Bur
+eau/JuriX/frontend/node_
+modules/@sveltejs/kit/sr
+c/exports/vite/index.js:
+1357:5)
+    at async PluginDrive
+r.hookParallel (file:///
+C:/Users/PC/OneDrive/Bur
+eau/JuriX/frontend/node_
+modules/rollup/dist/es/s
+hared/node-entry.js:2242
+6:17)
+    at async 
+Object.close (file:///C:
+/Users/PC/OneDrive/Burea
+u/JuriX/frontend/node_mo
+dules/rollup/dist/es/sha
+red/node-entry.js:23445:
+13)
+    at async build (file
+:///C:/Users/PC/OneDrive
+/Bureau/JuriX/frontend/n
+ode_modules/vite/dist/no
+de/chunks/dep-BK3b2jBa.j
+s:65732:17)
+    at async 
+CAC.<anonymous> (file://
+/C:/Users/PC/OneDrive/Bu
+reau/JuriX/frontend/node
+_modules/vite/dist/node/
+cli.js:829:5)[39m
