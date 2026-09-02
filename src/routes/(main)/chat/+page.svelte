@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL, API_BASE_URL } from '$lib/api';
+  import { API_URL } from '$lib/api';
   import { onMount, tick } from "svelte";
   import { language, tr } from "$lib/stores/language";
 
@@ -81,7 +81,7 @@
     await scrollToBottom();
 
     try {
-      const response = await fetch(`${API_BASE_URL}/rag/ask`, {
+      const response = await fetch(`${API_URL}/rag/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

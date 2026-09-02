@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL, API_BASE_URL } from '$lib/api';
+  import { API_URL } from '$lib/api';
   import { createEventDispatcher, onMount } from 'svelte';
   import { tr } from '$lib/stores/language';
   import { goto } from '$app/navigation';
@@ -30,7 +30,7 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/search/suggest?q=${encodeURIComponent(query)}&limit=5`);
+      const response = await fetch(`${API_URL}/search/suggest?q=${encodeURIComponent(query)}&limit=5`);
       if (response.ok) {
         const data = await response.json();
         suggestions = data.suggestions || [];
