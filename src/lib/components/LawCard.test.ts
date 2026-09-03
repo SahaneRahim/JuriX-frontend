@@ -37,14 +37,19 @@ describe('LawCard', () => {
   });
 
   it('should dispatch click event when clicked', async () => {
-    const component = render(LawCard, { law: mockLaw });
     const clickHandler = vi.fn();
-    component.component.$on('click', clickHandler);
+    // Svelte 5 a retire l'API d'instance $on. Les evenements de
+    // createEventDispatcher se branchent a la construction, via l'option
+    // `events` de mount, que @testing-library transmet telle quelle.
+    const { container } = render(LawCard, {
+      props: { law: mockLaw },
+      events: { click: clickHandler }
+    });
 
-    const card = component.container.querySelector('.law-card');
-    if (card) {
-      await fireEvent.click(card);
-      expect(clickHandler).toHaveBeenCalled();
-    }
+    const card = container.querySelector('.law-card');
+    expect(card).toBeTruthy();
+
+    await fireEvent.click(card!);
+    expect(clickHandler).toHaveBeenCalled();
   });
 });

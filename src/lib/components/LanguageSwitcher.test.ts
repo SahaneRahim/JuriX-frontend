@@ -4,13 +4,6 @@ import { get } from 'svelte/store';
 import LanguageSwitcher from './LanguageSwitcher.svelte';
 import { language } from '$lib/stores/language';
 
-// Mock window.location.reload
-const mockReload = vi.fn();
-Object.defineProperty(window, 'location', {
-  value: { reload: mockReload },
-  writable: true
-});
-
 describe('LanguageSwitcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,11 +26,12 @@ describe('LanguageSwitcher', () => {
   it('should call switchLanguage when clicking language button', async () => {
     const { getByText } = render(LanguageSwitcher);
     const enButton = getByText('EN').closest('button');
+    expect(enButton).toBeTruthy();
 
-    if (enButton) {
-      await fireEvent.click(enButton);
-      // Note: window.location.reload() is called by switchLanguage
-      expect(mockReload).toHaveBeenCalled();
-    }
+    await fireEvent.click(enButton!);
+
+    // switchLanguage met a jour le store ; elle ne recharge PAS la page. Le
+    // test attendait window.location.reload(), qui n'est appelee nulle part.
+    expect(get(language).current).toBe('en');
   });
 });

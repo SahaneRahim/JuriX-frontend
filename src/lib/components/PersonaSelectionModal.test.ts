@@ -14,34 +14,49 @@ describe('PersonaSelectionModal', () => {
   });
 
   it('should display all 4 persona options', () => {
-    const { getByText } = render(PersonaSelectionModal, { isOpen: true });
-    expect(getByText(/Avocat/)).toBeTruthy();
-    expect(getByText(/Entrepreneur/)).toBeTruthy();
-    expect(getByText(/Citoyen/)).toBeTruthy();
-    expect(getByText(/Étudiant/)).toBeTruthy();
+    const { container } = render(PersonaSelectionModal, { props: { isOpen: true } });
+
+    // Lecture des intitules eux-memes, pas d'un getByText en expression
+    // reguliere : "Citoyen" et "Etudiant" figurent aussi dans les descriptions,
+    // et getByText leve des qu'il trouve plusieurs correspondances.
+    const names = Array.from(container.querySelectorAll('.persona-name')).map(
+      (node) => node.textContent?.trim()
+    );
+
+    expect(names).toEqual(['Avocat / Juriste', 'Entrepreneur', 'Citoyen', 'Étudiant']);
   });
 
   it('should dispatch select event when persona is clicked', async () => {
-    const component = render(PersonaSelectionModal, { isOpen: true });
     const selectHandler = vi.fn();
-    component.component.$on('select', selectHandler);
+    // Svelte 5 a retire l'API d'instance $on. Les evenements de
+    // createEventDispatcher se branchent a la construction, via l'option
+    // `events` de mount, que @testing-library transmet telle quelle.
+    const { getByText } = render(PersonaSelectionModal, {
+      props: { isOpen: true },
+      events: { select: selectHandler }
+    });
 
-    const lawyerCard = component.getByText(/Avocat/).closest('button');
-    if (lawyerCard) {
-      await fireEvent.click(lawyerCard);
-      expect(selectHandler).toHaveBeenCalled();
-    }
+    const lawyerCard = getByText(/Avocat/).closest('button');
+    expect(lawyerCard).toBeTruthy();
+
+    await fireEvent.click(lawyerCard!);
+    expect(selectHandler).toHaveBeenCalled();
   });
 
   it('should close when close button is clicked', async () => {
-    const component = render(PersonaSelectionModal, { isOpen: true });
     const closeHandler = vi.fn();
-    component.component.$on('close', closeHandler);
+    // Svelte 5 a retire l'API d'instance $on. Les evenements de
+    // createEventDispatcher se branchent a la construction, via l'option
+    // `events` de mount, que @testing-library transmet telle quelle.
+    const { container } = render(PersonaSelectionModal, {
+      props: { isOpen: true },
+      events: { close: closeHandler }
+    });
 
-    const closeButton = component.container.querySelector('.close-btn');
-    if (closeButton) {
-      await fireEvent.click(closeButton);
-      expect(closeHandler).toHaveBeenCalled();
-    }
+    const closeButton = container.querySelector('.close-btn');
+    expect(closeButton).toBeTruthy();
+
+    await fireEvent.click(closeButton!);
+    expect(closeHandler).toHaveBeenCalled();
   });
 });

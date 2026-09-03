@@ -9,8 +9,11 @@ vi.stubGlobal('sessionStorage', {
   removeItem: vi.fn()
 });
 
+// Identifiant different a chaque appel : la doublure renvoyait une constante,
+// ce qui rendait impossible de verifier que newSession() change de session.
+let uuidCounter = 0;
 vi.stubGlobal('crypto', {
-  randomUUID: vi.fn(() => 'test-uuid-1234')
+  randomUUID: vi.fn(() => `test-uuid-${++uuidCounter}`)
 });
 
 describe('chat store', () => {

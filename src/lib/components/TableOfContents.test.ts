@@ -33,14 +33,20 @@ describe('TableOfContents', () => {
   });
 
   it('should dispatch navigate event when article is clicked', async () => {
-    const component = render(TableOfContents, { articles: mockArticles });
     const navigateHandler = vi.fn();
-    component.component.$on('navigate', navigateHandler);
+    // Svelte 5 a retire l'API d'instance $on. Les evenements de
+    // createEventDispatcher se branchent a la construction, via l'option
+    // `events` de mount, que @testing-library transmet telle quelle.
+    const { container } = render(TableOfContents, {
+      props: { articles: mockArticles },
+      events: { navigate: navigateHandler }
+    });
 
-    const firstLink = component.container.querySelector('.toc-link');
-    if (firstLink) {
-      await fireEvent.click(firstLink);
-      expect(navigateHandler).toHaveBeenCalled();
-    }
+    // Assertion et non `if (...)` : selecteur absent, le test passait a vide.
+    const firstLink = container.querySelector('.toc-link');
+    expect(firstLink).toBeTruthy();
+
+    await fireEvent.click(firstLink!);
+    expect(navigateHandler).toHaveBeenCalled();
   });
 });
