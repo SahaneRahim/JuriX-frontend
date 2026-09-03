@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, apiFetch } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   
   export let show = false;
@@ -25,7 +25,7 @@ let title = '';
   async function fetchCategories() {
     loadingCategories = true;
     try {
-      const response = await fetch(`${API_URL}/categories?limit=20`);
+      const response = await apiFetch(`/categories?limit=20`);
       if (response.ok) {
         categories = await response.json();
         console.log('Loaded categories:', categories.length);
@@ -86,7 +86,7 @@ let title = '';
       
       console.log('Saving with payload:', updatePayload);
       
-      const response = await fetch(`${API_URL}/laws/admin/${document.id}`, {
+      const response = await apiFetch(`/laws/admin/${document.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload)

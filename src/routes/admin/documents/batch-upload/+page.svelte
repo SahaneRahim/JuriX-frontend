@@ -152,8 +152,7 @@
 		files = [...files]; // Trigger reactivity
 
 		try {
-			const response = await fetch(
-				`${API_URL}/batch-upload/upload?session_id=${sessionId}`,
+			const response = await apiFetch(`/batch-upload/upload?session_id=${sessionId}`,
 				{
 					method: "POST",
 					body: formData,

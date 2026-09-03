@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, apiFetch } from '$lib/api';
   import { onMount } from "svelte";
   import UploadModal from "$lib/components/admin/UploadModal.svelte";
   import EditModal from "$lib/components/admin/EditModal.svelte";
@@ -24,7 +24,7 @@ let documents: any[] = [];
 
   async function fetchCategories() {
     try {
-      const response = await fetch(`${API_URL}/categories`);
+      const response = await apiFetch(`/categories`);
       if (response.ok) {
         categories = await response.json();
       }
@@ -119,7 +119,7 @@ let documents: any[] = [];
     }
 
     try {
-      const response = await fetch(`${API_URL}/laws/admin/${lawId}`, {
+      const response = await apiFetch(`/laws/admin/${lawId}`, {
         method: "DELETE",
       });
 

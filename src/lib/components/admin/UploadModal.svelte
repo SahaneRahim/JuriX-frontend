@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL, apiFetch } from '$lib/api';
     import { createEventDispatcher, onMount } from "svelte";
     import { fade, scale } from "svelte/transition";
 
@@ -34,8 +34,7 @@ let files: FileList | null = null;
     async function fetchCategories() {
         loadingCategories = true;
         try {
-            const response = await fetch(
-                `${API_URL}/categories?limit=20`,
+            const response = await apiFetch(`/categories?limit=20`,
             );
             if (response.ok) {
                 categories = await response.json();
@@ -79,7 +78,7 @@ let files: FileList | null = null;
                 const formData = new FormData();
                 formData.append("file", file);
 
-                const uploadRes = await fetch(`${API_URL}/upload`, {
+                const uploadRes = await apiFetch(`/upload`, {
                     method: "POST",
                     body: formData,
                 });
@@ -118,8 +117,7 @@ let files: FileList | null = null;
                     ingestPayload.category_id = selectedCategoryId;
                 }
 
-                const ingestRes = await fetch(
-                    `${API_URL}/laws/admin/ingest`,
+                const ingestRes = await apiFetch(`/laws/admin/ingest`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },

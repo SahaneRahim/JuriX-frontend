@@ -1,5 +1,14 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { authStore } from '$lib/stores/auth';
+
+  // "Déconnexion" était un simple <a href="/"> : il ramenait à l'accueil sans
+  // rien déconnecter, le jeton restait dans localStorage.
+  function handleLogout() {
+    authStore.logout();
+    goto('/login', { replaceState: true });
+  }
 </script>
 
 <aside class="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-200 bg-white transition-transform">
@@ -48,12 +57,15 @@
     </ul>
 
     <div class="mt-auto px-3 border-t border-slate-200 pt-4 mt-6">
-        <a href="/" class="flex items-center rounded-lg p-3 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+        <button
+          type="button"
+          on:click={handleLogout}
+          class="flex w-full items-center rounded-lg p-3 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
           </svg>
           Déconnexion
-        </a>
+        </button>
     </div>
   </div>
 </aside>
