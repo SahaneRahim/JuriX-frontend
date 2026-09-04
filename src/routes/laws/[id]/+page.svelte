@@ -28,6 +28,7 @@
       articles: "Articles",
       share: "Partager",
       download: "Télécharger PDF",
+    no_source_file: "Le fichier d'origine n'est pas disponible pour ce document",
       previous: "Précédent",
       next: "Suivant",
       in_force: "En vigueur",
@@ -55,6 +56,7 @@
       articles: "Articles",
       share: "Share",
       download: "Download PDF",
+    no_source_file: "The original file is not available for this document",
       previous: "Previous",
       next: "Next",
       in_force: "In Force",
@@ -426,8 +428,8 @@
                   {t.law_decree}
                 </span>
                 <span class="text-sm text-gray-500"
-                  >{law.name || "Loi No " + law.id} - {formatDate(
-                    law.date,
+                  >{law.reference || "Loi No " + law.id} - {formatDate(
+                    law.publication_date,
                   )}</span
                 >
               </div>
@@ -441,7 +443,8 @@
               >
                 <span>{flatArticles.length} {t.articles}</span>
                 <span class="text-gray-300">•</span>
-                <span>{t.updated} : 2024</span>
+                <!-- Etait code en dur a "2024". -->
+                <span>{t.updated} : {formatDate(law.updated_at || law.created_at)}</span>
               </div>
               <div class="document-actions flex gap-3">
                 <button
@@ -465,18 +468,44 @@
                   >
                   {t.share}
                 </button>
-                <button
-                  class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm shadow-blue-600/20 transition-colors"
-                  on:click={() => window.print()}
-                >
-                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
-                    ><path
-                      fill-rule="evenodd"
-                      d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                    /></svg
+                <!-- Telechargement du document D'ORIGINE, servi par l'API.
+                     Ce bouton appelait window.print(), qui imprime la page
+                     telle qu'affichee : comme la page ne monte qu'UN article a
+                     la fois et qu'aucune feuille @media print n'existe, le PDF
+                     obtenu contenait le seul article lu, le sommaire et le fil
+                     d'Ariane — jamais le document. -->
+                {#if law.file_id}
+                  <a
+                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm shadow-blue-600/20 transition-colors"
+                    href={`${API_URL}/laws/${law.id}/download`}
+                    download={law.original_filename || ""}
                   >
-                  {t.download}
-                </button>
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
+                      ><path
+                        fill-rule="evenodd"
+                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                      /></svg
+                    >
+                    {t.download}
+                  </a>
+                {:else}
+                  <!-- Loi creee sans televersement : l'endpoint repondrait 404.
+                       Bouton desactive et explique, plutot que masque sans
+                       raison visible. -->
+                  <button
+                    class="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                    disabled
+                    title={t.no_source_file}
+                  >
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
+                      ><path
+                        fill-rule="evenodd"
+                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                      /></svg
+                    >
+                    {t.download}
+                  </button>
+                {/if}
               </div>
             </div>
 

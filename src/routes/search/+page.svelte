@@ -1,5 +1,6 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
+  import SearchBar from '$lib/components/SearchBar.svelte';
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
@@ -109,11 +110,7 @@
     performSearch();
   }
 
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter") {
-      handleSearchSubmit();
-    }
-  }
+  // handleKeydown a ete retire : la gestion des touches vit dans SearchBar.
 
   $: filteredResults =
     activeTab === "all"
@@ -313,41 +310,23 @@
       </h1>
 
       <!-- Search Bar -->
-      <div class="relative max-w-3xl group">
-        <div
-          class="absolute -inset-0.5 bg-gradient-to-r from-blue-200 to-indigo-200 dark:from-indigo-900 dark:to-blue-900 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-500"
-        ></div>
-        <div
-          class="relative flex items-center bg-white dark:bg-card-dark rounded-2xl shadow-card border border-slate-100 dark:border-slate-700 p-2"
-        >
-          <div class="pl-4 text-slate-400">
-            <span class="material-icons">search</span>
-          </div>
-          <input
-            type="text"
-            bind:value={searchQuery}
-            on:keydown={handleKeydown}
-            class="w-full bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 px-4 py-3 text-base"
-            placeholder={$tr("search.searchLaw")}
-          />
-          {#if searchQuery}
-            <button
-              on:click={() => {
-                searchQuery = "";
-              }}
-              class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-              title={$tr("search.clearSearch")}
-            >
-              <span class="material-icons text-xl">close</span>
-            </button>
-          {/if}
-          <button
-            on:click={handleSearchSubmit}
-            class="bg-primary hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors shadow-lg shadow-primary/25"
-          >
-            {$tr("search.button")}
-          </button>
-        </div>
+      <!-- SearchBar est le seul composant qui appelle /search/suggest : il
+           porte l'anti-rebond de 300 ms, la liste deroulante et la navigation
+           au clavier. Il n'etait importe NULLE PART, et cette page avait son
+           propre champ de saisie sans suggestions — d'ou l'absence totale
+           d'autocompletion a l'ecran, meme apres reparation de l'endpoint. -->
+      <div class="max-w-3xl">
+        <SearchBar
+          size="large"
+          bind:value={searchQuery}
+          loading={isLoading}
+          placeholder={$tr("search.searchLaw")}
+          on:search={handleSearchSubmit}
+          on:clear={() => {
+            searchQuery = "";
+            results = [];
+          }}
+        />
       </div>
 
       <!-- Tabs -->
