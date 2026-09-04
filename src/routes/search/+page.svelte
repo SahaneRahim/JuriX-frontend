@@ -230,8 +230,10 @@
       <a class="hover:text-primary transition-colors" href="/"
         >{$tr("nav.home")}</a
       >
-      <a class="hover:text-primary transition-colors" href="/categories"
-        >{$tr("nav.explore")}</a
+      <!-- Pointait /categories, route inexistante (seule /categories/[id]
+           l'est) : ce lien repondait 404. -->
+      <a class="hover:text-primary transition-colors" href="/laws"
+        >{$tr("nav.documents")}</a
       >
       <a class="hover:text-primary transition-colors" href="/about"
         >{$tr("nav.about")}</a
@@ -583,6 +585,27 @@
                     $tr("search.noDescription")}...
                 {/if}
               </p>
+
+              <!-- matched_articles etait toujours vide : la recherche
+                   travaillait au niveau document. Elle rend desormais des
+                   articles, et chacun mene directement au bon endroit du
+                   texte. -->
+              {#if result.matched_articles && result.matched_articles.length > 0}
+                <div class="flex flex-wrap gap-2 mb-3">
+                  {#each result.matched_articles as article}
+                    <a
+                      href="/laws/{result.law_id}?article={encodeURIComponent(
+                        article.number,
+                      )}"
+                      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-primary hover:text-white transition-colors"
+                      title={article.title || ""}
+                    >
+                      <span class="material-icons text-sm">article</span>
+                      Article {article.number}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
 
               <div
                 class="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-secondary-text-light dark:text-secondary-text-dark border-t border-slate-100 dark:border-slate-800 pt-4 mt-2"

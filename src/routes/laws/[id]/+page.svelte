@@ -5,6 +5,11 @@
   import { language, switchLanguage } from "$lib/stores/language";
 
   $: lawId = $page.params.id;
+  // Article demande par l'URL, pose par les citations du chat et les articles
+  // trouves par la recherche. La page reconstruit sa liste depuis le texte du
+  // document : elle ne connait pas les identifiants de ligne, seulement les
+  // numeros.
+  $: requestedArticle = $page.url.searchParams.get("article");
 
   // -- State --
   let law: any = null;
@@ -177,6 +182,28 @@
 
   // Reactive: Current Article
   $: currentArticle = flatArticles[currentArticleIndex];
+
+  // Des que la liste est prete, se placer sur l'article demande. Comparaison
+  // normalisee : "1er", "1ER" et "1" designent le meme article.
+  $: if (flatArticles.length > 0 && requestedArticle) {
+    const wanted = normaliseArticleNumber(requestedArticle);
+    const found = flatArticles.findIndex(
+      (a) => normaliseArticleNumber(a.number) === wanted,
+    );
+    if (found >= 0 && found !== currentArticleIndex) {
+      currentArticleIndex = found;
+    }
+  }
+
+  function normaliseArticleNumber(value: string | number | undefined) {
+    if (value === undefined || value === null) return "";
+    return String(value)
+      .trim()
+      .toUpperCase()
+      .replace(/^(ARTICLE|ART\.?|SECTION)\s+/, "")
+      .replace(/^(\d+)\s*(ER|ÈRE|ERE)$/, "$1")
+      .replace(/[.:\-\s]+$/, "");
+  }
   // Reactive: Translator shorthand
   $: t = translations[currentLanguage];
 
@@ -475,10 +502,15 @@
                      obtenu contenait le seul article lu, le sommaire et le fil
                      d'Ariane — jamais le document. -->
                 {#if law.file_id}
+                  <!-- download nu, sans valeur : le nom propose est celui que
+                       l'API annonce dans Content-Disposition, construit sur le
+                       TITRE du document. Y mettre original_filename rendrait le
+                       nom brut du fichier aspire
+                       ("10691_decret-n-2026-164-du-..."). -->
                   <a
                     class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm shadow-blue-600/20 transition-colors"
                     href={`${API_URL}/laws/${law.id}/download`}
-                    download={law.original_filename || ""}
+                    download
                   >
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
                       ><path

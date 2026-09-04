@@ -54,12 +54,15 @@
           : ''}"
         href="/">{$tr("nav.home")}</a
       >
+      <!-- Pointait /categories, qui n'existe pas : seule /categories/[id] est
+           definie, donc ce lien de navigation repondait 404. Il mene desormais
+           a la liste des documents. -->
       <a
         class="hover:text-primary transition-colors whitespace-nowrap {$page.url
-          .pathname === '/categories'
+          .pathname.startsWith('/laws')
           ? 'text-primary'
           : ''}"
-        href="/categories">{$tr("nav.explore")}</a
+        href="/laws">{$tr("nav.documents")}</a
       >
       <a
         class="hover:text-primary transition-colors whitespace-nowrap {$page.url

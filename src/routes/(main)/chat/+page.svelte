@@ -10,6 +10,18 @@
     content: string;
     suggestions?: string[];
     details?: { title: string; description: string }[];
+    // Les citations renvoyees par le RAG. Elles etaient purement et simplement
+    // jetees : la reponse s'affichait sans aucune source, alors que l'API en
+    // fournit avec le numero d'article et son identifiant de ligne.
+    sources?: {
+      law_id: number;
+      law_reference: string;
+      law_title: string;
+      article_number?: string | null;
+      article_id?: number | null;
+      excerpt: string;
+      relevance_score: number;
+    }[];
     timestamp: string;
   }
 
@@ -101,6 +113,7 @@
             ($language.current === "fr"
               ? "Je n'ai pas pu traiter votre demande."
               : "I couldn't process your request."),
+          sources: data.sources || [],
           timestamp: getCurrentTime(),
         };
         chatMessages = [...chatMessages, aiMessage];
@@ -220,6 +233,41 @@
                 >
                   {message.content}
                 </p>
+
+                {#if message.sources && message.sources.length > 0}
+                  <div
+                    class="text-left border-t border-slate-100 dark:border-slate-700 pt-3"
+                  >
+                    <p class="text-xs font-medium text-slate-400 mb-2">
+                      {$language.current === "fr" ? "Sources" : "Sources"}
+                    </p>
+                    <ul class="space-y-2">
+                      {#each message.sources as source}
+                        <li>
+                          <!-- article_number en parametre : la page /laws/[id]
+                               reconstruit sa liste d'articles depuis le texte,
+                               elle ne connait pas les identifiants de ligne. -->
+                          <a
+                            href={source.article_number
+                              ? `/laws/${source.law_id}?article=${encodeURIComponent(source.article_number)}`
+                              : `/laws/${source.law_id}`}
+                            class="block rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            <span class="text-sm font-medium text-slate-800 dark:text-white">
+                              {source.law_reference}
+                              {#if source.article_number}
+                                — article {source.article_number}
+                              {/if}
+                            </span>
+                            <span class="block text-xs text-slate-500 line-clamp-2">
+                              {source.excerpt}
+                            </span>
+                          </a>
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
 
                 {#if message.details}
                   <ul class="space-y-2 ml-4 text-left">
