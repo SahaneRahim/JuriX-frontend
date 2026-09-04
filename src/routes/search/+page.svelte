@@ -575,11 +575,17 @@
                     <span class="material-icons text-xs">{badge.icon}</span>
                     {$tr(badge.labelKey)}
                   </span>
-                  <h2
-                    class="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors cursor-pointer"
-                  >
-                    {result.title || $tr("search.noTitle")}
-                  </h2>
+                  <!-- Le titre porte cursor-pointer depuis toujours, mais
+                       n'etait ni un lien ni muni d'un gestionnaire : cliquer
+                       dessus ne faisait rien, alors que le style annonçait le
+                       contraire. Seul le petit lien en bas de carte navigait. -->
+                  <a href="/laws/{result.law_id || result.id}">
+                    <h2
+                      class="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors cursor-pointer hover:underline"
+                    >
+                      {result.title || $tr("search.noTitle")}
+                    </h2>
+                  </a>
                 </div>
                 <button
                   class="text-slate-400 hover:text-primary transition-colors"

@@ -378,7 +378,7 @@
         <div class="grid gap-4">
           {#each filteredDocuments as doc, i}
             <a
-              href="/laws/{doc.id}"
+              href="/laws/{doc.law_id ?? doc.id}"
               class="group block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
               in:fly={{ y: 20, duration: 400, delay: i * 50 }}
             >
