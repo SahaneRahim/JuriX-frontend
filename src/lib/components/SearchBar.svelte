@@ -174,7 +174,10 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
           on:click={() => selectSuggestion(suggestion)}
           on:mouseenter={() => selectedIndex = index}
         >
-          <div class="font-medium text-slate-800" >{@html suggestion.title}</div>
+          <!-- Etait rendu avec {@html} : GET /search/suggest renvoie `row.title`
+               brut, sans le moindre balisage. Le rendu HTML n'apportait donc
+               rien et exposait le titre de chaque loi comme vecteur. -->
+          <div class="font-medium text-slate-800">{suggestion.title}</div>
           <div class="text-sm text-slate-500">{suggestion.reference}</div>
         </div>
       {/each}

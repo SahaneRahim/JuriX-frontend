@@ -188,12 +188,14 @@
 	// Fetch laws
 	async function fetchLaws() {
 		try {
-			const url =
+			// apiFetch : endpoint d'administration, il lui faut l'en-tete
+			// Authorization et la deconnexion sur 401.
+			const chemin =
 				statusFilter === "all"
-					? `${API_URL}/batch-upload/status`
-					: `${API_URL}/batch-upload/status?status=${statusFilter}`;
+					? "/batch-upload/status"
+					: `/batch-upload/status?status=${statusFilter}`;
 
-			const response = await fetch(url);
+			const response = await apiFetch(chemin);
 			const data = await response.json();
 			laws = data.laws;
 		} catch (error) {
@@ -204,7 +206,8 @@
 	// Lifecycle
 	onMount(() => {
 		connectWebSocket();
-		fetchLaws();
+		// fetchLaws() n'est PAS appele ici : le bloc reactif sur statusFilter
+		// s'execute deja au montage et lancait la meme requete une seconde fois.
 	});
 
 	onDestroy(() => {

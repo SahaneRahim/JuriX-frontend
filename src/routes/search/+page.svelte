@@ -1,5 +1,6 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
+  import { highlightSegments } from '$lib/highlight';
   import SearchBar from '$lib/components/SearchBar.svelte';
   // Cette page recopiait le header à la main (90 lignes) : la copie et
   // l'original avaient divergé — le lien mort vers /categories a dû être
@@ -173,13 +174,12 @@
         searchTimeMs = data.search_time_ms || 0;
       } else {
         errorMessage = $tr("search.errorSearch");
-        results = [];
       }
     } catch (error) {
       console.error("Search error:", error);
       errorMessage = $tr("search.errorServer");
-      results = [];
     } finally {
+      results = errorMessage ? [] : results;
       isLoading = false;
     }
   }
@@ -528,6 +528,30 @@
             </p>
           </div>
 
+          <!-- Erreur : cette branche doit passer AVANT « aucun resultat ».
+               Sans elle, une panne de serveur s'affichait en grand comme
+               « Aucun resultat trouve / Essayez avec d'autres termes », et
+               l'utilisateur reformulait sa requete pour un probleme reseau. -->
+        {:else if errorMessage}
+          <div
+            role="alert"
+            data-testid="search-error"
+            class="bg-white dark:bg-card-dark p-12 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-soft text-center"
+          >
+            <span class="material-icons text-6xl text-red-300 mb-4"
+              >cloud_off</span
+            >
+            <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+              {errorMessage}
+            </h3>
+            <button
+              on:click={() => performSearch()}
+              data-testid="search-retry"
+              class="mt-4 px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+              >{$tr("common.retry")}</button
+            >
+          </div>
+
           <!-- No Results -->
         {:else if filteredResults.length === 0}
           <div
@@ -597,10 +621,15 @@
                 class="text-secondary-text-light dark:text-secondary-text-dark mb-4 leading-relaxed line-clamp-2"
               >
                 {#if result.highlights?.content}
-                  {@html result.highlights.content}
+                  <!-- Le surlignage vient de ts_headline, qui n'echappe PAS le
+                       texte source : on reconnait <mark> et on rend le reste en
+                       noeuds de texte, que Svelte echappe. Voir $lib/highlight. -->
+                  {#each highlightSegments(result.highlights.content) as seg, i (i)}
+                    {#if seg.marked}<mark>{seg.text}</mark>{:else}{seg.text}{/if}
+                  {/each}
                 {:else}
                   {result.content?.substring(0, 200) ||
-                    $tr("search.noDescription")}...
+                    $tr("search.noDescription")}{result.content?.length > 200 ? "..." : ""}
                 {/if}
               </p>
 

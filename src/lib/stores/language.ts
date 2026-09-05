@@ -125,6 +125,8 @@ export const translations = {
     'chat.header': 'Assistant Juridique IA',
     'chat.subtitle': 'Posez vos questions sur le droit camerounais',
     'chat.disclaimer': 'L\'IA peut faire des erreurs. Vérifiez toujours les informations importantes.',
+    'chat.errorServer': 'Le serveur n\'a pas pu traiter votre question.',
+    'chat.errorNetwork': 'Impossible de joindre le serveur.',
 
     // Categories
     'categories.title': 'Explorer par Catégorie',
@@ -312,6 +314,8 @@ export const translations = {
     'admin.dashboard': 'Tableau de Bord',
     'admin.dashboardDesc': 'Aperçu des performances de JuriX',
     'admin.lastUpdate': 'Dernière mise à jour',
+    'admin.statsError': 'Impossible de charger les statistiques. Le serveur est peut-être injoignable.',
+    'admin.docsError': 'Impossible de charger les documents. Le serveur est peut-être injoignable.',
     'admin.refresh': 'Actualiser',
     'admin.totalDocs': 'Documents Total',
     'admin.totalSearches': 'Recherches Total',
@@ -418,6 +422,8 @@ export const translations = {
     'chat.header': 'AI Legal Assistant',
     'chat.subtitle': 'Ask your questions about Cameroonian law',
     'chat.disclaimer': 'AI can make mistakes. Always verify important information.',
+    'chat.errorServer': 'The server could not process your question.',
+    'chat.errorNetwork': 'Could not reach the server.',
 
     // Categories
     'categories.title': 'Browse by Category',
@@ -603,6 +609,8 @@ export const translations = {
     'admin.dashboard': 'Dashboard',
     'admin.dashboardDesc': 'Overview of JuriX performance',
     'admin.lastUpdate': 'Last update',
+    'admin.statsError': 'Could not load statistics. The server may be unreachable.',
+    'admin.docsError': 'Could not load documents. The server may be unreachable.',
     'admin.refresh': 'Refresh',
     'admin.totalDocs': 'Total Documents',
     'admin.totalSearches': 'Total Searches',

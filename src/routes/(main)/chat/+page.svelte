@@ -7,7 +7,16 @@
 // Chat message types
   interface ChatMessage {
     id: number;
-    type: "assistant" | "user";
+    /**
+     * `error` est distinct d'`assistant` a dessein.
+     *
+     * Une panne reseau produisait un message de type "assistant", donc une
+     * bulle de reponse d'IA indiscernable d'une vraie. Pire, un 5xx affichait
+     * « Je traite votre question. Veuillez patienter... » — une erreur serveur
+     * presentee comme un succes en cours, sur une page qui n'attendait plus
+     * rien.
+     */
+    type: "assistant" | "user" | "error";
     content: string;
     suggestions?: string[];
     details?: { title: string; description: string }[];
@@ -123,11 +132,8 @@
           ...chatMessages,
           {
             id: chatMessages.length + 1,
-            type: "assistant",
-            content:
-              $language.current === "fr"
-                ? "Je traite votre question. Veuillez patienter..."
-                : "Processing your question. Please wait...",
+            type: "error",
+            content: t("chat.errorServer"),
             timestamp: getCurrentTime(),
           },
         ];
@@ -137,11 +143,8 @@
         ...chatMessages,
         {
           id: chatMessages.length + 1,
-          type: "assistant",
-          content:
-            $language.current === "fr"
-              ? "Désolé, je ne peux pas me connecter au serveur. Veuillez réessayer."
-              : "Sorry, I can't connect to the server. Please try again.",
+          type: "error",
+          content: t("chat.errorNetwork"),
           timestamp: getCurrentTime(),
         },
       ];
@@ -209,7 +212,13 @@
         >
           <!-- Avatar -->
           <div class="flex-shrink-0">
-            {#if message.type === "assistant"}
+            {#if message.type === "error"}
+              <div
+                class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/30"
+              >
+                <span class="material-icons text-white text-lg">cloud_off</span>
+              </div>
+            {:else if message.type === "assistant"}
               <div
                 class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30"
               >
@@ -226,7 +235,21 @@
 
           <!-- Message Content -->
           <div class="flex-1 {message.type === 'user' ? 'text-right' : ''}">
-            {#if message.type === "user"}
+            {#if message.type === "error"}
+              <div
+                role="alert"
+                data-testid="chat-error"
+                class="inline-block bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-2xl px-5 py-3 max-w-md text-left"
+              >
+                <p class="text-red-700 dark:text-red-300">{message.content}</p>
+                <button
+                  on:click={handleSendChatMessage}
+                  data-testid="chat-retry"
+                  class="mt-2 text-sm font-semibold text-red-700 dark:text-red-300 underline"
+                  >{t("common.retry")}</button
+                >
+              </div>
+            {:else if message.type === "user"}
               <div
                 class="inline-block bg-gray-100 dark:bg-slate-700 rounded-2xl rounded-tr-none px-5 py-3 max-w-md text-left"
               >

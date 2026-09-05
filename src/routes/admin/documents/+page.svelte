@@ -7,6 +7,7 @@
 
   let searchQuery = "";
 let documents: any[] = [];
+  let erreur = "";
   let categories: any[] = [];
   let loading = true;
   let showUploadModal = false;
@@ -35,6 +36,7 @@ let documents: any[] = [];
 
   async function fetchDocuments() {
     loading = true;
+    erreur = "";
     try {
       // Build query parameters
       const params = new URLSearchParams();
@@ -53,16 +55,19 @@ let documents: any[] = [];
       // Une chaine vide desactive le filtre cote backend (laws.py, `if law_status:`).
       params.append("law_status", selectedStatus || "");
 
-      const response = await fetch(
-        `${API_URL}/laws/?${params.toString()}`,
-      );
+      // apiFetch et non fetch : ce fichier l'importait deja et s'en servait
+      // pour /categories et le DELETE, mais pas pour la lecture principale.
+      // Un jeton expire laissait donc la liste vide, affichee comme « Aucun
+      // document trouve » — indiscernable d'une base vide.
+      const response = await apiFetch(`/laws/?${params.toString()}`);
       if (response.ok) {
         documents = await response.json();
       } else {
-        console.error("Failed to fetch documents");
+        erreur = $tr("admin.docsError");
       }
     } catch (error) {
       console.error("Error fetching documents:", error);
+      erreur = $tr("admin.docsError");
     } finally {
       loading = false;
     }
@@ -366,6 +371,20 @@ let documents: any[] = [];
             >{$tr("admin.loading")}</td
           ></tr
         >
+        {:else if erreur}
+          <!-- Sans cette branche, un serveur injoignable affichait « Aucun
+               document trouve » : l'operateur concluait que la base etait vide. -->
+          <tr>
+            <td colspan="6" class="px-6 py-16 text-center" role="alert">
+              <p class="mb-4 font-medium text-red-700" data-testid="docs-error">{erreur}</p>
+              <button
+                on:click={fetchDocuments}
+                data-testid="docs-retry"
+                class="rounded-lg bg-red-600 px-5 py-2 font-semibold text-white hover:bg-red-700"
+                >{$tr("common.retry")}</button
+              >
+            </td>
+          </tr>
       {:else if filteredDocuments.length === 0}
         <tr
           ><td colspan="5" class="px-6 py-4 text-center"
