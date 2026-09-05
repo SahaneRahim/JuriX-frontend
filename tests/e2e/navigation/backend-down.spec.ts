@@ -21,6 +21,8 @@
 
 import { expect, test } from '@playwright/test';
 
+import { saisirJusqualEffet } from '../hydratation';
+
 /** Coupe tout appel à l'API, en laissant passer le reste (JS, CSS, polices). */
 async function couperApi(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/**', (route) => route.abort());
@@ -72,13 +74,14 @@ test.describe('Backend injoignable', () => {
     await page.goto('/chat');
 
     const champ = page.locator('input[type="text"], textarea').first();
-    await champ.fill('Quelles sont les conditions de nationalité ?');
-    await champ.press('Enter');
-
-    // Le message d'échec porte son propre type, avec role="alert" : il ne peut
-    // plus être confondu avec une réponse du modèle.
     const erreur = page.getByTestId('chat-error');
-    await expect(erreur).toBeVisible({ timeout: 15000 });
+
+    // La saisie doit attendre l'hydratation : le champ existe dans le HTML
+    // rendu par le serveur avant que le gestionnaire de touche ne soit
+    // attaché, et un Entrée parti dans cette fenêtre est perdu.
+    // Le message d'échec porte son propre type, avec role="alert" : il ne peut
+    // pas être confondu avec une réponse du modèle.
+    await saisirJusqualEffet(champ, 'Quelles sont les conditions de nationalité ?', erreur);
     await expect(erreur).toHaveAttribute('role', 'alert');
     await expect(page.getByText(/veuillez patienter|please wait/i)).toHaveCount(0);
   });

@@ -17,6 +17,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { cliquerJusqualEffet } from '../hydratation';
 import { NAV_LINKS } from '../../../src/lib/nav';
 
 const API = process.env.VITE_API_URL ?? 'http://localhost:8000';
@@ -79,8 +80,13 @@ test.describe('Intégrité des liens', () => {
     // sont invisibles au viewport de bureau et échappaient donc à tout contrôle.
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
-    await page.getByTestId('nav-mobile-toggle').click();
-    await expect(page.getByTestId('nav-mobile-panel')).toBeVisible();
+    // Le clic doit attendre l'hydratation : le bouton est dans le HTML rendu
+    // par le serveur bien avant que son gestionnaire ne soit attaché, et un
+    // clic parti dans cette fenêtre ne déclenche rien. Voir tests/e2e/hydratation.ts.
+    await cliquerJusqualEffet(
+      page.getByTestId('nav-mobile-toggle'),
+      page.getByTestId('nav-mobile-panel'),
+    );
     await expectAllResolve(page, await internalLinksOf(page), '/ (mobile)');
   });
 
