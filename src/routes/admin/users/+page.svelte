@@ -16,6 +16,8 @@
   import { apiFetch } from "$lib/api";
   import UserFormModal from "$lib/components/admin/UserFormModal.svelte";
   import { authStore } from "$lib/stores/auth";
+  import { formatDateCourte } from "$lib/format";
+  import { language } from "$lib/stores/language";
 
   const PAR_PAGE = 15;
 
@@ -102,14 +104,6 @@
     return "bg-slate-100 text-slate-600";
   }
 
-  function formaterDate(v: string | null): string {
-    if (!v) return "—";
-    return new Date(v).toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }
 </script>
 
 <svelte:head><title>JuriX Admin — Utilisateurs</title></svelte:head>
@@ -216,7 +210,7 @@
                 >{u.is_active ? "Actif" : "Inactif"}</span
               >
             </td>
-            <td class="px-6 py-4 text-slate-500">{formaterDate(u.last_login_at)}</td>
+            <td class="px-6 py-4 text-slate-500">{formatDateCourte(u.last_login_at, $language.current)}</td>
             <td class="px-6 py-4 text-right">
               <button
                 on:click={() => ouvrirEdition(u)}

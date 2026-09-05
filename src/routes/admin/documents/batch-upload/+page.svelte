@@ -7,6 +7,8 @@
 	import { onMount, onDestroy } from "svelte";
 	import { goto } from "$app/navigation";
 	import { language, tr } from "$lib/stores/language";
+	import StatusBadge from "$lib/components/StatusBadge.svelte";
+	import { formatDateHeure } from "$lib/format";
 
 	// Types
 	interface UploadedFile {
@@ -222,27 +224,7 @@
 	}
 
 	// Status badge color
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case "pending":
-				return "bg-yellow-100 text-yellow-800";
-			case "processing":
-				return "bg-blue-100 text-blue-800";
-			case "published":
-				return "bg-green-100 text-green-800";
-			case "refused":
-				return "bg-red-100 text-red-800";
-			default:
-				return "bg-gray-100 text-gray-800";
-		}
-	}
 
-	function formatDate(dateStr: string | null): string {
-		if (!dateStr) return "N/A";
-		return new Date(dateStr).toLocaleString(
-			$language.current === "fr" ? "fr-FR" : "en-US",
-		);
-	}
 </script>
 
 <!-- Ni min-h-screen ni p-8 ici : admin/+layout.svelte fournit déjà le fond et
@@ -343,13 +325,7 @@
 
 								<!-- Status Badge -->
 								<div class="ml-4 flex items-center gap-2">
-									<span
-										class="px-2 py-1 text-xs font-medium rounded-full {getStatusColor(
-											file.status,
-										)}"
-									>
-										{file.status}
-									</span>
+									<StatusBadge status={file.status} size="sm" />
 
 									{#if file.status === "pending"}
 										<button
@@ -452,13 +428,7 @@
 									>{law.reference}</td
 								>
 								<td class="px-6 py-4 whitespace-nowrap">
-									<span
-										class="px-2 py-1 text-xs font-medium rounded-full {getStatusColor(
-											law.status,
-										)}"
-									>
-										{law.status}
-									</span>
+									<StatusBadge status={law.status} size="sm" />
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									{#if law.processing_progress !== null}
@@ -473,7 +443,7 @@
 									{/if}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-									{formatDate(law.created_at)}
+									{formatDateHeure(law.created_at, $language.current)}
 								</td>
 							</tr>
 						{/each}

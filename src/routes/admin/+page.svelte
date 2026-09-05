@@ -2,7 +2,8 @@
   import { apiFetch } from '$lib/api';
   import StatsCard from "$lib/components/admin/StatsCard.svelte";
   import { onMount } from "svelte";
-  import { tr } from "$lib/stores/language";
+  import { formatDate } from "$lib/format";
+  import { language, tr } from "$lib/stores/language";
 
 let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
   let usage: any = { active_users: 0, total_calls: 0 };
@@ -206,7 +207,7 @@ let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
                   {law.title}
                 </p>
                 <p class="text-xs text-slate-500">
-                  {new Date(law.created_at).toLocaleDateString()}
+                  {formatDate(law.created_at, $language.current)}
                 </p>
               </div>
             </div>

@@ -1,44 +1,69 @@
-import { describe, it, expect } from 'vitest';
+/**
+ * Le vocabulaire de ce composant a change.
+ *
+ * Il declarait `repealed`, `completed` et `failed` — trois statuts qui
+ * n'existent nulle part dans l'API. Le modele Law (app/models/law.py:163)
+ * definit draft, published, archived, pending, processing, refused. Les tests
+ * suivent le contrat reel, et non plus l'ancien.
+ */
+
+import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import StatusBadge from './StatusBadge.svelte';
 
 describe('StatusBadge', () => {
-  it('should render with draft status', () => {
-    const { getByText } = render(StatusBadge, { status: 'draft' });
-    expect(getByText('Brouillon')).toBeTruthy();
+  it('traduit le libelle au lieu de l’ecrire en dur', () => {
+    const { getByTestId } = render(StatusBadge, { status: 'published' });
+    // Le libelle vient desormais du store de traductions : batch-upload
+    // affichait l'enumeration anglaise brute alors que la cle existait.
+    expect(getByTestId('status-badge').textContent?.trim()).toBe('Publié');
   });
 
-  it('should render with active status', () => {
-    const { getByText } = render(StatusBadge, { status: 'active' });
-    expect(getByText('Actif')).toBeTruthy();
+  it('couvre les six statuts reels du modele Law', () => {
+    for (const [statut, attendu] of [
+      ['draft', 'Brouillon'],
+      ['pending', 'En attente'],
+      ['processing', 'Traitement...'],
+      ['published', 'Publié'],
+      ['refused', 'Refusé'],
+      ['archived', 'Archivé'],
+    ] as const) {
+      const { getByTestId, unmount } = render(StatusBadge, { status: statut });
+      expect(getByTestId('status-badge').textContent?.trim()).toBe(attendu);
+      unmount();
+    }
   });
 
-  it('should render with repealed status', () => {
-    const { getByText } = render(StatusBadge, { status: 'repealed' });
-    expect(getByText('Abrogé')).toBeTruthy();
+  it('rend un statut inconnu visible plutot que de le masquer', () => {
+    const { getByTestId } = render(StatusBadge, { status: 'inconnu' });
+    const badge = getByTestId('status-badge');
+    expect(badge.textContent?.trim()).toBe('inconnu');
+    expect(badge.getAttribute('data-status')).toBe('inconnu');
   });
 
-  it('should apply correct color for status', () => {
-    const { container } = render(StatusBadge, { status: 'active' });
-    const badge = container.querySelector('.status-badge');
-    expect(badge?.getAttribute('data-color')).toBe('green');
+  it('n’anime que « processing », le seul etat ou un travail est en cours', () => {
+    const { getByTestId, unmount } = render(StatusBadge, { status: 'processing' });
+    expect(getByTestId('status-badge').className).toContain('animate-pulse');
+    unmount();
+
+    const rendu = render(StatusBadge, { status: 'published' });
+    expect(rendu.getByTestId('status-badge').className).not.toContain('animate-pulse');
   });
 
-  it('should render with small size', () => {
-    const { container } = render(StatusBadge, { status: 'draft', size: 'sm' });
-    const badge = container.querySelector('.status-badge');
-    expect(badge?.classList.contains('sm')).toBe(true);
+  it('applique la taille demandee', () => {
+    for (const [taille, classe] of [
+      ['sm', 'text-xs'],
+      ['md', 'text-sm'],
+      ['lg', 'text-base'],
+    ] as const) {
+      const { getByTestId, unmount } = render(StatusBadge, { status: 'draft', size: taille });
+      expect(getByTestId('status-badge').className).toContain(classe);
+      unmount();
+    }
   });
 
-  it('should render with medium size by default', () => {
-    const { container } = render(StatusBadge, { status: 'draft' });
-    const badge = container.querySelector('.status-badge');
-    expect(badge?.classList.contains('md')).toBe(true);
-  });
-
-  it('should render with large size', () => {
-    const { container } = render(StatusBadge, { status: 'draft', size: 'lg' });
-    const badge = container.querySelector('.status-badge');
-    expect(badge?.classList.contains('lg')).toBe(true);
+  it('utilise la taille moyenne par defaut', () => {
+    const { getByTestId } = render(StatusBadge, { status: 'draft' });
+    expect(getByTestId('status-badge').className).toContain('text-sm');
   });
 });

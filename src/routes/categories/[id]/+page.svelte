@@ -2,6 +2,7 @@
   import { API_URL } from "$lib/api";
   import { page } from "$app/stores";
   import { language, tr, type Language } from "$lib/stores/language";
+  import { formatDate } from "$lib/format";
   import { fade, fly } from "svelte/transition";
 
   // L'identifiant vient de la BASE, plus d'un slug devine.
@@ -74,13 +75,6 @@
     error = $tr("categories.notFound");
   }
 
-  function formatDate(dateString: string) {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString(
-      $language.current === "fr" ? "fr-FR" : "en-US",
-      { year: "numeric", month: "long", day: "numeric" },
-    );
-  }
 
   $: filteredDocuments = documents.filter(
     (doc) =>
@@ -294,7 +288,7 @@
                         <span class="material-icons text-[14px]"
                           >calendar_today</span
                         >
-                        {formatDate(doc.date || doc.publication_date)}
+                        {formatDate(doc.date || doc.publication_date, $language.current)}
                       </span>
                     {/if}
                   </div>

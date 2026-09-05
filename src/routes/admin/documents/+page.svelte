@@ -3,6 +3,8 @@
   import { onMount } from "svelte";
   import UploadModal from "$lib/components/admin/UploadModal.svelte";
   import EditModal from "$lib/components/admin/EditModal.svelte";
+  import StatusBadge from "$lib/components/StatusBadge.svelte";
+  import { formatDate } from "$lib/format";
   import { language, tr } from "$lib/stores/language";
 
   let searchQuery = "";
@@ -78,41 +80,7 @@ let documents: any[] = [];
     fetchDocuments();
   }
 
-  function getStatusStyle(status: string) {
-    switch (status) {
-      case "active":
-      case "published":
-        return "bg-emerald-100 text-emerald-800";
-      case "processing":
-        return "bg-amber-100 text-amber-800 animate-pulse";
-      case "pending":
-        return "bg-blue-100 text-blue-800";
-      case "refused":
-        return "bg-red-100 text-red-800";
-      case "archived":
-        return "bg-slate-100 text-slate-800";
-      default:
-        return "bg-slate-100 text-slate-800";
-    }
-  }
 
-  function getStatusLabel(status: string) {
-    switch (status) {
-      case "active":
-      case "published":
-        return $tr("admin.published");
-      case "processing":
-        return $tr("admin.processing");
-      case "pending":
-        return $tr("admin.pending");
-      case "refused":
-        return $tr("admin.refused");
-      case "archived":
-        return $tr("admin.archived");
-      default:
-        return status;
-    }
-  }
 
   async function deleteDocument(lawId: number, title: string) {
     if (
@@ -417,15 +385,10 @@ let documents: any[] = [];
               >
             </td>
             <td class="px-6 py-4"
-              >{new Date(doc.created_at).toLocaleDateString()}</td
+              >{formatDate(doc.created_at, $language.current)}</td
             >
             <td class="px-6 py-4">
-              <span
-                class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                {getStatusStyle(doc.status)}"
-              >
-                {getStatusLabel(doc.status)}
-              </span>
+              <StatusBadge status={doc.status} size="sm" />
             </td>
             <td class="px-6 py-4 text-right">
               <button

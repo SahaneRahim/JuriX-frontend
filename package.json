@@ -43,8 +43,5 @@
     "vite": "^6.0.0",
     "vitest": "^3.2.7"
   },
-  "type": "module",
-  "dependencies": {
-    "pdfjs-dist": "^5.4.530"
-  }
+  "type": "module"
 }

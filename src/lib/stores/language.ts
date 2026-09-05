@@ -309,6 +309,7 @@ export const translations = {
     'categories.noPreview': 'Aucun aperçu disponible',
     'categories.errorLoad': 'Impossible de charger les documents. Vérifiez que le serveur backend est démarré.',
     'categories.notFound': "Cette catégorie n'existe pas.",
+    'search.bodyMatches': 'Mentions dans le texte',
 
     // Admin
     'admin.dashboard': 'Tableau de Bord',
@@ -352,6 +353,7 @@ export const translations = {
     'admin.next': 'Suivant',
     'admin.firstPage': 'Première page',
     'admin.lastPage': 'Dernière page',
+    'admin.draft': 'Brouillon',
     'admin.published': 'Publié',
     'admin.processing': 'Traitement...',
     'admin.pending': 'En attente',
@@ -604,6 +606,7 @@ export const translations = {
     'categories.noPreview': 'No preview available',
     'categories.errorLoad': 'Unable to load documents. Check that the backend server is running.',
     'categories.notFound': 'This category does not exist.',
+    'search.bodyMatches': 'Mentioned in the text',
 
     // Admin
     'admin.dashboard': 'Dashboard',
@@ -647,6 +650,7 @@ export const translations = {
     'admin.next': 'Next',
     'admin.firstPage': 'First page',
     'admin.lastPage': 'Last page',
+    'admin.draft': 'Draft',
     'admin.published': 'Published',
     'admin.processing': 'Processing...',
     'admin.pending': 'Pending',

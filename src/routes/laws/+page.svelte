@@ -8,7 +8,11 @@
    */
   import { onMount } from "svelte";
   import { API_URL } from "$lib/api";
-  import { tr } from "$lib/stores/language";
+  // Alias : la page a deja une variable locale `language`, qui est le FILTRE de
+  // langue des documents. Le store, lui, porte la langue de l'INTERFACE. Deux
+  // notions distinctes que le meme nom rendait confuses.
+  import { language as langueInterface, tr } from "$lib/stores/language";
+  import { formatDate } from "$lib/format";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
 
@@ -65,15 +69,6 @@
   function changeFilters() {
     page = 0;
     loadLaws();
-  }
-
-  function formatDate(value: string | null) {
-    if (!value) return "";
-    return new Date(value).toLocaleDateString("fr-FR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
   }
 
   onMount(() => {
@@ -154,7 +149,7 @@
               <div class="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500">
                 <span>{law.reference}</span>
                 {#if law.publication_date}
-                  <span>•</span><span>{formatDate(law.publication_date)}</span>
+                  <span>•</span><span>{formatDate(law.publication_date, $langueInterface.current)}</span>
                 {/if}
                 {#if law.article_count}
                   <span>•</span><span>{law.article_count} {$tr("laws.articles")}</span>

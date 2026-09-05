@@ -5,6 +5,7 @@
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { language, switchLanguage } from "$lib/stores/language";
+  import { formatDate } from "$lib/format";
 
   $: lawId = $page.params.id;
   // Article demande par l'URL, pose par les citations du chat et les articles
@@ -98,10 +99,11 @@
   /**
    * Affichage du document d'origine.
    *
-   * ImagePdfViewer est préféré à PdfViewer : il affiche des pages rendues par
-   * le serveur, sans charger pdfjs-dist ni son worker. PdfViewer importe cette
-   * bibliothèque statiquement, ce qui alourdirait le bundle de la page la plus
-   * consultée du site pour une fonction secondaire.
+   * ImagePdfViewer affiche des pages rendues par le serveur (endpoints
+   * /pdf-info et /page/{n}), sans bibliothèque de rendu côté client. Le
+   * composant concurrent, qui importait pdfjs-dist statiquement, a été supprimé
+   * avec la dépendance : il n'était monté nulle part et pesait ~10 Mo à
+   * l'installation pour du code jamais expédié.
    */
   let afficherDocument = false;
 
@@ -148,7 +150,11 @@
 
     // Heuristic Regex
     const sectionRegex = /^(LIVRE|TITRE|CHAPITRE)\s+[IVX0-9]+/i; // e.g., LIVRE I
-    const articleRegex = /^Article\s+(\d+)/i; // e.g., Article 1
+    // Le PDF converti ecrit `**ARTICLE 1er.**-` et parfois `**Article35.-**` :
+    // emphase markdown avant le mot, et pas toujours d'espace avant le numero.
+    // `/^Article\s+(\d+)/` ratait les deux, si bien que le sommaire de ces
+    // documents restait vide et qu'un lien `?article=35` ne trouvait rien.
+    const articleRegex = /^\**\s*Article\s*(\d+)/i;
 
     for (let line of lines) {
       line = line.trim();
@@ -164,7 +170,10 @@
         const match = line.match(articleRegex);
         const num = match ? match[1] : "?";
 
-        let titleText = line.replace(/^Article\s+\d+\s*[:.-]?\s*/i, "");
+        let titleText = line.replace(
+          /^\**\s*Article\s*\d+\s*(?:er|ère|ème)?\s*[:.-]*\**\s*/i,
+          "",
+        );
         if (!titleText) titleText = `Texte de l'article ${num}`;
 
         currentArticle = {
@@ -263,13 +272,6 @@
     }
   }
 
-  function formatDate(date: string) {
-    if (!date) return "";
-    return new Date(date).toLocaleDateString(
-      currentLanguage === "fr" ? "fr-FR" : "en-US",
-      { year: "numeric", month: "long", day: "numeric" },
-    );
-  }
 
   $: if (lawId) {
     fetchLaw(lawId);
@@ -497,9 +499,7 @@
                   {t.law_decree}
                 </span>
                 <span class="text-sm text-gray-500"
-                  >{law.reference || "Loi No " + law.id} - {formatDate(
-                    law.publication_date,
-                  )}</span
+                  >{law.reference || "Loi No " + law.id} - {formatDate(law.publication_date, currentLanguage)}</span
                 >
               </div>
               <h1
@@ -513,7 +513,7 @@
                 <span>{flatArticles.length} {t.articles}</span>
                 <span class="text-gray-300">•</span>
                 <!-- Etait code en dur a "2024". -->
-                <span>{t.updated} : {formatDate(law.updated_at || law.created_at)}</span>
+                <span>{t.updated} : {formatDate(law.updated_at || law.created_at, currentLanguage)}</span>
               </div>
               <div class="document-actions flex gap-3">
                 <button
