@@ -24,6 +24,17 @@ export const TAILLE_PAGE_ADMIN = 15;
 export const TAILLE_PAGE_RECHERCHE = 20;
 
 /**
+ * Taille de page de la liste publique du corpus.
+ *
+ * Vit ici et non dans `src/routes/laws/+page.ts` : un `+page.ts` n'accepte que
+ * les exports que SvelteKit connaît (`load`, `prerender`, `ssr`…) et refuse le
+ * reste au moment de la construction. Une constante partagée entre le `load` et
+ * son composant n'a donc pas d'autre endroit où vivre — et c'est de toute façon
+ * ici que vivent déjà ses deux sœurs.
+ */
+export const TAILLE_PAGE_LOIS = 20;
+
+/**
  * Nombre total de pages, jamais inférieur à 1.
  *
  * Le minimum n'est pas cosmétique : sans lui, une liste vide donne 0, et toute

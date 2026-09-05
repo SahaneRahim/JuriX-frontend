@@ -3,6 +3,7 @@
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { language, tr } from "$lib/stores/language";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
 
 // Chat message types
   interface ChatMessage {
@@ -179,9 +180,9 @@
   });
 </script>
 
-<svelte:head>
-  <title>JuriX - {t("chat.header")}</title>
-</svelte:head>
+<!-- Hors index : une session de conversation n'a pas de contenu stable, et la
+     page ne rend rien avant que l'utilisateur ait ecrit. -->
+<MetaSeo titre={t("chat.header")} indexable={false} />
 
 <div class="w-full max-w-3xl mb-12">
   <!-- Le h1 du layout est masque sur cette route (le hero marketing n'a rien a

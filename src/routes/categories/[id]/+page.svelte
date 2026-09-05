@@ -1,9 +1,15 @@
 <script lang="ts">
-  import { API_URL } from "$lib/api";
+  import { goto, invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
-  import { language, tr, type Language } from "$lib/stores/language";
+  import { language, tr } from "$lib/stores/language";
   import { formatDate } from "$lib/format";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import { descriptionDepuis, urlCanonique } from "$lib/seo";
+  import type { FiltreLangue } from "$lib/types";
   import { fade, fly } from "svelte/transition";
+
+  /** Rempli par `+page.ts`. Une catégorie absente n'arrive plus ici : 404. */
+  export let data;
 
   // L'identifiant vient de la BASE, plus d'un slug devine.
   //
@@ -11,68 +17,42 @@
   // une categorie dont le nom le CONTIENNE. Quand rien ne correspondait — et
   // rien ne correspondait jamais pour les types de texte — elle basculait sur
   // une recherche plein texte du mot « loi », qui remonte tous les decrets :
-  // d'ou des decrets affiches dans « Lois ». Ce repli est supprime. Une
-  // categorie introuvable se dit maintenant au lieu d'etre maquillee en
-  // resultats.
-  $: categoryId = Number($page.params.id);
-  $: isValidId = Number.isInteger(categoryId) && categoryId > 0;
+  // d'ou des decrets affiches dans « Lois ». Ce repli est supprime, et la
+  // validation de l'identifiant a rejoint `+page.ts` : une categorie
+  // introuvable repond desormais 404 au lieu de rendre une page vide en 200.
 
-  let documents: any[] = [];
-  let isLoading = true;
-  let error = "";
-  let categoryTitle = "";
-  let categoryDesc = "";
-  let categoryIcon = "";
-
+  /** Filtre de texte, purement client : il n'y a pas d'endpoint pour cela. */
   let searchQuery = "";
+
+  // Tout vient du `load` et se re-derive a chaque navigation : sans `$:`, passer
+  // de /categories/3 a /categories/7 laisserait le titre et la liste de la
+  // categorie precedente a l'ecran, SvelteKit reutilisant le composant.
+  $: documents = data.documents;
+  $: categoryTitle = data.categorie?.name ?? "";
+  $: categoryDesc = data.categorie?.description ?? "";
+  $: categoryIcon = data.categorie?.icon || "📄";
+  $: error = data.erreur ? $tr(data.erreur) : "";
+
   /**
    * Langue du filtre : les deux langues du site, plus « toutes ».
    *
    * Le type était inféré depuis `$language.current`, donc `Language` — alors
-   * que le troisième bouton assigne `"all"` (voir plus bas). Le type mentait ;
-   * `loadCategory` accepte bien la chaîne.
+   * que le troisième bouton assigne `"all"`. Le type mentait ; `FiltreLangue`
+   * du module de types partagés dit exactement ce que la valeur peut valoir.
+   *
+   * La valeur vit désormais dans l'URL : une catégorie filtrée en anglais
+   * n'était pas partageable, les trois vues partageant la même adresse.
    */
-  let selectedLanguage: Language | "all" = $language.current;
+  $: selectedLanguage = data.lang as FiltreLangue;
 
-  async function loadCategory(id: number, lang: string) {
-    isLoading = true;
-    error = "";
-    documents = [];
-
-    try {
-      const categoryResponse = await fetch(`${API_URL}/categories/${id}`);
-      if (categoryResponse.status === 404) {
-        error = $tr("categories.notFound");
-        return;
-      }
-      if (!categoryResponse.ok) throw new Error(`HTTP ${categoryResponse.status}`);
-
-      const category = await categoryResponse.json();
-      categoryTitle = category.name;
-      categoryDesc = category.description || "";
-      categoryIcon = category.icon || "📄";
-
-      let url = `${API_URL}/laws/?category_id=${id}&limit=50`;
-      if (lang !== "all") url += `&language=${lang}`;
-
-      const lawsResponse = await fetch(url);
-      if (!lawsResponse.ok) throw new Error(`HTTP ${lawsResponse.status}`);
-      documents = await lawsResponse.json();
-    } catch (e) {
-      console.error(e);
-      error = $tr("categories.errorLoad");
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  // Un seul declencheur reactif. L'ancienne version chargeait depuis onMount ET
-  // depuis un bloc reactif, ce qui lançait deux requetes concurrentes au montage.
-  $: if (isValidId) {
-    loadCategory(categoryId, selectedLanguage);
-  } else if ($page.params.id) {
-    isLoading = false;
-    error = $tr("categories.notFound");
+  function choisirLangue(valeur: FiltreLangue) {
+    const params = new URLSearchParams($page.url.searchParams);
+    // « toutes » est l'etat par defaut : ne pas l'ecrire garde l'URL propre, et
+    // c'est celle-la que la canonique designe.
+    if (valeur === "all") params.delete("lang");
+    else params.set("lang", valeur);
+    const requete = params.toString();
+    goto(requete ? `?${requete}` : "?", { keepFocus: true, noScroll: true });
   }
 
 
@@ -89,9 +69,20 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
-<svelte:head>
-  <title>JuriX - {categoryTitle}</title>
-</svelte:head>
+<!--
+  Description : celle de la catégorie quand elle existe, sinon une phrase
+  construite depuis son nom et son volume. Une `meta description` vide serait
+  indexée telle quelle, et la plupart des catégories du corpus n'ont pas de
+  description saisie.
+-->
+<MetaSeo
+  titre={categoryTitle}
+  description={descriptionDepuis(categoryDesc) ||
+    (data.categorie
+      ? `${data.categorie.law_count} ${$tr("categories.documentsShort")} — ${categoryTitle}`
+      : "")}
+  canonique={urlCanonique($page.url)}
+/>
 
 <SiteHeader />
 
@@ -171,21 +162,21 @@
             'fr'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}"
-            on:click={() => (selectedLanguage = "fr")}>FR</button
+            on:click={() => choisirLangue("fr")}>FR</button
           >
           <button
             class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {selectedLanguage ===
             'en'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}"
-            on:click={() => (selectedLanguage = "en")}>EN</button
+            on:click={() => choisirLangue("en")}>EN</button
           >
           <button
             class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {selectedLanguage ===
             'all'
               ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}"
-            on:click={() => (selectedLanguage = "all")}
+            on:click={() => choisirLangue("all")}
             >{$tr("categories.all")}</button
           >
         </div>
@@ -194,26 +185,25 @@
 
     <!-- Results Section -->
     <div>
-      {#if isLoading}
+      <!--
+        L'indicateur de chargement a disparu avec le bloc reactif qui chargeait :
+        la page n'est plus rendue avant que ses donnees soient la.
+
+        La reprise passe par `invalidateAll()`, qui rejoue le `load`. Le bouton
+        appelait auparavant `fetchCategoryDocuments`, une fonction qui n'a jamais
+        existe dans ce fichier : le SEUL moyen de recuperation de la page levait
+        une ReferenceError. Ne pas reintroduire d'appel a une fonction locale ici.
+      -->
+      {#if error}
         <div
-          class="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100"
-        >
-          <div
-            class="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"
-          ></div>
-          <p class="text-slate-500 font-medium">
-            {$tr("categories.loadingDocs")}
-          </p>
-        </div>
-      {:else if error}
-        <div
+          role="alert"
           class="bg-red-50 dark:bg-red-900/20 text-red-600 p-8 rounded-2xl text-center border border-red-100 dark:border-red-900/30"
         >
           <span class="material-icons text-4xl mb-2" aria-hidden="true">error_outline</span>
           <p class="font-medium mb-4">{error}</p>
           <button
             class="px-6 py-2 bg-white text-red-600 font-semibold rounded-lg shadow-sm border border-red-100 hover:bg-red-50 transition-colors"
-            on:click={() => loadCategory(categoryId, selectedLanguage)}
+            on:click={() => invalidateAll()}
             data-testid="category-retry"
           >
             {$tr("categories.retry")}
@@ -242,9 +232,16 @@
         </p>
 
         <div class="grid gap-4">
+          <!--
+            Les replis `doc.law_id ?? doc.id` et `doc.date || doc.publication_date`
+            ont ete retires : cet endpoint rend des LawResponse, qui n'ont ni
+            `law_id` ni `date`. Les deux branches gauches etaient donc toujours
+            indefinies — du code defensif contre une forme qui n'existe pas, que
+            le typage a rendu visible.
+          -->
           {#each filteredDocuments as doc, i}
             <a
-              href="/laws/{doc.law_id ?? doc.id}"
+              href="/laws/{doc.id}"
               class="group block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
               in:fly={{ y: 20, duration: 400, delay: i * 50 }}
             >
@@ -283,14 +280,14 @@
                     </span>
 
                     <!-- Date -->
-                    {#if doc.date || doc.publication_date}
+                    {#if doc.publication_date}
                       <span
                         class="flex items-center gap-1.5 text-xs font-medium text-slate-500"
                       >
                         <span class="material-icons text-[14px]"
                            aria-hidden="true">calendar_today</span
                         >
-                        {formatDate(doc.date || doc.publication_date, $language.current)}
+                        {formatDate(doc.publication_date, $language.current)}
                       </span>
                     {/if}
                   </div>

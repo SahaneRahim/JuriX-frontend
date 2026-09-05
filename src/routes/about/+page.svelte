@@ -1,11 +1,18 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
   import { tr } from "$lib/stores/language";
+  import { page } from "$app/stores";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import { urlCanonique } from "$lib/seo";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
-<svelte:head><title>JuriX — {$tr("nav.about")}</title></svelte:head>
+<MetaSeo
+  titre={$tr("nav.about")}
+  description={$tr("about.subtitle")}
+  canonique={urlCanonique($page.url)}
+/>
 
 <SiteHeader />
 

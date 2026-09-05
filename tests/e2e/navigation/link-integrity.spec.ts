@@ -118,11 +118,135 @@ test.describe('Pages à paramètre', () => {
     test.skip(!Array.isArray(lois) || lois.length === 0, 'corpus vide');
 
     await page.goto(`/laws/${lois[0].id}`);
-    // Ni /laws/[id] ni /categories/[id] n'ont de `load` serveur : ils chargent
-    // dans onMount, donc le rendu serveur répond 200 même pour un identifiant
-    // inexistant. Un contrôle de statut ne prouverait rien ici — seul le bloc
-    // d'erreur affiché distingue une fiche réelle d'une fiche vide.
     await expect(page.getByTestId('law-error')).toHaveCount(0);
     await expectAllResolve(page, await internalLinksOf(page), `/laws/${lois[0].id}`);
+  });
+
+  /**
+   * Le statut dit la vérité — l'assertion inverse de celle qui vivait ici.
+   *
+   * CE QUE CE TEST REMPLACE. `/laws/[id]` et `/categories/[id]` chargeaient dans
+   * un bloc réactif, sans `load` serveur : le rendu répondait 200 pour
+   * n'importe quel identifiant, et ce fichier devait s'en accommoder en
+   * cherchant un bloc d'erreur AFFICHÉ plutôt qu'un statut. Le crawler attrapait
+   * donc les routes mortes, jamais les enregistrements morts — une fiche
+   * supprimée du corpus restait « vivante » pour ce garde-fou, pour un moteur de
+   * recherche et pour tout moniteur.
+   *
+   * Depuis que `+page.ts` lève `error(404)`, le contrôle de statut redevient
+   * possible : c'est une assertion plus forte que la précédente, et elle vaut
+   * sans exécuter la moindre ligne de JavaScript.
+   */
+  const IDENTIFIANTS_ABSENTS = [
+    // Hors de portée du corpus : aucune séquence n'atteint cette valeur.
+    { chemin: '/laws/999999999', quoi: 'fiche de loi' },
+    { chemin: '/categories/999999999', quoi: 'fiche de catégorie' },
+    // Non numérique : l'API type l'identifiant en entier et pose une assertion
+    // dessus. Sans contrôle côté front, ces adresses produisaient une 500 côté
+    // API là où la bonne réponse est 404.
+    { chemin: '/laws/abc', quoi: 'identifiant non numérique' },
+    { chemin: '/categories/abc', quoi: 'identifiant non numérique' },
+    { chemin: '/laws/-1', quoi: 'identifiant négatif' },
+  ];
+
+  for (const { chemin, quoi } of IDENTIFIANTS_ABSENTS) {
+    test(`${chemin} répond 404 (${quoi})`, async ({ request }) => {
+      const res = await request.get(chemin, { failOnStatusCode: false });
+      expect(res.status(), `${chemin} devrait répondre 404, pas ${res.status()}`).toBe(404);
+    });
+  }
+
+  test('la page d’erreur du site reste navigable', async ({ page }) => {
+    await page.goto('/laws/999999999');
+    // Un 404 doit rester une page du site : en-tête, pied de page et sorties.
+    // Sans `+error.svelte`, SvelteKit sert sa page brute, sans le moindre lien —
+    // exactement le cul-de-sac que ce fichier existe pour empêcher.
+    await expect(page.getByTestId('error-page')).toBeVisible();
+    await expectAllResolve(page, await internalLinksOf(page), '/laws/999999999');
+  });
+});
+
+/**
+ * Le contenu indexable est-il RÉELLEMENT dans le HTML servi ?
+ *
+ * C'est la seule preuve directe du bénéfice de l'étape. Les assertions faites
+ * dans un navigateur ne distinguent pas un titre rendu par le serveur d'un titre
+ * écrit par le JavaScript après hydratation : les deux sont visibles à l'écran,
+ * et un seul est indexable. `request.get` n'exécute aucun script — ce qu'il voit
+ * est ce que voit un moteur qui ne rend pas les pages, et ce que voit l'aperçu
+ * d'un lien partagé.
+ */
+test.describe('Contenu rendu par le serveur', () => {
+  test.beforeEach(async ({ request }) => {
+    const sante = await request.get(`${API}/health`, { failOnStatusCode: false });
+    test.skip(!sante.ok(), 'backend injoignable');
+  });
+
+  test('le HTML de /laws/[id] porte le titre du document sans JavaScript', async ({ request }) => {
+    const res = await request.get(`${API}/api/v1/laws/?limit=1`, { failOnStatusCode: false });
+    test.skip(!res.ok(), 'aucune loi disponible');
+    const lois = await res.json();
+    test.skip(!Array.isArray(lois) || lois.length === 0, 'corpus vide');
+
+    const loi = lois[0];
+    const html = await (await request.get(`/laws/${loi.id}`)).text();
+
+    /**
+     * Comparaison sur le <title> DÉSÉCHAPPÉ, et non sur un fragment cherché
+     * dans la page.
+     *
+     * Première version de cette assertion : prendre les trois premiers mots
+     * longs du titre et les chercher dans le HTML. Elle échouait sur un
+     * document parfaitement rendu, parce que ces trois mots ne sont pas
+     * ADJACENTS dans le titre — les joindre par une espace fabriquait une
+     * chaîne qui n'existe nulle part. L'assertion mentait sur le code.
+     *
+     * Le titre entier, déséchappé, est à la fois plus simple et plus fort : il
+     * vérifie aussi la politique de titre du site (`$lib/seo.titreDePage`).
+     */
+    const brut = html.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '';
+    const titre = brut
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&');
+
+    expect(titre, 'le <title> servi ne porte pas le titre du document').toBe(
+      `${loi.title} — JuriX`,
+    );
+
+    // Métadonnées : c'est ce qui alimente l'aperçu d'un lien partagé.
+    expect(html, 'meta description absente').toMatch(/<meta[^>]+name="description"/);
+    expect(html, 'canonique absente').toMatch(/<link[^>]+rel="canonical"/);
+    expect(html, 'og:type absent').toMatch(/<meta[^>]+property="og:type"[^>]+content="article"/);
+
+    // La description doit porter du CONTENU, pas une chaîne vide : c'est le
+    // texte du document, nettoyé de ses marqueurs de page et de son markdown.
+    const description = html.match(/<meta[^>]+name="description"[^>]+content="([^"]*)"/)?.[1] ?? '';
+    expect(description.length, 'meta description vide').toBeGreaterThan(20);
+    expect(description, 'marqueurs de page non nettoyés').not.toContain('PAGE:');
+  });
+
+  test('les pages sans valeur d’index portent noindex, et les autres non', async ({ request }) => {
+    for (const chemin of ['/search?q=loi', '/chat', '/login', '/admin']) {
+      const html = await (await request.get(chemin)).text();
+      expect(html, `${chemin} devrait être en noindex`).toMatch(
+        /<meta[^>]+name="robots"[^>]+content="noindex, follow"/,
+      );
+    }
+    for (const chemin of ['/', '/laws', '/about']) {
+      const html = await (await request.get(chemin)).text();
+      expect(html, `${chemin} ne doit PAS être en noindex`).not.toMatch(/name="robots"/);
+    }
+  });
+
+  test('une liste filtrée sort de l’index mais garde sa canonique', async ({ request }) => {
+    // Chaque combinaison de filtres est une page de contenu quasi dupliqué :
+    // l'indexer disperserait l'autorité de /laws sur des dizaines d'adresses.
+    const html = await (await request.get('/laws?lang=fr')).text();
+    expect(html).toMatch(/<meta[^>]+name="robots"[^>]+content="noindex, follow"/);
+    // La canonique désigne la liste nue, sans la chaîne de requête.
+    expect(html).toMatch(/<link[^>]+rel="canonical"[^>]+href="[^"]*\/laws"/);
   });
 });

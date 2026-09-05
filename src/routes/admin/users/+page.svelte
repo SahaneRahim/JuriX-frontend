@@ -107,7 +107,9 @@
 
 </script>
 
-<svelte:head><title>JuriX Admin — Utilisateurs</title></svelte:head>
+<!-- Pas de <title> ici : le layout d'administration le derive du chemin pour
+     les quatre pages. Deux <title> dans le document laisseraient gagner celui
+     du layout, qui est rendu en premier. -->
 
 <div class="mb-8 flex items-center justify-between">
   <div>

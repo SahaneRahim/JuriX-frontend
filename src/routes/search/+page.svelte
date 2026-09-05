@@ -14,6 +14,8 @@
   import SearchResultCard from "$lib/components/SearchResultCard.svelte";
   import { onMount } from "svelte";
   import { language, tr } from "$lib/stores/language";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import { urlCanonique } from "$lib/seo";
   import { formatDate } from '$lib/format';
 
 // State
@@ -318,8 +320,16 @@
 
 </script>
 
+<!-- Hors index : chaque requete produit une URL differente, donc une infinite
+     de pages au contenu quasi identique. `follow` reste actif : la page doit
+     continuer a transmettre l'autorite de ses liens vers les fiches. -->
+<MetaSeo
+  titre={$tr("title.search")}
+  canonique={urlCanonique($page.url)}
+  indexable={false}
+/>
+
 <svelte:head>
-  <title>JuriX - {$tr("title.search")}</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet"

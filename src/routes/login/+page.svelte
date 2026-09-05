@@ -8,6 +8,7 @@
   // La page ne contenait aucun <a> : une fois arrivé dessus, il n'existait
   // aucun moyen de revenir au site autrement qu'en modifiant l'URL.
   import SiteHeader from "$lib/components/SiteHeader.svelte";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { authStore } from "$lib/stores/auth";
   import "../../app.css";
 
@@ -82,7 +83,9 @@
   }
 </script>
 
-<svelte:head><title>Connexion — JuriX Admin</title></svelte:head>
+<!-- Hors index : un formulaire de connexion n'apporte rien a une recherche, et
+     son apparition dans les resultats ne fait qu'exposer la porte d'entree. -->
+<MetaSeo titre="Connexion" indexable={false} />
 
 <SiteHeader />
 

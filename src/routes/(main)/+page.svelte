@@ -1,9 +1,14 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
-  import { API_URL } from "$lib/api";
+  import { goto, invalidateAll } from "$app/navigation";
+  import { page } from "$app/stores";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import { urlCanonique } from "$lib/seo";
   import { tr } from "$lib/stores/language";
+  import type { Category } from "$lib/types";
   import { fade, fly } from "svelte/transition";
+
+  /** Rempli par `+page.ts`. */
+  export let data;
 
   let searchQuery = "";
 
@@ -27,17 +32,14 @@
   // de la table, la page de categorie basculait sur une recherche plein texte
   // du mot « loi » — qui remonte tous les decrets. C'est exactement le
   // symptome constate : des decrets affiches dans « Lois ».
-  type ApiCategory = {
-    id: number;
-    name: string;
-    description: string | null;
-    icon: string | null;
-    law_count: number;
-  };
-
-  let categories: ApiCategory[] = [];
-  let categoriesError = "";
-  let categoriesLoading = true;
+  // Le type était déclaré ici, en local, alors que trois autres pages lisent la
+  // même forme. Il vit maintenant dans `$lib/types` avec le reste du modèle.
+  //
+  // Réactif et non simplement affecté : SvelteKit réutilise ce composant d'une
+  // navigation à l'autre, et une affectation unique laisserait les catégories du
+  // rendu précédent à l'écran après un `invalidateAll()`.
+  $: categories = data.categories as Category[];
+  $: categoriesError = data.erreur ? $tr(data.erreur) : "";
 
   // Palette appliquee par position d'affichage. Les couleurs sont decoratives :
   // les rattacher au nom obligerait a modifier le front a chaque domaine ajoute.
@@ -58,23 +60,13 @@
     "text-cyan-600 bg-cyan-50 dark:bg-cyan-500/10",
   ];
 
-  onMount(async () => {
-    try {
-      const response = await fetch(`${API_URL}/categories`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      categories = await response.json();
-    } catch (e) {
-      console.error("Chargement des categories impossible", e);
-      categoriesError = $tr("categories.errorLoad");
-    } finally {
-      categoriesLoading = false;
-    }
-  });
 </script>
 
-<svelte:head>
-  <title>JuriX - {$tr("title.home")}</title>
-</svelte:head>
+<MetaSeo
+  titre={$tr("title.home")}
+  description={$tr("hero.subtitle")}
+  canonique={urlCanonique($page.url)}
+/>
 
 <div
   class="w-full max-w-7xl flex flex-col items-center pb-20"
@@ -118,10 +110,27 @@
     </p>
   </div>
 
-  {#if categoriesLoading}
-    <p class="text-slate-500 dark:text-slate-400">{$tr("common.loading")}</p>
-  {:else if categoriesError}
-    <p class="text-red-600 dark:text-red-400">{categoriesError}</p>
+  <!--
+    L'état « chargement » a disparu avec le `onMount` : la page n'est plus rendue
+    avant que ses données soient là, donc un indicateur de chargement ne serait
+    jamais vrai — un état mort de plus dans le balisage.
+
+    L'erreur, elle, reste, et gagne enfin sa reprise. `invalidateAll()` rejoue le
+    `load` : c'est le pendant exact de l'ancien appel manuel, sans dupliquer la
+    requête dans le composant.
+  -->
+  {#if categoriesError}
+    <div role="alert" class="flex flex-col items-center gap-3 mb-6">
+      <p class="text-red-600 dark:text-red-400">{categoriesError}</p>
+      <button
+        type="button"
+        on:click={() => invalidateAll()}
+        data-testid="home-retry"
+        class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-primary hover:text-primary transition-colors"
+      >
+        {$tr("common.retry")}
+      </button>
+    </div>
   {/if}
 
   <!-- Categories Grid -->

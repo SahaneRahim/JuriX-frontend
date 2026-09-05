@@ -1,13 +1,20 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
   import ImagePdfViewer from "$lib/components/ImagePdfViewer.svelte";
-  import { goto } from "$app/navigation";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import { goto, invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
-  import { onMount, tick } from "svelte";
-  import { language, switchLanguage } from "$lib/stores/language";
+  import { language, switchLanguage, tr } from "$lib/stores/language";
   import { formatDate } from "$lib/format";
+  import { descriptionDepuis, urlCanonique } from "$lib/seo";
 
-  $: lawId = $page.params.id;
+  /** Rempli par `+page.ts`. Un identifiant inexistant n'arrive plus ici : 404. */
+  export let data;
+
+  // `lawId` a disparu avec le chargement client : l'identifiant est lu par
+  // `+page.ts`, qui seul en a besoin. Le garder ici en aurait fait une seconde
+  // source de verite pour la meme valeur.
+
   // Article demande par l'URL, pose par les citations du chat et les articles
   // trouves par la recherche. La page reconstruit sa liste depuis le texte du
   // document : elle ne connait pas les identifiants de ligne, seulement les
@@ -15,9 +22,9 @@
   $: requestedArticle = $page.url.searchParams.get("article");
 
   // -- State --
-  let law: any = null;
-  let isLoading = true;
-  let error = "";
+  // `law` et `error` ne sont plus des variables locales : elles sont derivees de
+  // `data` plus bas. `isLoading` a disparu — la page n'est plus rendue avant que
+  // ses donnees soient la, un indicateur de chargement n'y serait jamais vrai.
 
   // Language: use shared store
   $: currentLanguage = $language.current;
@@ -109,24 +116,15 @@
 
   // -- Logic --
 
-  async function fetchLaw(id: string) {
-    isLoading = true;
-    error = "";
-    try {
-      const response = await fetch(`${API_URL}/laws/${id}`);
-      if (!response.ok) throw new Error("Document non trouvé");
-      law = await response.json();
-      parseContent(law.content);
-    } catch (e) {
-      console.error(e);
-      error = "Impossible de charger le document.";
-    } finally {
-      isLoading = false;
-    }
-  }
-
   function parseContent(rawText: string) {
-    if (!rawText) return;
+    if (!rawText) {
+      // Vider, et non sortir : un retour anticipe laisserait la table des
+      // matieres du document precedent apres une navigation vers une fiche en
+      // erreur.
+      tableOfContents = [];
+      flatArticles = [];
+      return;
+    }
 
     // Clean text
     const cleanText = rawText
@@ -273,9 +271,19 @@
   }
 
 
-  $: if (lawId) {
-    fetchLaw(lawId);
-  }
+  /**
+   * Le document vient du `load`, et sa table des matieres est recalculee a
+   * CHAQUE changement de `data.law`.
+   *
+   * C'est le piege central de cette migration : SvelteKit reutilise le meme
+   * composant en naviguant de /laws/1 a /laws/2. Un `parseContent` appele une
+   * seule fois au montage laisserait a l'ecran la table des matieres du document
+   * precedent, sous le titre du nouveau. Le bloc reactif ci-dessous depend
+   * explicitement de `data.law` pour que ce cas soit couvert.
+   */
+  $: law = data.law;
+  $: error = data.erreur ? $tr(data.erreur) : "";
+  $: parseContent(law?.content ?? "");
 
   // Filtered TOC for sidebar
   $: filteredTOC = tableOfContents
@@ -296,9 +304,21 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
-<svelte:head>
-  <title>JuriX - {law?.title || "Document"}</title>
-</svelte:head>
+<!--
+  Le titre du document et un extrait de son texte sont maintenant présents dans
+  le HTML rendu par le serveur, sans JavaScript. C'est le bénéfice entier de
+  l'étape : jusqu'ici la page la plus indexable du site n'expédiait qu'une
+  coquille vide.
+
+  `type="article"` et non `website` : c'est un document daté et signé, pas une
+  page de portail — la distinction change l'aperçu au partage.
+-->
+<MetaSeo
+  titre={law?.title || $tr("laws.title")}
+  description={descriptionDepuis(law?.content)}
+  canonique={urlCanonique($page.url)}
+  type="article"
+/>
 
 <SiteHeader />
 
@@ -388,25 +408,28 @@
     </div>
   </div>
 
-  {#if isLoading}
-    <div class="flex items-center justify-center h-[50vh]">
-      <div
-        class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"
-      ></div>
-    </div>
-  {:else if error}
-    <!-- data-testid : cette page charge dans onMount, sans `load` serveur. Le
-         rendu répond donc 200 même pour un identifiant inexistant, et un
-         contrôle de statut ne prouverait rien. Ce marqueur est le seul moyen
-         pour le test d'intégrité de distinguer une fiche réelle d'une fiche
-         vide (tests/e2e/navigation/link-integrity.spec.ts). -->
-    <div class="text-center py-20" data-testid="law-error">
+  {#if error}
+    <!-- data-testid conservé, mais son rôle a changé. Il servait à distinguer
+         une fiche réelle d'une fiche inexistante, faute de statut fiable : la
+         page chargeait dans un bloc réactif et répondait 200 sur n'importe quel
+         identifiant. Depuis `+page.ts`, un identifiant inexistant répond 404 et
+         n'atteint jamais ce balisage — le test d'intégrité contrôle désormais le
+         statut. Ce bloc ne couvre plus que la panne : backend éteint ou 5xx. -->
+    <div class="text-center py-20" data-testid="law-error" role="alert">
       <h2 class="text-2xl font-bold text-gray-700 dark:text-gray-300">
         {error}
       </h2>
-      <a href="/" class="text-blue-600 hover:underline mt-4 inline-block"
-        >{t.return}</a
-      >
+      <div class="mt-6 flex items-center justify-center gap-3">
+        <button
+          type="button"
+          on:click={() => invalidateAll()}
+          data-testid="law-retry"
+          class="px-5 py-2 rounded-lg border border-slate-300 dark:border-slate-600 font-medium hover:border-primary hover:text-primary transition-colors"
+        >
+          {$tr("common.retry")}
+        </button>
+        <a href="/" class="text-blue-600 hover:underline">{t.return}</a>
+      </div>
     </div>
   {:else}
     <!-- Main Content -->
