@@ -7,10 +7,11 @@
  * `/admin/users`. Aucune relecture manuelle ne les avait attrapées en plusieurs
  * mois. Ce test les attrape en quelques secondes, et attrapera les suivantes.
  *
- * Ce spec est DÉTERMINISTE, contrairement aux specs existants sous
- * `tests/e2e/auth`, `search`, `chatbot`… qui reposent sur `@zerostep/playwright`
- * (`import { ai }`) : ceux-là exigent une clé d'API et rendent un verdict
- * variable, donc ne peuvent pas servir de garde-fou en intégration continue.
+ * Ce spec est DÉTERMINISTE. Les sept specs qui l'ont précédé reposaient sur
+ * `@zerostep/playwright` : chaque assertion passait par un modèle de langage
+ * distant, ce qui exigeait une clé d'API absente du dépôt et rendait un verdict
+ * variable d'une exécution à l'autre. Ils ne pouvaient pas servir de garde-fou
+ * et ont été retirés.
  *
  * Lancer : npm run test:e2e:nav
  */

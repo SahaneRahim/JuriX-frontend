@@ -1,11 +1,25 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
+/**
+ * Rôles reconnus par le backend.
+ *
+ * `superadmin` manquait à cette union, alors que le rôle existe en base
+ * (`app/schemas/user.py`, motif `^(user|admin|superadmin)$`) et qu'il est testé
+ * partout dans le front. Le type déclarait donc impossible un rôle réel.
+ *
+ * La contradiction n'avait jamais été signalée : sans `tsconfig.json` à la
+ * racine, aucun contrôle de types ne tournait. Les appelants qui passent par
+ * `["admin","superadmin"].includes(...)` ne levaient rien non plus — ils
+ * contournent le typage sur un `string[]` au lieu de le satisfaire.
+ */
+export type UserRole = 'user' | 'admin' | 'superadmin';
+
 // User type
 export interface User {
   id: string;
   email: string;
-  role: 'admin' | 'user';
+  role: UserRole;
   name?: string;
 }
 

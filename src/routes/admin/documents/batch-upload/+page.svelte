@@ -69,41 +69,49 @@
 				break;
 
 			case "file_created":
-				// Update file with law_id
-				const fileIndex = files.findIndex((f) => f.file.name === data.filename);
-				if (fileIndex !== -1) {
-					files[fileIndex].law_id = data.law_id;
-					files[fileIndex].status = "pending";
-				}
-				break;
+			{
+					// Update file with law_id
+					const fileIndex = files.findIndex((f) => f.file.name === data.filename);
+					if (fileIndex !== -1) {
+						files[fileIndex].law_id = data.law_id;
+						files[fileIndex].status = "pending";
+					}
+					break;
+			}
 
 			case "processing_start":
-				// Update file status to processing
-				const processingFile = files.find((f) => f.law_id === data.law_id);
-				if (processingFile) {
-					processingFile.status = "processing";
-					processingFile.progress = 0;
-				}
-				break;
+			{
+					// Update file status to processing
+					const processingFile = files.find((f) => f.law_id === data.law_id);
+					if (processingFile) {
+						processingFile.status = "processing";
+						processingFile.progress = 0;
+					}
+					break;
+			}
 
 			case "processing_complete":
-				// Update file status to published
-				const completedFile = files.find((f) => f.law_id === data.law_id);
-				if (completedFile) {
-					completedFile.status = data.status;
-					completedFile.progress = 100;
-				}
-				fetchLaws(); // Refresh list
-				break;
+			{
+					// Update file status to published
+					const completedFile = files.find((f) => f.law_id === data.law_id);
+					if (completedFile) {
+						completedFile.status = data.status;
+						completedFile.progress = 100;
+					}
+					fetchLaws(); // Refresh list
+					break;
+			}
 
 			case "processing_error":
-				// Update file status to refused
-				const errorFile = files.find((f) => f.law_id === data.law_id);
-				if (errorFile) {
-					errorFile.status = "refused";
-					errorFile.error = data.error;
-				}
-				break;
+			{
+					// Update file status to refused
+					const errorFile = files.find((f) => f.law_id === data.law_id);
+					if (errorFile) {
+						errorFile.status = "refused";
+						errorFile.error = data.error;
+					}
+					break;
+			}
 		}
 
 		files = [...files]; // Trigger reactivity

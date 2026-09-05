@@ -130,7 +130,6 @@ let title = '';
     tabindex="0"
     aria-label="Fermer la modale"
   >
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div 
       class="w-full max-w-4xl rounded-2xl bg-white shadow-2xl" 
       on:click|stopPropagation

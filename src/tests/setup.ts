@@ -1,8 +1,13 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
-// Mock browser environment
-global.window = global.window || {};
+// Mock browser environment.
+// `global.window || {}` produisait le type `Window | {}`, que TypeScript refuse
+// d'assigner a `global.window`. jsdom/happy-dom fournissent deja `window` :
+// l'affectation ne sert que de garde-fou si l'environnement ne le fait pas.
+if (!global.window) {
+  global.window = {} as unknown as Window & typeof globalThis;
+}
 
 // Mock localStorage
 const localStorageMock = {

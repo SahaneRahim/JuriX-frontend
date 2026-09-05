@@ -1,7 +1,7 @@
 <script lang="ts">
   import { API_URL } from "$lib/api";
   import { page } from "$app/stores";
-  import { language, tr } from "$lib/stores/language";
+  import { language, tr, type Language } from "$lib/stores/language";
   import { fade, fly } from "svelte/transition";
 
   // L'identifiant vient de la BASE, plus d'un slug devine.
@@ -24,7 +24,14 @@
   let categoryIcon = "";
 
   let searchQuery = "";
-  let selectedLanguage = $language.current;
+  /**
+   * Langue du filtre : les deux langues du site, plus « toutes ».
+   *
+   * Le type était inféré depuis `$language.current`, donc `Language` — alors
+   * que le troisième bouton assigne `"all"` (voir plus bas). Le type mentait ;
+   * `loadCategory` accepte bien la chaîne.
+   */
+  let selectedLanguage: Language | "all" = $language.current;
 
   async function loadCategory(id: number, lang: string) {
     isLoading = true;
@@ -210,7 +217,8 @@
           <p class="font-medium mb-4">{error}</p>
           <button
             class="px-6 py-2 bg-white text-red-600 font-semibold rounded-lg shadow-sm border border-red-100 hover:bg-red-50 transition-colors"
-            on:click={() => fetchCategoryDocuments(categoryId)}
+            on:click={() => loadCategory(categoryId, selectedLanguage)}
+            data-testid="category-retry"
           >
             {$tr("categories.retry")}
           </button>

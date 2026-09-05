@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount, onDestroy } from "svelte";
 
   // Expects the base URL to the law (e.g., /api/v1/laws/123)
@@ -168,7 +168,7 @@
           min="1"
           max={totalPages}
           value={pageNum}
-          on:change={(e) => goToPage(e.target.value)}
+          on:change={(e) => goToPage((e.currentTarget as HTMLInputElement).value)}
           disabled={pageLoading}
         />
         sur {totalPages}

@@ -1,0 +1,32 @@
+{
+  // Étend le tsconfig GÉNÉRÉ par `svelte-kit sync`, qui porte les alias $lib et
+  // $app. Ce fichier n'existait pas : personne n'étendait le fichier généré,
+  // donc aucun alias n'était résolu. `svelte-check` remontait 86 erreurs
+  // « Cannot find module '$lib/...' » qui noyaient les vraies, et TOUT type
+  // traversant une frontière de module devenait `any` implicite — l'outil était
+  // aveugle sur la totalité du code applicatif.
+  "extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+
+    // Le fichier généré déclare `"types": ["node"]`, ce qui EXCLUT les globales
+    // de vitest et les matchers de jest-dom : sans cette liste, `src/tests/setup.ts`
+    // remonte des erreurs qui ne sont pas des défauts du code.
+    "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
+
+    // `strict` reste désactivé VOLONTAIREMENT, pour l'instant.
+    //
+    // Le code compte 29 annotations `: any` explicites et aucun module de types
+    // partagés. L'activer aujourd'hui produirait un mur d'erreurs sur du code qui
+    // fonctionne, avant même que les types métier (law, article, user,
+    // searchResult) existent. Il sera activé en dernier, une fois ces types
+    // écrits — c'est le point final du chantier, pas son point de départ.
+    "strict": false
+  }
+}
