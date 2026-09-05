@@ -48,6 +48,20 @@ export function authHeaders(extra: Record<string, string> = {}): Record<string, 
 }
 
 /**
+ * URL WebSocket portant le jeton d'accès.
+ *
+ * Le navigateur ne permet pas de poser un en-tête `Authorization` sur un
+ * WebSocket : le jeton passe donc en paramètre de requête. Cette fonction
+ * existe pour que la clé de stockage ne soit pas recopiée dans les pages —
+ * elle a déjà divergé une fois.
+ */
+export function wsUrlAuthentifiee(chemin: string): string {
+  const token = get(authStore).token;
+  const base = `${WS_URL}${chemin}`;
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+}
+
+/**
  * fetch authentifié vers l'API.
  *
  * Centralise la gestion du 401 : un jeton expiré déconnecte et renvoie vers la

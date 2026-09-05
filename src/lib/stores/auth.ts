@@ -46,13 +46,34 @@ interface AuthState {
 const TOKEN_STORAGE_KEY = 'jurix-auth-token';
 const USER_STORAGE_KEY = 'jurix-auth-user';
 
+/**
+ * Vrai si le jeton est expiré, d'après sa propre date d'expiration.
+ *
+ * L'état était réhydraté avec `isAuthenticated: true` sur la seule présence
+ * d'un jeton dans localStorage : un jeton périmé donnait une coquille
+ * « connectée », avec un menu d'administration visible, jusqu'au premier 401.
+ * La signature n'est PAS vérifiée ici — le client ne le peut pas, et c'est au
+ * serveur de le faire. On lit seulement la date, qui suffit à ne pas se
+ * mentir à soi-même.
+ */
+function jetonExpire(token: string): boolean {
+  try {
+    const charge = JSON.parse(atob(token.split(".")[1]));
+    return typeof charge.exp === "number" && charge.exp * 1000 <= Date.now();
+  } catch {
+    // Jeton illisible : le traiter comme expiré vaut mieux que de faire
+    // confiance à ce qu'on ne comprend pas.
+    return true;
+  }
+}
+
 // Get initial state from localStorage
 function getInitialState(): AuthState {
   if (browser) {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     const userStr = localStorage.getItem(USER_STORAGE_KEY);
 
-    if (token && userStr) {
+    if (token && userStr && !jetonExpire(token)) {
       try {
         const user = JSON.parse(userStr);
         return {

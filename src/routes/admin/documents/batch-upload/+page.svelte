@@ -3,7 +3,7 @@
   // import, chaque clic sur « Téléverser » levait un ReferenceError, capturé
   // par le catch et affiché en alert. Le téléversement par lot était donc
   // totalement inopérant, sans que rien ne le signale à la compilation.
-  import { WS_URL, apiFetch } from '$lib/api';
+  import { apiFetch, wsUrlAuthentifiee } from '$lib/api';
 	import { onMount, onDestroy } from "svelte";
 	
 	import { language, tr } from "$lib/stores/language";
@@ -44,7 +44,7 @@
 	// WebSocket connection
 	function connectWebSocket() {
 		sessionId = crypto.randomUUID();
-		const wsUrl = `${WS_URL}/batch-upload/ws/${sessionId}`;
+		const wsUrl = wsUrlAuthentifiee(`/batch-upload/ws/${sessionId}`);
 		ws = new WebSocket(wsUrl);
 
 		ws.onopen = () => {

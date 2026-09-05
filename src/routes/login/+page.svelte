@@ -19,7 +19,21 @@
 
   // Redirection post-connexion, transmise par la garde du layout admin.
   // `next` n'est renseigné que si la garde admin nous a envoyés ici.
-  $: next = $page.url.searchParams.get("next");
+  $: next = cheminInterne($page.url.searchParams.get("next"));
+
+  /**
+   * N'accepte qu'un chemin interne comme destination.
+   *
+   * `?next=` était suivi sans aucune validation : une adresse absolue
+   * (`?next=https://ailleurs.example`) ou protocole-relative (`?next=//…`)
+   * aurait fait de la page de connexion un tremplin de redirection, avec
+   * l'autorité du domaine derrière elle.
+   */
+  function cheminInterne(valeur: string | null): string | null {
+    if (!valeur) return null;
+    if (!valeur.startsWith("/") || valeur.startsWith("//")) return null;
+    return valeur;
+  }
 
   /**
    * Où envoyer un compte après connexion.
