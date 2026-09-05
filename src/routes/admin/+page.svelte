@@ -7,8 +7,14 @@
   import type { AnalyticsOverview, AnalyticsSearch, AnalyticsUsage, Law } from '$lib/types';
 
 let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws: 0 };
-  let usage: AnalyticsUsage = { active_users: 0, total_calls: 0 };
-  let searchStats: AnalyticsSearch = { total_searches: 0, avg_response_time_ms: 0 };
+  let usage: AnalyticsUsage = {
+    window_days: 7, conversations: 0, questions_asked: 0, answers_generated: 0,
+    searches: 0, active_users: 0, median_answer_time_ms: 0,
+  };
+  let searchStats: AnalyticsSearch = {
+    window_days: 7, total_searches: 0, median_response_time_ms: 0,
+    p95_response_time_ms: 0, max_response_time_ms: 0, cache_hit_rate_percent: 0,
+  };
 
   /**
    * Derniers documents ingeres, dans leur PROPRE variable.
@@ -127,22 +133,20 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
     <StatsCard
       title={$tr("admin.totalSearches")}
       value={searchStats.total_searches?.toString() || "0"}
-      change="+12%"
-      trend="up"
+      trend="neutral"
       icon="🔍"
       color="purple"
     />
     <StatsCard
       title={$tr("admin.activeUsers")}
       value={usage.active_users?.toString() || "0"}
-      change="+5.4%"
-      trend="up"
+      trend="neutral"
       icon="👥"
       color="green"
     />
     <StatsCard
       title={$tr("admin.responseTime")}
-      value={`${searchStats.avg_response_time_ms || 0}ms`}
+      value={`${searchStats.median_response_time_ms || 0}ms`}
       trend="neutral"
       icon="⚡"
       color="orange"
@@ -157,10 +161,12 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
     >
       <div class="mb-6 flex items-center justify-between">
         <h3 class="font-bold text-slate-900">{$tr("admin.searchActivity")}</h3>
-        <!-- Le select est retiré : GET /analytics/search ne prend aucun paramètre
-             et renvoie des valeurs codées en dur ("note": "Mock data"). Il n'y
-             avait rien à câbler, et un filtre qui ne filtre pas induit en erreur
-             sur la fraîcheur des chiffres affichés. -->
+        <!-- La fenêtre d'observation est affichée plutôt que choisie : le
+             backend accepte désormais `?days=`, mais un sélecteur suppose des
+             données sur plusieurs semaines. Il sera utile quand il y en aura. -->
+        <span class="text-sm text-slate-500"
+          >{$tr("admin.lastDays").replace("{n}", String(searchStats.window_days ?? 7))}</span
+        >
       </div>
 
       <!-- Placeholder Chart -->

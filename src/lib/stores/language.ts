@@ -122,6 +122,10 @@ export const translations = {
     'chat.header': 'Assistant Juridique IA',
     'chat.errorServer': 'Le serveur n\'a pas pu traiter votre question.',
     'chat.errorNetwork': 'Impossible de joindre le serveur.',
+    'chat.errorOverloaded': 'Le service est momentanément saturé. Réessayez dans quelques instants.',
+    'chat.errorTooShort': 'Votre question est trop courte : au moins 5 caractères.',
+    'chat.errorQuota': "Le quota de questions du jour est atteint. L'assistant sera de nouveau disponible demain.",
+    'admin.lastDays': 'Les {n} derniers jours',
 
     // Categories
     'categories.title': 'Explorer par Catégorie',
@@ -357,6 +361,10 @@ export const translations = {
     'chat.header': 'AI Legal Assistant',
     'chat.errorServer': 'The server could not process your question.',
     'chat.errorNetwork': 'Could not reach the server.',
+    'chat.errorOverloaded': 'The service is temporarily overloaded. Please try again shortly.',
+    'chat.errorTooShort': 'Your question is too short: at least 5 characters.',
+    'chat.errorQuota': "Today's question quota has been reached. The assistant will be available again tomorrow.",
+    'admin.lastDays': 'Last {n} days',
 
     // Categories
     'categories.title': 'Browse by Category',

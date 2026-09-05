@@ -258,13 +258,17 @@ export interface AnalyticsOverview {
 }
 
 export interface AnalyticsUsage {
+  window_days: number;
+  conversations: number;
+  questions_asked: number;
+  answers_generated: number;
+  searches: number;
   active_users: number;
-  total_calls: number;
-  api_calls?: Record<string, number>;
-  peak_hours?: unknown;
+  /** Heures les plus actives, mesurées sur `messages` et `search_events`. */
+  peak_hours?: { hour: number; count: number }[];
+  median_answer_time_ms: number;
+  personas_usage?: Record<string, number>;
   timestamp?: string;
-  /** Le backend marque lui-même ces valeurs comme fictives. */
-  note?: string;
 }
 
 /**
@@ -274,13 +278,22 @@ export interface AnalyticsUsage {
  * croire à un filtre qui n'existe pas.
  */
 export interface AnalyticsSearch {
+  window_days: number;
   total_searches: number;
-  avg_response_time_ms: number;
+  /**
+   * Médiane, et non moyenne : une seule requête froide à trois secondes
+   * déplace la moyenne et ne dit rien de l'expérience courante.
+   */
+  median_response_time_ms: number;
+  p95_response_time_ms: number;
+  max_response_time_ms: number;
+  cache_hit_rate_percent: number;
   /** Répartition entre les modes `text`, `semantic` et `hybrid`. */
   modes_usage?: Record<string, number>;
+  popular_queries?: { query: string; count: number }[];
+  /** Ce que les gens cherchent et que le corpus ne contient pas. */
+  queries_without_results?: { query: string; count: number }[];
   timestamp?: string;
-  /** Le backend marque lui-même ces valeurs comme fictives. */
-  note?: string;
 }
 
 /* -------------------------------------------------------------------------- */

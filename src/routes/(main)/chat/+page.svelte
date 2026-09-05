@@ -79,6 +79,15 @@
     );
   }
 
+  /** Contrainte serveur : RAGRequest.question impose min_length=5. */
+  const QUESTION_MIN_LENGTH = 5;
+
+  /** Identifiant de conversation rendu par le serveur, renvoyé au message suivant. */
+  let sessionId: string | null = null;
+
+  /** Dernière question envoyée, pour que « Réessayer » ait quelque chose à renvoyer. */
+  let lastQuestion = "";
+
   async function scrollToBottom() {
     await tick();
     if (messagesContainer) {
@@ -86,18 +95,45 @@
     }
   }
 
-  async function handleSendChatMessage() {
-    if (!chatInput.trim()) return;
+  /**
+   * Envoie une question au RAG.
+   *
+   * `question` est explicite parce que le bouton « Réessayer » n'avait aucune
+   * chance de fonctionner : il rappelait cette fonction, qui commençait par
+   * `if (!chatInput.trim()) return;` — or la saisie venait d'être vidée à
+   * l'envoi. Le bouton ne faisait rien, jamais.
+   */
+  async function handleSendChatMessage(question?: string) {
+    const query = (question ?? chatInput).trim();
+    if (!query) return;
+
+    // Le schéma serveur impose `min_length=5` sur `question`. Sans ce contrôle,
+    // une question de quatre lettres rendait un 422 que l'écran affichait en
+    // « erreur serveur » — un message qui accuse le serveur d'un refus légitime.
+    if (query.length < QUESTION_MIN_LENGTH) {
+      chatMessages = [
+        ...chatMessages,
+        {
+          id: chatMessages.length + 1,
+          type: "error",
+          content: t("chat.errorTooShort"),
+          timestamp: getCurrentTime(),
+        },
+      ];
+      await scrollToBottom();
+      return;
+    }
+
+    lastQuestion = query;
 
     const userMessage: ChatMessage = {
       id: chatMessages.length + 1,
       type: "user",
-      content: chatInput,
+      content: query,
       timestamp: getCurrentTime(),
     };
 
     chatMessages = [...chatMessages, userMessage];
-    const query = chatInput;
     chatInput = "";
     isTyping = true;
 
@@ -107,15 +143,22 @@
       const response = await fetch(`${API_URL}/rag/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           question: query,
           persona: "citoyen", // Default persona for general chat
-          language: $language.current
+          language: $language.current,
+          // `session_id` etait renvoye par le serveur et jete par le client :
+          // chaque message ouvrait donc une conversation NEUVE, et l'historique
+          // cote serveur ne pouvait jamais servir. Le renvoyer donne enfin une
+          // mémoire à la conversation, et rend GET/DELETE
+          // /rag/conversations/{id} atteignables.
+          ...(sessionId ? { session_id: sessionId } : {}),
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
+        if (data.session_id) sessionId = data.session_id;
         const aiMessage: ChatMessage = {
           id: chatMessages.length + 1,
           type: "assistant",
@@ -134,7 +177,14 @@
           {
             id: chatMessages.length + 1,
             type: "error",
-            content: t("chat.errorServer"),
+            // 503 = le fournisseur est saturé, pas une panne. Le dire, sinon
+            // l'utilisateur renonce là où un second essai aboutirait.
+            content:
+              response.status === 503
+                ? t("chat.errorOverloaded")
+                : response.status === 429
+                  ? t("chat.errorQuota")
+                  : t("chat.errorServer"),
             timestamp: getCurrentTime(),
           },
         ];
@@ -261,7 +311,7 @@
               >
                 <p class="text-red-700 dark:text-red-300">{message.content}</p>
                 <button
-                  on:click={handleSendChatMessage}
+                  on:click={() => handleSendChatMessage(lastQuestion)}
                   data-testid="chat-retry"
                   class="mt-2 text-sm font-semibold text-red-700 dark:text-red-300 underline"
                   >{t("common.retry")}</button
@@ -400,7 +450,7 @@
              conversationnelle (/upload et /batch-upload sont réservés à l'admin
              authentifié), et le bouton n'avait de toute façon aucun on:click. -->
         <button
-          on:click={handleSendChatMessage}
+          on:click={() => handleSendChatMessage()}
           disabled={!chatInput.trim()}
           aria-label={t("chat.send")}
           class="w-10 h-10 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white flex items-center justify-center transition-all hover:scale-105 disabled:hover:scale-100"
