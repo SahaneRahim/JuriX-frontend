@@ -1,5 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+  import { API_URL } from "$lib/api";
   import { tr } from "$lib/stores/language";
   import { fade, fly } from "svelte/transition";
 
@@ -17,121 +19,57 @@
     }
   }
 
-  // Full 14 categories configuration
-  $: categories = [
-    {
-      id: "constitutionnel",
-      filter: "constitution",
-      icon: "account_balance",
-      color: "text-amber-600 bg-amber-50 dark:bg-amber-500/10",
-      labelKey: "cat.constitutionnel",
-      descKey: "catdesc.constitutionnel",
-    },
-    {
-      id: "international",
-      filter: "international",
-      icon: "public",
-      color: "text-blue-800 bg-blue-50 dark:bg-blue-900/10",
-      labelKey: "cat.international",
-      descKey: "catdesc.international",
-    },
-    {
-      id: "civil",
-      filter: "civil",
-      icon: "groups",
-      color: "text-purple-600 bg-purple-50 dark:bg-purple-500/10",
-      labelKey: "cat.civil",
-      descKey: "catdesc.civil",
-    },
-    {
-      id: "penal",
-      filter: "penal",
-      icon: "lock",
-      color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-500/10",
-      labelKey: "cat.penal",
-      descKey: "catdesc.penal",
-    },
-    {
-      id: "travail",
-      filter: "travail",
-      icon: "work",
-      color: "text-sky-600 bg-sky-50 dark:bg-sky-500/10",
-      labelKey: "cat.travail",
-      descKey: "catdesc.travail",
-    },
-    {
-      id: "fiscal",
-      filter: "fiscal",
-      icon: "attach_money",
-      color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10",
-      labelKey: "cat.fiscal",
-      descKey: "catdesc.fiscal",
-    },
-    {
-      id: "affaires",
-      filter: "affaires",
-      icon: "business_center",
-      color: "text-red-600 bg-red-50 dark:bg-red-500/10",
-      labelKey: "cat.affaires",
-      descKey: "catdesc.affaires",
-    },
-    {
-      id: "lois",
-      filter: "loi",
-      icon: "menu_book",
-      color: "text-rose-600 bg-rose-50 dark:bg-rose-500/10",
-      labelKey: "cat.lois",
-      descKey: "catdesc.lois",
-    },
-    {
-      id: "ordonnances",
-      filter: "ordonnance",
-      icon: "assignment_late",
-      color: "text-orange-600 bg-orange-50 dark:bg-orange-500/10",
-      labelKey: "cat.ordonnances",
-      descKey: "catdesc.ordonnances",
-    },
-    {
-      id: "decrets",
-      filter: "decret",
-      icon: "description",
-      color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10",
-      labelKey: "cat.decrets",
-      descKey: "catdesc.decrets",
-    },
-    {
-      id: "arretes",
-      filter: "arrete",
-      icon: "rule",
-      color: "text-teal-600 bg-teal-50 dark:bg-teal-500/10",
-      labelKey: "cat.arretes",
-      descKey: "catdesc.arretes",
-    },
-    {
-      id: "circulaires",
-      filter: "circulaire",
-      icon: "campaign",
-      color: "text-cyan-600 bg-cyan-50 dark:bg-cyan-500/10",
-      labelKey: "cat.circulaires",
-      descKey: "catdesc.circulaires",
-    },
-    {
-      id: "decisions",
-      filter: "decision",
-      icon: "fact_check",
-      color: "text-blue-600 bg-blue-50 dark:bg-blue-500/10",
-      labelKey: "cat.decisions",
-      descKey: "catdesc.decisions",
-    },
-    {
-      id: "autres",
-      filter: "autre",
-      icon: "category",
-      color: "text-slate-600 bg-slate-50 dark:bg-slate-500/10",
-      labelKey: "cat.autres",
-      descKey: "catdesc.autres",
-    },
+  // Les categories viennent de la BASE, plus d'une liste ecrite en dur.
+  //
+  // L'ancienne liste melangeait des domaines juridiques (Droit Fiscal) et des
+  // types de texte (Lois, Decrets, Arretes). Un decret fiscal n'avait donc
+  // aucune case correcte, et le slug « lois » ne correspondant a aucune ligne
+  // de la table, la page de categorie basculait sur une recherche plein texte
+  // du mot « loi » — qui remonte tous les decrets. C'est exactement le
+  // symptome constate : des decrets affiches dans « Lois ».
+  type ApiCategory = {
+    id: number;
+    name: string;
+    description: string | null;
+    icon: string | null;
+    law_count: number;
+  };
+
+  let categories: ApiCategory[] = [];
+  let categoriesError = "";
+  let categoriesLoading = true;
+
+  // Palette appliquee par position d'affichage. Les couleurs sont decoratives :
+  // les rattacher au nom obligerait a modifier le front a chaque domaine ajoute.
+  const PALETTE = [
+    "text-amber-600 bg-amber-50 dark:bg-amber-500/10",
+    "text-slate-600 bg-slate-50 dark:bg-slate-500/10",
+    "text-sky-600 bg-sky-50 dark:bg-sky-500/10",
+    "text-blue-800 bg-blue-50 dark:bg-blue-900/10",
+    "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10",
+    "text-yellow-600 bg-yellow-50 dark:bg-yellow-500/10",
+    "text-orange-600 bg-orange-50 dark:bg-orange-500/10",
+    "text-purple-600 bg-purple-50 dark:bg-purple-500/10",
+    "text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10",
+    "text-pink-600 bg-pink-50 dark:bg-pink-500/10",
+    "text-teal-600 bg-teal-50 dark:bg-teal-500/10",
+    "text-red-600 bg-red-50 dark:bg-red-500/10",
+    "text-lime-600 bg-lime-50 dark:bg-lime-500/10",
+    "text-cyan-600 bg-cyan-50 dark:bg-cyan-500/10",
   ];
+
+  onMount(async () => {
+    try {
+      const response = await fetch(`${API_URL}/categories`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      categories = await response.json();
+    } catch (e) {
+      console.error("Chargement des categories impossible", e);
+      categoriesError = $tr("categories.errorLoad");
+    } finally {
+      categoriesLoading = false;
+    }
+  });
 </script>
 
 <svelte:head>
@@ -180,41 +118,54 @@
     </p>
   </div>
 
+  {#if categoriesLoading}
+    <p class="text-slate-500 dark:text-slate-400">{$tr("common.loading")}</p>
+  {:else if categoriesError}
+    <p class="text-red-600 dark:text-red-400">{categoriesError}</p>
+  {/if}
+
   <!-- Categories Grid -->
   <div
     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4"
   >
     {#each categories as cat, i}
+      <!--
+        Les categories vides restent affichees mais attenuees. Les masquer
+        ferait apparaitre et disparaitre des cases au fil des ingestions : le
+        plan de la page changerait a chaque visite, et un utilisateur cherchant
+        « Droit Pénal » conclurait que la plateforme ne le couvre pas.
+      -->
       <a
         href="/categories/{cat.id}"
-        class="group relative flex flex-col p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+        class="group relative flex flex-col p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 {cat.law_count ===
+        0
+          ? 'opacity-55'
+          : ''}"
       >
-        <!-- Icon -->
         <div class="mb-3 flex items-center justify-between">
           <div
-            class="w-10 h-10 rounded-xl {cat.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
+            class="w-10 h-10 rounded-xl {PALETTE[i % PALETTE.length]} flex items-center justify-center text-xl group-hover:scale-110 transition-transform duration-300"
           >
-            <span class="material-icons text-xl">{cat.icon}</span>
+            {cat.icon || "📄"}
           </div>
-
-          <!-- Small arrow on hover -->
           <span
-            class="material-icons text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-x-1 group-hover:translate-x-0 text-sm"
-            >arrow_forward</span
+            class="text-[11px] font-medium text-slate-400 dark:text-slate-500 tabular-nums"
           >
+            {cat.law_count}
+            {$tr("categories.documentsShort")}
+          </span>
         </div>
 
-        <!-- Content -->
         <div>
           <h3
             class="text-base font-bold text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
           >
-            {$tr(cat.labelKey)}
+            {cat.name}
           </h3>
           <p
             class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2"
           >
-            {$tr(cat.descKey)}
+            {cat.description || ""}
           </p>
         </div>
       </a>

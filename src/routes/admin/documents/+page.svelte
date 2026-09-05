@@ -237,26 +237,52 @@ let documents: any[] = [];
       {$tr("admin.docManagementDesc")}
     </p>
   </div>
-  <button
-    on:click={() => (showUploadModal = true)}
-    class="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-700 hover:scale-105"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke-width="2"
-      stroke="currentColor"
-      class="h-5 w-5"
+  <div class="flex items-center gap-3">
+    <!-- /admin/documents/batch-upload existait mais n'était liée depuis nulle
+         part : la page n'était atteignable qu'en tapant l'URL à la main. -->
+    <a
+      href="/admin/documents/batch-upload"
+      data-testid="doc-batch-upload-link"
+      class="flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-2.5 font-semibold text-slate-700 transition-all hover:border-blue-400 hover:text-blue-700"
     >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        d="M12 4.5v15m7.5-7.5h-15"
-      />
-    </svg>
-    {$tr("admin.newDoc")}
-  </button>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="2"
+        stroke="currentColor"
+        class="h-5 w-5"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+        />
+      </svg>
+      Import en lot
+    </a>
+    <button
+      on:click={() => (showUploadModal = true)}
+      data-testid="doc-new"
+      class="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-700 hover:scale-105"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="2"
+        stroke="currentColor"
+        class="h-5 w-5"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 4.5v15m7.5-7.5h-15"
+        />
+      </svg>
+      {$tr("admin.newDoc")}
+    </button>
+  </div>
 </div>
 
 <!-- Filters -->

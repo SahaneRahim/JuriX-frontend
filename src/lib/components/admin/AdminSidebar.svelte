@@ -57,9 +57,21 @@
     </ul>
 
     <div class="mt-auto px-3 border-t border-slate-200 pt-4 mt-6">
+        <!-- L'administration n'avait AUCUNE sortie vers le site public : le logo
+             pointe /admin, et la seule issue était la déconnexion. -->
+        <a
+          href="/"
+          data-testid="admin-back-to-site"
+          class="mb-1 flex w-full items-center rounded-lg p-3 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" />
+          </svg>
+          Retour au site
+        </a>
         <button
           type="button"
           on:click={handleLogout}
+          data-testid="admin-logout"
           class="flex w-full items-center rounded-lg p-3 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />

@@ -8,8 +8,25 @@
 
   const dispatch = createEventDispatcher();
 
+  /**
+   * Annuler doit AUSSI fermer.
+   *
+   * Le bouton n'émettait que `cancel` : la modale restait affichée après le
+   * clic. Combiné à l'absence de croix, de fond cliquable et de touche Échap,
+   * l'utilisateur n'avait plus AUCUNE sortie pendant tout le traitement.
+   */
   function handleCancel() {
     dispatch('cancel');
+    handleClose();
+  }
+
+  function onBackdropClick(event: MouseEvent) {
+    // Un clic dans la boîte ne doit pas la fermer.
+    if (event.target === event.currentTarget) handleClose();
+  }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (isOpen && event.key === 'Escape') handleClose();
   }
 
   function handleClose() {
@@ -22,8 +39,15 @@
   $: hasFailed = !!error;
 </script>
 
+<svelte:window on:keydown={onKeydown} />
+
 {#if isOpen}
-  <div class="modal-backdrop" role="presentation">
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    data-testid="processing-modal"
+    on:click={onBackdropClick}
+  >
     <div class="modal-content" role="dialog" aria-labelledby="modal-title" aria-modal="true">
       <div class="modal-header">
         <h2 id="modal-title" class="modal-title">
@@ -35,6 +59,13 @@
             ⏳ Traitement en cours
           {/if}
         </h2>
+        <button
+          type="button"
+          class="modal-close"
+          data-testid="processing-modal-close"
+          aria-label="Fermer"
+          on:click={handleClose}>&times;</button
+        >
       </div>
 
       <div class="modal-body">
@@ -103,9 +134,28 @@
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   }
 
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.75rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #64748b;
+    padding: 0 0.25rem;
+  }
+
+  .modal-close:hover {
+    color: #0f172a;
+  }
+
   .modal-header {
     padding: 1.5rem;
     border-bottom: 1px solid #e5e7eb;
+    /* La croix vient d'être ajoutée : sans flex elle passerait sous le titre. */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
   }
 
   .modal-title {

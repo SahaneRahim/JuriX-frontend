@@ -1,155 +1,55 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { API_URL } from "$lib/api";
   import { page } from "$app/stores";
-  import { onMount } from "svelte";
   import { language, tr } from "$lib/stores/language";
   import { fade, fly } from "svelte/transition";
 
-  // Get category ID from URL params
-  $: categoryId = $page.params.id;
+  // L'identifiant vient de la BASE, plus d'un slug devine.
+  //
+  // L'ancienne version recevait un slug (« lois », « decrets ») et cherchait
+  // une categorie dont le nom le CONTIENNE. Quand rien ne correspondait — et
+  // rien ne correspondait jamais pour les types de texte — elle basculait sur
+  // une recherche plein texte du mot « loi », qui remonte tous les decrets :
+  // d'ou des decrets affiches dans « Lois ». Ce repli est supprime. Une
+  // categorie introuvable se dit maintenant au lieu d'etre maquillee en
+  // resultats.
+  $: categoryId = Number($page.params.id);
+  $: isValidId = Number.isInteger(categoryId) && categoryId > 0;
 
-  // State
   let documents: any[] = [];
   let isLoading = true;
   let error = "";
   let categoryTitle = "";
   let categoryDesc = "";
+  let categoryIcon = "";
 
-  // Helper to get category details from ID
-  function getCategoryDetails(id: string) {
-    const key = `cat.${id}`;
-    const descKey = `catdesc.${id}`;
-    // We use the store's value reactively
-    return {
-      title: $tr(key),
-      description: $tr(descKey),
-    };
-  }
+  let searchQuery = "";
+  let selectedLanguage = $language.current;
 
-  // Update title/desc when categoryId or language changes
-  $: {
-    if (categoryId) {
-      const details = getCategoryDetails(categoryId);
-      categoryTitle = details.title;
-      categoryDesc = details.description;
-    }
-  }
-
-  // Fetch categories and find the ID for the current slug
-  async function getCategoryIdFromName(slug: string): Promise<number | null> {
-    try {
-      const response = await fetch(`${API_URL}/categories`);
-      if (!response.ok) return null;
-
-      const categories = await response.json();
-
-      // Map frontend slugs to likely backend names (or partial match)
-      // This is necessary because backend uses IDs and French names, frontend uses slugs
-      const normalizedSlug = slug.toLowerCase();
-
-      // 1. Try to match by simplified name
-      const targetName =
-        {
-          constitutionnel: "constitution",
-          international: "international",
-          civil: "civil",
-          penal: "p\u00e9nal", // pénal
-          travail: "travail",
-          fiscal: "fiscal",
-          affaires: "affaires",
-          lois: "lois",
-          ordonnances: "ordonnances",
-          decrets: "d\u00e9crets", // décrets
-          arretes: "arr\u00eat\u00e9s", // arrêtés
-          circulaires: "circulaires",
-          decisions: "d\u00e9cisions", // décisions
-          autres: "autres",
-        }[normalizedSlug] || normalizedSlug;
-
-      const found = categories.find(
-        (c: any) =>
-          c.name.toLowerCase().includes(targetName) ||
-          (normalizedSlug === "penal" &&
-            c.name.toLowerCase().includes("p\u00e9nal")),
-      );
-
-      return found ? found.id : null;
-    } catch (e) {
-      console.error("Error fetching categories:", e);
-      return null;
-    }
-  }
-
-  // Fetch documents for the category
-  async function fetchCategoryDocuments(
-    slug: string,
-    language: string = "all",
-  ) {
+  async function loadCategory(id: number, lang: string) {
     isLoading = true;
     error = "";
     documents = [];
 
     try {
-// 1. Get the numeric ID from the backend
-      const backendId = await getCategoryIdFromName(slug);
-
-      if (!backendId) {
-        console.warn(`Category ID not found for slug: ${slug}`);
-        // Fallback: Use search API if category mapping failed?
-        const filterMap: Record<string, string> = {
-          constitutionnel: "constitution",
-          lois: "loi",
-          ordonnances: "ordonnance",
-          decrets: "decret",
-          arretes: "arrete",
-          circulaires: "circulaire",
-          decisions: "decision",
-          civil: "civil",
-          penal: "penal",
-          travail: "travail",
-          fiscal: "fiscal",
-          affaires: "affaires",
-          international: "international",
-          autres: "autre",
-        };
-        const filter = filterMap[slug] || slug;
-
-        const searchBody: any = {
-          query: filter,
-          mode: "text",
-          limit: 50,
-        };
-        if (language !== "all") {
-          searchBody.filters = { language: language };
-        }
-
-        const response = await fetch(`${API_URL}/search/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(searchBody),
-        });
-
-        if (!response.ok) throw new Error("Backend unavailable");
-        const data = await response.json();
-        documents = data.results || [];
-        isLoading = false;
+      const categoryResponse = await fetch(`${API_URL}/categories/${id}`);
+      if (categoryResponse.status === 404) {
+        error = $tr("categories.notFound");
         return;
       }
+      if (!categoryResponse.ok) throw new Error(`HTTP ${categoryResponse.status}`);
 
-      // 2. Fetch laws using the ID and language
-      let url = `${API_URL}/laws/?category_id=${backendId}&limit=50`;
-      if (language !== "all") {
-        url += `&language=${language}`;
-      }
+      const category = await categoryResponse.json();
+      categoryTitle = category.name;
+      categoryDesc = category.description || "";
+      categoryIcon = category.icon || "📄";
 
-      const response = await fetch(url);
+      let url = `${API_URL}/laws/?category_id=${id}&limit=50`;
+      if (lang !== "all") url += `&language=${lang}`;
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch documents");
-      }
-
-      const data = await response.json();
-      documents = data;
+      const lawsResponse = await fetch(url);
+      if (!lawsResponse.ok) throw new Error(`HTTP ${lawsResponse.status}`);
+      documents = await lawsResponse.json();
     } catch (e) {
       console.error(e);
       error = $tr("categories.errorLoad");
@@ -158,77 +58,41 @@
     }
   }
 
-  // Initial fetch on mount
-  onMount(() => {
-    if (categoryId) {
-      fetchCategoryDocuments(categoryId, selectedLanguage);
-    }
-  });
+  // Un seul declencheur reactif. L'ancienne version chargeait depuis onMount ET
+  // depuis un bloc reactif, ce qui lançait deux requetes concurrentes au montage.
+  $: if (isValidId) {
+    loadCategory(categoryId, selectedLanguage);
+  } else if ($page.params.id) {
+    isLoading = false;
+    error = $tr("categories.notFound");
+  }
 
   function formatDate(dateString: string) {
     if (!dateString) return "";
     return new Date(dateString).toLocaleDateString(
       $language.current === "fr" ? "fr-FR" : "en-US",
-      {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      },
+      { year: "numeric", month: "long", day: "numeric" },
     );
   }
 
-  // Search and Filter State
-  let searchQuery = "";
-  let selectedLanguage = $language.current; // Default to platform language ('fr' or 'en')
-
-  // Filtered documents (Client-side search only, language is server-side)
-  $: filteredDocuments = documents.filter((doc) => {
-    const matchesSearch =
+  $: filteredDocuments = documents.filter(
+    (doc) =>
       searchQuery === "" ||
       doc.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.content?.toLowerCase().includes(searchQuery.toLowerCase());
+      doc.content?.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
-    return matchesSearch;
-  });
+  $: currentStyle = { icon: categoryIcon, bg: "bg-white/20 text-white" };
 
-  // Trigger fetch when category or language changes
-  $: if (categoryId) {
-    fetchCategoryDocuments(categoryId, selectedLanguage);
-  }
-
-  // Category Icon & Color mapping (duplicated from categories page for styling)
-  const categoryStyles: Record<string, { icon: string; bg: string }> = {
-    constitutionnel: {
-      icon: "account_balance",
-      bg: "bg-amber-100 text-amber-600",
-    },
-    international: { icon: "public", bg: "bg-blue-100 text-blue-600" },
-    civil: { icon: "groups", bg: "bg-purple-100 text-purple-600" },
-    penal: { icon: "lock", bg: "bg-rose-100 text-rose-600" },
-    travail: { icon: "work", bg: "bg-sky-100 text-sky-600" },
-    fiscal: { icon: "attach_money", bg: "bg-emerald-100 text-emerald-600" },
-    affaires: { icon: "business_center", bg: "bg-red-100 text-red-600" },
-    lois: { icon: "menu_book", bg: "bg-indigo-100 text-indigo-600" },
-    ordonnances: {
-      icon: "assignment_late",
-      bg: "bg-orange-100 text-orange-600",
-    },
-    decrets: { icon: "description", bg: "bg-teal-100 text-teal-600" },
-    arretes: { icon: "rule", bg: "bg-cyan-100 text-cyan-600" },
-    circulaires: { icon: "campaign", bg: "bg-lime-100 text-lime-600" },
-    decisions: { icon: "fact_check", bg: "bg-blue-100 text-blue-800" },
-    autres: { icon: "category", bg: "bg-slate-100 text-slate-600" },
-  };
-
-  $: currentStyle = categoryStyles[categoryId?.toLowerCase()] || {
-    icon: "folder",
-    bg: "bg-slate-100 text-slate-500",
-  };
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
 <svelte:head>
   <title>JuriX - {categoryTitle}</title>
 </svelte:head>
+
+<SiteHeader />
 
 <div class="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
   <!-- Blue Header Section -->
@@ -255,9 +119,7 @@
         <div
           class="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 shadow-inner"
         >
-          <span class="material-icons text-4xl text-white"
-            >{currentStyle.icon}</span
-          >
+          <span class="text-4xl leading-none">{currentStyle.icon}</span>
         </div>
         <div>
           <h1
@@ -387,9 +249,7 @@
                 <div
                   class="shrink-0 w-12 h-12 rounded-xl {currentStyle.bg} flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
                 >
-                  <span class="material-icons text-2xl"
-                    >{currentStyle.icon}</span
-                  >
+                  <span class="text-2xl leading-none">{currentStyle.icon}</span>
                 </div>
 
                 <!-- Content -->
@@ -447,3 +307,5 @@
     </div>
   </div>
 </div>
+
+<SiteFooter />

@@ -111,7 +111,15 @@ let title = '';
       close();
     }
   }
+
+  // Le keydown du fond ne réagissait qu'à Entrée et Espace, et n'est atteint
+  // que si le fond a le focus. Échap doit fermer depuis n'importe où.
+  function onKeydown(e: KeyboardEvent) {
+    if (show && e.key === 'Escape') close();
+  }
 </script>
+
+<svelte:window on:keydown={onKeydown} />
 
 {#if show}
   <div 

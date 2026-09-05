@@ -1,5 +1,7 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
+  import ImagePdfViewer from "$lib/components/ImagePdfViewer.svelte";
+  import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { language, switchLanguage } from "$lib/stores/language";
@@ -45,6 +47,8 @@
       ai_implications: "Implications",
       ai_impl_desc: "Ce que cela signifie concrètement pour vous.",
       ai_ask: "Poser une question à l'Assistant IA",
+      show_document: "Document original",
+      show_text: "Revenir au texte",
       link_copied: "Lien copié !",
       article_prefix: "Article", // For "Article 1"
     },
@@ -73,6 +77,8 @@
       ai_implications: "Implications",
       ai_impl_desc: "What this concretely means for you.",
       ai_ask: "Ask the AI Assistant",
+      show_document: "Original document",
+      show_text: "Back to text",
       link_copied: "Link copied!",
       article_prefix: "Article",
     },
@@ -88,6 +94,16 @@
 
   let currentArticleIndex = 0;
   let searchQuery = "";
+
+  /**
+   * Affichage du document d'origine.
+   *
+   * ImagePdfViewer est préféré à PdfViewer : il affiche des pages rendues par
+   * le serveur, sans charger pdfjs-dist ni son worker. PdfViewer importe cette
+   * bibliothèque statiquement, ce qui alourdirait le bundle de la page la plus
+   * consultée du site pour une fonction secondaire.
+   */
+  let afficherDocument = false;
 
   // -- Logic --
 
@@ -227,6 +243,20 @@
     scrollToTop();
   }
 
+  /**
+   * Ouvre l'assistant avec la question pré-remplie.
+   *
+   * Le bouton n'avait aucun `on:click` : il annonçait une action et n'en
+   * déclenchait aucune. Il crée maintenant une entrée profonde vers /chat, qui
+   * n'était atteignable que par les onglets de l'accueil.
+   */
+  function askAssistant() {
+    const sujet = currentArticle
+      ? `${law?.title ?? ""} — ${t.article_prefix} ${currentArticle.number} : `
+      : `${law?.title ?? ""} : `;
+    goto(`/chat?q=${encodeURIComponent(sujet)}`);
+  }
+
   function scrollToTop() {
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -260,11 +290,15 @@
       return { ...section, articles: filteredArticles };
     })
     .filter((s) => s.articles.length > 0);
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
 <svelte:head>
   <title>JuriX - {law?.title || "Document"}</title>
 </svelte:head>
+
+<SiteHeader />
 
 <div
   class="page text-slate-900 dark:text-gray-100 bg-[#F8F9FA] dark:bg-slate-900 min-h-screen font-sans"
@@ -308,8 +342,11 @@
           /></svg
         >
         {#if law?.category_id}
-          <a href="/" class="hover:text-blue-600 transition-colors"
-            >{t.category} {law.category_id}</a
+          <!-- Pointait vers "/" : le libellé annonçait une catégorie et le lien
+               ramenait à l'accueil. La route /categories/[id] existe. -->
+          <a
+            href="/categories/{law.category_id}"
+            class="hover:text-blue-600 transition-colors">{t.category} {law.category_id}</a
           >
           <svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"
             ><path
@@ -356,7 +393,12 @@
       ></div>
     </div>
   {:else if error}
-    <div class="text-center py-20">
+    <!-- data-testid : cette page charge dans onMount, sans `load` serveur. Le
+         rendu répond donc 200 même pour un identifiant inexistant, et un
+         contrôle de statut ne prouverait rien. Ce marqueur est le seul moyen
+         pour le test d'intégrité de distinguer une fiche réelle d'une fiche
+         vide (tests/e2e/navigation/link-integrity.spec.ts). -->
+    <div class="text-center py-20" data-testid="law-error">
       <h2 class="text-2xl font-bold text-gray-700 dark:text-gray-300">
         {error}
       </h2>
@@ -520,6 +562,19 @@
                     >
                     {t.download}
                   </a>
+                  <!-- ImagePdfViewer et PdfViewer étaient complets et testés,
+                       mais importés NULLE PART : le document d'origine n'était
+                       consultable qu'en le téléchargeant. -->
+                  <button
+                    on:click={() => (afficherDocument = !afficherDocument)}
+                    data-testid="law-toggle-document"
+                    class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors {afficherDocument
+                      ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300'
+                      : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
+                  >
+                    <span class="material-icons text-lg">picture_as_pdf</span>
+                    {afficherDocument ? t.show_text : t.show_document}
+                  </button>
                 {:else}
                   <!-- Loi creee sans televersement : l'endpoint repondrait 404.
                        Bouton desactive et explique, plutot que masque sans
@@ -540,6 +595,15 @@
                 {/if}
               </div>
             </div>
+
+            {#if afficherDocument && law.file_id}
+              <div
+                class="mt-6 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+                data-testid="law-document-viewer"
+              >
+                <ImagePdfViewer url={`${API_URL}/laws/${law.id}/download`} />
+              </div>
+            {/if}
 
             <!-- Navigation -->
             <div
@@ -674,6 +738,8 @@
                       </li>
                     </ol>
                     <button
+                      on:click={askAssistant}
+                      data-testid="law-ask-ai"
                       class="ai-question-btn mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       {t.ai_ask}
@@ -696,3 +762,5 @@
     </div>
   {/if}
 </div>
+
+<SiteFooter />

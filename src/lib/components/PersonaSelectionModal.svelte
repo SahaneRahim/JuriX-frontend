@@ -45,10 +45,18 @@
       close();
     }
   }
+
+  // Échap ferme la modale. Aucune des quatre modales du projet ne le gérait :
+  // au clavier, la seule sortie était d'atteindre la croix à la tabulation.
+  function onKeydown(event: KeyboardEvent) {
+    if (isOpen && event.key === 'Escape') close();
+  }
 </script>
 
+<svelte:window on:keydown={onKeydown} />
+
 {#if isOpen}
-  <div class="modal-backdrop" on:click={handleBackdropClick} role="presentation">
+  <div class="modal-backdrop" on:click={handleBackdropClick} role="presentation" data-testid="persona-modal">
     <div class="modal-content" role="dialog" aria-labelledby="modal-title" aria-modal="true">
       <div class="modal-header">
         <h2 id="modal-title" class="modal-title">Sélectionnez votre profil</h2>

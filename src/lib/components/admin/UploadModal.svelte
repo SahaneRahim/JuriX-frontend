@@ -160,11 +160,27 @@ let files: FileList | null = null;
         documentReference = "";
         dispatch("close");
     }
+
+  // Échap ferme la modale. Aucune des quatre modales du projet ne le gérait :
+  // au clavier, la seule sortie était d'atteindre la croix à la tabulation.
+  function onKeydown(event: KeyboardEvent) {
+    if (show && event.key === 'Escape') close();
+  }
+
+  function onBackdropClick(event: MouseEvent) {
+    // Le fond n'avait aucun gestionnaire : cliquer à côté ne fermait rien.
+    if (event.target === event.currentTarget) close();
+  }
 </script>
+
+<svelte:window on:keydown={onKeydown} />
 
 {#if show}
     <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm"
+        role="presentation"
+        data-testid="upload-modal"
+        on:click={onBackdropClick}
         transition:fade
     >
         <div

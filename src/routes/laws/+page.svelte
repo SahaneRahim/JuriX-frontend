@@ -9,6 +9,8 @@
   import { onMount } from "svelte";
   import { API_URL } from "$lib/api";
   import { tr } from "$lib/stores/language";
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
 
   const PAGE_SIZE = 20;
 
@@ -81,6 +83,8 @@
 </script>
 
 <svelte:head><title>JuriX — {$tr("laws.title")}</title></svelte:head>
+
+<SiteHeader />
 
 <div class="max-w-5xl mx-auto px-4 py-8">
   <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -193,3 +197,5 @@
     </div>
   {/if}
 </div>
+
+<SiteFooter />

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
+  import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { language, tr } from "$lib/stores/language";
 
@@ -163,6 +164,14 @@
 
   onMount(() => {
     if (!initialized) initMessages();
+
+    // Entrée profonde depuis /laws/[id] : « Poser une question à l'Assistant
+    // IA » arrive ici avec le sujet déjà rédigé. La question est PRÉ-REMPLIE et
+    // non envoyée : l'utilisateur la complète avant de la poser, sinon on
+    // dépenserait un appel au modèle pour une phrase qu'il n'a pas écrite.
+    const q = $page.url.searchParams.get("q");
+    if (q) chatInput = q;
+
     scrollToBottom();
   });
 </script>
@@ -345,14 +354,9 @@
           placeholder={t("chat.placeholder")}
           class="flex-1 bg-transparent border-none focus:ring-0 text-slate-800 dark:text-white placeholder-slate-400 py-2"
         />
-        <button
-          class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-          title={$language.current === "fr"
-            ? "Joindre un fichier"
-            : "Attach a file"}
-        >
-          <span class="material-icons">attach_file</span>
-        </button>
+        <!-- Le trombone est retiré : aucun endpoint n'accepte de pièce jointe
+             conversationnelle (/upload et /batch-upload sont réservés à l'admin
+             authentifié), et le bouton n'avait de toute façon aucun on:click. -->
         <button
           on:click={handleSendChatMessage}
           disabled={!chatInput.trim()}

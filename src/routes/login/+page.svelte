@@ -5,6 +5,9 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { API_URL } from "$lib/api";
+  // La page ne contenait aucun <a> : une fois arrivé dessus, il n'existait
+  // aucun moyen de revenir au site autrement qu'en modifiant l'URL.
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { authStore } from "$lib/stores/auth";
   import "../../app.css";
 
@@ -14,11 +17,27 @@
   let loading = false;
 
   // Redirection post-connexion, transmise par la garde du layout admin.
-  $: next = $page.url.searchParams.get("next") || "/admin";
+  // `next` n'est renseigné que si la garde admin nous a envoyés ici.
+  $: next = $page.url.searchParams.get("next");
+
+  /**
+   * Où envoyer un compte après connexion.
+   *
+   * Le repli était `/admin` en dur. Un compte NON-admin se connectant depuis
+   * /login était donc envoyé vers /admin, dont la garde le renvoyait vers
+   * /login : boucle sans issue, sans message. Le repli dépend maintenant du
+   * rôle réellement obtenu.
+   */
+  function destinationFor(role: string | undefined): string {
+    if (next) return next;
+    return ["admin", "superadmin"].includes(role ?? "") ? "/admin" : "/";
+  }
 
   onMount(() => {
     // Déjà connecté : inutile de repasser par le formulaire.
-    if ($authStore.isAuthenticated) goto(next, { replaceState: true });
+    if ($authStore.isAuthenticated) {
+      goto(destinationFor($authStore.user?.role), { replaceState: true });
+    }
   });
 
   async function handleSubmit() {
@@ -42,7 +61,7 @@
           },
           data.access_token,
         );
-        await goto(next, { replaceState: true });
+        await goto(destinationFor(data.role), { replaceState: true });
         return;
       }
 
@@ -65,7 +84,9 @@
 
 <svelte:head><title>Connexion — JuriX Admin</title></svelte:head>
 
-<div class="flex min-h-screen items-center justify-center bg-slate-50 px-4 font-sans">
+<SiteHeader />
+
+<div class="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-slate-50 px-4 font-sans">
   <div class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
     <div class="mb-8 flex items-center justify-center gap-2 font-bold text-slate-900">
       <span class="text-3xl">⚖️</span>

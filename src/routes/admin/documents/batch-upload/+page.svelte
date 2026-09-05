@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { API_URL, WS_URL } from '$lib/api';
+  // apiFetch est utilisé plus bas pour le téléversement : sans lui dans cet
+  // import, chaque clic sur « Téléverser » levait un ReferenceError, capturé
+  // par le catch et affiché en alert. Le téléversement par lot était donc
+  // totalement inopérant, sans que rien ne le signale à la compilation.
+  import { API_URL, WS_URL, apiFetch } from '$lib/api';
 	import { onMount, onDestroy } from "svelte";
 	import { goto } from "$app/navigation";
 	import { language, tr } from "$lib/stores/language";
@@ -230,10 +234,22 @@
 	}
 </script>
 
-<div class="min-h-screen bg-gray-50 p-8">
+<!-- Ni min-h-screen ni p-8 ici : admin/+layout.svelte fournit déjà le fond et
+     un p-8 autour du <slot />. Les cumuler doublait la marge de cette seule
+     page par rapport aux autres écrans d'administration. -->
+<div>
 	<div class="max-w-7xl mx-auto">
 		<!-- Header -->
 		<div class="mb-8">
+			<!-- La page n'avait aucun retour : on n'y arrivait qu'en tapant l'URL. -->
+			<a
+				href="/admin/documents"
+				data-testid="batch-back-to-documents"
+				class="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-blue-600"
+			>
+				<span aria-hidden="true">←</span>
+				{$tr("admin.docManagement")}
+			</a>
 			<h1 class="text-3xl font-bold text-gray-900">
 				{$tr("admin.batchUpload")}
 			</h1>

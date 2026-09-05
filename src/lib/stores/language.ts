@@ -133,6 +133,7 @@ export const translations = {
     'categories.subtitle': 'Explorez les textes de loi par grandes catégories',
     'categories.back': 'Retour aux catégories',
     'categories.documents': 'document(s) dans cette catégorie',
+    'categories.documentsShort': 'doc.',
     'categories.empty': 'Aucun document',
     'categories.emptyDesc': 'Il n\'y a pas encore de documents dans cette catégorie.',
 
@@ -215,6 +216,7 @@ export const translations = {
     'search.resultsFound': 'résultats trouvés',
     'search.seconds': 'secondes',
     'search.readFull': 'Lire le texte complet',
+    'search.copyLink': 'Copier le lien',
     'search.allTexts': 'Tous les textes',
     'search.laws': 'Lois',
     'search.decrees': 'Décrets',
@@ -263,6 +265,16 @@ export const translations = {
     'nav.about': 'À propos',
     'nav.admin': 'Administration',
     'nav.login': 'Se connecter',
+    'nav.logout': 'Se déconnecter',
+
+    // Page d'erreur (src/routes/+error.svelte)
+    'error.notFoundTitle': 'Cette page n\'existe pas',
+    'error.notFoundBody': 'Le lien est peut-être périmé, ou l\'adresse comporte une faute. Voici par où repartir.',
+    'error.genericTitle': 'Quelque chose s\'est mal passé',
+    'error.genericBody': 'Réessayez dans un instant. Si le problème persiste, revenez à l\'accueil.',
+    // 'nav.signup' conservée : plus aucun lien ne l'utilise (aucun endpoint
+    // d'inscription n'existe côté backend), mais la retirer casserait toute
+    // traduction encore référencée ailleurs.
     'nav.signup': 'S\'inscrire',
 
     // Footer
@@ -294,6 +306,7 @@ export const translations = {
     'categories.docsCount': 'document(s) dans cette catégorie',
     'categories.noPreview': 'Aucun aperçu disponible',
     'categories.errorLoad': 'Impossible de charger les documents. Vérifiez que le serveur backend est démarré.',
+    'categories.notFound': "Cette catégorie n'existe pas.",
 
     // Admin
     'admin.dashboard': 'Tableau de Bord',
@@ -413,6 +426,7 @@ export const translations = {
     'categories.subtitle': 'Explore legal texts by major categories',
     'categories.back': 'Back to categories',
     'categories.documents': 'document(s) in this category',
+    'categories.documentsShort': 'doc.',
     'categories.empty': 'No documents',
     'categories.emptyDesc': 'There are no documents in this category yet.',
 
@@ -496,6 +510,7 @@ export const translations = {
     'search.seconds': 'seconds',
 
     'search.readFull': 'Read full text',
+    'search.copyLink': 'Copy link',
     'search.allTexts': 'All texts',
     'search.laws': 'Laws',
     'search.decrees': 'Decrees',
@@ -544,6 +559,13 @@ export const translations = {
     'nav.about': 'About',
     'nav.admin': 'Admin',
     'nav.login': 'Log in',
+    'nav.logout': 'Log out',
+
+    // Error page (src/routes/+error.svelte)
+    'error.notFoundTitle': 'This page does not exist',
+    'error.notFoundBody': 'The link may be outdated, or the address has a typo. Here is where to go next.',
+    'error.genericTitle': 'Something went wrong',
+    'error.genericBody': 'Try again in a moment. If the problem persists, head back home.',
     'nav.signup': 'Sign up',
 
     // Footer
@@ -575,6 +597,7 @@ export const translations = {
     'categories.docsCount': 'document(s) in this category',
     'categories.noPreview': 'No preview available',
     'categories.errorLoad': 'Unable to load documents. Check that the backend server is running.',
+    'categories.notFound': 'This category does not exist.',
 
     // Admin
     'admin.dashboard': 'Dashboard',

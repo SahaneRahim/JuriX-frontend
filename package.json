@@ -9,7 +9,8 @@
     "test": "vitest",
     "test:e2e": "playwright test",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:e2e:nav": "playwright test tests/e2e/navigation"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",

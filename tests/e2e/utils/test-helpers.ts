@@ -28,7 +28,10 @@ export const TEST_DATA = {
  * Login as admin user
  */
 export async function loginAsAdmin(page: Page, aiHelper: any) {
-  await aiHelper('Navigate to admin login page at /admin/login', page);
+  // La route est /login, jamais /admin/login : cette dernière n'a jamais
+  // existé. Le helper visait la même route fantôme que AdminLayout.svelte,
+  // désormais supprimé.
+  await aiHelper('Navigate to the login page at /login', page);
   await aiHelper(`Fill email field with "${TEST_DATA.admin.email}"`, page);
   await aiHelper(`Fill password field with "${TEST_DATA.admin.password}"`, page);
   await aiHelper('Click the login button', page);

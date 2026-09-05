@@ -1,11 +1,16 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
   import SearchBar from '$lib/components/SearchBar.svelte';
+  // Cette page recopiait le header à la main (90 lignes) : la copie et
+  // l'original avaient divergé — le lien mort vers /categories a dû être
+  // corrigé deux fois, et le bouton flottant « assistant » pointait ici vers
+  // l'accueil au lieu de /chat.
+  import SiteFooter from '$lib/components/SiteFooter.svelte';
+  import SiteHeader from '$lib/components/SiteHeader.svelte';
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { language, switchLanguage, tr } from "$lib/stores/language";
-  import { themeStore } from "$lib/stores/theme";
+  import { language, tr } from "$lib/stores/language";
 
 // State
   let searchQuery = "";
@@ -18,15 +23,81 @@
   let errorMessage = "";
   let sortBy = "relevance";
 
-  // Dynamic translations - computed
-  $: categories = [
-    $tr("search.laborLaw"),
-    $tr("search.civilLaw"),
-    $tr("search.criminalLaw"),
-    $tr("search.businessLaw"),
-    $tr("search.taxLaw"),
-    $tr("search.constitutionalLaw"),
-  ];
+  /**
+   * Filtres latéraux.
+   *
+   * Les radios et les cases n'avaient AUCUN `bind:` ni `on:change` : la colonne
+   * de filtres était entièrement décorative, elle ne filtrait rien.
+   *
+   * Les catégories sont désormais chargées depuis l'API. Les six libellés
+   * codés en dur étaient des chaînes traduites SANS identifiant : impossible
+   * de les envoyer à `SearchFilters.category_ids`, qui attend des entiers.
+   */
+  const RESULTS_PER_PAGE = 20; // SearchRequest.limit est plafonné à 50 côté API
+
+  let dateRange: "all" | "year" | "5y" = "all";
+  let selectedCategoryIds: number[] = [];
+  let categories: { id: number; name: string }[] = [];
+
+  async function loadCategories() {
+    try {
+      const r = await fetch(`${API_URL}/categories`);
+      if (r.ok) {
+        const data = await r.json();
+        categories = (Array.isArray(data) ? data : (data.items ?? [])).map(
+          (c: any) => ({ id: c.id, name: c.name }),
+        );
+      }
+    } catch {
+      // Les filtres restent vides : la recherche fonctionne sans eux.
+    }
+  }
+
+  /** Traduit `dateRange` en bornes d'années comprises par l'API. */
+  function yearBounds(): { year_from?: number } {
+    const now = new Date().getFullYear();
+    if (dateRange === "year") return { year_from: now };
+    if (dateRange === "5y") return { year_from: now - 4 };
+    return {};
+  }
+
+  function resetFilters() {
+    dateRange = "all";
+    selectedCategoryIds = [];
+    activeTab = "all";
+    sortBy = "relevance";
+    currentPage = 1;
+    performSearch();
+  }
+
+  function toggleCategory(id: number) {
+    selectedCategoryIds = selectedCategoryIds.includes(id)
+      ? selectedCategoryIds.filter((c) => c !== id)
+      : [...selectedCategoryIds, id];
+    currentPage = 1;
+    performSearch();
+  }
+
+  $: totalPages = Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
+
+  function goToPage(n: number) {
+    if (n < 1 || n > totalPages || n === currentPage) return;
+    currentPage = n;
+    performSearch();
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /**
+   * Fenêtre de pagination : au plus 5 numéros centrés sur la page courante.
+   * Les numéros étaient codés en dur (« 1 2 3 ») et sans `on:click`.
+   */
+  $: visiblePages = (() => {
+    const span = 5;
+    let start = Math.max(1, currentPage - Math.floor(span / 2));
+    const end = Math.min(totalPages, start + span - 1);
+    start = Math.max(1, end - span + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  })();
 
   $: tabFilters = [
     {
@@ -51,6 +122,7 @@
   ];
 
   onMount(() => {
+    loadCategories();
     const urlQuery = $page.url.searchParams.get("q");
     if (urlQuery) {
       searchQuery = urlQuery;
@@ -80,8 +152,17 @@
         body: JSON.stringify({
           query: searchQuery,
           mode: "text",
-          limit: 20,
-          filters: { status: "published" },
+          limit: RESULTS_PER_PAGE,
+          // `offset` existe depuis toujours dans SearchRequest : la pagination
+          // affichée n'était simplement jamais envoyée.
+          offset: (currentPage - 1) * RESULTS_PER_PAGE,
+          filters: {
+            status: "published",
+            ...yearBounds(),
+            ...(selectedCategoryIds.length
+              ? { category_ids: selectedCategoryIds }
+              : {}),
+          },
         }),
       });
 
@@ -103,7 +184,27 @@
     }
   }
 
+  /**
+   * Le bouton portait une icône de signet sans aucun gestionnaire, et aucune
+   * notion de favori n'existe ni côté front ni côté API. Il copie désormais le
+   * lien du document — même comportement que « Partager » sur /laws/[id].
+   */
+  let copiedId: number | null = null;
+
+  async function copyResultLink(result: any) {
+    const id = result.law_id ?? result.id;
+    const url = `${window.location.origin}/laws/${id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      copiedId = id;
+      setTimeout(() => (copiedId = null), 2000);
+    } catch {
+      // Presse-papiers refusé (contexte non sécurisé) : on n'affiche rien.
+    }
+  }
+
   function handleSearchSubmit() {
+    currentPage = 1;
     goto(`/search?q=${encodeURIComponent(searchQuery)}`, {
       replaceState: true,
     });
@@ -112,7 +213,7 @@
 
   // handleKeydown a ete retire : la gestion des touches vit dans SearchBar.
 
-  $: filteredResults =
+  $: tabFiltered =
     activeTab === "all"
       ? results
       : results.filter((r) => {
@@ -121,6 +222,24 @@
           const title = (r.title || "").toLowerCase();
           const ref = (r.reference || "").toLowerCase();
           return title.includes(tab.filter) || ref.includes(tab.filter);
+        });
+
+  /**
+   * Tri appliqué côté client.
+   *
+   * `sortBy` était lié au select mais lu NULLE PART : changer le tri ne
+   * changeait rien à l'affichage. L'API n'expose aucun champ de tri
+   * (`SearchRequest` = query, mode, filters, limit, offset), donc le tri se
+   * fait ici, sur la page courante de résultats. `relevance` conserve l'ordre
+   * rendu par l'API, qui EST le classement par pertinence.
+   */
+  $: filteredResults =
+    sortBy === "relevance"
+      ? tabFiltered
+      : [...tabFiltered].sort((a, b) => {
+          const da = new Date(a.publication_date || a.date || 0).getTime();
+          const db = new Date(b.publication_date || b.date || 0).getTime();
+          return sortBy === "date_desc" ? db - da : da - db;
         });
 
   function getBadgeInfo(result: any): {
@@ -208,96 +327,7 @@
 <div
   class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-body min-h-screen flex flex-col transition-colors duration-300"
 >
-  <!-- Header -->
-  <header
-    class="w-full py-4 px-6 md:px-12 flex justify-between items-center bg-white dark:bg-card-dark border-b border-slate-200 dark:border-slate-800"
-  >
-    <a href="/" class="flex items-center gap-3">
-      <div
-        class="bg-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/30"
-      >
-        <span class="material-icons text-white text-xl">balance</span>
-      </div>
-      <span
-        class="text-xl font-bold tracking-tight text-slate-900 dark:text-white"
-        >JuriX</span
-      >
-    </a>
-
-    <nav
-      class="hidden md:flex items-center gap-8 text-sm font-medium text-secondary-text-light dark:text-secondary-text-dark"
-    >
-      <a class="hover:text-primary transition-colors" href="/"
-        >{$tr("nav.home")}</a
-      >
-      <!-- Pointait /categories, route inexistante (seule /categories/[id]
-           l'est) : ce lien repondait 404. -->
-      <a class="hover:text-primary transition-colors" href="/laws"
-        >{$tr("nav.documents")}</a
-      >
-      <a class="hover:text-primary transition-colors" href="/about"
-        >{$tr("nav.about")}</a
-      >
-
-      <div class="h-4 w-px bg-white/10 mx-2"></div>
-
-      <div
-        class="relative flex items-center bg-gray-100 dark:bg-white/5 p-1 rounded-lg"
-      >
-        <!-- Sliding Pill Background -->
-        <div
-          class="sliding-pill absolute top-1 bottom-1 w-10 rounded-md bg-white dark:bg-white/10 shadow-sm"
-          class:translate-x-0={$language.current === "fr"}
-          class:translate-x-full={$language.current === "en"}
-        ></div>
-
-        <button
-          on:click={() => switchLanguage("fr")}
-          class="relative z-10 w-10 py-1 rounded-md text-xs font-bold transition-colors duration-300 {$language.current ===
-          'fr'
-            ? 'text-blue-600 dark:text-blue-400'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}"
-          >FR</button
-        >
-        <button
-          on:click={() => switchLanguage("en")}
-          class="relative z-10 w-10 py-1 rounded-md text-xs font-bold transition-colors duration-300 {$language.current ===
-          'en'
-            ? 'text-blue-600 dark:text-blue-400'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}"
-          >EN</button
-        >
-      </div>
-
-      <!-- Dark Mode Toggle -->
-      <button
-        on:click={themeStore.toggle}
-        class="w-8 h-8 flex items-center justify-center rounded-lg bg-transparent dark:bg-white/5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-        aria-label="Toggle Dark Mode"
-      >
-        {#if $themeStore === "dark"}
-          <span class="material-icons text-lg">light_mode</span>
-        {:else}
-          <span class="material-icons text-lg">dark_mode</span>
-        {/if}
-      </button>
-
-      <div class="flex items-center gap-3 ml-2">
-        <a
-          class="px-5 py-2 rounded-lg font-semibold text-sm transition-colors bg-white text-blue-600 hover:bg-gray-50 border border-transparent shadow-sm dark:bg-white/5 dark:border-white/10 dark:text-blue-400 dark:hover:bg-white/10"
-          href="/login"
-        >
-          {$tr("nav.login")}
-        </a>
-        <a
-          class="px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-lg bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
-          href="/signup"
-        >
-          {$tr("nav.signup")}
-        </a>
-      </div>
-    </nav>
-  </header>
+  <SiteHeader />
 
   <!-- Main Content -->
   <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
@@ -359,7 +389,10 @@
             <h3 class="font-bold text-slate-900 dark:text-white">
               {$tr("search.filters")}
             </h3>
-            <button class="text-xs text-primary font-medium hover:underline"
+            <button
+              on:click={resetFilters}
+              data-testid="search-reset"
+              class="text-xs text-primary font-medium hover:underline"
               >{$tr("search.reset")}</button
             >
           </div>
@@ -372,11 +405,14 @@
               {$tr("search.datePublication")}
             </h4>
             <div class="space-y-2">
-              {#each [$tr("search.allTime"), $tr("search.thisYear"), $tr("search.last5Years")] as label}
+              {#each [{ v: "all", label: $tr("search.allTime") }, { v: "year", label: $tr("search.thisYear") }, { v: "5y", label: $tr("search.last5Years") }] as { v, label }}
                 <label class="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="radio"
                     name="date"
+                    value={v}
+                    bind:group={dateRange}
+                    on:change={() => { currentPage = 1; performSearch(); }}
                     class="form-radio text-primary border-slate-300 focus:ring-primary h-4 w-4"
                   />
                   <span
@@ -396,52 +432,25 @@
               {$tr("search.category")}
             </h4>
             <div class="space-y-2">
-              {#each categories as category}
+              {#each categories as category (category.id)}
                 <label class="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
+                    checked={selectedCategoryIds.includes(category.id)}
+                    on:change={() => toggleCategory(category.id)}
                     class="form-checkbox text-primary rounded border-slate-300 focus:ring-primary h-4 w-4"
                   />
                   <span
                     class="text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
-                    >{category}</span
+                    >{category.name}</span
                   >
                 </label>
+              {:else}
+                <p class="text-xs text-slate-400">{$tr("common.loading")}</p>
               {/each}
             </div>
           </div>
 
-          <!-- Source Filter -->
-          <div>
-            <h4
-              class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3"
-            >
-              {$tr("search.source")}
-            </h4>
-            <div class="space-y-2">
-              <label class="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked
-                  class="form-checkbox text-primary rounded border-slate-300 focus:ring-primary h-4 w-4"
-                />
-                <span
-                  class="text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
-                  >{$tr("search.officialJournal")}</span
-                >
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  class="form-checkbox text-primary rounded border-slate-300 focus:ring-primary h-4 w-4"
-                />
-                <span
-                  class="text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
-                  >{$tr("search.caseLaw")}</span
-                >
-              </label>
-            </div>
-          </div>
         </div>
       </aside>
 
@@ -467,6 +476,7 @@
             <span>{$tr("search.sortBy")}</span>
             <select
               bind:value={sortBy}
+              data-testid="search-sort"
               class="bg-transparent border-none text-slate-900 dark:text-white font-medium focus:ring-0 cursor-pointer pr-8 text-sm"
             >
               <option value="relevance">{$tr("search.relevance")}</option>
@@ -569,9 +579,17 @@
                   </a>
                 </div>
                 <button
+                  on:click={() => copyResultLink(result)}
+                  data-testid="search-copy-link"
+                  title={$tr("search.copyLink")}
+                  aria-label={$tr("search.copyLink")}
                   class="text-slate-400 hover:text-primary transition-colors"
                 >
-                  <span class="material-icons">bookmark_border</span>
+                  <span class="material-icons"
+                    >{copiedId === (result.law_id ?? result.id)
+                      ? "check"
+                      : "link"}</span
+                  >
                 </button>
               </div>
 
@@ -640,34 +658,45 @@
             </article>
           {/each}
 
-          <!-- Pagination -->
-          {#if totalResults > 20}
-            <div class="flex justify-center items-center gap-2 mt-8 pt-4">
+          <!-- Pagination : les numeros etaient codes en dur et sans on:click -->
+          {#if totalPages > 1}
+            <nav
+              class="flex justify-center items-center gap-2 mt-8 pt-4"
+              aria-label={$tr("pagination.page")}
+            >
               <button
+                on:click={() => goToPage(currentPage - 1)}
+                data-testid="search-page-prev"
+                aria-label={$tr("pagination.prev")}
                 class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                 disabled={currentPage === 1}
               >
                 <span class="material-icons">chevron_left</span>
               </button>
+
+              {#each visiblePages as n (n)}
+                <button
+                  on:click={() => goToPage(n)}
+                  data-testid="search-page-{n}"
+                  aria-current={n === currentPage ? "page" : undefined}
+                  class="w-10 h-10 flex items-center justify-center rounded-xl font-medium transition-colors {n ===
+                  currentPage
+                    ? 'bg-primary text-white shadow-lg shadow-primary/25'
+                    : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
+                  >{n}</button
+                >
+              {/each}
+
               <button
-                class="w-10 h-10 flex items-center justify-center rounded-xl bg-primary text-white font-medium shadow-lg shadow-primary/25"
-                >1</button
-              >
-              <button
-                class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >2</button
-              >
-              <button
-                class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >3</button
-              >
-              <span class="text-slate-400 px-2">...</span>
-              <button
-                class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                on:click={() => goToPage(currentPage + 1)}
+                data-testid="search-page-next"
+                aria-label={$tr("pagination.next")}
+                class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                disabled={currentPage === totalPages}
               >
                 <span class="material-icons">chevron_right</span>
               </button>
-            </div>
+            </nav>
           {/if}
         {/if}
       </div>
@@ -676,13 +705,16 @@
 
   <!-- FAB -->
   <div class="fixed bottom-6 right-6 z-40">
+    <!-- Pointait vers "/" : l'icône annonce l'assistant, la cible est /chat.
+         Le FAB équivalent de (main)/+layout.svelte pointe bien vers /chat. -->
     <a
-      href="/"
+      href="/chat"
       class="w-14 h-14 bg-primary text-white rounded-full shadow-lg hover:bg-indigo-700 transition-colors flex items-center justify-center"
     >
       <span class="material-icons text-2xl">smart_toy</span>
     </a>
   </div>
+  <SiteFooter />
 </div>
 
 <style>

@@ -1,31 +1,16 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
   import { tr } from "$lib/stores/language";
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
+
+<SiteHeader />
 
 <div
   class="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 relative"
   in:fade
 >
-  <!-- Back Button -->
-  <a
-    href="/"
-    class="absolute top-4 left-4 md:top-8 md:left-8 flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors bg-white px-4 py-2 rounded-lg shadow-sm font-medium text-sm"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      ><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg
-    >
-    {$tr("common.back")}
-  </a>
 
   <div class="max-w-4xl mx-auto space-y-12 pt-8">
     <!-- Hero Section -->
@@ -164,3 +149,5 @@
     </div>
   </div>
 </div>
+
+<SiteFooter />

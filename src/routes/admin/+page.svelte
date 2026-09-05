@@ -100,12 +100,10 @@ let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
   >
     <div class="mb-6 flex items-center justify-between">
       <h3 class="font-bold text-slate-900">{$tr("admin.searchActivity")}</h3>
-      <select
-        class="rounded-lg border-slate-200 py-1 text-xs font-medium text-slate-600"
-      >
-        <option>{$tr("admin.last7days")}</option>
-        <option>{$tr("admin.last30days")}</option>
-      </select>
+      <!-- Le select est retiré : GET /analytics/search ne prend aucun paramètre
+           et renvoie des valeurs codées en dur ("note": "Mock data"). Il n'y
+           avait rien à câbler, et un filtre qui ne filtre pas induit en erreur
+           sur la fraîcheur des chiffres affichés. -->
     </div>
 
     <!-- Placeholder Chart -->
