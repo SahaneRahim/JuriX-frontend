@@ -3,9 +3,9 @@
   // import, chaque clic sur « Téléverser » levait un ReferenceError, capturé
   // par le catch et affiché en alert. Le téléversement par lot était donc
   // totalement inopérant, sans que rien ne le signale à la compilation.
-  import { API_URL, WS_URL, apiFetch } from '$lib/api';
+  import { WS_URL, apiFetch } from '$lib/api';
 	import { onMount, onDestroy } from "svelte";
-	import { goto } from "$app/navigation";
+	
 	import { language, tr } from "$lib/stores/language";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { formatDateHeure } from "$lib/format";

@@ -1,5 +1,5 @@
-import { writable, derived } from 'svelte/store';
-import type { Writable, Readable } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
+import type { Writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
 // Language type
@@ -8,7 +8,6 @@ export type Language = 'fr' | 'en';
 // Language state interface
 export interface LanguageState {
   current: Language;
-  showAllLanguages: boolean;
 }
 
 // Default language
@@ -31,8 +30,7 @@ function getInitialLanguage(): Language {
 // Create the language store
 function createLanguageStore() {
   const { subscribe, set, update } = writable<LanguageState>({
-    current: getInitialLanguage(),
-    showAllLanguages: false
+    current: getInitialLanguage()
   });
 
   return {
@@ -44,12 +42,6 @@ function createLanguageStore() {
 
 // Export the main language store
 export const language: Writable<LanguageState> = createLanguageStore();
-
-// Derived store: API filter (null = show all, string = filter by language)
-export const languageFilter: Readable<string | null> = derived(
-  language,
-  ($language) => $language.showAllLanguages ? null : $language.current
-);
 
 // Action: Switch language (with persist and reload)
 export const switchLanguage = (newLang: Language) => {
@@ -64,39 +56,12 @@ export const switchLanguage = (newLang: Language) => {
   }
 };
 
-// Action: Toggle show all languages
-export const toggleShowAll = () => {
-  language.update(state => ({
-    ...state,
-    showAllLanguages: !state.showAllLanguages
-  }));
-};
-
-// Legacy exports for backward compatibility
-export const languageStore = {
-  subscribe: language.subscribe,
-  set: (value: Language) => {
-    language.update(state => ({ ...state, current: value }));
-    if (browser) {
-      localStorage.setItem(LANGUAGE_STORAGE_KEY, value);
-    }
-  },
-  toggle: () => {
-    language.update(state => {
-      const newLang: Language = state.current === 'fr' ? 'en' : 'fr';
-      if (browser) {
-        localStorage.setItem(LANGUAGE_STORAGE_KEY, newLang);
-      }
-      return { ...state, current: newLang };
-    });
-  },
-  reset: () => {
-    if (browser) {
-      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
-    }
-    language.set({ current: DEFAULT_LANGUAGE, showAllLanguages: false });
-  }
-};
+// languageFilter, toggleShowAll et languageStore ont ete retires.
+//
+// Leur unique consommateur, ShowAllLanguagesToggle.svelte, a ete supprime ;
+// l'API du store, elle, est restee, avec les neuf tests qui l'exerçaient. Des
+// tests verts sur du code que personne n'appelle donnent une couverture qui
+// rassure a tort.
 
 // Comprehensive translations
 export const translations = {

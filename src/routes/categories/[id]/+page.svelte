@@ -6,7 +6,7 @@
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
   import type { FiltreLangue } from "$lib/types";
-  import { fade, fly } from "svelte/transition";
+  import { fly } from "svelte/transition";
 
   /** Rempli par `+page.ts`. Une catégorie absente n'arrive plus ici : 404. */
   export let data;

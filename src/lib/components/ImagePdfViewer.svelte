@@ -18,10 +18,6 @@
   let dpi = 120; // Default DPI (120 = good balance of quality/speed)
 
   // Extract law ID from URL
-  function getLawId(lawUrl: string): string | null {
-    const match = lawUrl.match(/\/laws\/(\d+)/);
-    return match ? match[1] : null;
-  }
 
   // Get the base API URL
   function getBaseUrl(lawUrl: string): string {

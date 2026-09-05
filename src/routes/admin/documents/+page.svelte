@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { API_URL, apiFetch } from '$lib/api';
+  import { apiFetch } from '$lib/api';
   import { onMount } from "svelte";
   import UploadModal from "$lib/components/admin/UploadModal.svelte";
   import EditModal from "$lib/components/admin/EditModal.svelte";

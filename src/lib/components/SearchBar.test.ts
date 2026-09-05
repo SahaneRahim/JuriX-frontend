@@ -88,7 +88,27 @@ describe('SearchBar', () => {
     await fireEvent.input(input, { target: { value: 'nomination' } });
     await vi.advanceTimersByTimeAsync(500);
 
-    // Aucune exception ne remonte, aucune liste affichee.
-    expect(container.querySelectorAll('li').length).toBe(0);
+    // Le compte portait sur des <li> — que ce composant NE REND PAS : les
+    // suggestions sont des <div role="option">. L'assertion valait donc
+    // 0 === 0 quoi qu'il arrive, et serait restee verte si l'erreur reseau
+    // avait affiche la liste complete. On compte ce qui existe.
+    expect(container.querySelectorAll('[role="option"]').length).toBe(0);
+    expect(input.value).toBe('nomination');
+  });
+
+  it('la liste apparait bien quand la requete aboutit', async () => {
+    // Contre-epreuve du test precedent : sans elle, un selecteur errone
+    // rendrait les deux tests verts pour la mauvaise raison.
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ suggestions: [{ id: 1, title: 'Decret de nomination', reference: 'PRC-1' }] }),
+    })));
+    const { container } = render(SearchBar, {});
+    const input = container.querySelector('input')!;
+
+    await fireEvent.input(input, { target: { value: 'nomination' } });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(container.querySelectorAll('[role="option"]').length).toBe(1);
   });
 });

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
   import { tr } from '$lib/stores/language';
   import { goto } from '$app/navigation';
 

@@ -77,7 +77,7 @@ function getInitialState(): AuthState {
 
 // Create the auth store
 function createAuthStore() {
-  const { subscribe, set, update } = writable<AuthState>(getInitialState());
+  const { subscribe, set } = writable<AuthState>(getInitialState());
 
   return {
     subscribe,
@@ -110,30 +110,13 @@ function createAuthStore() {
       });
     },
 
-    // Update user info
-    updateUser: (user: User) => {
-      if (browser) {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-      }
-      update(state => ({
-        ...state,
-        user
-      }));
-    },
-
-    // Set loading state
-    setLoading: (isLoading: boolean) => {
-      update(state => ({
-        ...state,
-        isLoading
-      }));
-    },
-
-    // Check if user has admin role
-    isAdmin: (): boolean => {
-      const state = getInitialState();
-      return state.user?.role === 'admin';
-    }
+    // updateUser, setLoading et isAdmin ont ete retirees : aucun appelant.
+    //
+    // isAdmin etait en outre FAUSSE : elle relisait localStorage au lieu de
+    // l'etat courant du store, et ne testait que `role === 'admin'`, oubliant
+    // 'superadmin' — la contredisant partout ailleurs dans l'application, ou le
+    // controle est `["admin", "superadmin"].includes(role)`. L'avoir appelee un
+    // jour aurait exclu les super-administrateurs de leur propre interface.
   };
 }
 

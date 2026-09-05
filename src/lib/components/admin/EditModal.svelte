@@ -1,6 +1,6 @@
 <script lang="ts">
   import { piegerFocus } from '$lib/actions/pieger-focus';
-  import { API_URL, apiFetch } from '$lib/api';
+  import { apiFetch } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   import type { Law, LawUpdatePayload } from '$lib/types';
   

@@ -5,7 +5,7 @@
   import { urlCanonique } from "$lib/seo";
   import { tr } from "$lib/stores/language";
   import type { Category } from "$lib/types";
-  import { fade, fly } from "svelte/transition";
+  import { fade } from "svelte/transition";
 
   /** Rempli par `+page.ts`. */
   export let data;

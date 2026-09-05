@@ -1,6 +1,6 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
-  import { highlightSegments } from '$lib/highlight';
+  
   import { nombreDePages, pagesVisibles, TAILLE_PAGE_RECHERCHE } from '$lib/pagination';
   import SearchBar from '$lib/components/SearchBar.svelte';
   // Cette page recopiait le header à la main (90 lignes) : la copie et
@@ -13,10 +13,9 @@
   import { goto } from "$app/navigation";
   import SearchResultCard from "$lib/components/SearchResultCard.svelte";
   import { onMount } from "svelte";
-  import { language, tr } from "$lib/stores/language";
+  import { tr } from "$lib/stores/language";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { urlCanonique } from "$lib/seo";
-  import { formatDate } from '$lib/format';
   import type { Category, SearchResult } from '$lib/types';
 
 // State

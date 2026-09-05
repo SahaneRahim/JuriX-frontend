@@ -49,7 +49,7 @@ function applyTheme(theme: 'light' | 'dark') {
 
 // Create the theme store
 function createThemeStore() {
-  const { subscribe, set, update } = writable<Theme>(getInitialTheme());
+  const { subscribe, update } = writable<Theme>(getInitialTheme());
 
   // Apply initial theme
   if (browser) {
@@ -68,17 +68,12 @@ function createThemeStore() {
     });
   }
 
+  // set, setLight, setDark, setAuto, reset et getEffective ont ete retirees :
+  // aucun appelant. Le mode 'auto' n'est donc plus POSABLE par l'interface —
+  // il reste lisible depuis localStorage, et l'ecouteur matchMedia le sert
+  // toujours pour qui l'avait deja enregistre.
   return {
     subscribe,
-
-    // Set theme
-    set: (value: Theme) => {
-      if (browser) {
-        localStorage.setItem(THEME_STORAGE_KEY, value);
-        applyTheme(getEffectiveTheme(value));
-      }
-      set(value);
-    },
 
     // Toggle between light and dark
     toggle: () => {
@@ -91,50 +86,6 @@ function createThemeStore() {
         return newTheme;
       });
     },
-
-    // Set to light theme
-    setLight: () => {
-      const newTheme: Theme = 'light';
-      if (browser) {
-        localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-        applyTheme('light');
-      }
-      set(newTheme);
-    },
-
-    // Set to dark theme
-    setDark: () => {
-      const newTheme: Theme = 'dark';
-      if (browser) {
-        localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-        applyTheme('dark');
-      }
-      set(newTheme);
-    },
-
-    // Set to auto (follow system)
-    setAuto: () => {
-      const newTheme: Theme = 'auto';
-      if (browser) {
-        localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-        applyTheme(getSystemTheme());
-      }
-      set(newTheme);
-    },
-
-    // Reset to default
-    reset: () => {
-      if (browser) {
-        localStorage.removeItem(THEME_STORAGE_KEY);
-        applyTheme(getEffectiveTheme(DEFAULT_THEME));
-      }
-      set(DEFAULT_THEME);
-    },
-
-    // Get effective theme (resolves 'auto')
-    getEffective: (): 'light' | 'dark' => {
-      return getEffectiveTheme(getInitialTheme());
-    }
   };
 }
 
