@@ -24,6 +24,7 @@
       <li>
         <a
           href="/admin"
+          aria-current={$page.url.pathname === '/admin' ? "page" : undefined}
           class="flex items-center rounded-lg p-3 text-base font-medium transition-colors hover:bg-blue-50 hover:text-blue-600 {$page.url.pathname === '/admin' ? 'bg-blue-50 text-blue-600' : 'text-slate-700'}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
@@ -35,6 +36,7 @@
       <li>
         <a
           href="/admin/documents"
+          aria-current={$page.url.pathname.startsWith('/admin/documents') ? "page" : undefined}
           class="flex items-center rounded-lg p-3 text-base font-medium transition-colors hover:bg-blue-50 hover:text-blue-600 {$page.url.pathname.startsWith('/admin/documents') ? 'bg-blue-50 text-blue-600' : 'text-slate-700'}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
@@ -46,6 +48,7 @@
       <li>
         <a
           href="/admin/users"
+          aria-current={$page.url.pathname.startsWith('/admin/users') ? "page" : undefined}
           class="flex items-center rounded-lg p-3 text-base font-medium transition-colors hover:bg-blue-50 hover:text-blue-600 {$page.url.pathname.startsWith('/admin/users') ? 'bg-blue-50 text-blue-600' : 'text-slate-700'}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">

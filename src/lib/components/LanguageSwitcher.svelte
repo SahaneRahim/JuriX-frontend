@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { language, switchLanguage } from '$lib/stores/language';
+  import { language, switchLanguage, tr } from '$lib/stores/language';
 
   const languages = [
     { code: 'fr', name: 'Français', flag: '🇫🇷' },
@@ -19,7 +19,7 @@
         on:click={() => handleSwitch(lang.code)}
         class="language-btn"
         class:active={$language.current === lang.code}
-        aria-label="Switch to {lang.name}"
+        aria-label="{$tr('a11y.switchTo')} {lang.name}"
       >
         <span class="lang-code">{lang.code.toUpperCase()}</span>
       </button>

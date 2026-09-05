@@ -184,6 +184,11 @@
 </svelte:head>
 
 <div class="w-full max-w-3xl mb-12">
+  <!-- Le h1 du layout est masque sur cette route (le hero marketing n'a rien a
+       faire au-dessus d'une conversation). La page se retrouvait sans aucun
+       titre : celui-ci est visuellement masque mais annonce par les lecteurs
+       d'ecran. -->
+  <h1 class="sr-only">{t("chat.header")}</h1>
   <div
     class="bg-white dark:bg-slate-800/50 rounded-2xl shadow-xl dark:shadow-none border border-gray-100 dark:border-slate-700/50 overflow-hidden"
   >
@@ -193,7 +198,7 @@
     >
       <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
       <span
-        class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tracking-wider uppercase"
+        class="text-xs font-semibold text-emerald-700 dark:text-emerald-400 tracking-wider uppercase"
       >
         {$language.current === "fr"
           ? "IA Juridique Camerounaise V2.0"
@@ -202,8 +207,20 @@
     </div>
 
     <!-- Messages Area -->
+    <!--
+      role="log" + aria-live="polite" : les reponses de l'assistant et
+      l'indicateur « en train d'ecrire » n'etaient jamais annonces. Un
+      utilisateur de lecteur d'ecran envoyait sa question et n'entendait plus
+      rien.
+
+      L'annonce est sur le CONTENEUR, pas sur chaque message : la poser aux deux
+      niveaux ferait lire chaque reponse deux fois.
+    -->
     <div
       bind:this={messagesContainer}
+      role="log"
+      aria-live="polite"
+      aria-label={t("chat.header")}
       class="p-6 space-y-6 min-h-[400px] max-h-[500px] overflow-y-auto"
     >
       {#each chatMessages as message (message.id)}
@@ -216,19 +233,19 @@
               <div
                 class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/30"
               >
-                <span class="material-icons text-white text-lg">cloud_off</span>
+                <span class="material-icons text-white text-lg" aria-hidden="true">cloud_off</span>
               </div>
             {:else if message.type === "assistant"}
               <div
                 class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30"
               >
-                <span class="material-icons text-white text-lg">smart_toy</span>
+                <span class="material-icons text-white text-lg" aria-hidden="true">smart_toy</span>
               </div>
             {:else}
               <div
                 class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30"
               >
-                <span class="material-icons text-white text-lg">person</span>
+                <span class="material-icons text-white text-lg" aria-hidden="true">person</span>
               </div>
             {/if}
           </div>
@@ -254,7 +271,7 @@
                 class="inline-block bg-gray-100 dark:bg-slate-700 rounded-2xl rounded-tr-none px-5 py-3 max-w-md text-left"
               >
                 <p class="text-slate-800 dark:text-white">{message.content}</p>
-                <span class="text-xs text-slate-400 mt-2 block"
+                <span class="text-xs text-slate-500 mt-2 block"
                   >{message.timestamp}</span
                 >
               </div>
@@ -270,7 +287,7 @@
                   <div
                     class="text-left border-t border-slate-100 dark:border-slate-700 pt-3"
                   >
-                    <p class="text-xs font-medium text-slate-400 mb-2">
+                    <p class="text-xs font-medium text-slate-500 mb-2">
                       {$language.current === "fr" ? "Sources" : "Sources"}
                     </p>
                     <ul class="space-y-2">
@@ -341,7 +358,7 @@
           <div
             class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center"
           >
-            <span class="material-icons text-white text-lg">smart_toy</span>
+            <span class="material-icons text-white text-lg" aria-hidden="true">smart_toy</span>
           </div>
           <div
             class="flex items-center gap-1 px-4 py-3 bg-gray-100 dark:bg-slate-700 rounded-2xl"
@@ -373,6 +390,7 @@
         <input
           type="text"
           bind:value={chatInput}
+          aria-label={t("a11y.chatInput")}
           on:keydown={handleChatKeydown}
           placeholder={t("chat.placeholder")}
           class="flex-1 bg-transparent border-none focus:ring-0 text-slate-800 dark:text-white placeholder-slate-400 py-2"
@@ -383,9 +401,10 @@
         <button
           on:click={handleSendChatMessage}
           disabled={!chatInput.trim()}
+          aria-label={t("chat.send")}
           class="w-10 h-10 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white flex items-center justify-center transition-all hover:scale-105 disabled:hover:scale-100"
         >
-          <span class="material-icons">send</span>
+          <span class="material-icons" aria-hidden="true">send</span>
         </button>
       </div>
     </div>

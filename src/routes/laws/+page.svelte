@@ -81,6 +81,7 @@
 
 <SiteHeader />
 
+<main id="contenu">
 <div class="max-w-5xl mx-auto px-4 py-8">
   <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">
     {$tr("laws.title")}
@@ -91,6 +92,7 @@
   <div class="flex flex-wrap gap-3 mb-6">
     <select
       bind:value={language}
+      aria-label={$tr("a11y.filterLanguage")}
       on:change={changeFilters}
       class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
     >
@@ -101,6 +103,7 @@
 
     <select
       bind:value={categoryId}
+      aria-label={$tr("a11y.filterCategory")}
       on:change={changeFilters}
       class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
     >
@@ -192,5 +195,7 @@
     </div>
   {/if}
 </div>
+
+</main>
 
 <SiteFooter />

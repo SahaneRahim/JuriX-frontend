@@ -38,6 +38,7 @@
 
   <!-- Main Content -->
   <main
+    id="contenu"
     class="flex-grow flex flex-col items-center justify-start px-4 md:px-6 relative overflow-hidden {isChat
       ? 'pt-6'
       : 'pt-12 md:pt-20'}"
@@ -65,7 +66,7 @@
             >
               <!-- Badge -->
               <div
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm font-semibold mb-8 backdrop-blur-sm"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-sm font-semibold mb-8 backdrop-blur-sm"
               >
                 <span class="w-2 h-2 rounded-full bg-primary animate-pulse"
                 ></span>
@@ -111,7 +112,7 @@
                 ? 'text-blue-600 dark:text-blue-100'
                 : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}"
             >
-              <span class="material-icons text-sm">search</span>
+              <span class="material-icons text-sm" aria-hidden="true">search</span>
               {$tr("mode.search")}
             </a>
             <a
@@ -121,7 +122,7 @@
                 ? 'text-blue-600 dark:text-blue-100'
                 : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}"
             >
-              <span class="material-icons text-sm">auto_awesome</span>
+              <span class="material-icons text-sm" aria-hidden="true">auto_awesome</span>
               {$tr("mode.chat")}
             </a>
           </div>
@@ -149,9 +150,10 @@
   {#if !isChat}
   <a
     href="/chat"
+    aria-label={$tr("mode.chat")}
     class="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-2xl shadow-blue-500/40 hover:-translate-y-1 hover:shadow-blue-500/60 transition-all duration-300 z-50 flex items-center justify-center"
   >
-    <span class="material-icons text-3xl">smart_toy</span>
+    <span class="material-icons text-3xl" aria-hidden="true">smart_toy</span>
   </a>
   {/if}
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { piegerFocus } from '$lib/actions/pieger-focus';
   import { API_URL, apiFetch } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
   
@@ -106,11 +107,6 @@ let title = '';
       isSaving = false;
     }
   }
-  function handleBackdropKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      close();
-    }
-  }
 
   // Le keydown du fond ne réagissait qu'à Entrée et Espace, et n'est atteint
   // que si le fond a le focus. Échap doit fermer depuis n'importe où.
@@ -123,24 +119,23 @@ let title = '';
 
 {#if show}
   <div 
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" 
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     on:click={close}
-    on:keydown={handleBackdropKeydown}
-    role="button"
-    tabindex="0"
-    aria-label="Fermer la modale"
+    role="presentation"
+    data-testid="edit-modal"
   >
-    <div 
-      class="w-full max-w-4xl rounded-2xl bg-white shadow-2xl" 
+    <div
+      use:piegerFocus
+      class="w-full max-w-4xl rounded-2xl bg-white shadow-2xl"
       on:click|stopPropagation
-      on:keydown|stopPropagation
-      role="document"
-      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Éditer le document"
     >
       <!-- Header -->
       <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
         <h2 class="text-2xl font-bold text-slate-900">Éditer le Document</h2>
-        <button on:click={close} class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Fermer">
+        <button on:click={close} class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-600" aria-label="Fermer">
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>

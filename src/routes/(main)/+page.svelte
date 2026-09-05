@@ -86,18 +86,18 @@
       class="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity duration-300"
     ></div>
     <div
-      class="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl flex items-center p-2 border border-slate-100 dark:border-slate-700/50"
+      class="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl flex items-center p-2 border border-slate-100 dark:border-slate-700/50 focus-within:ring-2 focus-within:ring-primary"
     >
-      <div class="pl-4 text-slate-400">
-        <span class="material-icons text-2xl">search</span>
+      <div class="pl-4 text-slate-500">
+        <span class="material-icons text-2xl" aria-hidden="true">search</span>
       </div>
       <input
         type="text"
         bind:value={searchQuery}
+          aria-label={$tr("a11y.searchField")}
         on:keydown={handleKeydown}
         placeholder={$tr("search.placeholder")}
-        class="w-full bg-transparent border-none text-lg text-slate-800 dark:text-white placeholder-slate-400 focus:ring-0 px-4 py-3"
-        autofocus
+        class="w-full bg-transparent border-none text-lg text-slate-800 dark:text-white placeholder-slate-400 focus:ring-0 focus:outline-none px-4 py-3"
       />
       <button
         on:click={handleSearch}
@@ -134,13 +134,19 @@
         ferait apparaitre et disparaitre des cases au fil des ingestions : le
         plan de la page changerait a chaque visite, et un utilisateur cherchant
         « Droit Pénal » conclurait que la plateforme ne le couvre pas.
+
+        L'attenuation passait par `opacity-55` sur la carte entiere. L'intention
+        etait juste, le moyen non : l'opacite s'applique au TEXTE comme au reste
+        et faisait tomber le titre et le compteur a 2,13:1 — sous le seuil de
+        lisibilite, pour tout le monde. Le fond grise et la bordure attenuee
+        rendent le meme signal visuel sans toucher au contraste du texte.
       -->
       <a
         href="/categories/{cat.id}"
-        class="group relative flex flex-col p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 {cat.law_count ===
+        class="group relative flex flex-col p-5 rounded-2xl border shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 {cat.law_count ===
         0
-          ? 'opacity-55'
-          : ''}"
+          ? 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/40'
+          : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700/50'}"
       >
         <div class="mb-3 flex items-center justify-between">
           <div
@@ -149,7 +155,7 @@
             {cat.icon || "📄"}
           </div>
           <span
-            class="text-[11px] font-medium text-slate-400 dark:text-slate-500 tabular-nums"
+            class="text-[11px] font-medium text-slate-500 dark:text-slate-500 tabular-nums"
           >
             {cat.law_count}
             {$tr("categories.documentsShort")}

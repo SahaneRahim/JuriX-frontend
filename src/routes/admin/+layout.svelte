@@ -46,6 +46,12 @@
   }
 </script>
 
+<!-- Titre de repli pour tout l'espace d'administration. Trois pages sur
+     quatre n'en avaient aucun : l'onglet du navigateur affichait l'URL, et un
+     utilisateur avec plusieurs onglets ouverts ne pouvait pas les distinguer.
+     Une page qui pose son propre <title> le remplace. -->
+<svelte:head><title>JuriX Admin</title></svelte:head>
+
 {#if checked}
   <div class="min-h-screen bg-slate-50 font-sans text-slate-900">
     <AdminSidebar />

@@ -57,6 +57,15 @@
 
 <svelte:window on:keydown={onKeydown} />
 
+<!-- Lien d'evitement : au clavier, atteindre le contenu demandait de traverser
+     le logo, les quatre liens de navigation, la bascule de langue, celle du
+     theme et la grappe d'authentification — a chaque page. -->
+<a
+  href="#contenu"
+  class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:font-semibold focus:text-white"
+  >{$tr("a11y.skipToContent")}</a
+>
+
 <header
   data-testid="site-header"
   class="w-full py-4 px-6 md:px-12 flex items-center justify-between relative z-50
@@ -70,7 +79,7 @@
     <div
       class="bg-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/30"
     >
-      <span class="material-icons text-white text-xl">balance</span>
+      <span class="material-icons text-white text-xl" aria-hidden="true">balance</span>
     </div>
     <span class="text-xl font-bold tracking-tight text-slate-900 dark:text-white"
       >JuriX</span
@@ -82,7 +91,11 @@
     class="hidden md:flex items-center justify-center gap-8 text-sm font-medium text-secondary-text-light dark:text-secondary-text-dark flex-1"
   >
     {#each NAV_LINKS as lien (lien.href)}
+      <!-- L'etat actif n'etait signale QUE par la couleur : invisible aux
+           lecteurs d'ecran, et invisible tout court pour qui ne distingue pas
+           ce bleu du gris environnant. -->
       <a
+        aria-current={lien.isActive(pathname) ? "page" : undefined}
         class="hover:text-primary transition-colors whitespace-nowrap {lien.isActive(
           pathname,
         )
@@ -111,7 +124,7 @@
         class="relative z-10 w-10 py-1 rounded-md text-xs font-bold transition-colors duration-300 {$language.current ===
         'fr'
           ? 'text-blue-600 dark:text-blue-400'
-          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}"
+          : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}"
         >FR</button
       >
       <button
@@ -120,7 +133,7 @@
         class="relative z-10 w-10 py-1 rounded-md text-xs font-bold transition-colors duration-300 {$language.current ===
         'en'
           ? 'text-blue-600 dark:text-blue-400'
-          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}"
+          : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}"
         >EN</button
       >
     </div>
@@ -128,13 +141,13 @@
     <button
       on:click={themeStore.toggle}
       data-testid="theme-toggle"
-      class="w-8 h-8 flex items-center justify-center rounded-lg bg-transparent dark:bg-white/5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-      aria-label="Toggle Dark Mode"
+      class="w-8 h-8 flex items-center justify-center rounded-lg bg-transparent dark:bg-white/5 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+      aria-label={$tr("a11y.toggleTheme")}
     >
       {#if $themeStore === "dark"}
-        <span class="material-icons text-lg">light_mode</span>
+        <span class="material-icons text-lg" aria-hidden="true">light_mode</span>
       {:else}
-        <span class="material-icons text-lg">dark_mode</span>
+        <span class="material-icons text-lg" aria-hidden="true">dark_mode</span>
       {/if}
     </button>
 
@@ -175,10 +188,10 @@
       data-testid="nav-mobile-toggle"
       aria-expanded={mobileOpen}
       aria-controls="site-nav-mobile"
-      aria-label="Menu"
+      aria-label={$tr("a11y.menu")}
       class="p-2 text-slate-600 dark:text-slate-300"
     >
-      <span class="material-icons">{mobileOpen ? "close" : "menu"}</span>
+      <span class="material-icons" aria-hidden="true">{mobileOpen ? "close" : "menu"}</span>
     </button>
   </div>
 </header>
@@ -198,6 +211,7 @@
       {#each NAV_LINKS as lien (lien.href)}
         <a
           href={lien.href}
+          aria-current={lien.isActive(pathname) ? "page" : undefined}
           class="py-2 text-base font-medium transition-colors {lien.isActive(
             pathname,
           )
@@ -230,11 +244,11 @@
         <button
           on:click={themeStore.toggle}
           data-testid="theme-toggle-mobile"
-          aria-label="Toggle Dark Mode"
-          class="ml-2 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400"
+          aria-label={$tr("a11y.toggleTheme")}
+          class="ml-2 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500"
         >
           <span class="material-icons text-lg"
-            >{$themeStore === "dark" ? "light_mode" : "dark_mode"}</span
+             aria-hidden="true">{$themeStore === "dark" ? "light_mode" : "dark_mode"}</span
           >
         </button>
       </div>

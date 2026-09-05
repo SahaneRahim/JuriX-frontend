@@ -265,7 +265,7 @@
 				on:dragleave={() => (isDragging = false)}
 			>
 				<svg
-					class="mx-auto h-12 w-12 text-gray-400"
+					class="mx-auto h-12 w-12 text-gray-500"
 					stroke="currentColor"
 					fill="none"
 					viewBox="0 0 48 48"
@@ -374,6 +374,7 @@
 				<!-- Status Filter -->
 				<select
 					bind:value={statusFilter}
+          aria-label={$tr("a11y.filterStatus")}
 					class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 				>
 					<option value="all">{$tr("admin.all")}</option>
@@ -439,7 +440,7 @@
 											></div>
 										</div>
 									{:else}
-										<span class="text-sm text-gray-400">-</span>
+										<span class="text-sm text-gray-500">-</span>
 									{/if}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

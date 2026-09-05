@@ -336,7 +336,7 @@
   <SiteHeader />
 
   <!-- Main Content -->
-  <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+  <main id="contenu" class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
     <!-- Search Header -->
     <div class="mb-10">
       <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-6">
@@ -377,7 +377,7 @@
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
             on:click={() => (activeTab = tab.id)}
           >
-            <span class="material-icons text-lg">{tab.icon}</span>
+            <span class="material-icons text-lg" aria-hidden="true">{tab.icon}</span>
             {tab.label}
           </button>
         {/each}
@@ -406,7 +406,7 @@
           <!-- Date Filter -->
           <div class="mb-6">
             <h4
-              class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3"
+              class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3"
             >
               {$tr("search.datePublication")}
             </h4>
@@ -433,7 +433,7 @@
           <!-- Category Filter -->
           <div class="mb-6">
             <h4
-              class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3"
+              class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3"
             >
               {$tr("search.category")}
             </h4>
@@ -452,7 +452,7 @@
                   >
                 </label>
               {:else}
-                <p class="text-xs text-slate-400">{$tr("common.loading")}</p>
+                <p class="text-xs text-slate-500">{$tr("common.loading")}</p>
               {/each}
             </div>
           </div>
@@ -466,6 +466,15 @@
         <div
           class="flex justify-between items-center text-sm text-secondary-text-light dark:text-secondary-text-dark pb-2"
         >
+          <!--
+            role="status" (donc aria-live="polite") : apres une recherche, un
+            lecteur d'ecran n'apprenait NI que la requete etait partie, NI
+            combien de resultats revenaient — la page changeait en silence.
+            L'annonce est posee ici, sur la ligne de statut, et non sur la liste
+            de resultats : annoncer les deux ferait entendre l'information deux
+            fois.
+          -->
+          <span role="status" aria-live="polite" data-testid="search-status">
           {#if isLoading}
             <span>{$tr("search.searching")}</span>
           {:else if errorMessage}
@@ -478,12 +487,14 @@
               {$tr("search.seconds")})</span
             >
           {/if}
+          </span>
           <div class="flex items-center gap-2">
             <span>{$tr("search.sortBy")}</span>
             <select
               bind:value={sortBy}
+          aria-label={$tr("a11y.sortBy")}
               data-testid="search-sort"
-              class="bg-transparent border-none text-slate-900 dark:text-white font-medium focus:ring-0 cursor-pointer pr-8 text-sm"
+              class="bg-transparent border-none text-slate-900 dark:text-white font-medium focus:ring-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:rounded cursor-pointer pr-8 text-sm"
             >
               <option value="relevance">{$tr("search.relevance")}</option>
               <option value="date_desc">{$tr("search.recentDate")}</option>
@@ -522,7 +533,7 @@
           >
             <span
               class="material-icons text-6xl text-slate-300 dark:text-slate-600 mb-4"
-              >search</span
+               aria-hidden="true">search</span
             >
             <h3
               class="text-xl font-semibold text-slate-900 dark:text-white mb-2"
@@ -545,7 +556,7 @@
             class="bg-white dark:bg-card-dark p-12 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-soft text-center"
           >
             <span class="material-icons text-6xl text-red-300 mb-4"
-              >cloud_off</span
+               aria-hidden="true">cloud_off</span
             >
             <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">
               {errorMessage}
@@ -565,7 +576,7 @@
           >
             <span
               class="material-icons text-6xl text-slate-300 dark:text-slate-600 mb-4"
-              >search_off</span
+               aria-hidden="true">search_off</span
             >
             <h3
               class="text-xl font-semibold text-slate-900 dark:text-white mb-2"
@@ -627,7 +638,7 @@
                 class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                 disabled={currentPage === 1}
               >
-                <span class="material-icons">chevron_left</span>
+                <span class="material-icons" aria-hidden="true">chevron_left</span>
               </button>
 
               {#each visiblePages as n (n)}
@@ -650,7 +661,7 @@
                 class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                 disabled={currentPage === totalPages}
               >
-                <span class="material-icons">chevron_right</span>
+                <span class="material-icons" aria-hidden="true">chevron_right</span>
               </button>
             </nav>
           {/if}
@@ -665,9 +676,10 @@
          Le FAB équivalent de (main)/+layout.svelte pointe bien vers /chat. -->
     <a
       href="/chat"
+      aria-label={$tr("mode.chat")}
       class="w-14 h-14 bg-primary text-white rounded-full shadow-lg hover:bg-indigo-700 transition-colors flex items-center justify-center"
     >
-      <span class="material-icons text-2xl">smart_toy</span>
+      <span class="material-icons text-2xl" aria-hidden="true">smart_toy</span>
     </a>
   </div>
   <SiteFooter />

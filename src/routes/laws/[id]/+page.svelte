@@ -424,10 +424,10 @@
             </div>
 
             <div
-              class="search-box flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 mb-6"
+              class="search-box flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 mb-6 focus-within:ring-2 focus-within:ring-blue-500"
             >
               <svg
-                class="w-4 h-4 text-gray-400 mr-2"
+                class="w-4 h-4 text-gray-500 mr-2"
                 viewBox="0 0 16 16"
                 fill="currentColor"
               >
@@ -440,6 +440,7 @@
                 class="bg-transparent border-none outline-none w-full text-sm text-gray-900 dark:text-white placeholder-gray-400"
                 placeholder={t.filter}
                 bind:value={searchQuery}
+          aria-label={t.filter}
               />
             </div>
 
@@ -479,13 +480,14 @@
               {/each}
 
               {#if filteredTOC.length === 0}
-                <div class="text-sm text-gray-400 italic">{t.no_result}</div>
+                <div class="text-sm text-gray-500 italic">{t.no_result}</div>
               {/if}
             </div>
           </aside>
 
           <!-- Content Column -->
           <main
+            id="contenu"
             class="content bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 md:p-10 shadow-sm relative"
           >
             <!-- Document Header -->
@@ -572,7 +574,7 @@
                       ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300'
                       : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
                   >
-                    <span class="material-icons text-lg">picture_as_pdf</span>
+                    <span class="material-icons text-lg" aria-hidden="true">picture_as_pdf</span>
                     {afficherDocument ? t.show_text : t.show_document}
                   </button>
                 {:else}
@@ -580,7 +582,7 @@
                        Bouton desactive et explique, plutot que masque sans
                        raison visible. -->
                   <button
-                    class="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                    class="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed"
                     disabled
                     title={t.no_source_file}
                   >
@@ -653,7 +655,7 @@
                 >
                   <div>
                     <p
-                      class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1"
+                      class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1"
                     >
                       {currentArticle.sectionTitle || ""}
                     </p>
@@ -754,7 +756,7 @@
                 <pre class="whitespace-pre-wrap font-sans">{law.content}</pre>
               </div>
             {:else}
-              <div class="py-20 text-center text-gray-400">{t.loading}</div>
+              <div class="py-20 text-center text-gray-500">{t.loading}</div>
             {/if}
           </main>
         </div>

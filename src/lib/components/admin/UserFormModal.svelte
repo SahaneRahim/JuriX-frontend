@@ -8,6 +8,7 @@
    * partie qui compte.
    */
   import { createEventDispatcher } from "svelte";
+  import { piegerFocus } from "$lib/actions/pieger-focus";
   import { apiFetch } from "$lib/api";
   import { authStore } from "$lib/stores/auth";
 
@@ -142,6 +143,7 @@
   >
     <div
       class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+      use:piegerFocus
       role="dialog"
       aria-modal="true"
       aria-labelledby="user-modal-title"
@@ -155,7 +157,7 @@
           on:click={close}
           data-testid="user-modal-close"
           aria-label="Fermer"
-          class="text-2xl leading-none text-slate-400 hover:text-slate-700">&times;</button
+          class="text-2xl leading-none text-slate-500 hover:text-slate-700">&times;</button
         >
       </div>
 

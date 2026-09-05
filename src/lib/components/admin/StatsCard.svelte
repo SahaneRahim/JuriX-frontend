@@ -45,7 +45,7 @@
         {/if}
         {change}
       </span>
-      <span class="text-slate-400">depuis le mois dernier</span>
+      <span class="text-slate-500">depuis le mois dernier</span>
     </div>
   {/if}
 </div>

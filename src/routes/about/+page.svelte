@@ -5,8 +5,11 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
+<svelte:head><title>JuriX — {$tr("nav.about")}</title></svelte:head>
+
 <SiteHeader />
 
+<main id="contenu">
 <div
   class="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 relative"
   in:fade
@@ -132,7 +135,7 @@
           </div>
           <a
             href="https://wa.me/237696383736"
-            class="text-green-600 hover:underline">+237 696 38 37 36</a
+            class="text-green-700 hover:underline">+237 696 38 37 36</a
           >
         </div>
         <div class="p-4 bg-white rounded-lg shadow-sm border border-slate-100">
@@ -149,5 +152,7 @@
     </div>
   </div>
 </div>
+
+</main>
 
 <SiteFooter />

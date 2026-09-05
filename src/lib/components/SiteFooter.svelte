@@ -22,7 +22,7 @@
       <div
         class="bg-gradient-to-br from-blue-500 to-blue-600 w-8 h-8 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20"
       >
-        <span class="material-icons text-white text-sm">balance</span>
+        <span class="material-icons text-white text-sm" aria-hidden="true">balance</span>
       </div>
       <span class="font-bold text-slate-700 dark:text-white text-lg">JuriX</span>
     </a>

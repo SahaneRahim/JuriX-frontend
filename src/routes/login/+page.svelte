@@ -86,12 +86,16 @@
 
 <SiteHeader />
 
+<main id="contenu">
 <div class="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-slate-50 px-4 font-sans">
   <div class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-    <div class="mb-8 flex items-center justify-center gap-2 font-bold text-slate-900">
-      <span class="text-3xl">⚖️</span>
+    <!-- La marque etait composee de deux <span> : la page n'avait aucun titre,
+         de h1 a h6. Un lecteur d'ecran arrivait sur un formulaire sans savoir
+         de quoi il s'agissait. -->
+    <h1 class="mb-8 flex items-center justify-center gap-2 font-bold text-slate-900">
+      <span class="text-3xl" aria-hidden="true">&#9878;</span>
       <span class="text-xl">JuriX Admin</span>
-    </div>
+    </h1>
 
     <form on:submit|preventDefault={handleSubmit} class="space-y-5">
       <div>
@@ -143,3 +147,4 @@
     </p>
   </div>
 </div>
+</main>

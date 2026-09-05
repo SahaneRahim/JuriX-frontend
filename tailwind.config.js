@@ -8,7 +8,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "#3B82F6", // Blue-500 for a more vibrant, standard blue
+        // Blue-600 et non Blue-500. #3B82F6 donnait 3,68:1 — sous le seuil AA de
+        // 4,5 — DANS LES DEUX SENS : en texte sur fond blanc, et en texte blanc
+        // sur bouton bleu. Un seul jeton corrigeait les deux (5,17:1).
+        primary: "#2563EB",
         "background-light": "#f8f9fa", // Light gray from reference
         "background-dark": "#0a1628", // Matches reference background
         "card-light": "#fafafa", // Slightly off-white for cards

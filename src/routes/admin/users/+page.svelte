@@ -18,7 +18,7 @@
   import { authStore } from "$lib/stores/auth";
   import { formatDateCourte } from "$lib/format";
   import { nombreDePages, trancheDePage, TAILLE_PAGE_ADMIN } from "$lib/pagination";
-  import { language } from "$lib/stores/language";
+  import { language, tr } from "$lib/stores/language";
 
   const PAR_PAGE = TAILLE_PAGE_ADMIN;
 
@@ -138,12 +138,14 @@
 <div class="mb-6 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4">
   <input
     bind:value={recherche}
+          aria-label={$tr("a11y.searchField")}
     data-testid="user-search"
     placeholder="Rechercher par email, identifiant ou nom…"
     class="min-w-64 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
   />
   <select
     bind:value={filtreRole}
+          aria-label={$tr("a11y.filterRole")}
     data-testid="user-filter-role"
     class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
   >
@@ -154,6 +156,7 @@
   </select>
   <select
     bind:value={filtreStatut}
+          aria-label={$tr("a11y.filterStatus")}
     data-testid="user-filter-status"
     class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
   >
@@ -241,7 +244,7 @@
   </div>
 
   {#if totalPages > 1}
-    <nav class="mt-6 flex items-center justify-center gap-2" aria-label="Pagination">
+    <nav class="mt-6 flex items-center justify-center gap-2" aria-label={$tr("a11y.pagination")}>
       <button
         on:click={() => (page = Math.max(1, page - 1))}
         disabled={page === 1}

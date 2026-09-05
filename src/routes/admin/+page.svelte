@@ -182,7 +182,7 @@ let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
           </div>
         {:else}
           <div
-            class="flex h-full items-center justify-center text-slate-400 text-sm"
+            class="flex h-full items-center justify-center text-slate-500 text-sm"
           >
             {$tr("admin.noActivityData")}
           </div>

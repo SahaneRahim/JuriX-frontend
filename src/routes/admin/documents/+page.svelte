@@ -247,7 +247,7 @@ let documents: any[] = [];
       viewBox="0 0 24 24"
       stroke-width="1.5"
       stroke="currentColor"
-      class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+      class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
     >
       <path
         stroke-linecap="round"
@@ -260,11 +260,13 @@ let documents: any[] = [];
       placeholder={$tr("admin.searchDoc")}
       class="w-full rounded-lg border-slate-200 pl-10 text-sm focus:border-blue-500 focus:ring-blue-500"
       bind:value={searchQuery}
+          aria-label={$tr("a11y.searchField")}
     />
   </div>
   <select
     class="rounded-lg border-slate-200 text-sm text-slate-600 focus:border-blue-500 focus:ring-blue-500"
     bind:value={selectedCategoryId}
+          aria-label={$tr("a11y.filterCategory")}
     on:change={applyFilters}
   >
     <option value="">{$tr("admin.allCategories")}</option>
@@ -275,6 +277,7 @@ let documents: any[] = [];
   <select
     class="rounded-lg border-slate-200 text-sm text-slate-600 focus:border-blue-500 focus:ring-blue-500"
     bind:value={selectedLanguage}
+          aria-label={$tr("a11y.filterLanguage")}
     on:change={applyFilters}
   >
     <option value="">{$tr("admin.allLanguages")}</option>
@@ -284,6 +287,7 @@ let documents: any[] = [];
   <select
     class="rounded-lg border-slate-200 text-sm text-slate-600 focus:border-blue-500 focus:ring-blue-500"
     bind:value={selectedStatus}
+          aria-label={$tr("a11y.filterStatus")}
     on:change={applyFilters}
   >
     <option value="">{$tr("admin.allStatuses")}</option>
@@ -399,7 +403,7 @@ let documents: any[] = [];
       {filteredDocuments.length}
       {$tr("admin.docs")}
       {#if totalPages > 1}
-        <span class="text-slate-400"
+        <span class="text-slate-500"
           >• {$tr("admin.page")}
           {currentPage}
           {$tr("admin.on")}

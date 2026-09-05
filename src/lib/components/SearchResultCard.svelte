@@ -33,7 +33,7 @@
       <span
         class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium mb-3 {badge.color}"
       >
-        <span class="material-icons text-xs">{badge.icon}</span>
+        <span class="material-icons text-xs" aria-hidden="true">{badge.icon}</span>
         {$tr(badge.labelKey)}
       </span>
       <!-- Le titre porte cursor-pointer depuis toujours, mais
@@ -53,10 +53,10 @@
       data-testid="search-copy-link"
       title={$tr("search.copyLink")}
       aria-label={$tr("search.copyLink")}
-      class="text-slate-400 hover:text-primary transition-colors"
+      class="text-slate-500 hover:text-primary transition-colors"
     >
       <span class="material-icons"
-        >{copied
+         aria-hidden="true">{copied
           ? "check"
           : "link"}</span
       >
@@ -93,7 +93,7 @@
           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-primary hover:text-white transition-colors"
           title={article.title || ""}
         >
-          <span class="material-icons text-sm">article</span>
+          <span class="material-icons text-sm" aria-hidden="true">article</span>
           Article {article.number}
         </a>
       {/each}
@@ -105,19 +105,19 @@
   >
     {#if result.publication_date || result.date}
       <div class="flex items-center gap-1.5">
-        <span class="material-icons text-base">calendar_today</span>
+        <span class="material-icons text-base" aria-hidden="true">calendar_today</span>
         {formatDate(result.publication_date || result.date, $language.current)}
       </div>
     {/if}
     {#if result.category_name}
       <div class="flex items-center gap-1.5">
-        <span class="material-icons text-base">folder_open</span>
+        <span class="material-icons text-base" aria-hidden="true">folder_open</span>
         {result.category_name}
       </div>
     {/if}
     {#if result.reference}
       <div class="flex items-center gap-1.5">
-        <span class="material-icons text-base">tag</span>
+        <span class="material-icons text-base" aria-hidden="true">tag</span>
         {result.reference}
       </div>
     {/if}
@@ -127,7 +127,7 @@
       class="ml-auto flex items-center gap-1 text-primary font-medium hover:underline"
     >
       {$tr("search.readFull")}
-      <span class="material-icons text-sm">arrow_forward</span>
+      <span class="material-icons text-sm" aria-hidden="true">arrow_forward</span>
     </a>
   </div>
 </article>

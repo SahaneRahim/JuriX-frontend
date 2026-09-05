@@ -25,6 +25,7 @@
   <SiteHeader />
 
   <main
+    id="contenu"
     class="flex-grow flex flex-col items-center justify-center px-6 py-20 text-center"
     data-testid="error-page"
   >

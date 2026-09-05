@@ -94,7 +94,7 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
 
 <div class="relative w-full mx-auto transition-all duration-300 {size === 'large' ? 'max-w-2xl' : 'max-w-xl'}">
   <div class="relative flex items-center">
-    <div class="pointer-events-none absolute left-0 flex h-full items-center pl-4 text-slate-400">
+    <div class="pointer-events-none absolute left-0 flex h-full items-center pl-4 text-slate-500">
       <svg
         class="{size === 'large' ? 'h-6 w-6' : 'h-5 w-5'}"
         xmlns="http://www.w3.org/2000/svg"
@@ -111,9 +111,24 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
       </svg>
     </div>
 
+    <!--
+      Combobox complet, et non un simple champ texte.
+
+      La navigation au clavier fonctionnait deja (fleches, Entree, Echap dans
+      handleKeydown), mais rien ne l'ANNONCAIT : aucun aria-expanded, aucun
+      role="listbox", aucun aria-activedescendant. Un lecteur d'ecran ne savait
+      ni qu'une liste s'etait ouverte, ni quelle entree etait selectionnee — la
+      fonction existait sans etre perceptible.
+    -->
     <input
       type="text"
-      class="w-full rounded-2xl border-none bg-white/90 py-4 pl-12 pr-28 text-slate-800 shadow-xl ring-1 ring-slate-900/5 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 focus:shadow-2xl transition-all outline-none {size === 'large' ? 'text-lg py-5 pl-14' : 'text-base'}"
+      role="combobox"
+      aria-label={$tr("a11y.searchField")}
+      aria-expanded={showSuggestions && suggestions.length > 0}
+      aria-controls="suggestions-liste"
+      aria-autocomplete="list"
+      aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
+      class="w-full rounded-2xl border-none bg-white/90 py-4 pl-12 pr-28 text-slate-800 shadow-xl ring-1 ring-slate-900/5 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:shadow-2xl transition-all outline-none {size === 'large' ? 'text-lg py-5 pl-14' : 'text-base'}"
       {placeholder}
       {value}
       on:input={handleInput}
@@ -128,9 +143,9 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
       {#if value}
         <button
           type="button"
-          class="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500 transition-colors"
+          class="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-red-500 transition-colors"
           on:click={clearSearch}
-          aria-label="Clear search"
+          aria-label={$tr("search.clearSearch")}
         >
           <svg
             class="h-5 w-5"
@@ -145,8 +160,15 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
         </button>
       {/if}
 
+      <!--
+        aria-label permanent : le libelle visible vit dans un
+        <span class="hidden md:inline">, donc absent sous md, et il disparait
+        entierement pendant le chargement au profit d'un rond animé. Le bouton
+        principal de la recherche n'avait alors AUCUN nom.
+      -->
       <button
         type="button"
+        aria-label={$tr('search.button')}
         class="flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 md:px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:scale-105 hover:shadow-blue-500/30 disabled:opacity-70 disabled:hover:scale-100 {size === 'large' ? 'md:px-8 md:py-3' : ''}"
         on:click={handleSubmit}
         disabled={loading || !value.trim()}
@@ -165,11 +187,18 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
 
   <!-- Autocomplete Suggestions Dropdown -->
   {#if showSuggestions && suggestions.length > 0}
-    <div class="absolute z-50 mt-2 w-full rounded-xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
-      {#each suggestions as suggestion, index}
+    <div
+      id="suggestions-liste"
+      role="listbox"
+      aria-label={$tr("a11y.searchField")}
+      class="absolute z-50 mt-2 w-full rounded-xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden"
+    >
+      {#each suggestions as suggestion, index (suggestion.id)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div
+          id="suggestion-{index}"
+          role="option"
+          aria-selected={index === selectedIndex}
           class="px-4 py-3 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0 {index === selectedIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}"
           on:click={() => selectSuggestion(suggestion)}
           on:mouseenter={() => selectedIndex = index}

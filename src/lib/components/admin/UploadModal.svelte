@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { piegerFocus } from '$lib/actions/pieger-focus';
   import { API_URL, apiFetch } from '$lib/api';
     import { createEventDispatcher, onMount } from "svelte";
     import { fade, scale } from "svelte/transition";
@@ -184,6 +185,9 @@ let files: FileList | null = null;
         transition:fade
     >
         <div
+            use:piegerFocus
+            role="dialog"
+            aria-modal="true"
             class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto"
             transition:scale
         >
@@ -193,7 +197,7 @@ let files: FileList | null = null;
                 </h2>
                 <button
                     on:click={close}
-                    class="text-slate-400 hover:text-slate-600"
+                    class="text-slate-500 hover:text-slate-600"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -235,7 +239,7 @@ let files: FileList | null = null;
                     for="doc-ref"
                     class="block text-sm font-medium text-slate-700 mb-1"
                 >
-                    Référence <span class="text-slate-400 font-normal"
+                    Référence <span class="text-slate-500 font-normal"
                         >(optionnel)</span
                     >
                 </label>
@@ -342,7 +346,7 @@ let files: FileList | null = null;
                             {:else if uploadStatus[file.name] === "error"}
                                 <span class="text-red-600">Erreur</span>
                             {:else}
-                                <span class="text-slate-400">En attente</span>
+                                <span class="text-slate-500">En attente</span>
                             {/if}
                         </div>
                     {/each}

@@ -95,6 +95,7 @@
 
 <SiteHeader />
 
+<main id="contenu">
 <div class="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
   <!-- Blue Header Section -->
   <div
@@ -111,7 +112,7 @@
         href="/"
         class="inline-flex items-center gap-2 text-white/80 hover:text-white transition-colors mb-8 font-medium"
       >
-        <span class="material-icons text-sm">arrow_back</span>
+        <span class="material-icons text-sm" aria-hidden="true">arrow_back</span>
         {$tr("categories.backHome")}
       </a>
 
@@ -145,12 +146,13 @@
       <!-- Input -->
       <div class="flex-1 relative w-full">
         <span
-          class="absolute left-4 top-1/2 -translate-y-1/2 material-icons text-slate-400"
-          >search</span
+          class="absolute left-4 top-1/2 -translate-y-1/2 material-icons text-slate-500"
+           aria-hidden="true">search</span
         >
         <input
           type="text"
           bind:value={searchQuery}
+          aria-label={$tr("a11y.searchField")}
           placeholder={$tr("categories.searchPlaceholder")}
           class="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border-none rounded-xl focus:ring-2 focus:ring-blue-500/50 text-slate-700 dark:text-slate-200 placeholder-slate-400 font-medium transition-shadow"
         />
@@ -207,7 +209,7 @@
         <div
           class="bg-red-50 dark:bg-red-900/20 text-red-600 p-8 rounded-2xl text-center border border-red-100 dark:border-red-900/30"
         >
-          <span class="material-icons text-4xl mb-2">error_outline</span>
+          <span class="material-icons text-4xl mb-2" aria-hidden="true">error_outline</span>
           <p class="font-medium mb-4">{error}</p>
           <button
             class="px-6 py-2 bg-white text-red-600 font-semibold rounded-lg shadow-sm border border-red-100 hover:bg-red-50 transition-colors"
@@ -224,8 +226,8 @@
           <div
             class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"
           >
-            <span class="material-icons text-3xl text-slate-400"
-              >search_off</span
+            <span class="material-icons text-3xl text-slate-500"
+               aria-hidden="true">search_off</span
             >
           </div>
           <p class="text-slate-900 font-medium mb-1">
@@ -283,10 +285,10 @@
                     <!-- Date -->
                     {#if doc.date || doc.publication_date}
                       <span
-                        class="flex items-center gap-1.5 text-xs font-medium text-slate-400"
+                        class="flex items-center gap-1.5 text-xs font-medium text-slate-500"
                       >
                         <span class="material-icons text-[14px]"
-                          >calendar_today</span
+                           aria-hidden="true">calendar_today</span
                         >
                         {formatDate(doc.date || doc.publication_date, $language.current)}
                       </span>
@@ -298,7 +300,7 @@
                 <div class="self-center pl-2">
                   <span
                     class="material-icons text-slate-300 group-hover:text-blue-500 transition-colors"
-                    >chevron_right</span
+                     aria-hidden="true">chevron_right</span
                   >
                 </div>
               </div>
@@ -309,5 +311,7 @@
     </div>
   </div>
 </div>
+
+</main>
 
 <SiteFooter />

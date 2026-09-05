@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tr } from "$lib/stores/language";
   import { onMount, onDestroy } from "svelte";
 
   // Expects the base URL to the law (e.g., /api/v1/laws/123)
@@ -165,6 +166,7 @@
         Page
         <input
           type="number"
+          aria-label={$tr("a11y.pageNumber")}
           min="1"
           max={totalPages}
           value={pageNum}
