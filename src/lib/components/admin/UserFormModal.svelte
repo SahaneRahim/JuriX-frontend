@@ -11,10 +11,11 @@
   import { piegerFocus } from "$lib/actions/pieger-focus";
   import { apiFetch } from "$lib/api";
   import { authStore } from "$lib/stores/auth";
+  import type { User } from '$lib/types';
 
   export let show = false;
   /** `null` = création (POST), sinon modification (PUT). */
-  export let user: any = null;
+  export let user: User | null = null;
 
   const dispatch = createEventDispatcher();
 
@@ -100,7 +101,7 @@
       if (password) corps.password = password;
 
       const reponse = await apiFetch(
-        enCreation ? "/admin/users" : `/admin/users/${user.id}`,
+        enCreation ? "/admin/users" : `/admin/users/${user!.id}`,
         {
           method: enCreation ? "POST" : "PUT",
           headers: { "Content-Type": "application/json" },

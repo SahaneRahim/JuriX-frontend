@@ -3,6 +3,7 @@
   import { API_URL, apiFetch } from '$lib/api';
     import { createEventDispatcher, onMount } from "svelte";
     import { fade, scale } from "svelte/transition";
+  import type { IngestPayload } from '$lib/types';
 
     export let show = false;
 
@@ -98,7 +99,7 @@ let files: FileList | null = null;
                 const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
 
                 // 2. Trigger Ingestion Pipeline with metadata
-                const ingestPayload: any = {
+                const ingestPayload: IngestPayload = {
                     file_id: fileId,
                     original_filename: fileName,
                     // Use custom title if single file and user entered one, else use filename

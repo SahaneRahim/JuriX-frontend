@@ -17,12 +17,13 @@
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { urlCanonique } from "$lib/seo";
   import { formatDate } from '$lib/format';
+  import type { Category, SearchResult } from '$lib/types';
 
 // State
   let searchQuery = "";
   let activeTab = "all";
   let isLoading = true;
-  let results: any[] = [];
+  let results: SearchResult[] = [];
   let totalResults = 0;
   let searchTimeMs = 0;
   let currentPage = 1;
@@ -51,7 +52,7 @@
       if (r.ok) {
         const data = await r.json();
         categories = (Array.isArray(data) ? data : (data.items ?? [])).map(
-          (c: any) => ({ id: c.id, name: c.name }),
+          (c: Category) => ({ id: c.id, name: c.name }),
         );
       }
     } catch {
@@ -201,8 +202,8 @@
    */
   let copiedId: number | null = null;
 
-  async function copyResultLink(result: any) {
-    const id = result.law_id ?? result.id;
+  async function copyResultLink(result: SearchResult) {
+    const id = result.law_id;
     const url = `${window.location.origin}/laws/${id}`;
     try {
       await navigator.clipboard.writeText(url);
@@ -247,8 +248,9 @@
     sortBy === "relevance"
       ? tabFiltered
       : [...tabFiltered].sort((a, b) => {
-          const da = new Date(a.publication_date || a.date || 0).getTime();
-          const db = new Date(b.publication_date || b.date || 0).getTime();
+          // `|| a.date` retire : le champ n'existe pas sur SearchResult.
+          const da = new Date(a.publication_date || 0).getTime();
+          const db = new Date(b.publication_date || 0).getTime();
           return sortBy === "date_desc" ? db - da : da - db;
         });
 
@@ -266,7 +268,7 @@
   $: titleMatches = filteredResults.filter((r) => r.match_scope === "title");
   $: bodyMatches = filteredResults.filter((r) => r.match_scope !== "title");
 
-  function getBadgeInfo(result: any): {
+  function getBadgeInfo(result: SearchResult): {
     color: string;
     labelKey: string;
     icon: string;
@@ -611,7 +613,7 @@
               {result}
               badge={getBadgeInfo(result)}
               highlight={index === 0}
-              copied={copiedId === (result.law_id ?? result.id)}
+              copied={copiedId === result.law_id}
               onCopy={copyResultLink}
             />
           {/each}
@@ -629,7 +631,7 @@
               <SearchResultCard
                 {result}
                 badge={getBadgeInfo(result)}
-                copied={copiedId === (result.law_id ?? result.id)}
+                copied={copiedId === result.law_id}
                 onCopy={copyResultLink}
               />
             {/each}

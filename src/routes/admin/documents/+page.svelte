@@ -7,15 +7,16 @@
   import { formatDate } from "$lib/format";
   import { nombreDePages, pagesVisibles, TAILLE_PAGE_ADMIN } from "$lib/pagination";
   import { language, tr } from "$lib/stores/language";
+  import type { Category, Law } from '$lib/types';
 
   let searchQuery = "";
-let documents: any[] = [];
+let documents: Law[] = [];
   let erreur = "";
-  let categories: any[] = [];
+  let categories: Category[] = [];
   let loading = true;
   let showUploadModal = false;
   let showEditModal = false;
-  let selectedDocument: any = null;
+  let selectedDocument: Law | null = null;
 
   // Filter states
   let selectedCategoryId: string = "";
@@ -115,7 +116,7 @@ let documents: any[] = [];
     }
   }
 
-  function editDocument(doc: any) {
+  function editDocument(doc: Law) {
     selectedDocument = doc;
     showEditModal = true;
   }

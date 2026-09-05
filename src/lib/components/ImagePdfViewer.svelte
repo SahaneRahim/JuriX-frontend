@@ -3,35 +3,41 @@
   import { onMount, onDestroy } from "svelte";
 
   // Expects the base URL to the law (e.g., /api/v1/laws/123)
-  export let url;
+  export let url: string;
   export let initialPage = 1; // Optional: start at specific page (for article navigation)
 
   let pageNum = 1;
   let totalPages = 0;
-  let error = null;
+  // Annotees explicitement : initialisees a `null`, elles etaient inferees
+  // `null` tout court, et toute affectation d'une chaine plus loin devenait une
+  // erreur sous `strict`.
+  let error: string | null = null;
   let loading = true;
   let pageLoading = false;
-  let currentImageUrl = null;
+  let currentImageUrl: string | null = null;
   let dpi = 120; // Default DPI (120 = good balance of quality/speed)
 
   // Extract law ID from URL
-  function getLawId(lawUrl) {
+  function getLawId(lawUrl: string): string | null {
     const match = lawUrl.match(/\/laws\/(\d+)/);
     return match ? match[1] : null;
   }
 
   // Get the base API URL
-  function getBaseUrl(lawUrl) {
+  function getBaseUrl(lawUrl: string): string {
     // Convert download URL to base law URL
     return lawUrl.replace("/download", "");
   }
 
   // Keyboard navigation handler
-  function handleKeydown(event) {
+  function handleKeydown(event: KeyboardEvent) {
     if (
       totalPages === 0 ||
-      document.activeElement.tagName === "INPUT" ||
-      document.activeElement.tagName === "TEXTAREA"
+      // `activeElement` est nul quand aucun element n'a le focus — au premier
+      // rendu, ou apres un clic dans le vide. Le lire sans garde levait alors
+      // une exception qui avalait toute la navigation au clavier.
+      document.activeElement?.tagName === "INPUT" ||
+      document.activeElement?.tagName === "TEXTAREA"
     ) {
       return;
     }
@@ -72,9 +78,12 @@
       await loadPage(startPage);
     } catch (err) {
       console.error("Error loading PDF info:", err);
+      // `err` est typé `unknown` : c'est le type réel de ce qu'un `throw` peut
+      // produire. Le contrôle explicite remplace l'accès direct à `.message`,
+      // qui échouait sur tout ce qui n'est pas une Error.
       error =
         "Impossible de charger le document. " +
-        (err.message || "Erreur inconnue");
+        (err instanceof Error ? err.message : "Erreur inconnue");
       loading = false;
     }
   });
@@ -85,7 +94,7 @@
     }
   });
 
-  async function loadPage(num) {
+  async function loadPage(num: number) {
     if (num < 1 || num > totalPages) return;
 
     pageLoading = true;
@@ -122,8 +131,8 @@
     loadPage(pageNum + 1);
   }
 
-  function goToPage(num) {
-    const targetPage = parseInt(num, 10);
+  function goToPage(num: string | number) {
+    const targetPage = parseInt(String(num), 10);
     if (targetPage >= 1 && targetPage <= totalPages) {
       loadPage(targetPage);
     }

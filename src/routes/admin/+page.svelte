@@ -4,10 +4,22 @@
   import { onMount } from "svelte";
   import { formatDate } from "$lib/format";
   import { language, tr } from "$lib/stores/language";
+  import type { AnalyticsOverview, AnalyticsSearch, AnalyticsUsage, Law } from '$lib/types';
 
-let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
-  let usage: any = { active_users: 0, total_calls: 0 };
-  let searchStats: any = { total_searches: 0, avg_response_time_ms: 0 };
+let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws: 0 };
+  let usage: AnalyticsUsage = { active_users: 0, total_calls: 0 };
+  let searchStats: AnalyticsSearch = { total_searches: 0, avg_response_time_ms: 0 };
+
+  /**
+   * Derniers documents ingeres, dans leur PROPRE variable.
+   *
+   * Ils venaient d'une quatrieme requete puis etaient greffes sur `overview`
+   * sous le nom `latest_laws` — un champ que `/analytics/overview` ne renvoie
+   * pas et n'a jamais renvoye. Melanger une reponse du serveur et une donnee
+   * composee par le client dans le meme objet rendait impossible de dire, en
+   * lisant la page, d'ou venait quoi.
+   */
+  let dernieresLois: Law[] = [];
   let loading = true;
   let erreur = "";
 
@@ -49,9 +61,7 @@ let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
       if (overviewRes.ok) overview = await overviewRes.json();
       if (usageRes.ok) usage = await usageRes.json();
       if (searchRes.ok) searchStats = await searchRes.json();
-      if (!overview.latest_laws) {
-        overview.latest_laws = lawsRes.ok ? await lawsRes.json() : [];
-      }
+      if (lawsRes.ok) dernieresLois = await lawsRes.json();
     } catch (e) {
       console.error("Error fetching admin stats:", e);
       erreur = $tr("admin.statsError");
@@ -194,8 +204,8 @@ let overview: any = { total_laws: 0, by_language: {}, recent_laws: 0 };
     <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h3 class="mb-4 font-bold text-slate-900">{$tr("admin.latestDocs")}</h3>
       <div class="space-y-4">
-        {#if overview.latest_laws && overview.latest_laws.length > 0}
-          {#each overview.latest_laws as law}
+        {#if dernieresLois.length > 0}
+          {#each dernieresLois as law}
             <div class="flex items-start gap-3">
               <div
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600"

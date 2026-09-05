@@ -19,10 +19,11 @@
   import { formatDateCourte } from "$lib/format";
   import { nombreDePages, trancheDePage, TAILLE_PAGE_ADMIN } from "$lib/pagination";
   import { language, tr } from "$lib/stores/language";
+  import type { User } from '$lib/types';
 
   const PAR_PAGE = TAILLE_PAGE_ADMIN;
 
-  let users: any[] = [];
+  let users: User[] = [];
   let chargement = true;
   let erreur = "";
 
@@ -32,7 +33,7 @@
   let page = 1;
 
   let modaleOuverte = false;
-  let userEnCours: any = null;
+  let userEnCours: User | null = null;
 
   // Seul un superadmin peut supprimer (get_current_superadmin_user), et le
   // backend refuse la suppression de son propre compte.
@@ -61,9 +62,12 @@
     const q = recherche.trim().toLowerCase();
     const correspond =
       !q ||
+      // `filter(Boolean)` retire bien les valeurs nulles a l'execution, mais
+      // TypeScript ne le deduit pas : la garde de type explicite le lui dit,
+      // sans changer le comportement.
       [u.email, u.username, u.full_name]
-        .filter(Boolean)
-        .some((v: string) => v.toLowerCase().includes(q));
+        .filter((v): v is string => Boolean(v))
+        .some((v) => v.toLowerCase().includes(q));
     const roleOk = filtreRole === "all" || u.role === filtreRole;
     const statutOk =
       filtreStatut === "all" ||
@@ -82,12 +86,12 @@
     modaleOuverte = true;
   }
 
-  function ouvrirEdition(u: any) {
+  function ouvrirEdition(u: User) {
     userEnCours = u;
     modaleOuverte = true;
   }
 
-  async function supprimer(u: any) {
+  async function supprimer(u: User) {
     if (!confirm(`Supprimer définitivement le compte ${u.email} ?`)) return;
     const r = await apiFetch(`/admin/users/${u.id}`, { method: "DELETE" });
     if (!r.ok) {

@@ -251,12 +251,20 @@ export interface AnalyticsOverview {
   total_laws: number;
   /** Décompte par code langue ; les clés dépendent des données présentes. */
   by_language: Record<string, number>;
+  /** Décompte par statut du cycle de vie. */
+  by_status?: Record<string, number>;
   recent_laws: number;
+  timestamp?: string;
 }
 
 export interface AnalyticsUsage {
   active_users: number;
   total_calls: number;
+  api_calls?: Record<string, number>;
+  peak_hours?: unknown;
+  timestamp?: string;
+  /** Le backend marque lui-même ces valeurs comme fictives. */
+  note?: string;
 }
 
 /**
@@ -268,4 +276,69 @@ export interface AnalyticsUsage {
 export interface AnalyticsSearch {
   total_searches: number;
   avg_response_time_ms: number;
+  /** Répartition entre les modes `text`, `semantic` et `hybrid`. */
+  modes_usage?: Record<string, number>;
+  timestamp?: string;
+  /** Le backend marque lui-même ces valeurs comme fictives. */
+  note?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Charges utiles envoyées au backend                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `PUT /laws/admin/{id}` — `LawUpdate` côté serveur : tous les champs sont
+ * facultatifs, seuls ceux présents sont écrits.
+ *
+ * `category_id` est un NOMBRE ici alors que le `<select>` porte une chaîne : la
+ * conversion est faite par l'appelant, et c'est précisément ce que le type
+ * force à ne pas oublier.
+ */
+export interface LawUpdatePayload {
+  title?: string;
+  content?: string;
+  reference?: string;
+  language?: LangueDocument | string;
+  category_id?: number;
+  type?: LawType;
+  status?: LawStatus;
+  publication_date?: string | null;
+}
+
+/** `POST /laws/admin/ingest` — déclenche la chaîne d'ingestion d'un fichier. */
+export interface IngestPayload {
+  file_id: string;
+  original_filename: string;
+  title: string;
+  reference: string;
+  /**
+   * Nombre : `UploadModal` lie son `<select>` à un identifiant numérique, là où
+   * `EditModal` lie le sien à une chaîne et convertit avant l'envoi. L'écart est
+   * réel entre les deux écrans — le noter évite une « correction » qui casserait
+   * celui qu'on ne regarde pas.
+   */
+  category_id?: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* WebSocket de l'import en lot — app/api/routes/batch_upload.py               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Messages du suivi d'import en lot, en union discriminée sur `type`.
+ *
+ * Le backend en émet SEPT ; l'interface n'en traite que cinq. `progress`
+ * (batch_upload.py:67) et `error` (batch_upload.py:196) tombent dans un `switch`
+ * sans branche : une erreur signalée par le serveur pendant l'import n'apparaît
+ * nulle part à l'écran. L'union les déclare pour que le trou soit visible dans
+ * le type plutôt qu'invisible dans le code.
+ */
+export type MessageLotWS =
+  | { type: 'progress'; [k: string]: unknown }
+  | { type: 'upload_progress'; [k: string]: unknown }
+  | { type: 'file_created'; filename: string; law_id: number }
+  | { type: 'error'; error: string; filename?: string }
+  | { type: 'processing_start'; law_id: number }
+  | { type: 'processing_complete'; law_id: number; status: 'published' | 'refused' }
+  | { type: 'processing_error'; law_id: number; error: string };

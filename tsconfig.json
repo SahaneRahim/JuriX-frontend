@@ -20,13 +20,13 @@
     // remonte des erreurs qui ne sont pas des défauts du code.
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
 
-    // `strict` reste désactivé VOLONTAIREMENT, pour l'instant.
+    // `strict` est ACTIF depuis que `$lib/types.ts` existe.
     //
-    // Le code compte 29 annotations `: any` explicites et aucun module de types
-    // partagés. L'activer aujourd'hui produirait un mur d'erreurs sur du code qui
-    // fonctionne, avant même que les types métier (law, article, user,
-    // searchResult) existent. Il sera activé en dernier, une fois ces types
-    // écrits — c'est le point final du chantier, pas son point de départ.
-    "strict": false
+    // Il restait désactivé tant que le code portait 34 annotations `: any` et
+    // aucun type métier : l'activer plus tôt aurait produit un mur d'erreurs sur
+    // du code qui fonctionne, avant que les types (law, article, user,
+    // searchResult) existent pour y répondre. Ordre suivi : les types d'abord,
+    // la résorption des `any` ensuite, `strict` en dernier.
+    "strict": true
   }
 }

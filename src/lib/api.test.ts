@@ -36,7 +36,7 @@ describe('apiFetch', () => {
   });
 
   it("joint le jeton quand une session existe", async () => {
-    authStore.login({ id: '1', email: 'a@b.cm', role: 'admin' }, 'jeton-test');
+    authStore.login({ id: 1, email: 'a@b.cm', role: 'admin' }, 'jeton-test');
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -57,7 +57,7 @@ describe('apiFetch', () => {
   });
 
   it('déconnecte et renvoie vers /login sur 401', async () => {
-    authStore.login({ id: '1', email: 'a@b.cm', role: 'admin' }, 'jeton-expire');
+    authStore.login({ id: 1, email: 'a@b.cm', role: 'admin' }, 'jeton-expire');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })));
 
     await apiFetch('/admin/users');
@@ -71,7 +71,7 @@ describe('apiFetch', () => {
   });
 
   it("laisse passer les autres codes d'erreur sans déconnecter", async () => {
-    authStore.login({ id: '1', email: 'a@b.cm', role: 'admin' }, 'jeton-valide');
+    authStore.login({ id: 1, email: 'a@b.cm', role: 'admin' }, 'jeton-valide');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 500 })));
 
     const reponse = await apiFetch('/analytics/overview');

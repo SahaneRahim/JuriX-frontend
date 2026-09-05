@@ -17,7 +17,18 @@ export type UserRole = 'user' | 'admin' | 'superadmin';
 
 // User type
 export interface User {
-  id: string;
+  /**
+   * ENTIER, comme `UserResponse.id` du backend — la valeur vient telle quelle de
+   * `POST /auth/login/json` (`login/+page.svelte`).
+   *
+   * Elle etait declaree `string`. Le type mentait, et il n'a jamais leve
+   * d'erreur parce qu'aucun controle ne tournait avant l'ajout du tsconfig. Le
+   * cout reel : `/admin/users` masque son bouton de suppression sur le compte de
+   * l'operateur par `u.id !== $authStore.user?.id`, une comparaison que TypeScript
+   * declarait sans recouvrement possible. Elle fonctionnait par chance, les deux
+   * valeurs etant des nombres a l'execution.
+   */
+  id: number;
   email: string;
   role: UserRole;
   name?: string;

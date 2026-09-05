@@ -11,13 +11,22 @@
   import { tr, language } from "$lib/stores/language";
   import { formatDate } from "$lib/format";
   import { highlightSegments } from "$lib/highlight";
+  import type { SearchResult } from '$lib/types';
 
-  export let result: any;
+  /**
+   * Un `SearchResult` de `app/schemas/search.py` — plus un objet libre.
+   *
+   * Les replis `result.law_id || result.id` et `result.publication_date ||
+   * result.date` ont ete retires : ni `id` ni `date` n'existent sur ce type, et
+   * la branche gauche etait donc toujours celle qui gagnait. Du code defensif
+   * contre une forme que l'API n'a jamais renvoyee.
+   */
+  export let result: SearchResult;
   export let badge: { color: string; icon: string; labelKey: string };
   /** Barre d'accent verticale, réservée au premier résultat de la page. */
   export let highlight = false;
   export let copied = false;
-  export let onCopy: (result: any) => void = () => {};
+  export let onCopy: (result: SearchResult) => void = () => {};
 
 </script>
 
@@ -40,7 +49,7 @@
            n'etait ni un lien ni muni d'un gestionnaire : cliquer
            dessus ne faisait rien, alors que le style annonçait le
            contraire. Seul le petit lien en bas de carte navigait. -->
-      <a href="/laws/{result.law_id || result.id}">
+      <a href="/laws/{result.law_id}">
         <h2
           class="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors cursor-pointer hover:underline"
         >
@@ -75,7 +84,7 @@
       {/each}
     {:else}
       {result.content?.substring(0, 200) ||
-        $tr("search.noDescription")}{result.content?.length > 200 ? "..." : ""}
+        $tr("search.noDescription")}{(result.content?.length ?? 0) > 200 ? "..." : ""}
     {/if}
   </p>
 
@@ -103,10 +112,10 @@
   <div
     class="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-secondary-text-light dark:text-secondary-text-dark border-t border-slate-100 dark:border-slate-800 pt-4 mt-2"
   >
-    {#if result.publication_date || result.date}
+    {#if result.publication_date}
       <div class="flex items-center gap-1.5">
         <span class="material-icons text-base" aria-hidden="true">calendar_today</span>
-        {formatDate(result.publication_date || result.date, $language.current)}
+        {formatDate(result.publication_date, $language.current)}
       </div>
     {/if}
     {#if result.category_name}
@@ -123,7 +132,7 @@
     {/if}
 
     <a
-      href="/laws/{result.law_id || result.id}"
+      href="/laws/{result.law_id}"
       class="ml-auto flex items-center gap-1 text-primary font-medium hover:underline"
     >
       {$tr("search.readFull")}

@@ -9,6 +9,7 @@
 	import { language, tr } from "$lib/stores/language";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { formatDateHeure } from "$lib/format";
+	import type { MessageLotWS } from '$lib/types';
 
 	// Types
 	interface UploadedFile {
@@ -64,7 +65,7 @@
 		};
 	}
 
-	function handleWebSocketMessage(data: any) {
+	function handleWebSocketMessage(data: MessageLotWS) {
 		switch (data.type) {
 			case "upload_progress":
 				// Update overall upload progress

@@ -96,9 +96,31 @@
     switchLanguage(lang);
   }
 
-  // TOC Structure
-  let tableOfContents: any[] = [];
-  let flatArticles: any[] = [];
+  /**
+   * Structure de la table des matieres.
+   *
+   * Elle est RECONSTRUITE depuis `law.content` par `parseContent`, et ne vient
+   * d'aucun endpoint : `GET /laws/{id}` rend un `LawResponse`, qui ne porte pas
+   * de champ `articles`. Ces types sont donc locaux a la page — les mettre dans
+   * `$lib/types` laisserait croire qu'ils decrivent une reponse de l'API.
+   */
+  interface ArticleTDM {
+    number: string;
+    title: string;
+    /** Ligne d'origine, entiere, telle qu'elle apparait dans le document. */
+    fullTitle: string;
+    content: string;
+    sectionTitle: string;
+  }
+
+  interface SectionTDM {
+    type: string;
+    title: string;
+    articles: ArticleTDM[];
+  }
+
+  let tableOfContents: SectionTDM[] = [];
+  let flatArticles: ArticleTDM[] = [];
 
   let currentArticleIndex = 0;
   let searchQuery = "";
@@ -137,14 +159,14 @@
     tableOfContents = [];
     flatArticles = [];
 
-    let currentSection = {
+    let currentSection: SectionTDM = {
       type: "section",
       title: "Préambule / Général",
       articles: [],
     };
     tableOfContents.push(currentSection);
 
-    let currentArticle: any = null;
+    let currentArticle: ArticleTDM | null = null;
 
     // Heuristic Regex
     const sectionRegex = /^(LIVRE|TITRE|CHAPITRE)\s+[IVX0-9]+/i; // e.g., LIVRE I
@@ -288,7 +310,7 @@
   // Filtered TOC for sidebar
   $: filteredTOC = tableOfContents
     .map((section) => {
-      const filteredArticles = section.articles.filter((art: any) => {
+      const filteredArticles = section.articles.filter((art) => {
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
         return (
@@ -431,7 +453,15 @@
         <a href="/" class="text-blue-600 hover:underline">{t.return}</a>
       </div>
     </div>
-  {:else}
+  <!--
+    `{:else if law}` et non `{:else}` : sans cette garde, tout le corps de la
+    page lit `law.x` sur une valeur que le type dit nullable — douze erreurs sous
+    `strict`. La brancher ici plutot que de disperser des `law!.` dans le
+    balisage garde la garantie a UN endroit. Le cas « ni erreur ni document » est
+    impossible par construction — `+page.ts` pose l'un ou l'autre — mais la
+    garde le rend inoffensif plutot qu'invisible.
+  -->
+  {:else if law}
     <!-- Main Content -->
     <div class="main-content py-8">
       <div class="container mx-auto px-4 max-w-[1400px]">

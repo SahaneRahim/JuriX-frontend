@@ -113,88 +113,34 @@ export const translations = {
     // Search
     'search.placeholder': 'Rechercher une loi, un mot-clé...',
     'search.button': 'Rechercher',
-    'search.results': 'résultats',
-    'search.noResults': 'Aucun résultat trouvé',
     'search.searching': 'Recherche en cours...',
 
     // Chat
     'chat.welcome': 'Bonjour ! Je suis votre assistant juridique IA. Posez-moi une question sur le droit camerounais.',
     'chat.placeholder': 'Posez votre question juridique...',
     'chat.send': 'Envoyer',
-    'chat.thinking': 'Réflexion en cours...',
     'chat.header': 'Assistant Juridique IA',
-    'chat.subtitle': 'Posez vos questions sur le droit camerounais',
-    'chat.disclaimer': 'L\'IA peut faire des erreurs. Vérifiez toujours les informations importantes.',
     'chat.errorServer': 'Le serveur n\'a pas pu traiter votre question.',
     'chat.errorNetwork': 'Impossible de joindre le serveur.',
 
     // Categories
     'categories.title': 'Explorer par Catégorie',
-    'categories.viewAll': 'Voir toutes les catégories',
-    'categories.laws': 'textes',
     'categories.subtitle': 'Explorez les textes de loi par grandes catégories',
-    'categories.back': 'Retour aux catégories',
-    'categories.documents': 'document(s) dans cette catégorie',
     'categories.documentsShort': 'doc.',
-    'categories.empty': 'Aucun document',
-    'categories.emptyDesc': 'Il n\'y a pas encore de documents dans cette catégorie.',
 
     // Category names (French)
-    'cat.constitutionnel': 'Droit Constitutionnel',
-    'cat.civil': 'Droit Civil',
-    'cat.penal': 'Droit Pénal',
-    'cat.travail': 'Droit du Travail',
-    'cat.fiscal': 'Droit Fiscal',
-    'cat.affaires': 'Droit des Affaires',
-    'cat.international': 'Lois Internationales Ratifiées',
-    'cat.lois': 'Lois',
-    'cat.ordonnances': 'Ordonnances',
-    'cat.decrets': 'Décrets',
-    'cat.arretes': 'Arrêtés',
-    'cat.circulaires': 'Circulaires',
-    'cat.decisions': 'Décisions',
-    'cat.autres': 'Autres',
 
     // Category descriptions (French)
-    'catdesc.constitutionnel': 'Constitution et lois fondamentales',
-    'catdesc.civil': 'Lois relatives au droit civil',
-    'catdesc.penal': 'Code pénal et infractions',
-    'catdesc.travail': 'Lois relatives au travail',
-    'catdesc.fiscal': 'Lois relatives à la fiscalité',
-    'catdesc.affaires': 'Lois commerciales et des affaires',
-    'catdesc.international': 'Traités et conventions internationales',
-    'catdesc.lois': 'Lois votées par le parlement',
-    'catdesc.ordonnances': 'Ordonnances présidentielles',
-    'catdesc.decrets': 'Décrets gouvernementaux',
-    'catdesc.arretes': 'Arrêtés présidentiels, ministériels et préfectoraux',
-    'catdesc.circulaires': 'Circulaires administratives',
-    'catdesc.decisions': 'Décisions administratives et judiciaires',
-    'catdesc.autres': 'Autres textes juridiques',
 
     // Common
     'common.loading': 'Chargement...',
-    'common.error': 'Erreur',
     'common.retry': 'Réessayer',
-    'common.close': 'Fermer',
-    'common.cancel': 'Annuler',
-    'common.save': 'Enregistrer',
-    'common.delete': 'Supprimer',
-    'common.edit': 'Modifier',
-    'common.view': 'Voir',
-    'common.back': 'Retour',
-    'common.language': 'Langue',
-    'common.all': 'Tout',
-    'common.showing': 'Affichage',
-    'common.of': 'sur',
-    'common.for': 'pour',
 
     // Search results
     'search.resultsFor': 'Résultats pour',
     'search.searchLaw': 'Rechercher une loi, un décret, un article...',
 
     // Pagination
-    'pagination.first': 'Première page',
-    'pagination.last': 'Dernière page',
     'pagination.prev': 'Précédent',
     'pagination.next': 'Suivant',
     'pagination.page': 'Page',
@@ -207,9 +153,6 @@ export const translations = {
     'search.thisYear': 'Cette année',
     'search.last5Years': '5 dernières années',
     'search.category': 'Catégorie',
-    'search.source': 'Source',
-    'search.officialJournal': 'Journal Officiel',
-    'search.caseLaw': 'Jurisprudence',
     'search.sortBy': 'Trier par:',
     'search.relevance': 'Pertinence',
     'search.recentDate': 'Date récente',
@@ -225,27 +168,14 @@ export const translations = {
     'search.articles': 'Articles',
     'badge.law': 'Loi',
     'badge.decree': 'Décret',
-    'badge.article': 'Article',
     'badge.constitution': 'Constitution',
     'badge.ordinance': 'Ordonnance',
     'badge.text': 'Texte',
     'search.errorSearch': 'Erreur lors de la recherche. Veuillez réessayer.',
     'search.errorServer': 'Impossible de contacter le serveur.',
-    'search.laborLaw': 'Droit du Travail',
-    'search.civilLaw': 'Droit Civil',
-    'search.criminalLaw': 'Droit Pénal',
-    'search.businessLaw': 'Droit des Affaires',
-    'search.taxLaw': 'Droit Fiscal',
-    'search.constitutionalLaw': 'Droit Constitutionnel',
 
     // Law details
-    'law.reference': 'Référence',
-    'law.type': 'Type',
-    'law.category': 'Catégorie',
-    'law.language': 'Langue',
-    'law.articles': 'Articles',
     'law.content': 'Contenu',
-    'law.back': 'Retour aux résultats',
 
     // Navigation
     'laws.title': 'Documents',
@@ -269,17 +199,12 @@ export const translations = {
     'a11y.filterStatus': 'Filtrer par statut',
     'a11y.filterRole': 'Filtrer par rôle',
     'a11y.sortBy': 'Trier les résultats',
-    'a11y.filterArticles': 'Filtrer les articles',
-    'a11y.chooseFiles': 'Choisir des fichiers',
     'a11y.toggleTheme': 'Changer de thème',
     'a11y.menu': 'Menu',
-    'a11y.close': 'Fermer',
     'a11y.pagination': 'Pagination',
     'a11y.switchTo': 'Passer en',
     'nav.home': 'Accueil',
     'nav.search': 'Recherche',
-    'nav.categories': 'Catégories',
-    'nav.explore': 'Explorer',
     'nav.about': 'À propos',
     'nav.admin': 'Administration',
     'nav.login': 'Se connecter',
@@ -293,7 +218,6 @@ export const translations = {
     // 'nav.signup' conservée : plus aucun lien ne l'utilise (aucun endpoint
     // d'inscription n'existe côté backend), mais la retirer casserait toute
     // traduction encore référencée ailleurs.
-    'nav.signup': 'S\'inscrire',
 
     // Footer
     'footer.rights': '© 2025 JuriX. Tous droits réservés. L\'accès au droit pour tous.',
@@ -317,14 +241,12 @@ export const translations = {
     'categories.searchPlaceholder': 'Rechercher une loi, un décret, un article...',
     'categories.langLabel': 'Langue',
     'categories.all': 'Tout',
-    'categories.loadingDocs': 'Chargement des documents...',
     'categories.retry': 'Réessayer',
     'categories.noDocsTitle': 'Aucun document trouvé',
     'categories.noDocsDesc': 'Essayez de modifier vos filtres.',
     'categories.docsCount': 'document(s) dans cette catégorie',
     'categories.noPreview': 'Aucun aperçu disponible',
     'categories.errorLoad': 'Impossible de charger les documents. Vérifiez que le serveur backend est démarré.',
-    'categories.notFound': "Cette catégorie n'existe pas.",
     'search.bodyMatches': 'Mentions dans le texte',
 
     // Admin
@@ -339,8 +261,6 @@ export const translations = {
     'admin.activeUsers': 'Utilisateurs Actifs',
     'admin.responseTime': 'Temps de Réponse',
     'admin.searchActivity': 'Activité de Recherche',
-    'admin.last7days': '7 derniers jours',
-    'admin.last30days': '30 derniers jours',
     'admin.noActivityData': 'Aucune donnée d\'activité',
     'admin.latestDocs': 'Derniers Documents',
     'admin.noRecentDocs': 'Aucun document récent',
@@ -428,88 +348,34 @@ export const translations = {
     // Search
     'search.placeholder': 'Search for a law, keyword...',
     'search.button': 'Search',
-    'search.results': 'results',
-    'search.noResults': 'No results found',
     'search.searching': 'Searching...',
 
     // Chat
     'chat.welcome': 'Hello! I am your AI legal assistant. Ask me a question about Cameroonian law.',
     'chat.placeholder': 'Ask your legal question...',
     'chat.send': 'Send',
-    'chat.thinking': 'Thinking...',
     'chat.header': 'AI Legal Assistant',
-    'chat.subtitle': 'Ask your questions about Cameroonian law',
-    'chat.disclaimer': 'AI can make mistakes. Always verify important information.',
     'chat.errorServer': 'The server could not process your question.',
     'chat.errorNetwork': 'Could not reach the server.',
 
     // Categories
     'categories.title': 'Browse by Category',
-    'categories.viewAll': 'View all categories',
-    'categories.laws': 'laws',
     'categories.subtitle': 'Explore legal texts by major categories',
-    'categories.back': 'Back to categories',
-    'categories.documents': 'document(s) in this category',
     'categories.documentsShort': 'doc.',
-    'categories.empty': 'No documents',
-    'categories.emptyDesc': 'There are no documents in this category yet.',
 
     // Category names (English)
-    'cat.constitutionnel': 'Constitutional Law',
-    'cat.civil': 'Civil Law',
-    'cat.penal': 'Criminal Law',
-    'cat.travail': 'Labor Law',
-    'cat.fiscal': 'Tax Law',
-    'cat.affaires': 'Business Law',
-    'cat.international': 'Ratified International Laws',
-    'cat.lois': 'Laws',
-    'cat.ordonnances': 'Ordinances',
-    'cat.decrets': 'Decrees',
-    'cat.arretes': 'Orders',
-    'cat.circulaires': 'Circulars',
-    'cat.decisions': 'Decisions',
-    'cat.autres': 'Others',
 
     // Category descriptions (English)
-    'catdesc.constitutionnel': 'Constitution and fundamental laws',
-    'catdesc.civil': 'Laws relating to civil law',
-    'catdesc.penal': 'Criminal code and offenses',
-    'catdesc.travail': 'Laws relating to labor',
-    'catdesc.fiscal': 'Laws relating to taxation',
-    'catdesc.affaires': 'Commercial and business laws',
-    'catdesc.international': 'International treaties and conventions',
-    'catdesc.lois': 'Laws passed by parliament',
-    'catdesc.ordonnances': 'Presidential ordinances',
-    'catdesc.decrets': 'Government decrees',
-    'catdesc.arretes': 'Presidential, ministerial and prefectural orders',
-    'catdesc.circulaires': 'Administrative circulars',
-    'catdesc.decisions': 'Administrative and judicial decisions',
-    'catdesc.autres': 'Other legal texts',
 
     // Common
     'common.loading': 'Loading...',
-    'common.error': 'Error',
     'common.retry': 'Retry',
-    'common.close': 'Close',
-    'common.cancel': 'Cancel',
-    'common.save': 'Save',
-    'common.delete': 'Delete',
-    'common.edit': 'Edit',
-    'common.view': 'View',
-    'common.back': 'Back',
-    'common.language': 'Language',
-    'common.all': 'All',
-    'common.showing': 'Showing',
-    'common.of': 'of',
-    'common.for': 'for',
 
     // Search results
     'search.resultsFor': 'Results for',
     'search.searchLaw': 'Search for a law, decree, article...',
 
     // Pagination
-    'pagination.first': 'First page',
-    'pagination.last': 'Last page',
     'pagination.prev': 'Previous',
     'pagination.next': 'Next',
     'pagination.page': 'Page',
@@ -522,9 +388,6 @@ export const translations = {
     'search.thisYear': 'This year',
     'search.last5Years': 'Last 5 years',
     'search.category': 'Category',
-    'search.source': 'Source',
-    'search.officialJournal': 'Official Journal',
-    'search.caseLaw': 'Case Law',
     'search.sortBy': 'Sort by:',
     'search.relevance': 'Relevance',
     'search.recentDate': 'Most recent',
@@ -541,27 +404,14 @@ export const translations = {
     'search.articles': 'Articles',
     'badge.law': 'Law',
     'badge.decree': 'Decree',
-    'badge.article': 'Article',
     'badge.constitution': 'Constitution',
     'badge.ordinance': 'Ordinance',
     'badge.text': 'Text',
     'search.errorSearch': 'Search error. Please try again.',
     'search.errorServer': 'Unable to contact the server.',
-    'search.laborLaw': 'Labor Law',
-    'search.civilLaw': 'Civil Law',
-    'search.criminalLaw': 'Criminal Law',
-    'search.businessLaw': 'Business Law',
-    'search.taxLaw': 'Tax Law',
-    'search.constitutionalLaw': 'Constitutional Law',
 
     // Law details
-    'law.reference': 'Reference',
-    'law.type': 'Type',
-    'law.category': 'Category',
-    'law.language': 'Language',
-    'law.articles': 'Articles',
     'law.content': 'Content',
-    'law.back': 'Back to results',
 
     // Navigation
     'laws.title': 'Documents',
@@ -585,17 +435,12 @@ export const translations = {
     'a11y.filterStatus': 'Filter by status',
     'a11y.filterRole': 'Filter by role',
     'a11y.sortBy': 'Sort results',
-    'a11y.filterArticles': 'Filter articles',
-    'a11y.chooseFiles': 'Choose files',
     'a11y.toggleTheme': 'Toggle theme',
     'a11y.menu': 'Menu',
-    'a11y.close': 'Close',
     'a11y.pagination': 'Pagination',
     'a11y.switchTo': 'Switch to',
     'nav.home': 'Home',
     'nav.search': 'Search',
-    'nav.categories': 'Categories',
-    'nav.explore': 'Explore',
     'nav.about': 'About',
     'nav.admin': 'Admin',
     'nav.login': 'Log in',
@@ -606,7 +451,6 @@ export const translations = {
     'error.notFoundBody': 'The link may be outdated, or the address has a typo. Here is where to go next.',
     'error.genericTitle': 'Something went wrong',
     'error.genericBody': 'Try again in a moment. If the problem persists, head back home.',
-    'nav.signup': 'Sign up',
 
     // Footer
     'footer.rights': '© 2025 JuriX. All rights reserved. Access to law for everyone.',
@@ -630,14 +474,12 @@ export const translations = {
     'categories.searchPlaceholder': 'Search for a law, decree, article...',
     'categories.langLabel': 'Language',
     'categories.all': 'All',
-    'categories.loadingDocs': 'Loading documents...',
     'categories.retry': 'Retry',
     'categories.noDocsTitle': 'No documents found',
     'categories.noDocsDesc': 'Try adjusting your filters.',
     'categories.docsCount': 'document(s) in this category',
     'categories.noPreview': 'No preview available',
     'categories.errorLoad': 'Unable to load documents. Check that the backend server is running.',
-    'categories.notFound': 'This category does not exist.',
     'search.bodyMatches': 'Mentioned in the text',
 
     // Admin
@@ -652,8 +494,6 @@ export const translations = {
     'admin.activeUsers': 'Active Users',
     'admin.responseTime': 'Response Time',
     'admin.searchActivity': 'Search Activity',
-    'admin.last7days': 'Last 7 days',
-    'admin.last30days': 'Last 30 days',
     'admin.noActivityData': 'No activity data',
     'admin.latestDocs': 'Latest Documents',
     'admin.noRecentDocs': 'No recent documents',
@@ -730,9 +570,46 @@ export const translations = {
   }
 };
 
-// Helper function to get translation
+/**
+ * Clés déjà signalées, pour ne pas répéter le même avertissement.
+ *
+ * Une clé manquante rendue dans une boucle — un badge par ligne d'un tableau —
+ * produirait des centaines de lignes identiques et noierait tout le reste.
+ */
+const CLES_SIGNALEES = new Set<string>();
+
+/**
+ * Traduction d'une clé.
+ *
+ * LE REPLI SUR LA CLÉ EST DÉLIBÉRÉ, L'AVERTISSEMENT AUSSI. Une clé absente rend
+ * son propre nom : l'interface affiche « laws.errorLoad » au lieu d'une phrase.
+ * C'est laid mais lisible, et bien préférable à une chaîne vide ou à une
+ * exception en production. Le problème est que RIEN ne le signalait : la faute
+ * de frappe se découvrait à l'écran, par hasard, souvent sur une branche
+ * d'erreur rarement atteinte.
+ *
+ * L'avertissement n'existe qu'en développement (`import.meta.env.DEV`) : il est
+ * retiré du paquet de production par l'élagage, et n'a donc aucun coût pour
+ * l'utilisateur. Le contrat de repli, lui, est inchangé.
+ */
 export function t(key: string, lang: Language): string {
-  return translations[lang][key as keyof typeof translations.fr] || key;
+  const valeur = translations[lang][key as keyof typeof translations.fr];
+
+  if (import.meta.env.DEV && !valeur && !CLES_SIGNALEES.has(`${lang}:${key}`)) {
+    CLES_SIGNALEES.add(`${lang}:${key}`);
+    // Les deux blocs sont vérifiés : une clé présente en français et absente en
+    // anglais est le défaut le plus courant, et le plus discret — l'interface
+    // reste correcte tant qu'on ne bascule pas de langue.
+    const autre: Language = lang === 'fr' ? 'en' : 'fr';
+    const existeAilleurs = Boolean(translations[autre][key as keyof typeof translations.fr]);
+    console.warn(
+      existeAilleurs
+        ? `[i18n] « ${key} » manque en « ${lang} » mais existe en « ${autre} » : traduction asymétrique.`
+        : `[i18n] « ${key} » n'existe dans aucune langue : l'interface affichera la clé.`,
+    );
+  }
+
+  return valeur || key;
 }
 
 // Reactive translation helper - automatically uses current language

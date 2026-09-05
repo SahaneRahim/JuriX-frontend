@@ -51,7 +51,9 @@ describe('SearchBar', () => {
     await vi.advanceTimersByTimeAsync(500);
 
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect((fetch as any).mock.calls[0][0]).toContain('/search/suggest?q=nomin');
+    // `vi.mocked` rend le mock typé : une faute sur `.mock.calls` serait signalée,
+    // ce qu'un `as any` empêchait.
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain('/search/suggest?q=nomin');
   });
 
   it('affiche les suggestions renvoyees', async () => {

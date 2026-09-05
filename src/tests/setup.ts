@@ -16,7 +16,11 @@ const localStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-global.localStorage = localStorageMock as any;
+// `as unknown as Storage` et non `as any` : le double cast dit exactement ce
+// qu'on affirme — cet objet TIENT LIEU de Storage sans en implementer toute la
+// surface (`length`, `key()`). `any` desactivait le controle sur la ligne
+// entiere, y compris sur le nom de la globale.
+global.localStorage = localStorageMock as unknown as Storage;
 
 // Mock sessionStorage
 const sessionStorageMock = {
@@ -25,7 +29,7 @@ const sessionStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-global.sessionStorage = sessionStorageMock as any;
+global.sessionStorage = sessionStorageMock as unknown as Storage;
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

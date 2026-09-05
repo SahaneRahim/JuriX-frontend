@@ -2,9 +2,10 @@
   import { piegerFocus } from '$lib/actions/pieger-focus';
   import { API_URL, apiFetch } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
+  import type { Law, LawUpdatePayload } from '$lib/types';
   
   export let show = false;
-  export let document: any = null;
+  export let document: Law | null = null;
   
   const dispatch = createEventDispatcher();
 let title = '';
@@ -51,7 +52,10 @@ let title = '';
     initializedDocId = null;
   }
   
-  function initFields(doc: any) {
+  // `Law` et non `Law | null` : l'appelant garde deja sur `document?.id`. Le
+  // signer nullable obligeait a re-tester a l'interieur, ou — ce qui s'est
+  // passe — a ne pas tester du tout et a lire `doc.id` sur un possible null.
+  function initFields(doc: Law) {
     console.log('Initializing fields for doc:', doc.id);
     initializedDocId = doc.id;
     title = doc.title || '';
@@ -73,7 +77,7 @@ let title = '';
     
     isSaving = true;
     try {
-      const updatePayload: any = {
+      const updatePayload: LawUpdatePayload = {
         title,
         content,
         reference,
