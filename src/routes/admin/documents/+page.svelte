@@ -5,6 +5,7 @@
   import EditModal from "$lib/components/admin/EditModal.svelte";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
   import { formatDate } from "$lib/format";
+  import { nombreDePages, pagesVisibles, TAILLE_PAGE_ADMIN } from "$lib/pagination";
   import { language, tr } from "$lib/stores/language";
 
   let searchQuery = "";
@@ -121,7 +122,7 @@ let documents: any[] = [];
 
   // Pagination state
   let currentPage = 1;
-  const itemsPerPage = 15;
+  const itemsPerPage = TAILLE_PAGE_ADMIN;
 
   // Filter documents by search query (client-side)
   $: filteredDocuments = documents.filter((doc) => {
@@ -144,7 +145,7 @@ let documents: any[] = [];
   }
 
   // Pagination computed values
-  $: totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
+  $: totalPages = nombreDePages(filteredDocuments.length, itemsPerPage);
   $: startIndex = (currentPage - 1) * itemsPerPage;
   $: endIndex = startIndex + itemsPerPage;
   $: paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
@@ -168,30 +169,7 @@ let documents: any[] = [];
     }
   }
 
-  // Generate page numbers to display (show max 7 pages with ellipsis)
-  $: visiblePages = (() => {
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      if (currentPage <= 4) {
-        for (let i = 1; i <= 5; i++) pages.push(i);
-        pages.push("...");
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 3) {
-        pages.push(1);
-        pages.push("...");
-        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push("...");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-        pages.push("...");
-        pages.push(totalPages);
-      }
-    }
-    return pages;
-  })();
+  $: visiblePages = pagesVisibles(currentPage, totalPages);
 </script>
 
 <UploadModal bind:show={showUploadModal} on:refresh={fetchDocuments} />
@@ -453,20 +431,21 @@ let documents: any[] = [];
 
         <!-- Page numbers -->
         <div class="flex items-center gap-1 mx-2">
-          {#each visiblePages as pageNum}
-            {#if pageNum === "..."}
-              <span class="px-2 py-1 text-slate-400">...</span>
-            {:else}
-              <button
-                on:click={() => goToPage(Number(pageNum))}
-                class="rounded px-3 py-1 text-sm transition-colors {currentPage ===
-                pageNum
-                  ? 'bg-blue-600 text-white font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100'}"
-              >
-                {pageNum}
-              </button>
-            {/if}
+          <!-- La branche « ... » a disparu avec l'ancienne fenetre a sept
+               numeros : pagesVisibles rend une plage contigue de nombres, donc
+               le rendu n'a plus a distinguer number et string. -->
+          {#each visiblePages as pageNum (pageNum)}
+            <button
+              on:click={() => goToPage(pageNum)}
+              data-testid="docs-page-{pageNum}"
+              aria-current={pageNum === currentPage ? "page" : undefined}
+              class="rounded px-3 py-1 text-sm transition-colors {currentPage ===
+              pageNum
+                ? 'bg-blue-600 text-white font-semibold'
+                : 'text-slate-600 hover:bg-slate-100'}"
+            >
+              {pageNum}
+            </button>
           {/each}
         </div>
 

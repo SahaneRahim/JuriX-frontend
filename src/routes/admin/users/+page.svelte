@@ -17,9 +17,10 @@
   import UserFormModal from "$lib/components/admin/UserFormModal.svelte";
   import { authStore } from "$lib/stores/auth";
   import { formatDateCourte } from "$lib/format";
+  import { nombreDePages, trancheDePage, TAILLE_PAGE_ADMIN } from "$lib/pagination";
   import { language } from "$lib/stores/language";
 
-  const PAR_PAGE = 15;
+  const PAR_PAGE = TAILLE_PAGE_ADMIN;
 
   let users: any[] = [];
   let chargement = true;
@@ -72,9 +73,9 @@
 
   // Un filtre qui laisse moins de pages qu'avant ne doit pas laisser l'écran
   // sur une page vide.
-  $: totalPages = Math.max(1, Math.ceil(filtres.length / PAR_PAGE));
+  $: totalPages = nombreDePages(filtres.length, PAR_PAGE);
   $: if (page > totalPages) page = 1;
-  $: visibles = filtres.slice((page - 1) * PAR_PAGE, page * PAR_PAGE);
+  $: visibles = trancheDePage(filtres, page, PAR_PAGE);
 
   function ouvrirCreation() {
     userEnCours = null;

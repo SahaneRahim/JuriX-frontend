@@ -1,6 +1,7 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
   import { highlightSegments } from '$lib/highlight';
+  import { nombreDePages, pagesVisibles, TAILLE_PAGE_RECHERCHE } from '$lib/pagination';
   import SearchBar from '$lib/components/SearchBar.svelte';
   // Cette page recopiait le header à la main (90 lignes) : la copie et
   // l'original avaient divergé — le lien mort vers /categories a dû être
@@ -36,7 +37,7 @@
    * codés en dur étaient des chaînes traduites SANS identifiant : impossible
    * de les envoyer à `SearchFilters.category_ids`, qui attend des entiers.
    */
-  const RESULTS_PER_PAGE = 20; // SearchRequest.limit est plafonné à 50 côté API
+  const RESULTS_PER_PAGE = TAILLE_PAGE_RECHERCHE;
 
   let dateRange: "all" | "year" | "5y" = "all";
   let selectedCategoryIds: number[] = [];
@@ -81,7 +82,7 @@
     performSearch();
   }
 
-  $: totalPages = Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
+  $: totalPages = nombreDePages(totalResults, RESULTS_PER_PAGE);
 
   function goToPage(n: number) {
     if (n < 1 || n > totalPages || n === currentPage) return;
@@ -94,13 +95,7 @@
    * Fenêtre de pagination : au plus 5 numéros centrés sur la page courante.
    * Les numéros étaient codés en dur (« 1 2 3 ») et sans `on:click`.
    */
-  $: visiblePages = (() => {
-    const span = 5;
-    let start = Math.max(1, currentPage - Math.floor(span / 2));
-    const end = Math.min(totalPages, start + span - 1);
-    start = Math.max(1, end - span + 1);
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-  })();
+  $: visiblePages = pagesVisibles(currentPage, totalPages);
 
   $: tabFilters = [
     {
