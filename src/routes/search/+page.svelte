@@ -51,7 +51,7 @@
       const r = await fetch(`${API_URL}/categories`);
       if (r.ok) {
         const data = await r.json();
-        categories = (Array.isArray(data) ? data : (data.items ?? [])).map(
+        categories = (Array.isArray(data) ? data : []).map(
           (c: Category) => ({ id: c.id, name: c.name }),
         );
       }

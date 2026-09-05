@@ -65,10 +65,24 @@
 		};
 	}
 
+	/** Erreur de LOT signalée par le serveur, distincte des erreurs par fichier. */
+	let erreurLot = "";
+
 	function handleWebSocketMessage(data: MessageLotWS) {
 		switch (data.type) {
+			case "progress":
 			case "upload_progress":
-				// Update overall upload progress
+				// Avancement global : rien a afficher ligne par ligne, mais la
+				// branche doit exister. `progress` n'en avait AUCUNE et tombait
+				// donc dans le vide, comme `error` juste en dessous.
+				break;
+
+			case "error":
+				// Le serveur signale une erreur de LOT, distincte de
+				// `processing_error` qui vise un fichier. Sans cette branche,
+				// une erreur signalee par le serveur n'atteignait jamais
+				// l'ecran : l'import paraissait simplement s'arreter.
+				erreurLot = data.error ?? $tr("batch.errorUnknown");
 				break;
 
 			case "file_created":
@@ -115,6 +129,12 @@
 					}
 					break;
 			}
+
+			default:
+				// Un type inconnu doit se voir, pas disparaitre. C'est ce
+				// silence qui a laisse `progress` et `error` sans branche
+				// pendant toute la vie de cet ecran.
+				console.warn("Message WebSocket non traite:", data);
 		}
 
 		files = [...files]; // Trigger reactivity
@@ -199,8 +219,15 @@
 					: `/batch-upload/status?status=${statusFilter}`;
 
 			const response = await apiFetch(chemin);
+			// `apiFetch` ne leve pas sur 4xx (c'est documente et voulu). Sans
+			// ce controle, un 401 faisait `laws = undefined` et la page se
+			// vidait sans rien dire.
+			if (!response.ok) {
+				console.error("Chargement des lois impossible:", response.status);
+				return;
+			}
 			const data = await response.json();
-			laws = data.laws;
+			laws = data.laws ?? [];
 		} catch (error) {
 			console.error("Failed to fetch laws:", error);
 		}
@@ -295,6 +322,18 @@
 			</div>
 
 			<!-- File List -->
+			<!-- Erreur de lot signalée par le serveur. Sans cet affichage, le
+			     message arrivait bien par le WebSocket et se perdait : l'import
+			     paraissait simplement s'arrêter sans raison. -->
+			{#if erreurLot}
+				<div
+					role="alert"
+					class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800"
+				>
+					{erreurLot}
+				</div>
+			{/if}
+
 			{#if files.length > 0}
 				<div class="mt-6">
 					<h3 class="text-sm font-medium text-gray-700 mb-3">

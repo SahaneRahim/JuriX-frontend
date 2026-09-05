@@ -94,6 +94,23 @@ export interface Category {
 /* Documents — LawResponse                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Un article tel que le sert `GET /laws/{id}`.
+ *
+ * Sert à remplacer la reconstruction du sommaire par expression régulière sur
+ * `law.content`, qui trouvait 193 articles là où la base en compte 230, et qui
+ * n'avait aucun moyen de connaître la page du PDF.
+ */
+export interface ArticleSummary {
+  id: number;
+  number: string;
+  title: string | null;
+  section: string | null;
+  /** Page du PDF, 1-indexée. */
+  page_number: number | null;
+  kind: string | null;
+}
+
 export interface Law {
   id: number;
   reference: string;
@@ -108,6 +125,8 @@ export interface Law {
   language: LangueDocument | null;
   category_id: number | null;
   status: LawStatus;
+  /** Servi uniquement par `GET /laws/{id}`, jamais par la liste. */
+  articles?: ArticleSummary[];
   /** Chaîne ISO de date seule (`2026-05-04`), ou nulle. */
   publication_date: string | null;
 

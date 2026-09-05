@@ -126,6 +126,7 @@ export const translations = {
     'chat.errorTooShort': 'Votre question est trop courte : au moins 5 caractères.',
     'chat.errorQuota': "Le quota de questions du jour est atteint. L'assistant sera de nouveau disponible demain.",
     'admin.lastDays': 'Les {n} derniers jours',
+    'batch.errorUnknown': "Le serveur a signalé une erreur pendant l'import.",
 
     // Categories
     'categories.title': 'Explorer par Catégorie',
@@ -365,6 +366,7 @@ export const translations = {
     'chat.errorTooShort': 'Your question is too short: at least 5 characters.',
     'chat.errorQuota': "Today's question quota has been reached. The assistant will be available again tomorrow.",
     'admin.lastDays': 'Last {n} days',
+    'batch.errorUnknown': 'The server reported an error during the import.',
 
     // Categories
     'categories.title': 'Browse by Category',

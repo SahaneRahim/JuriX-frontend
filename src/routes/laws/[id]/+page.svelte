@@ -58,6 +58,7 @@
       show_document: "Document original",
       show_text: "Revenir au texte",
       link_copied: "Lien copié !",
+      link_copy_failed: "Copie impossible. Copiez l'adresse depuis la barre du navigateur.",
       article_prefix: "Article", // For "Article 1"
     },
     en: {
@@ -88,6 +89,7 @@
       show_document: "Original document",
       show_text: "Back to text",
       link_copied: "Link copied!",
+      link_copy_failed: "Copy failed. Copy the address from the browser bar.",
       article_prefix: "Article",
     },
   };
@@ -228,6 +230,25 @@
   // Reactive: Current Article
   $: currentArticle = flatArticles[currentArticleIndex];
 
+  /**
+   * Page du PDF correspondant à l'article demandé par `?article=`.
+   *
+   * `GET /laws/{id}` sert désormais les articles avec leur `page_number`. Sur
+   * le corpus actuel toutes les pages valent 1 : le markdown stocké ne porte
+   * qu'un seul marqueur `<<PAGE:n>>`, hérité d'une extraction antérieure à la
+   * restitution des pages. Le câblage est correct et deviendra utile dès que
+   * le contenu sera ré-extrait ; d'ici là il ne déplace rien, ce qui vaut
+   * mieux que de déplacer vers une page fausse.
+   */
+  $: pageDemandee = (() => {
+    if (!requestedArticle) return 1;
+    const wanted = normaliseArticleNumber(requestedArticle);
+    const trouve = (law?.articles ?? []).find(
+      (a) => normaliseArticleNumber(a.number) === wanted,
+    );
+    return trouve?.page_number && trouve.page_number > 1 ? trouve.page_number : 1;
+  })();
+
   // Des que la liste est prete, se placer sur l'article demande. Comparaison
   // normalisee : "1er", "1ER" et "1" designent le meme article.
   $: if (flatArticles.length > 0 && requestedArticle) {
@@ -237,6 +258,22 @@
     );
     if (found >= 0 && found !== currentArticleIndex) {
       currentArticleIndex = found;
+    }
+  }
+
+  /**
+   * Copie le lien de la page.
+   *
+   * L'ancienne version n'attendait pas la promesse et n'attrapait rien : en
+   * contexte non sécurisé la copie échouait, le rejet partait non traité, et
+   * « Lien copié ! » s'affichait quand même.
+   */
+  async function copierLeLien() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      alert(t.link_copied);
+    } catch {
+      alert(t.link_copy_failed);
     }
   }
 
@@ -565,7 +602,12 @@
               <div
                 class="document-info flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-6"
               >
-                <span>{flatArticles.length} {t.articles}</span>
+                <!-- `law.article_count` vient de la base ; `flatArticles` est
+                     reconstruit par expression régulière sur le contenu et en
+                     trouve 193 là où la base en compte 230 pour le même
+                     document. Deux chiffres pour une seule vérité : on garde
+                     celui qui compte les lignes réellement stockées. -->
+                <span>{law.article_count ?? flatArticles.length} {t.articles}</span>
                 <span class="text-gray-300">•</span>
                 <!-- Etait code en dur a "2024". -->
                 <span>{t.updated} : {formatDate(law.updated_at || law.created_at, currentLanguage)}</span>
@@ -573,10 +615,7 @@
               <div class="document-actions flex gap-3">
                 <button
                   class="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm font-medium transition-colors"
-                  on:click={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert(t.link_copied);
-                  }}
+                  on:click={copierLeLien}
                 >
                   <svg
                     class="w-5 h-5"
@@ -656,7 +695,10 @@
                 class="mt-6 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
                 data-testid="law-document-viewer"
               >
-                <ImagePdfViewer url={`${API_URL}/laws/${law.id}/download`} />
+                <ImagePdfViewer
+                  url={`${API_URL}/laws/${law.id}/download`}
+                  initialPage={pageDemandee}
+                />
               </div>
             {/if}
 

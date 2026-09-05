@@ -20,7 +20,12 @@
 </script>
 
 <svelte:head>
-  <title>JuriX - {$tr("title.assistant")}</title>
+  <!--
+    Pas de <title> ici. Les deux pages de ce groupe montent MetaSeo, qui en
+    émet un : le navigateur garde le PREMIER, donc celui du gabarit gagnait et
+    les titres de page ne s'affichaient jamais. Il utilisait en plus la forme
+    « JuriX - x », retirée au profit de « x — JuriX » par $lib/seo.
+  -->
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet"

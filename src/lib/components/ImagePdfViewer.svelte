@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tr } from "$lib/stores/language";
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   // Expects the base URL to the law (e.g., /api/v1/laws/123)
   export let url: string;
@@ -92,6 +92,7 @@
     if (typeof window !== "undefined") {
       window.removeEventListener("keydown", handleKeydown);
     }
+    revoquerImage();
   });
 
   async function loadPage(num: number) {
@@ -112,12 +113,25 @@
       }
 
       const blob = await response.blob();
+      // Libérer l'URL précédente AVANT d'en créer une nouvelle. Sans ce
+      // révocation, chaque tourne-page laissait un blob vivant en mémoire
+      // jusqu'au rechargement de l'onglet : sur un code de 200 pages, deux
+      // cents images retenues pour une seule affichée.
+      revoquerImage();
       currentImageUrl = URL.createObjectURL(blob);
       pageLoading = false;
     } catch (err) {
       console.error(`Error loading page ${num}:`, err);
       pageLoading = false;
       error = `Erreur lors du chargement de la page ${num}`;
+    }
+  }
+
+  /** Libère le blob de la page affichée, s'il y en a un. */
+  function revoquerImage() {
+    if (currentImageUrl) {
+      URL.revokeObjectURL(currentImageUrl);
+      currentImageUrl = "";
     }
   }
 
