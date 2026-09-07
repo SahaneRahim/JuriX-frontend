@@ -191,7 +191,7 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
                 <div
                   class="absolute -top-8 hidden rounded-md bg-slate-900 px-2 py-1 text-xs text-white group-hover:block"
                 >
-                  {count} reqs
+                  {count} {$tr("admin.requests")}
                 </div>
               </div>
             {/each}

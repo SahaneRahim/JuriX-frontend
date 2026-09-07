@@ -3,6 +3,7 @@
   import { apiFetch } from '$lib/api';
     import { createEventDispatcher, onMount } from "svelte";
     import { fade, scale } from "svelte/transition";
+  import { tr } from '$lib/stores/language';
   import type { IngestPayload } from '$lib/types';
 
     export let show = false;
@@ -74,7 +75,7 @@ let files: FileList | null = null;
 
             try {
                 uploadStatus[fileName] = "uploading";
-                logs = [...logs, `📤 Upload de ${fileName}...`];
+                logs = [...logs, $tr("admin.upload.logUploading").replace("{name}", fileName)];
 
                 // 1. Upload File
                 const formData = new FormData();
@@ -85,14 +86,14 @@ let files: FileList | null = null;
                     body: formData,
                 });
 
-                if (!uploadRes.ok) throw new Error("Erreur upload");
+                if (!uploadRes.ok) throw new Error($tr("admin.upload.errUpload"));
                 const uploadData = await uploadRes.json();
                 const fileId = uploadData.file_id;
 
                 uploadStatus[fileName] = "processing";
                 logs = [
                     ...logs,
-                    `⚙️ Traitement de ${fileName} (ID: ${fileId})...`,
+                    $tr("admin.upload.logProcessing").replace("{name}", fileName).replace("{id}", String(fileId)),
                 ];
 
                 // Get title and reference from filename (without extension)
@@ -130,19 +131,19 @@ let files: FileList | null = null;
                 if (!ingestRes.ok) {
                     const errorText = await ingestRes.text();
                     throw new Error(
-                        `Erreur ingestion (${ingestRes.status}): ${errorText}`,
+                        $tr("admin.upload.errIngest").replace("{status}", String(ingestRes.status)).replace("{text}", errorText),
                     );
                 }
 
                 uploadStatus[fileName] = "done";
                 logs = [
                     ...logs,
-                    `✅ ${fileName} envoyé au pipeline avec succès.`,
+                    $tr("admin.upload.logDone").replace("{name}", fileName),
                 ];
             } catch (e) {
                 console.error(e);
                 uploadStatus[fileName] = "error";
-                logs = [...logs, `❌ Erreur sur ${fileName}: ${e}`];
+                logs = [...logs, $tr("admin.upload.logError").replace("{name}", fileName).replace("{err}", String(e))];
             }
         }
 
@@ -194,10 +195,11 @@ let files: FileList | null = null;
         >
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-xl font-bold text-slate-900">
-                    Ajouter des Documents
+                    {$tr("admin.upload.title")}
                 </h2>
                 <button
                     on:click={close}
+                    aria-label={$tr("common.close")}
                     class="text-slate-500 hover:text-slate-600"
                 >
                     <svg
@@ -223,13 +225,13 @@ let files: FileList | null = null;
                     for="doc-title"
                     class="block text-sm font-medium text-slate-700 mb-1"
                 >
-                    Titre du document
+                    {$tr("admin.doc.title")}
                 </label>
                 <input
                     type="text"
                     id="doc-title"
                     bind:value={documentTitle}
-                    placeholder="Ex: La Constitution du Cameroun"
+                    placeholder={$tr("admin.upload.titlePlaceholder")}
                     class="w-full rounded-lg border-slate-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
             </div>
@@ -240,19 +242,19 @@ let files: FileList | null = null;
                     for="doc-ref"
                     class="block text-sm font-medium text-slate-700 mb-1"
                 >
-                    Référence <span class="text-slate-500 font-normal"
-                        >(optionnel)</span
+                    {$tr("admin.reference")} <span class="text-slate-500 font-normal"
+                        >{$tr("admin.upload.optional")}</span
                     >
                 </label>
                 <input
                     type="text"
                     id="doc-ref"
                     bind:value={documentReference}
-                    placeholder="Ex: LOI-2024-001 ou Décret N°2024/PM/123"
+                    placeholder={$tr("admin.upload.refPlaceholder")}
                     class="w-full rounded-lg border-slate-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
                 <p class="text-xs text-slate-500 mt-1">
-                    Numéro officiel du document juridique
+                    {$tr("admin.upload.refHint")}
                 </p>
             </div>
 
@@ -262,7 +264,7 @@ let files: FileList | null = null;
                     for="category-select"
                     class="block text-sm font-medium text-slate-700 mb-1"
                 >
-                    Catégorie du document
+                    {$tr("admin.upload.category")}
                 </label>
                 <select
                     id="category-select"
@@ -270,7 +272,7 @@ let files: FileList | null = null;
                     class="w-full rounded-lg border-slate-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
                     <option value={null}
-                        >-- Sélectionner une catégorie --</option
+                        >{$tr("admin.upload.selectCategory")}</option
                     >
                     {#each categories as cat}
                         <option value={cat.id}>{cat.icon} {cat.name}</option>
@@ -278,7 +280,7 @@ let files: FileList | null = null;
                 </select>
                 {#if loadingCategories}
                     <p class="text-xs text-slate-500 mt-1">
-                        Chargement des catégories...
+                        {$tr("admin.upload.loadingCategories")}
                     </p>
                 {/if}
             </div>
@@ -308,10 +310,10 @@ let files: FileList | null = null;
                         </svg>
                     </div>
                     <p class="text-sm font-medium text-slate-900">
-                        Cliquez pour sélectionner des fichiers
+                        {$tr("admin.upload.clickToSelect")}
                     </p>
                     <p class="text-xs text-slate-500 mt-1">
-                        PDF ou DOCX (Max 1GB)
+                        {$tr("admin.upload.formats")}
                     </p>
                     <input
                         id="file-upload"
@@ -336,18 +338,18 @@ let files: FileList | null = null;
                             >
                             {#if uploadStatus[file.name] === "uploading"}
                                 <span class="text-blue-600 animate-pulse"
-                                    >Upload...</span
+                                    >{$tr("admin.upload.statusUploading")}</span
                                 >
                             {:else if uploadStatus[file.name] === "processing"}
                                 <span class="text-amber-600 animate-pulse"
-                                    >Traitement...</span
+                                    >{$tr("admin.upload.statusProcessing")}</span
                                 >
                             {:else if uploadStatus[file.name] === "done"}
-                                <span class="text-emerald-600">Terminé</span>
+                                <span class="text-emerald-600">{$tr("admin.upload.statusDone")}</span>
                             {:else if uploadStatus[file.name] === "error"}
-                                <span class="text-red-600">Erreur</span>
+                                <span class="text-red-600">{$tr("admin.upload.statusError")}</span>
                             {:else}
-                                <span class="text-slate-500">En attente</span>
+                                <span class="text-slate-500">{$tr("admin.upload.statusPending")}</span>
                             {/if}
                         </div>
                     {/each}
@@ -369,7 +371,7 @@ let files: FileList | null = null;
                 <button
                     on:click={close}
                     class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-                    >Annuler</button
+                    >{$tr("common.cancel")}</button
                 >
                 <button
                     on:click={handleUpload}
@@ -377,8 +379,8 @@ let files: FileList | null = null;
                     class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     {uploading
-                        ? "Traitement en cours..."
-                        : "Lancer le traitement"}
+                        ? $tr("admin.upload.processing")
+                        : $tr("admin.upload.start")}
                 </button>
             </div>
         </div>

@@ -2,6 +2,7 @@
   import { API_URL } from '$lib/api';
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
+  import { formatHeure } from "$lib/format";
   import { language, tr } from "$lib/stores/language";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
 
@@ -69,14 +70,10 @@
     initMessages();
   }
 
+  // `formatHeure` vit dans $lib/format avec les autres formats de date ; la
+  // page en portait une copie locale avec sa propre table de locales.
   function getCurrentTime(): string {
-    return new Date().toLocaleTimeString(
-      $language.current === "fr" ? "fr-FR" : "en-US",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-      },
-    );
+    return formatHeure(new Date(), $language.current);
   }
 
   /** Contrainte serveur : RAGRequest.question impose min_length=5. */

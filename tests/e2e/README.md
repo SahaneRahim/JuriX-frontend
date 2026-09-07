@@ -24,7 +24,7 @@ npx playwright test --ui
 npx playwright test --debug
 
 # Exécuter un fichier de test spécifique
-npx playwright test tests/e2e/example.spec.ts
+npx playwright test tests/e2e/navigation/link-integrity.spec.ts
 
 # Exécuter les tests sur un navigateur spécifique
 npx playwright test --project=chromium
@@ -39,8 +39,13 @@ npx playwright show-report
 
 ```
 tests/e2e/
-├── README.md          # Ce fichier
-└── example.spec.ts    # Tests d'exemple
+├── README.md                          # Ce fichier
+├── hydratation.ts                     # Helpers : cliquer/saisir apres hydratation
+└── navigation/
+    ├── accessibilite.spec.ts          # axe sur les pages publiques
+    ├── backend-down.spec.ts           # comportement backend eteint
+    ├── explication-article.spec.ts    # bouton « Expliquer l'article »
+    └── link-integrity.spec.ts         # aucun lien mort, rendu serveur
 ```
 
 ## ✍️ Écrire des Tests

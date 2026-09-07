@@ -156,11 +156,12 @@ export interface Law {
 /**
  * `ArticleResponse`.
  *
- * ATTENTION : `GET /laws/{id}` rend un `LawResponse`, qui ne porte PAS de champ
- * `articles` — seul `LawDetailResponse` en a un, et aucun endpoint du front ne
- * l'appelle. La fiche de loi reconstruit sa table des matières en analysant
- * `law.content`. Ce type sert aux réponses de recherche et à un futur endpoint,
- * pas à la page de détail.
+ * Un article complet, avec son contenu. `GET /laws/{id}` ne rend PAS ce type :
+ * il sert un `LawDetailResponse` dont `articles` est une liste
+ * d'`ArticleSummary` (sans contenu, voir plus haut) — la fiche de loi lit ce
+ * sommaire pour la page du PDF, et reconstruit le texte des articles depuis
+ * `law.content`. Ce type-ci décrit les résultats de recherche et la carte
+ * SearchResultCard.
  */
 export interface Article {
   id: number;
@@ -242,6 +243,17 @@ export interface SearchResponse {
   mode: string;
   results: SearchResult[];
   total: number;
+  search_time_ms: number;
+  filters_applied?: Record<string, unknown> | null;
+  /**
+   * « article 35 du code minier » : le backend a identifié le document ET
+   * vérifié que l'article y existe. La page de recherche navigue alors
+   * directement, sans afficher de liste. Ces trois champs étaient lus sans
+   * être déclarés ici.
+   */
+  direct_navigation: boolean;
+  target_law_id: number | null;
+  target_article: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -374,3 +386,53 @@ export type MessageLotWS =
   | { type: 'processing_start'; law_id: number }
   | { type: 'processing_complete'; law_id: number; status: 'published' | 'refused' }
   | { type: 'processing_error'; law_id: number; error: string };
+
+/* -------------------------------------------------------------------------- */
+/* Mode comparaison — POST /api/v1/compare                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Un article cité par une cellule de la grille.
+ *
+ * `content` porte le texte INTÉGRAL, et c'est délibéré : c'est lui qu'on
+ * déplie sous la cellule. Sans ce texte à l'écran, une citation surnuméraire —
+ * un article réel mais qui ne dit pas ce que la cellule affirme — reste
+ * invisible. C'est le seul filet contre ce cas, mesuré une fois sur treize.
+ */
+export interface SourceRef {
+  article_id: number | null;
+  law_id: number;
+  law_title: string;
+  reference: string;
+  number: string;
+  article_title: string | null;
+  page_number: number | null;
+  content: string;
+}
+
+export interface ComparisonCell {
+  value: string;
+  /** Vide = le corpus ne répond pas. Jamais « pas encore cité ». */
+  sources: SourceRef[];
+}
+
+export interface ComparisonRow {
+  criterion: string;
+  a: ComparisonCell;
+  b: ComparisonCell;
+}
+
+export interface ComparisonResponse {
+  subject_a: string;
+  subject_b: string;
+  language: string;
+  rows: ComparisonRow[];
+  key_differences: string[];
+  blind_spots: string[];
+  articles_a: SourceRef[];
+  articles_b: SourceRef[];
+  /** Numéros cités par le modèle sans article correspondant. Toujours affichés. */
+  unmatched_citations: string[];
+  retrieval_time_ms: number;
+  generation_time_ms: number;
+}

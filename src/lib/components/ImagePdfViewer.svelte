@@ -78,8 +78,8 @@
       // produire. Le contrôle explicite remplace l'accès direct à `.message`,
       // qui échouait sur tout ce qui n'est pas une Error.
       error =
-        "Impossible de charger le document. " +
-        (err instanceof Error ? err.message : "Erreur inconnue");
+        $tr("pdf.errorLoad") + " " +
+        (err instanceof Error ? err.message : $tr("pdf.errorUnknown"));
       loading = false;
     }
   });
@@ -119,7 +119,7 @@
     } catch (err) {
       console.error(`Error loading page ${num}:`, err);
       pageLoading = false;
-      error = `Erreur lors du chargement de la page ${num}`;
+      error = $tr("pdf.errorPage").replace("{n}", String(num));
     }
   }
 
@@ -167,22 +167,20 @@
   {#if loading}
     <div class="loading-container">
       <div class="spinner"></div>
-      <p>Chargement du document...</p>
+      <p>{$tr("pdf.loading")}</p>
     </div>
   {:else if error}
     <div class="error-container">
       <p class="error-message">{error}</p>
-      <p class="error-hint">
-        Essayez de rafraîchir la page ou contactez l'administrateur.
-      </p>
+      <p class="error-hint">{$tr("pdf.errorHint")}</p>
     </div>
   {:else}
     <div class="controls">
       <button on:click={onPrevPage} disabled={pageNum <= 1 || pageLoading}>
-        ← Précédent
+        {$tr("pdf.previous")}
       </button>
       <span class="page-info">
-        Page
+        {$tr("pdf.page")}
         <input
           type="number"
           aria-label={$tr("a11y.pageNumber")}
@@ -192,19 +190,19 @@
           on:change={(e) => goToPage((e.currentTarget as HTMLInputElement).value)}
           disabled={pageLoading}
         />
-        sur {totalPages}
+        {$tr("pdf.of")} {totalPages}
       </span>
       <button
         on:click={onNextPage}
         disabled={pageNum >= totalPages || pageLoading}
       >
-        Suivant →
+        {$tr("pdf.next")}
       </button>
       <span class="zoom-controls">
         <button
           on:click={zoomOut}
           disabled={dpi <= 72 || pageLoading}
-          title="Réduire"
+          title={$tr("pdf.zoomOut")}
         >
           −
         </button>
@@ -212,7 +210,7 @@
         <button
           on:click={zoomIn}
           disabled={dpi >= 200 || pageLoading}
-          title="Agrandir"
+          title={$tr("pdf.zoomIn")}
         >
           +
         </button>
@@ -228,13 +226,13 @@
       {#if currentImageUrl}
         <img
           src={currentImageUrl}
-          alt={`Page ${pageNum}`}
+          alt={$tr("pdf.pageAlt").replace("{n}", String(pageNum))}
           class:loading={pageLoading}
         />
       {/if}
     </div>
 
-    <div class="keyboard-hint">Utilisez les flèches ← → pour naviguer</div>
+    <div class="keyboard-hint">{$tr("pdf.keyboardHint")}</div>
   {/if}
 </div>
 

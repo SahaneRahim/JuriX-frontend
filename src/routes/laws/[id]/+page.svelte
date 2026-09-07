@@ -2,11 +2,12 @@
   import { API_URL } from '$lib/api';
   import ImagePdfViewer from "$lib/components/ImagePdfViewer.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
-  import { goto, invalidateAll } from "$app/navigation";
+  import { invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
   import { language, switchLanguage, tr } from "$lib/stores/language";
   import { formatDate } from "$lib/format";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
+  import { blocsDeReponse } from "$lib/texte";
 
   /** Rempli par `+page.ts`. Un identifiant inexistant n'arrive plus ici : 404. */
   export let data;
@@ -49,17 +50,24 @@
       in_force: "En vigueur",
       ai_title: "Explication Simplifiée (IA)",
       ai_desc:
-        "L'intelligence artificielle analysera cet article dès que le système LlamaParse sera activé. En attendant, voici ce que vous pourrez voir :",
+        "Demandez à l'assistant d'expliquer cet article en langage courant, à partir de son texte et de son document d'origine. Vous obtiendrez :",
       ai_key_content: "Contenu clé",
       ai_key_desc: "Le résumé des points importants de l'article.",
       ai_implications: "Implications",
       ai_impl_desc: "Ce que cela signifie concrètement pour vous.",
-      ai_ask: "Poser une question à l'Assistant IA",
+      ai_explain: "Expliquer l'article",
+      ai_loading: "Explication en cours\u2026",
+      ai_regenerate: "Régénérer",
+      ai_error_not_found:
+        "Cet article n'a pas pu être retrouvé dans le document.",
+      ai_disclaimer:
+        "Réponse générée par une IA. Vérifiez-la sur le texte de l'article ci-dessus.",
       show_document: "Document original",
       show_text: "Revenir au texte",
       link_copied: "Lien copié !",
       link_copy_failed: "Copie impossible. Copiez l'adresse depuis la barre du navigateur.",
       article_prefix: "Article", // For "Article 1"
+      raw_fallback: "Affichage brut (structure non détectée) :",
     },
     en: {
       explorer: "Explorer",
@@ -80,17 +88,23 @@
       in_force: "In Force",
       ai_title: "Simplified Explanation (AI)",
       ai_desc:
-        "Artificial intelligence will analyze this article as soon as the LlamaParse system is enabled. In the meantime, here is what you will see:",
+        "Ask the assistant to explain this article in plain language, from its text and its parent document. You will get:",
       ai_key_content: "Key Content",
       ai_key_desc: "Summary of the article's important points.",
       ai_implications: "Implications",
       ai_impl_desc: "What this concretely means for you.",
-      ai_ask: "Ask the AI Assistant",
+      ai_explain: "Explain this article",
+      ai_loading: "Generating explanation\u2026",
+      ai_regenerate: "Regenerate",
+      ai_error_not_found: "This article could not be found in the document.",
+      ai_disclaimer:
+        "AI-generated answer. Check it against the article text above.",
       show_document: "Original document",
       show_text: "Back to text",
       link_copied: "Link copied!",
       link_copy_failed: "Copy failed. Copy the address from the browser bar.",
       article_prefix: "Article",
+      raw_fallback: "Raw display (structure not detected):",
     },
   };
 
@@ -101,10 +115,12 @@
   /**
    * Structure de la table des matieres.
    *
-   * Elle est RECONSTRUITE depuis `law.content` par `parseContent`, et ne vient
-   * d'aucun endpoint : `GET /laws/{id}` rend un `LawResponse`, qui ne porte pas
-   * de champ `articles`. Ces types sont donc locaux a la page — les mettre dans
-   * `$lib/types` laisserait croire qu'ils decrivent une reponse de l'API.
+   * Elle est RECONSTRUITE depuis `law.content` par `parseContent`. L'API
+   * sert bien un sommaire (`law.articles`, des `ArticleSummary` sans contenu),
+   * que la page utilise pour la page du PDF ; mais le TEXTE de chaque article
+   * n'existe que dans `law.content`, d'ou cette reconstruction. Ces types sont
+   * locaux a la page — les mettre dans `$lib/types` laisserait croire qu'ils
+   * decrivent une reponse de l'API.
    */
   interface ArticleTDM {
     number: string;
@@ -170,6 +186,15 @@
 
     let currentArticle: ArticleTDM | null = null;
 
+    // Rempli localement, puis AFFECTE a `flatArticles` a la fin.
+    //
+    // Svelte n'observe que les affectations, jamais les mutations : une suite
+    // de `flatArticles.push(...)` remplit le tableau sans jamais l'invalider.
+    // Rien ne s'en apercevait tant que `currentArticleIndex` changeait par
+    // ailleurs — c'etait un piege dormant, pas la panne. Une affectation unique
+    // le desamorce.
+    const articlesPlats: ArticleTDM[] = [];
+
     // Heuristic Regex
     const sectionRegex = /^(LIVRE|TITRE|CHAPITRE)\s+[IVX0-9]+/i; // e.g., LIVRE I
     // Le PDF converti ecrit `**ARTICLE 1er.**-` et parfois `**Article35.-**` :
@@ -207,7 +232,7 @@
         };
 
         currentSection.articles.push(currentArticle);
-        flatArticles.push(currentArticle);
+        articlesPlats.push(currentArticle);
       } else {
         // Content
         if (currentArticle) {
@@ -220,6 +245,7 @@
 
     // Cleanup empty sections
     tableOfContents = tableOfContents.filter((s) => s.articles.length > 0);
+    flatArticles = articlesPlats;
 
     // Set initial view
     if (flatArticles.length > 0) {
@@ -227,8 +253,6 @@
     }
   }
 
-  // Reactive: Current Article
-  $: currentArticle = flatArticles[currentArticleIndex];
 
   /**
    * Page du PDF correspondant à l'article demandé par `?article=`.
@@ -309,18 +333,92 @@
     scrollToTop();
   }
 
+  // ---------------------------------------------------------------------------
+  // Explication de l'article par le modèle
+  //
+  // La réponse s'affiche ICI, dans le bloc, et ne part pas vers /chat : le
+  // lecteur garde l'article sous les yeux pendant qu'il lit l'explication.
+  // Le bouton renvoyait auparavant vers l'assistant avec une question
+  // pré-remplie — qu'il fallait encore envoyer soi-même, sur une page où le
+  // texte expliqué n'était plus visible.
+  // ---------------------------------------------------------------------------
+
+  let explication = "";
+  let explicationEnCours = false;
+  let explicationErreur = "";
+  /** Jeton anti-course. Voir `reinitialiserExplication`. */
+  let explicationJeton = 0;
+
   /**
-   * Ouvre l'assistant avec la question pré-remplie.
+   * Remet le bloc IA à zéro quand on change d'article ou de document.
    *
-   * Le bouton n'avait aucun `on:click` : il annonçait une action et n'en
-   * déclenchait aucune. Il crée maintenant une entrée profonde vers /chat, qui
-   * n'était atteignable que par les onglets de l'accueil.
+   * Le bloc ne se démonte pas d'un article à l'autre : `{#if currentArticle}`
+   * reste vrai et Svelte réutilise les mêmes nœuds. Sans cette remise à zéro,
+   * l'explication de l'article 12 resterait affichée sous le texte du 13.
+   *
+   * Le jeton couvre le second cas, invisible au test manuel : l'utilisateur
+   * clique, puis pagine pendant les quelques secondes de génération. La réponse
+   * arrive pour l'article précédent ; l'incrément la rend périmée et
+   * `expliquerArticle` la jette.
+   *
+   * Les trois affectations ne figurent pas dans la liste de dépendances de la
+   * ligne réactive : pas de boucle.
    */
-  function askAssistant() {
-    const sujet = currentArticle
-      ? `${law?.title ?? ""} — ${t.article_prefix} ${currentArticle.number} : `
-      : `${law?.title ?? ""} : `;
-    goto(`/chat?q=${encodeURIComponent(sujet)}`);
+  function reinitialiserExplication(_index: number, _lawId: number | undefined) {
+    explication = "";
+    explicationErreur = "";
+    explicationEnCours = false;
+    explicationJeton += 1;
+  }
+
+  $: reinitialiserExplication(currentArticleIndex, law?.id);
+
+  async function expliquerArticle() {
+    if (!law || !currentArticle) return;
+
+    const jeton = ++explicationJeton;
+    explicationEnCours = true;
+    explicationErreur = "";
+    explication = "";
+
+    try {
+      const reponse = await fetch(`${API_URL}/laws/${law.id}/explain-article`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          number: currentArticle.number,
+          language: currentLanguage,
+          // Le texte affiché. Il permet au serveur de répondre même quand la
+          // base n'a pas de ligne pour ce numéro — la page en reconnaît 193 là
+          // où la base en compte 230 pour le même document. Le serveur vérifie
+          // que cet extrait provient bien du document avant de s'en servir, et
+          // l'ignore dès qu'il trouve la vraie ligne.
+          excerpt: currentArticle.content.slice(0, 12000),
+        }),
+      });
+
+      // L'utilisateur a changé d'article pendant la génération : cette réponse
+      // ne concerne plus ce qui est à l'écran.
+      if (jeton !== explicationJeton) return;
+
+      if (reponse.ok) {
+        const donnees = await reponse.json();
+        explication = donnees.explanation ?? "";
+        if (!explication.trim()) explicationErreur = $tr("chat.errorServer");
+      } else if (reponse.status === 404) {
+        explicationErreur = t.ai_error_not_found;
+      } else if (reponse.status === 429) {
+        explicationErreur = $tr("chat.errorQuota");
+      } else if (reponse.status === 503) {
+        explicationErreur = $tr("chat.errorOverloaded");
+      } else {
+        explicationErreur = $tr("chat.errorServer");
+      }
+    } catch {
+      if (jeton === explicationJeton) explicationErreur = $tr("chat.errorNetwork");
+    } finally {
+      if (jeton === explicationJeton) explicationEnCours = false;
+    }
   }
 
   function scrollToTop() {
@@ -343,6 +441,25 @@
   $: law = data.law;
   $: error = data.erreur ? $tr(data.erreur) : "";
   $: parseContent(law?.content ?? "");
+
+  /**
+   * L'article affiche. DECLARE APRES `parseContent`, et ce n'est pas cosmetique.
+   *
+   * Svelte 4 triait les blocs `$:` par dependances : cette declaration pouvait
+   * vivre plus haut dans le fichier, le compilateur la placait apres celle qui
+   * remplit `flatArticles`. Svelte 5 — utilise ici en mode legacy, faute de
+   * runes — les execute dans l'ORDRE DU SOURCE. Declaree avant `parseContent`,
+   * elle lisait donc un tableau encore vide et ne se recalculait plus.
+   *
+   * L'effet visible : `{#if currentArticle}` restait faux et la page affichait
+   * « Chargement... » a la place du texte, alors que le sommaire et le compteur
+   * « 1 / 199 » — qui lisent `flatArticles` directement dans le gabarit —
+   * etaient corrects. Le premier clic sur « Suivant » affectait
+   * `currentArticleIndex`, relancait le calcul, et tout apparaissait : le defaut
+   * ne se voyait qu'au tout premier affichage, et disparaissait des qu'on
+   * paginait.
+   */
+  $: currentArticle = flatArticles[currentArticleIndex];
 
   // Filtered TOC for sidebar
   $: filteredTOC = tableOfContents
@@ -822,32 +939,111 @@
                     >
                       {t.ai_desc}
                     </p>
-                    <ol
-                      class="ai-list list-decimal pl-5 space-y-2 text-sm text-gray-600 dark:text-gray-400 marker:text-blue-600 marker:font-bold"
-                    >
-                      <li>
-                        <strong>{t.ai_key_content} :</strong>
-                        {t.ai_key_desc}
-                      </li>
-                      <li>
-                        <strong>{t.ai_implications} :</strong>
-                        {t.ai_impl_desc}
-                      </li>
-                    </ol>
-                    <button
-                      on:click={askAssistant}
-                      data-testid="law-ask-ai"
-                      class="ai-question-btn mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      {t.ai_ask}
-                    </button>
+                    {#if explicationEnCours}
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        data-testid="law-explain-loading"
+                        class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300"
+                      >
+                        <span class="flex items-center gap-1" aria-hidden="true">
+                          <span
+                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce"
+                            style="animation-delay: 0ms"
+                          ></span>
+                          <span
+                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce"
+                            style="animation-delay: 150ms"
+                          ></span>
+                          <span
+                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce"
+                            style="animation-delay: 300ms"
+                          ></span>
+                        </span>
+                        {t.ai_loading}
+                      </div>
+                    {:else if explicationErreur}
+                      <div
+                        role="alert"
+                        data-testid="law-explain-error"
+                        class="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 text-sm text-red-700 dark:text-red-300"
+                      >
+                        <p>{explicationErreur}</p>
+                        <button
+                          on:click={expliquerArticle}
+                          data-testid="law-explain-retry"
+                          class="mt-2 underline font-medium hover:no-underline"
+                        >
+                          {$tr("common.retry")}
+                        </button>
+                      </div>
+                    {:else if explication}
+                      <div
+                        data-testid="law-explain-answer"
+                        aria-live="polite"
+                        class="space-y-3 text-base leading-relaxed text-gray-700 dark:text-gray-300"
+                      >
+                        <!--
+                          Rendu en NOEUDS Svelte, donc echappe. Le prompt
+                          systeme « citoyen » du backend demande du markdown ;
+                          `blocsDeReponse` le reconnait ici plutot que de le
+                          passer a `{@html}`, que ce depot s'interdit.
+                        -->
+                        {#each blocsDeReponse(explication) as bloc}
+                          {#if bloc.type === "titre"}
+                            <h5 class="font-bold text-gray-900 dark:text-white pt-1">
+                              {bloc.texte}
+                            </h5>
+                          {:else if bloc.type === "puce"}
+                            <p class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:text-blue-600 dark:before:text-blue-400">
+                              {bloc.texte}
+                            </p>
+                          {:else}
+                            <p>{bloc.texte}</p>
+                          {/if}
+                        {/each}
+                      </div>
+                      <p
+                        class="mt-4 text-xs italic text-gray-500 dark:text-gray-400"
+                        data-testid="law-explain-disclaimer"
+                      >
+                        {t.ai_disclaimer}
+                      </p>
+                      <button
+                        on:click={expliquerArticle}
+                        data-testid="law-explain-regenerate"
+                        class="mt-4 px-4 py-2 border border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400 hover:bg-blue-100 dark:hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        {t.ai_regenerate}
+                      </button>
+                    {:else}
+                      <ol
+                        class="ai-list list-decimal pl-5 space-y-2 text-sm text-gray-600 dark:text-gray-400 marker:text-blue-600 marker:font-bold"
+                      >
+                        <li>
+                          <strong>{t.ai_key_content} :</strong>
+                          {t.ai_key_desc}
+                        </li>
+                        <li>
+                          <strong>{t.ai_implications} :</strong>
+                          {t.ai_impl_desc}
+                        </li>
+                      </ol>
+                      <button
+                        on:click={expliquerArticle}
+                        data-testid="law-explain"
+                        class="ai-question-btn mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        {t.ai_explain}
+                      </button>
+                    {/if}
                   </div>
                 </div>
               </article>
             {:else if flatArticles.length === 0 && law.content}
               <!-- Fallback if parsing failed but content exists -->
               <div class="prose dark:prose-invert max-w-none">
-                <p>Affichage brut (Structure non détectée) :</p>
+                <p>{t.raw_fallback}</p>
                 <pre class="whitespace-pre-wrap font-sans">{law.content}</pre>
               </div>
             {:else}

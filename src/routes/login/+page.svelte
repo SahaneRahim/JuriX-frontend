@@ -10,6 +10,7 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { authStore } from "$lib/stores/auth";
+  import { tr } from "$lib/stores/language";
   import "../../app.css";
 
   let email = "";
@@ -81,16 +82,16 @@
       }
 
       if (response.status === 401) {
-        error = "Identifiants invalides.";
+        error = $tr("login.errorCredentials");
       } else if (response.status === 403) {
-        error = "Ce compte est désactivé.";
+        error = $tr("login.errorDisabled");
       } else {
-        error = "Connexion impossible. Réessayez dans un instant.";
+        error = $tr("login.errorGeneric");
       }
     } catch (e) {
       // Distinguer « mauvais identifiants » de « serveur injoignable » évite de
       // faire chercher un mot de passe quand c'est le backend qui est éteint.
-      error = "Impossible de joindre le serveur.";
+      error = $tr("login.errorNetwork");
     } finally {
       loading = false;
     }
@@ -99,7 +100,7 @@
 
 <!-- Hors index : un formulaire de connexion n'apporte rien a une recherche, et
      son apparition dans les resultats ne fait qu'exposer la porte d'entree. -->
-<MetaSeo titre="Connexion" indexable={false} />
+<MetaSeo titre={$tr("login.title")} indexable={false} />
 
 <SiteHeader />
 
@@ -117,7 +118,7 @@
     <form on:submit|preventDefault={handleSubmit} class="space-y-5">
       <div>
         <label for="email" class="mb-1 block text-sm font-medium text-slate-700">
-          Adresse email
+          {$tr("login.email")}
         </label>
         <input
           id="email"
@@ -132,7 +133,7 @@
 
       <div>
         <label for="password" class="mb-1 block text-sm font-medium text-slate-700">
-          Mot de passe
+          {$tr("login.password")}
         </label>
         <input
           id="password"
@@ -155,12 +156,12 @@
         disabled={loading}
         class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Connexion…" : "Se connecter"}
+        {loading ? $tr("login.submitting") : $tr("login.submit")}
       </button>
     </form>
 
     <p class="mt-6 text-center text-xs text-slate-500">
-      Les comptes sont créés par un administrateur.
+      {$tr("login.accountsNote")}
     </p>
   </div>
 </div>

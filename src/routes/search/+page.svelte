@@ -16,7 +16,7 @@
   import { tr } from "$lib/stores/language";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { urlCanonique } from "$lib/seo";
-  import type { Category, SearchResult } from '$lib/types';
+  import type { SearchResponse, Category, SearchResult } from '$lib/types';
 
 // State
   let searchQuery = "";
@@ -167,7 +167,7 @@
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: SearchResponse = await response.json();
 
         // « article 35 du code minier » : le backend a identifie le document ET
         // verifie que l'article y existe. Ces trois champs etaient calcules

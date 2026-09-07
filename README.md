@@ -64,11 +64,13 @@ src/lib/
   components/     SearchBar, SearchResultCard, StatusBadge, ImagePdfViewer, admin/
 src/routes/
   (main)/         accueil et assistant conversationnel
-  laws/           liste et lecture des documents
+  laws/           liste et lecture des documents, explication d'un article par l'IA
   categories/[id] documents d'un domaine juridique
   search/         résultats de recherche, titres puis mentions dans le texte
+  compare/        comparaison de deux régimes, grille sourcée cellule par cellule
   admin/          tableau de bord, documents, import en masse, comptes
-tests/e2e/        playwright : navigation, accessibilité, backend indisponible
+tests/e2e/        playwright : navigation, accessibilité, backend indisponible,
+                  explication d'article, comparaison (appel Gemini intercepté)
 ```
 
 ## Conventions

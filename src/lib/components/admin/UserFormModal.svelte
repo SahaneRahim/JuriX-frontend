@@ -11,6 +11,7 @@
   import { piegerFocus } from "$lib/actions/pieger-focus";
   import { apiFetch } from "$lib/api";
   import { authStore } from "$lib/stores/auth";
+  import { tr } from "$lib/stores/language";
   import type { User } from '$lib/types';
 
   export let show = false;
@@ -52,19 +53,19 @@
    * un message en anglais pointant un chemin de champ interne.
    */
   function valider(): string {
-    if (!email.includes("@")) return "Adresse email invalide.";
+    if (!email.includes("@")) return $tr("admin.user.errEmail");
     if (username.trim().length < 3)
-      return "Le nom d'utilisateur doit faire au moins 3 caractères.";
+      return $tr("admin.user.errUsernameLen");
     if (!/^[a-zA-Z0-9_-]+$/.test(username))
-      return "Le nom d'utilisateur n'accepte que lettres, chiffres, _ et -.";
+      return $tr("admin.user.errUsernameChars");
     if (enCreation || password) {
       if (password.length < 8)
-        return "Le mot de passe doit faire au moins 8 caractères.";
+        return $tr("admin.user.errPwdLen");
       if (!/[A-Z]/.test(password))
-        return "Le mot de passe doit contenir une majuscule.";
+        return $tr("admin.user.errPwdUpper");
       if (!/[a-z]/.test(password))
-        return "Le mot de passe doit contenir une minuscule.";
-      if (!/\d/.test(password)) return "Le mot de passe doit contenir un chiffre.";
+        return $tr("admin.user.errPwdLower");
+      if (!/\d/.test(password)) return $tr("admin.user.errPwdDigit");
     }
     return "";
   }
@@ -119,14 +120,14 @@
         const corpsErreur = await reponse.json().catch(() => null);
         error =
           corpsErreur?.detail ??
-          `Enregistrement impossible (${reponse.status}).`;
+          $tr("admin.user.errSave").replace("{status}", String(reponse.status));
         return;
       }
 
       dispatch("saved");
       close();
     } catch {
-      error = "Impossible de joindre le serveur.";
+      error = $tr("common.errorNetwork");
     } finally {
       saving = false;
     }
@@ -151,13 +152,13 @@
     >
       <div class="mb-6 flex items-center justify-between">
         <h2 id="user-modal-title" class="text-xl font-bold text-slate-900">
-          {enCreation ? "Nouveau compte" : "Modifier le compte"}
+          {enCreation ? $tr("admin.user.new") : $tr("admin.user.edit")}
         </h2>
         <button
           type="button"
           on:click={close}
           data-testid="user-modal-close"
-          aria-label="Fermer"
+          aria-label={$tr("common.close")}
           class="text-2xl leading-none text-slate-500 hover:text-slate-700">&times;</button
         >
       </div>
@@ -165,7 +166,7 @@
       <form on:submit|preventDefault={save} class="space-y-4">
         <div>
           <label for="u-email" class="mb-1 block text-sm font-medium text-slate-700"
-            >Email</label
+            >{$tr("admin.user.email")}</label
           >
           <input
             id="u-email"
@@ -178,7 +179,7 @@
 
         <div>
           <label for="u-username" class="mb-1 block text-sm font-medium text-slate-700"
-            >Nom d'utilisateur</label
+            >{$tr("admin.user.username")}</label
           >
           <input
             id="u-username"
@@ -187,13 +188,13 @@
             class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           <p class="mt-1 text-xs text-slate-500">
-            Converti en minuscules à l'enregistrement.
+            {$tr("admin.user.usernameHint")}
           </p>
         </div>
 
         <div>
           <label for="u-fullname" class="mb-1 block text-sm font-medium text-slate-700"
-            >Nom complet</label
+            >{$tr("admin.user.fullName")}</label
           >
           <input
             id="u-fullname"
@@ -205,7 +206,7 @@
         <div class="flex gap-4">
           <div class="flex-1">
             <label for="u-role" class="mb-1 block text-sm font-medium text-slate-700"
-              >Rôle</label
+              >{$tr("admin.user.role")}</label
             >
             <select
               id="u-role"
@@ -213,26 +214,26 @@
               disabled={!peutChangerRole}
               title={peutChangerRole
                 ? undefined
-                : "Seul un superadmin peut changer un rôle"}
+                : $tr("admin.user.roleHint")}
               class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
             >
-              <option value="user">Utilisateur</option>
-              <option value="admin">Administrateur</option>
-              <option value="superadmin">Superadmin</option>
+              <option value="user">{$tr("admin.role.user")}</option>
+              <option value="admin">{$tr("admin.role.admin")}</option>
+              <option value="superadmin">{$tr("admin.role.superadmin")}</option>
             </select>
           </div>
 
           <div class="flex items-end pb-2">
             <label class="flex items-center gap-2 text-sm font-medium text-slate-700">
               <input type="checkbox" bind:checked={isActive} class="h-4 w-4 rounded" />
-              Compte actif
+              {$tr("admin.user.active")}
             </label>
           </div>
         </div>
 
         <div>
           <label for="u-password" class="mb-1 block text-sm font-medium text-slate-700"
-            >Mot de passe {enCreation ? "" : "(laisser vide pour ne pas changer)"}</label
+            >{$tr("admin.user.password")} {enCreation ? "" : $tr("admin.user.passwordKeep")}</label
           >
           <input
             id="u-password"
@@ -243,7 +244,7 @@
             class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           <p class="mt-1 text-xs text-slate-500">
-            8 caractères minimum, avec majuscule, minuscule et chiffre.
+            {$tr("admin.user.passwordHint")}
           </p>
         </div>
 
@@ -259,14 +260,14 @@
             on:click={close}
             data-testid="user-modal-cancel"
             class="rounded-lg px-4 py-2 font-medium text-slate-600 hover:bg-slate-100"
-            >Annuler</button
+            >{$tr("common.cancel")}</button
           >
           <button
             type="submit"
             disabled={saving}
             data-testid="user-modal-save"
             class="rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-            >{saving ? "Enregistrement…" : "Enregistrer"}</button
+            >{saving ? $tr("common.saving") : $tr("common.save")}</button
           >
         </div>
       </form>

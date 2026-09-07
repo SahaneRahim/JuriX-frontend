@@ -19,7 +19,15 @@
 
 import { expect, test } from '@playwright/test';
 
-const PAGES_PUBLIQUES = ['/', '/chat', '/laws', '/about', '/search?q=loi', '/login'];
+const PAGES_PUBLIQUES = [
+  '/',
+  '/chat',
+  '/laws',
+  '/about',
+  '/search?q=loi',
+  '/login',
+  '/compare',
+];
 
 test.describe('Structure des pages', () => {
   for (const chemin of PAGES_PUBLIQUES) {

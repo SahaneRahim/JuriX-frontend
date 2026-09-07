@@ -1,5 +1,6 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { API_URL } from '$lib/api';
 
 /**
  * Rôles reconnus par le backend.
@@ -119,6 +120,19 @@ function createAuthStore() {
 
     // Logout action
     logout: () => {
+      // `POST /auth/logout` existe cote backend « pour donner un point d'appel
+      // explicite au front et pour tracer la deconnexion » — et n'etait appele
+      // nulle part. Les JWT etant sans etat, l'appel ne conditionne rien : il
+      // part en arriere-plan, avec le jeton encore en main, et son echec est
+      // sans consequence.
+      const jeton = get({ subscribe })?.token;
+      if (browser && jeton) {
+        fetch(`${API_URL}/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${jeton}` },
+          keepalive: true,
+        }).catch(() => {});
+      }
       if (browser) {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         localStorage.removeItem(USER_STORAGE_KEY);

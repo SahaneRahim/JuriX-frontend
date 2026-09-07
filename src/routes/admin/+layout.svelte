@@ -5,6 +5,7 @@
   import AdminSidebar from "$lib/components/admin/AdminSidebar.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { authStore } from "$lib/stores/auth";
+  import { tr } from "$lib/stores/language";
   import "../../app.css";
 
   /**
@@ -15,12 +16,12 @@
    * qui en posait un était masquée par celui du layout.
    */
   const TITRES_ADMIN: Record<string, string> = {
-    "/admin": "Tableau de bord",
-    "/admin/documents": "Documents",
-    "/admin/documents/batch-upload": "Import en lot",
-    "/admin/users": "Utilisateurs",
+    "/admin": "admin.dashboard",
+    "/admin/documents": "admin.documents",
+    "/admin/documents/batch-upload": "admin.batchUpload",
+    "/admin/users": "admin.users",
   };
-  $: titreAdmin = `${TITRES_ADMIN[$page.url.pathname] ?? "Administration"} — Admin`;
+  $: titreAdmin = `${$tr(TITRES_ADMIN[$page.url.pathname] ?? "admin.administration")} — Admin`;
 
   // Garde de confort uniquement. La vraie barrière est côté backend : chaque
   // endpoint d'administration exige un jeton et un rôle (401 / 403). Ce contrôle
@@ -93,6 +94,6 @@
 {:else}
   <!-- Évite que l'interface d'administration apparaisse le temps de la redirection -->
   <div class="flex min-h-screen items-center justify-center bg-slate-50">
-    <p class="text-sm text-slate-500">Vérification de la session…</p>
+    <p class="text-sm text-slate-500">{$tr("admin.checkingSession")}</p>
   </div>
 {/if}

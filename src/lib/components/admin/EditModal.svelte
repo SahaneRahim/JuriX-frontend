@@ -2,6 +2,7 @@
   import { piegerFocus } from '$lib/actions/pieger-focus';
   import { apiFetch } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
+  import { tr } from '$lib/stores/language';
   import type { Law, LawUpdatePayload } from '$lib/types';
   
   export let show = false;
@@ -102,11 +103,11 @@ let title = '';
         close();
       } else {
         const error = await response.json();
-        alert(`Erreur: ${error.detail || 'Erreur inconnue'}`);
+        alert($tr('admin.doc.saveError').replace('{detail}', error.detail || $tr('admin.doc.unknownError')));
       }
     } catch (error) {
       console.error('Error saving document:', error);
-      alert('Erreur réseau lors de la sauvegarde');
+      alert($tr('common.errorNetwork'));
     } finally {
       isSaving = false;
     }
@@ -134,12 +135,12 @@ let title = '';
       on:click|stopPropagation
       role="dialog"
       aria-modal="true"
-      aria-label="Éditer le document"
+      aria-label={$tr("admin.doc.editTitle")}
     >
       <!-- Header -->
       <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-        <h2 class="text-2xl font-bold text-slate-900">Éditer le Document</h2>
-        <button on:click={close} class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-600" aria-label="Fermer">
+        <h2 class="text-2xl font-bold text-slate-900">{$tr("admin.doc.editTitle")}</h2>
+        <button on:click={close} class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-600" aria-label={$tr("common.close")}>
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
@@ -151,20 +152,20 @@ let title = '';
         <div class="space-y-4">
           <!-- Title -->
           <div>
-            <label for="edit-title" class="mb-2 block text-sm font-semibold text-slate-700">Titre</label>
+            <label for="edit-title" class="mb-2 block text-sm font-semibold text-slate-700">{$tr("admin.doc.title")}</label>
             <input
               id="edit-title"
               type="text"
               bind:value={title}
               class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              placeholder="Titre du document"
+              placeholder={$tr("admin.doc.titlePlaceholder")}
             />
           </div>
           
           <!-- Reference and Category -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label for="edit-reference" class="mb-2 block text-sm font-semibold text-slate-700">Référence</label>
+              <label for="edit-reference" class="mb-2 block text-sm font-semibold text-slate-700">{$tr("admin.reference")}</label>
               <input
                 id="edit-reference"
                 type="text"
@@ -175,26 +176,26 @@ let title = '';
             </div>
             
             <div>
-              <label for="edit-category" class="mb-2 block text-sm font-semibold text-slate-700">Catégorie</label>
+              <label for="edit-category" class="mb-2 block text-sm font-semibold text-slate-700">{$tr("admin.doc.category")}</label>
               <select
                 id="edit-category"
                 bind:value={selectedCategoryId}
                 class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
-                <option value="">-- Aucune catégorie --</option>
+                <option value="">{$tr("admin.doc.noCategory")}</option>
                 {#each categories as cat}
                   <option value={String(cat.id)}>{cat.icon} {cat.name}</option>
                 {/each}
               </select>
               {#if loadingCategories}
-                <p class="mt-1 text-xs text-slate-500">Chargement...</p>
+                <p class="mt-1 text-xs text-slate-500">{$tr("admin.loading")}</p>
               {/if}
             </div>
           </div>
           
           <!-- Language -->
           <div>
-            <label for="edit-language" class="mb-2 block text-sm font-semibold text-slate-700">Langue</label>
+            <label for="edit-language" class="mb-2 block text-sm font-semibold text-slate-700">{$tr("admin.language")}</label>
             <select
               id="edit-language"
               bind:value={language}
@@ -207,15 +208,15 @@ let title = '';
           
           <!-- Content -->
           <div>
-            <label for="edit-content" class="mb-2 block text-sm font-semibold text-slate-700">Contenu</label>
+            <label for="edit-content" class="mb-2 block text-sm font-semibold text-slate-700">{$tr("admin.doc.content")}</label>
             <textarea
               id="edit-content"
               bind:value={content}
               rows="12"
               class="w-full rounded-lg border border-slate-300 px-4 py-2.5 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              placeholder="Contenu du document..."
+              placeholder={$tr("admin.doc.contentPlaceholder")}
             />
-            <p class="mt-1 text-xs text-slate-500">{content.length} caractères</p>
+            <p class="mt-1 text-xs text-slate-500">{content.length} {$tr("admin.doc.chars")}</p>
           </div>
         </div>
       </div>
@@ -226,7 +227,7 @@ let title = '';
           on:click={close}
           class="rounded-lg px-5 py-2.5 font-semibold text-slate-700 hover:bg-slate-100"
         >
-          Annuler
+          {$tr("common.cancel")}
         </button>
         <button
           on:click={save}
@@ -238,9 +239,9 @@ let title = '';
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
             </svg>
-            Enregistrement...
+            {$tr("common.saving")}
           {:else}
-            Enregistrer
+            {$tr("common.save")}
           {/if}
         </button>
       </div>

@@ -121,6 +121,7 @@
       <button
         on:click={() => switchLanguage("fr")}
         data-testid="lang-fr"
+          aria-label="{$tr('a11y.switchTo')} français"
         class="relative z-10 w-10 py-1 rounded-md text-xs font-bold transition-colors duration-300 {$language.current ===
         'fr'
           ? 'text-blue-600 dark:text-blue-400'
@@ -130,6 +131,7 @@
       <button
         on:click={() => switchLanguage("en")}
         data-testid="lang-en"
+          aria-label="{$tr('a11y.switchTo')} English"
         class="relative z-10 w-10 py-1 rounded-md text-xs font-bold transition-colors duration-300 {$language.current ===
         'en'
           ? 'text-blue-600 dark:text-blue-400'
@@ -228,6 +230,7 @@
         <button
           on:click={() => switchLanguage("fr")}
           data-testid="lang-fr-mobile"
+          aria-label="{$tr('a11y.switchTo')} français"
           class="px-3 py-1 rounded-md text-xs font-bold {$language.current ===
           'fr'
             ? 'bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-blue-400'
@@ -236,6 +239,7 @@
         <button
           on:click={() => switchLanguage("en")}
           data-testid="lang-en-mobile"
+          aria-label="{$tr('a11y.switchTo')} English"
           class="px-3 py-1 rounded-md text-xs font-bold {$language.current ===
           'en'
             ? 'bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-blue-400'

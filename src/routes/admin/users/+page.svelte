@@ -47,12 +47,12 @@
     try {
       const r = await apiFetch("/admin/users?skip=0&limit=500");
       if (!r.ok) {
-        erreur = `Chargement impossible (${r.status}).`;
+        erreur = $tr("admin.users.loadError").replace("{status}", String(r.status));
         return;
       }
       users = await r.json();
     } catch {
-      erreur = "Impossible de joindre le serveur.";
+      erreur = $tr("common.errorNetwork");
     } finally {
       chargement = false;
     }
@@ -92,12 +92,12 @@
   }
 
   async function supprimer(u: User) {
-    if (!confirm(`Supprimer définitivement le compte ${u.email} ?`)) return;
+    if (!confirm($tr("admin.users.confirmDelete").replace("{email}", u.email))) return;
     const r = await apiFetch(`/admin/users/${u.id}`, { method: "DELETE" });
     if (!r.ok) {
       // 400 = dernier superadmin actif, ou son propre compte.
       const corps = await r.json().catch(() => null);
-      alert(corps?.detail ?? `Suppression impossible (${r.status}).`);
+      alert(corps?.detail ?? $tr("admin.users.deleteError").replace("{status}", String(r.status)));
       return;
     }
     users = users.filter((x) => x.id !== u.id);
@@ -117,9 +117,9 @@
 
 <div class="mb-8 flex items-center justify-between">
   <div>
-    <h1 class="text-3xl font-bold text-slate-900">Utilisateurs</h1>
+    <h1 class="text-3xl font-bold text-slate-900">{$tr("admin.users")}</h1>
     <p class="mt-1 text-slate-500">
-      Comptes autorisés à accéder à l'administration.
+      {$tr("admin.usersDesc")}
     </p>
   </div>
   <button
@@ -137,7 +137,7 @@
     >
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
-    Nouveau compte
+    {$tr("admin.user.new")}
   </button>
 </div>
 
@@ -146,7 +146,7 @@
     bind:value={recherche}
           aria-label={$tr("a11y.searchField")}
     data-testid="user-search"
-    placeholder="Rechercher par email, identifiant ou nom…"
+    placeholder={$tr("admin.users.searchPlaceholder")}
     class="min-w-64 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
   />
   <select
@@ -155,10 +155,10 @@
     data-testid="user-filter-role"
     class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
   >
-    <option value="all">Tous les rôles</option>
-    <option value="user">Utilisateur</option>
-    <option value="admin">Administrateur</option>
-    <option value="superadmin">Superadmin</option>
+    <option value="all">{$tr("admin.users.allRoles")}</option>
+    <option value="user">{$tr("admin.role.user")}</option>
+    <option value="admin">{$tr("admin.role.admin")}</option>
+    <option value="superadmin">{$tr("admin.role.superadmin")}</option>
   </select>
   <select
     bind:value={filtreStatut}
@@ -166,14 +166,14 @@
     data-testid="user-filter-status"
     class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
   >
-    <option value="all">Tous les statuts</option>
-    <option value="active">Actifs</option>
-    <option value="inactive">Inactifs</option>
+    <option value="all">{$tr("admin.allStatuses")}</option>
+    <option value="active">{$tr("admin.users.activePlural")}</option>
+    <option value="inactive">{$tr("admin.users.inactivePlural")}</option>
   </select>
 </div>
 
 {#if chargement}
-  <p class="py-16 text-center text-slate-500">Chargement…</p>
+  <p class="py-16 text-center text-slate-500">{$tr("common.loading")}</p>
 {:else if erreur}
   <div class="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
     <p class="mb-3 text-red-700">{erreur}</p>
@@ -181,22 +181,22 @@
       on:click={charger}
       data-testid="user-retry"
       class="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
-      >Réessayer</button
+      >{$tr("common.retry")}</button
     >
   </div>
 {:else if filtres.length === 0}
-  <p class="py-16 text-center text-slate-500">Aucun compte ne correspond.</p>
+  <p class="py-16 text-center text-slate-500">{$tr("admin.users.none")}</p>
 {:else}
   <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
     <table class="w-full text-left text-sm">
       <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
         <tr>
-          <th class="px-6 py-3">Compte</th>
-          <th class="px-6 py-3">Nom</th>
-          <th class="px-6 py-3">Rôle</th>
-          <th class="px-6 py-3">Statut</th>
-          <th class="px-6 py-3">Dernière connexion</th>
-          <th class="px-6 py-3 text-right">Actions</th>
+          <th class="px-6 py-3">{$tr("admin.users.account")}</th>
+          <th class="px-6 py-3">{$tr("admin.users.name")}</th>
+          <th class="px-6 py-3">{$tr("admin.user.role")}</th>
+          <th class="px-6 py-3">{$tr("admin.status")}</th>
+          <th class="px-6 py-3">{$tr("admin.users.lastLogin")}</th>
+          <th class="px-6 py-3 text-right">{$tr("admin.actions")}</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100">
@@ -217,7 +217,7 @@
                 class="rounded-full px-2.5 py-1 text-xs font-semibold {u.is_active
                   ? 'bg-green-100 text-green-700'
                   : 'bg-slate-100 text-slate-500'}"
-                >{u.is_active ? "Actif" : "Inactif"}</span
+                >{u.is_active ? $tr("admin.users.activeOne") : $tr("admin.users.inactiveOne")}</span
               >
             </td>
             <td class="px-6 py-4 text-slate-500">{formatDateCourte(u.last_login_at, $language.current)}</td>
@@ -226,7 +226,7 @@
                 on:click={() => ouvrirEdition(u)}
                 data-testid="user-edit"
                 class="mr-2 rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50"
-                >Éditer</button
+                >{$tr("admin.edit")}</button
               >
               <!--
                 Le bouton n'est rendu que si l'action peut aboutir : le backend
@@ -239,7 +239,7 @@
                   on:click={() => supprimer(u)}
                   data-testid="user-delete"
                   class="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-                  >Supprimer</button
+                  >{$tr("admin.delete")}</button
                 >
               {/if}
             </td>
@@ -256,15 +256,15 @@
         disabled={page === 1}
         data-testid="user-page-prev"
         class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50"
-        >Précédent</button
+        >{$tr("admin.previous")}</button
       >
-      <span class="px-2 text-sm text-slate-500">Page {page} / {totalPages}</span>
+      <span class="px-2 text-sm text-slate-500">{$tr("admin.page")} {page} / {totalPages}</span>
       <button
         on:click={() => (page = Math.min(totalPages, page + 1))}
         disabled={page === totalPages}
         data-testid="user-page-next"
         class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50"
-        >Suivant</button
+        >{$tr("admin.next")}</button
       >
     </nav>
   {/if}

@@ -202,7 +202,7 @@
 			console.log("Upload result:", result);
 		} catch (error) {
 			console.error("Upload error:", error);
-			alert("Upload failed: " + error);
+			alert($tr("batch.uploadFailed").replace("{err}", String(error)));
 		} finally {
 			isUploading = false;
 		}

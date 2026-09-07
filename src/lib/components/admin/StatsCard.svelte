@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tr } from '$lib/stores/language';
   export let title: string;
   export let value: string;
   export let change: string | null = null;
@@ -45,7 +46,7 @@
         {/if}
         {change}
       </span>
-      <span class="text-slate-500">depuis le mois dernier</span>
+      <span class="text-slate-500">{$tr("admin.sinceLastMonth")}</span>
     </div>
   {/if}
 </div>
