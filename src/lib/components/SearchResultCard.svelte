@@ -9,6 +9,7 @@
    * carte pour une seconde section aurait recommencé.
    */
   import { tr, language } from "$lib/stores/language";
+  import { nomCategorie } from "$lib/categories";
   import { formatDate } from "$lib/format";
   import { highlightSegments } from "$lib/highlight";
   import type { SearchResult } from '$lib/types';
@@ -121,7 +122,7 @@
     {#if result.category_name}
       <div class="flex items-center gap-1.5">
         <span class="material-icons text-base" aria-hidden="true">folder_open</span>
-        {result.category_name}
+        {nomCategorie(result.category_name, $language.current)}
       </div>
     {/if}
     {#if result.reference}

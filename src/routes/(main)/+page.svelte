@@ -3,7 +3,8 @@
   import { page } from "$app/stores";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { urlCanonique } from "$lib/seo";
-  import { tr } from "$lib/stores/language";
+  import { tr, language } from "$lib/stores/language";
+  import { descriptionCategorie, nomCategorie } from "$lib/categories";
   import type { Category } from "$lib/types";
   import { fade } from "svelte/transition";
 
@@ -175,12 +176,12 @@
           <h3
             class="text-base font-bold text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
           >
-            {cat.name}
+            {nomCategorie(cat.name, $language.current)}
           </h3>
           <p
             class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2"
           >
-            {cat.description || ""}
+            {descriptionCategorie(cat.name, cat.description, $language.current)}
           </p>
         </div>
       </a>

@@ -2,6 +2,7 @@
   import { goto, invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
   import { language, tr } from "$lib/stores/language";
+  import { descriptionCategorie, nomCategorie } from "$lib/categories";
   import { formatDate } from "$lib/format";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
@@ -28,8 +29,12 @@
   // de /categories/3 a /categories/7 laisserait le titre et la liste de la
   // categorie precedente a l'ecran, SvelteKit reutilisant le composant.
   $: documents = data.documents;
-  $: categoryTitle = data.categorie?.name ?? "";
-  $: categoryDesc = data.categorie?.description ?? "";
+  $: categoryTitle = nomCategorie(data.categorie?.name, $language.current);
+  $: categoryDesc = descriptionCategorie(
+    data.categorie?.name,
+    data.categorie?.description,
+    $language.current,
+  );
   $: categoryIcon = data.categorie?.icon || "📄";
   $: error = data.erreur ? $tr(data.erreur) : "";
 

@@ -13,7 +13,8 @@
   import { goto } from "$app/navigation";
   import SearchResultCard from "$lib/components/SearchResultCard.svelte";
   import { onMount } from "svelte";
-  import { tr } from "$lib/stores/language";
+  import { tr, language } from "$lib/stores/language";
+  import { nomCategorie } from "$lib/categories";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { urlCanonique } from "$lib/seo";
   import type { SearchResponse, Category, SearchResult } from '$lib/types';
@@ -459,7 +460,7 @@
                   />
                   <span
                     class="text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
-                    >{category.name}</span
+                    >{nomCategorie(category.name, $language.current)}</span
                   >
                 </label>
               {:else}

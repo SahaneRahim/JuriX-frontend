@@ -2,7 +2,8 @@
   import { piegerFocus } from '$lib/actions/pieger-focus';
   import { apiFetch } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
-  import { tr } from '$lib/stores/language';
+  import { tr, language as langueInterface } from '$lib/stores/language';
+  import { nomCategorie } from '$lib/categories';
   import type { Law, LawUpdatePayload } from '$lib/types';
   
   export let show = false;
@@ -184,7 +185,7 @@ let title = '';
               >
                 <option value="">{$tr("admin.doc.noCategory")}</option>
                 {#each categories as cat}
-                  <option value={String(cat.id)}>{cat.icon} {cat.name}</option>
+                  <option value={String(cat.id)}>{cat.icon} {nomCategorie(cat.name, $langueInterface.current)}</option>
                 {/each}
               </select>
               {#if loadingCategories}

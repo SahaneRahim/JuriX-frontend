@@ -3,7 +3,8 @@
   import { apiFetch } from '$lib/api';
     import { createEventDispatcher, onMount } from "svelte";
     import { fade, scale } from "svelte/transition";
-  import { tr } from '$lib/stores/language';
+  import { tr, language } from '$lib/stores/language';
+  import { nomCategorie } from '$lib/categories';
   import type { IngestPayload } from '$lib/types';
 
     export let show = false;
@@ -275,7 +276,7 @@ let files: FileList | null = null;
                         >{$tr("admin.upload.selectCategory")}</option
                     >
                     {#each categories as cat}
-                        <option value={cat.id}>{cat.icon} {cat.name}</option>
+                        <option value={cat.id}>{cat.icon} {nomCategorie(cat.name, $language.current)}</option>
                     {/each}
                 </select>
                 {#if loadingCategories}

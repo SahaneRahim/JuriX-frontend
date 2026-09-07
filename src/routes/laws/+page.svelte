@@ -12,6 +12,7 @@
   // langue des documents. Le store, lui, porte la langue de l'INTERFACE. Deux
   // notions distinctes que le meme nom rendait confuses.
   import { language as langueInterface, tr } from "$lib/stores/language";
+  import { nomCategorie } from "$lib/categories";
   import { formatDate } from "$lib/format";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
@@ -112,7 +113,7 @@
     >
       <option value="all">{$tr("laws.allCategories")}</option>
       {#each categories as category}
-        <option value={String(category.id)}>{category.name}</option>
+        <option value={String(category.id)}>{nomCategorie(category.name, $langueInterface.current)}</option>
       {/each}
     </select>
 

@@ -7,6 +7,7 @@
   import { formatDate } from "$lib/format";
   import { nombreDePages, pagesVisibles, TAILLE_PAGE_ADMIN } from "$lib/pagination";
   import { language, tr } from "$lib/stores/language";
+  import { nomCategorie } from "$lib/categories";
   import type { Category, Law } from '$lib/types';
 
   let searchQuery = "";
@@ -272,7 +273,7 @@ let documents: Law[] = [];
   >
     <option value="">{$tr("admin.allCategories")}</option>
     {#each categories as category}
-      <option value={category.id}>{category.name}</option>
+      <option value={category.id}>{nomCategorie(category.name, $language.current)}</option>
     {/each}
   </select>
   <select
