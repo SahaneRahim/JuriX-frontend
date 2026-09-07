@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
+  import { apiFetch } from "$lib/api";
+  import {
+    ecrireSessionChat,
+    effacerSessionChat,
+    lireSessionChat,
+  } from "$lib/chat-session";
+  import { authStore } from "$lib/stores/auth";
+  import type { ConversationSummary } from "$lib/types";
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { formatHeure } from "$lib/format";
@@ -85,6 +92,88 @@
   /** Dernière question envoyée, pour que « Réessayer » ait quelque chose à renvoyer. */
   let lastQuestion = "";
 
+  // ---------------------------------------------------------------------------
+  // Panneau des conversations
+  //
+  // Rendu uniquement pour un compte connecté : une conversation anonyme
+  // n'appartient à personne, donc aucune liste ne peut la contenir.
+  // ---------------------------------------------------------------------------
+
+  let conversations: ConversationSummary[] = [];
+  let conversationsEnCours = false;
+  let conversationsErreur = "";
+  let panneauOuvert = false;
+
+  async function chargerConversations() {
+    if (!$authStore.isAuthenticated) {
+      conversations = [];
+      return;
+    }
+    conversationsEnCours = true;
+    conversationsErreur = "";
+    try {
+      const reponse = await apiFetch("/rag/conversations");
+      if (reponse.ok) conversations = await reponse.json();
+      else conversationsErreur = t("chat.conversationsError");
+    } catch {
+      conversationsErreur = t("chat.conversationsError");
+    } finally {
+      conversationsEnCours = false;
+    }
+  }
+
+  async function ouvrirConversation(conversation: ConversationSummary) {
+    const reponse = await apiFetch(`/rag/conversations/${conversation.session_id}`);
+    if (!reponse.ok) {
+      // Supprimée ailleurs, ou plus accessible. Retirer la ligne plutôt que de
+      // laisser cliquer sur un fantôme.
+      conversations = conversations.filter(
+        (c) => c.session_id !== conversation.session_id,
+      );
+      conversationsErreur = t("chat.conversationsError");
+      return;
+    }
+    const detail = await reponse.json();
+    sessionId = detail.session_id;
+    ecrireSessionChat(sessionId);
+    chatMessages = (detail.messages ?? []).map(
+      (m: { id: number; role: string; content: string; sources?: unknown[] }) => ({
+        id: m.id,
+        type: m.role === "user" ? "user" : "assistant",
+        content: m.content,
+        sources: (m.sources ?? []) as ChatMessage["sources"],
+        timestamp: "",
+      }),
+    );
+    initialized = true;
+    panneauOuvert = false;
+    await scrollToBottom();
+  }
+
+  async function supprimerConversation(conversation: ConversationSummary) {
+    const reponse = await apiFetch(`/rag/conversations/${conversation.session_id}`, {
+      method: "DELETE",
+    });
+    // 404 compris : si elle n'existe plus, le but est atteint.
+    if (!reponse.ok && reponse.status !== 404) {
+      conversationsErreur = t("chat.conversationsError");
+      return;
+    }
+    conversations = conversations.filter(
+      (c) => c.session_id !== conversation.session_id,
+    );
+    if (sessionId === conversation.session_id) nouvelleConversation();
+  }
+
+  function nouvelleConversation() {
+    sessionId = null;
+    effacerSessionChat();
+    initialized = false;
+    initMessages();
+    initialized = true;
+    panneauOuvert = false;
+  }
+
   async function scrollToBottom() {
     await tick();
     if (messagesContainer) {
@@ -137,7 +226,10 @@
     await scrollToBottom();
 
     try {
-      const response = await fetch(`${API_URL}/rag/ask`, {
+      // `apiFetch` et non `fetch` : le jeton part enfin avec la question — ce
+      // qui rattache la conversation au compte — et le 401 est traité au même
+      // endroit que partout ailleurs dans l'application.
+      const response = await apiFetch("/rag/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -155,7 +247,14 @@
 
       if (response.ok) {
         const data = await response.json();
-        if (data.session_id) sessionId = data.session_id;
+        if (data.session_id) {
+          const conversationNeuve = data.session_id !== sessionId;
+          sessionId = data.session_id;
+          ecrireSessionChat(sessionId);
+          // Le titre est écrit par le serveur à la première interaction : la
+          // liste n'a de nouveau à montrer qu'à ce moment-là.
+          if (conversationNeuve) chargerConversations();
+        }
         const aiMessage: ChatMessage = {
           id: chatMessages.length + 1,
           type: "assistant",
@@ -169,6 +268,14 @@
         };
         chatMessages = [...chatMessages, aiMessage];
       } else {
+        if (response.status === 404) {
+          // Conversation supprimée, ou devenue celle d'un autre compte après
+          // un changement de session. Repartir sur une neuve, sinon
+          // « Réessayer » reposerait la question au même identifiant mort.
+          sessionId = null;
+          effacerSessionChat();
+          chargerConversations();
+        }
         chatMessages = [
           ...chatMessages,
           {
@@ -181,7 +288,9 @@
                 ? t("chat.errorOverloaded")
                 : response.status === 429
                   ? t("chat.errorQuota")
-                  : t("chat.errorServer"),
+                  : response.status === 404
+                    ? t("chat.errorConversationGone")
+                    : t("chat.errorServer"),
             timestamp: getCurrentTime(),
           },
         ];
@@ -214,6 +323,10 @@
   }
 
   onMount(() => {
+    // Reprise du fil laissé au chargement précédent : sans cette ligne, un
+    // simple F5 perdait la conversation, qui restait pourtant en base.
+    sessionId = lireSessionChat();
+    chargerConversations();
     if (!initialized) initMessages();
 
     // Entrée profonde depuis /laws/[id] : « Poser une question à l'Assistant
@@ -231,12 +344,115 @@
      page ne rend rien avant que l'utilisateur ait ecrit. -->
 <MetaSeo titre={t("chat.header")} indexable={false} />
 
-<div class="w-full max-w-3xl mb-12">
+<div
+  class="w-full mb-12 {$authStore.isAuthenticated
+    ? 'max-w-6xl md:flex md:items-start md:gap-6'
+    : 'max-w-3xl'}"
+>
   <!-- Le h1 du layout est masque sur cette route (le hero marketing n'a rien a
        faire au-dessus d'une conversation). La page se retrouvait sans aucun
        titre : celui-ci est visuellement masque mais annonce par les lecteurs
        d'ecran. -->
   <h1 class="sr-only">{t("chat.header")}</h1>
+
+  {#if $authStore.isAuthenticated}
+    <!--
+      Panneau des conversations. Un <h2>, et non un second <h1> : le spec
+      d'accessibilite exige exactement un h1 par page.
+
+      Rendu pour un compte seulement : une conversation anonyme n'appartient a
+      personne, donc aucune liste ne peut la contenir.
+    -->
+    <aside
+      data-testid="conversations-panel"
+      class="mb-6 md:mb-0 md:w-72 md:shrink-0 rounded-2xl border border-gray-100 dark:border-slate-700/50 bg-white dark:bg-slate-800/50 p-4"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-sm font-bold text-slate-900 dark:text-white">
+          {t("chat.conversations")}
+        </h2>
+        <!-- Sous md, le panneau se replie : deploye, il mangerait l'ecran
+             avant meme qu'on voie la conversation. -->
+        <button
+          class="md:hidden text-xs underline text-slate-500 dark:text-slate-400"
+          data-testid="conversations-toggle"
+          aria-expanded={panneauOuvert}
+          aria-controls="liste-conversations"
+          on:click={() => (panneauOuvert = !panneauOuvert)}
+        >
+          {panneauOuvert ? t("common.close") : t("chat.conversations")}
+        </button>
+      </div>
+
+      <button
+        on:click={nouvelleConversation}
+        data-testid="chat-new"
+        class="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+      >
+        {t("chat.newConversation")}
+      </button>
+
+      <div id="liste-conversations" class:hidden={!panneauOuvert} class="md:block">
+        {#if conversationsEnCours}
+          <p
+            role="status"
+            aria-live="polite"
+            class="mt-4 text-xs text-slate-500 dark:text-slate-400"
+          >
+            {t("common.loading")}
+          </p>
+        {:else if conversationsErreur}
+          <div
+            role="alert"
+            data-testid="conversations-error"
+            class="mt-4 rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-300"
+          >
+            <p>{conversationsErreur}</p>
+            <button
+              on:click={chargerConversations}
+              data-testid="conversations-retry"
+              class="mt-1 underline font-medium hover:no-underline"
+            >
+              {t("common.retry")}
+            </button>
+          </div>
+        {:else if conversations.length === 0}
+          <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">
+            {t("chat.conversationsEmpty")}
+          </p>
+        {:else}
+          <ul class="mt-4 space-y-1">
+            {#each conversations as conversation (conversation.session_id)}
+              <li class="flex items-center gap-1">
+                <button
+                  on:click={() => ouvrirConversation(conversation)}
+                  data-testid="conversation-item"
+                  aria-current={conversation.session_id === sessionId ? "true" : undefined}
+                  class="flex-1 truncate rounded-lg px-2 py-1.5 text-left text-xs transition-colors {conversation.session_id ===
+                  sessionId
+                    ? 'bg-blue-50 dark:bg-slate-700 font-semibold text-blue-700 dark:text-blue-300'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'}"
+                >
+                  {conversation.title || t("chat.untitledConversation")}
+                </button>
+                <button
+                  on:click={() => supprimerConversation(conversation)}
+                  data-testid="conversation-delete"
+                  aria-label="{t('chat.deleteConversation')} : {conversation.title ||
+                    t('chat.untitledConversation')}"
+                  class="shrink-0 rounded px-1.5 py-1 text-slate-400 transition-colors hover:text-red-600"
+                >
+                  <span class="material-icons text-sm" aria-hidden="true">delete_outline</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    </aside>
+  {/if}
+
+  <div class="min-w-0 flex-1">
   <div
     class="bg-white dark:bg-slate-800/50 rounded-2xl shadow-xl dark:shadow-none border border-gray-100 dark:border-slate-700/50 overflow-hidden"
   >
@@ -456,5 +672,16 @@
         </button>
       </div>
     </div>
+  </div>
+
+  {#if !$authStore.isAuthenticated}
+    <!-- L'invitation n'apparait qu'aux visiteurs anonymes : le chat reste
+         pleinement utilisable sans compte, le compte n'ajoute que la memoire. -->
+    <p class="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
+      <a href="/signup" data-testid="chat-signup-link" class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+        >{t("chat.signInToKeep")}</a
+      >
+    </p>
+  {/if}
   </div>
 </div>

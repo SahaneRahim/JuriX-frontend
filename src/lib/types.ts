@@ -436,3 +436,41 @@ export interface ComparisonResponse {
   retrieval_time_ms: number;
   generation_time_ms: number;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Conversations du chat — app/schemas/rag.py                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Une conversation dans le panneau latéral, SANS ses messages.
+ *
+ * Le détail complet passe par `ConversationDetail` : charger les messages dans
+ * la liste ferait transiter tout l'historique du compte à chaque ouverture du
+ * panneau.
+ *
+ * `title` est `null` pour les conversations antérieures à la colonne, et pour
+ * les conversations anonymes — mais celles-là n'apparaissent dans la liste de
+ * personne, puisqu'elles n'ont pas de propriétaire.
+ */
+export interface ConversationSummary {
+  session_id: string;
+  title: string | null;
+  persona: string;
+  language: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationMessage {
+  id: number;
+  /** `user` ou `assistant`. */
+  role: string;
+  content: string;
+  sources?: unknown[] | null;
+  confidence?: number | null;
+  created_at: string;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: ConversationMessage[];
+}

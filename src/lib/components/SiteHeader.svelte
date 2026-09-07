@@ -154,11 +154,14 @@
     </button>
 
     <!--
-      Le couple statique « Se connecter / S'inscrire » est remplacé par un bloc
-      réactif. `/signup` n'a jamais existé : `app/api/routes/auth.py` n'expose
-      que login, login/json, me et logout, et la page de connexion indique
-      elle-même que les comptes sont créés par un administrateur.
-      Au passage, c'est la première sortie de session hors de /admin.
+      Bloc réactif : « Se connecter / Créer un compte » quand la session est
+      vide, le nom de l'utilisateur et « Se déconnecter » sinon.
+
+      `/signup` existe désormais vraiment — `POST /api/v1/auth/signup` —, après
+      avoir été un lien mort que le spec `link-integrity` avait été écrit pour
+      attraper. Le nom affiché donne enfin un signe visible que la session est
+      ouverte : jusqu'ici, un utilisateur connecté ne voyait qu'un bouton de
+      déconnexion.
     -->
     <div class="flex items-center gap-3 ml-2">
       {#if $authStore.isAuthenticated}
@@ -166,6 +169,14 @@
           <a
             class="px-5 py-2 rounded-lg font-semibold text-sm transition-colors whitespace-nowrap bg-white text-blue-600 hover:bg-gray-50 border border-transparent shadow-sm dark:bg-white/5 dark:border-white/10 dark:text-blue-400 dark:hover:bg-white/10"
             href="/admin">{$tr("nav.admin")}</a
+          >
+        {/if}
+        {#if $authStore.user?.name || $authStore.user?.email}
+          <span
+            data-testid="user-name"
+            class="max-w-[10rem] truncate text-sm font-medium text-slate-600 dark:text-slate-300"
+            title={$authStore.user?.email}
+            >{$authStore.user?.name || $authStore.user?.email}</span
           >
         {/if}
         <button
@@ -176,8 +187,13 @@
         >
       {:else}
         <a
-          class="px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-lg whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
+          class="px-5 py-2 rounded-lg font-semibold text-sm transition-all whitespace-nowrap text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
           href="/login">{$tr("nav.login")}</a
+        >
+        <a
+          data-testid="nav-signup"
+          class="px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-lg whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
+          href="/signup">{$tr("nav.signup")}</a
         >
       {/if}
     </div>
@@ -274,11 +290,19 @@
           >
         </div>
       {:else}
-        <a
-          href="/login"
-          class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold"
-          >{$tr("nav.login")}</a
-        >
+        <div class="flex items-center gap-2">
+          <a
+            href="/login"
+            class="px-3 py-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300"
+            >{$tr("nav.login")}</a
+          >
+          <a
+            href="/signup"
+            data-testid="nav-signup-mobile"
+            class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold"
+            >{$tr("nav.signup")}</a
+          >
+        </div>
       {/if}
     </div>
   </div>

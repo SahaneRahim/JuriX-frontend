@@ -2,12 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { get } from 'svelte/store';
 import { language, t, translations, switchLanguage } from './language';
 
-// Mock browser environment
-vi.stubGlobal('localStorage', {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn()
-});
+// Pas de stub de localStorage ici : `src/tests/setup.ts` fournit desormais un
+// vrai stockage en memoire, vide entre chaque test. L'ancien stub rendait
+// `undefined` a toute lecture, ce qui masquait la persistance reelle de la
+// langue au lieu de la verifier.
 
 describe('language store', () => {
   beforeEach(() => {

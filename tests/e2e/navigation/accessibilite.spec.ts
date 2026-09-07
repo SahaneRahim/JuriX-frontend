@@ -27,6 +27,7 @@ const PAGES_PUBLIQUES = [
   '/search?q=loi',
   '/login',
   '/compare',
+  '/signup',
 ];
 
 test.describe('Structure des pages', () => {

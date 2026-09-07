@@ -7,6 +7,7 @@
   import { API_URL } from "$lib/api";
   // La page ne contenait aucun <a> : une fois arrivé dessus, il n'existait
   // aucun moyen de revenir au site autrement qu'en modifiant l'URL.
+  import BoutonGoogle from "$lib/components/BoutonGoogle.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { authStore } from "$lib/stores/auth";
@@ -56,6 +57,53 @@
     }
   });
 
+  /** Session ouverte, puis redirection selon le rôle. Partagée avec Google. */
+  async function ouvrirLaSession(data: {
+    id: number;
+    email: string;
+    role: "user" | "admin" | "superadmin";
+    full_name?: string | null;
+    username?: string;
+    access_token: string;
+  }) {
+    authStore.login(
+      {
+        id: data.id,
+        email: data.email,
+        role: data.role,
+        name: data.full_name || data.username,
+      },
+      data.access_token,
+    );
+    await goto(destinationFor(data.role), { replaceState: true });
+  }
+
+  async function connexionGoogle(evenement: CustomEvent<string>) {
+    error = "";
+    loading = true;
+    try {
+      const reponse = await fetch(`${API_URL}/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: evenement.detail }),
+      });
+      if (reponse.ok) {
+        await ouvrirLaSession(await reponse.json());
+        return;
+      }
+      // 503 = connexion Google non configurée, ou certificats Google
+      // injoignables : ce n'est pas l'utilisateur qui a échoué.
+      error =
+        reponse.status === 503
+          ? $tr("auth.googleUnavailable")
+          : $tr("auth.googleError");
+    } catch {
+      error = $tr("login.errorNetwork");
+    } finally {
+      loading = false;
+    }
+  }
+
   async function handleSubmit() {
     error = "";
     loading = true;
@@ -67,17 +115,7 @@
       });
 
       if (response.ok) {
-        const data = await response.json();
-        authStore.login(
-          {
-            id: data.id,
-            email: data.email,
-            role: data.role,
-            name: data.full_name || data.username,
-          },
-          data.access_token,
-        );
-        await goto(destinationFor(data.role), { replaceState: true });
+        await ouvrirLaSession(await response.json());
         return;
       }
 
@@ -112,7 +150,7 @@
          de quoi il s'agissait. -->
     <h1 class="mb-8 flex items-center justify-center gap-2 font-bold text-slate-900">
       <span class="text-3xl" aria-hidden="true">&#9878;</span>
-      <span class="text-xl">JuriX Admin</span>
+      <span class="text-xl">JuriX</span>
     </h1>
 
     <form on:submit|preventDefault={handleSubmit} class="space-y-5">
@@ -122,6 +160,7 @@
         </label>
         <input
           id="email"
+          data-testid="login-email"
           type="email"
           bind:value={email}
           required
@@ -137,6 +176,7 @@
         </label>
         <input
           id="password"
+          data-testid="login-password"
           type="password"
           bind:value={password}
           required
@@ -146,7 +186,7 @@
       </div>
 
       {#if error}
-        <p role="alert" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" data-testid="login-error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
       {/if}
@@ -154,14 +194,22 @@
       <button
         type="submit"
         disabled={loading}
+        data-testid="login-submit"
         class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? $tr("login.submitting") : $tr("login.submit")}
       </button>
     </form>
 
+    <div class="mt-6">
+      <BoutonGoogle on:credential={connexionGoogle} />
+    </div>
+
     <p class="mt-6 text-center text-xs text-slate-500">
-      {$tr("login.accountsNote")}
+      {$tr("login.noAccount")}
+      <a href="/signup" data-testid="login-to-signup" class="font-medium text-blue-600 hover:underline"
+        >{$tr("signup.submit")}</a
+      >
     </p>
   </div>
 </div>

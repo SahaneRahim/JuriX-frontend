@@ -1,6 +1,7 @@
 import { get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { API_URL } from '$lib/api';
+import { effacerSessionChat } from '$lib/chat-session';
 
 /**
  * Rôles reconnus par le backend.
@@ -106,6 +107,11 @@ function createAuthStore() {
 
     // Login action
     login: (user: User, token: string) => {
+      // La conversation en cours appartenait a la session precedente —
+      // anonyme, ou celle d'un autre compte sur le meme navigateur. La garder
+      // ferait repondre 404 a chaque question, le serveur refusant desormais
+      // le session_id d'autrui.
+      effacerSessionChat();
       if (browser) {
         localStorage.setItem(TOKEN_STORAGE_KEY, token);
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
@@ -126,6 +132,9 @@ function createAuthStore() {
       // part en arriere-plan, avec le jeton encore en main, et son echec est
       // sans consequence.
       const jeton = get({ subscribe })?.token;
+      // Meme raison qu'a la connexion : le fil ne doit pas survivre au
+      // changement de session.
+      effacerSessionChat();
       if (browser && jeton) {
         fetch(`${API_URL}/auth/logout`, {
           method: 'POST',

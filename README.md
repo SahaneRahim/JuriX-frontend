@@ -67,9 +67,11 @@ src/routes/
   laws/           liste et lecture des documents, explication d'un article par l'IA
   categories/[id] documents d'un domaine juridique
   search/         résultats de recherche, titres puis mentions dans le texte
+  signup/         création de compte (nom, adresse, mot de passe, ou Google)
   compare/        comparaison de deux régimes, grille sourcée cellule par cellule
   admin/          tableau de bord, documents, import en masse, comptes
 tests/e2e/        playwright : navigation, accessibilité, backend indisponible,
+                  inscription, conversations enregistrées,
                   explication d'article, comparaison (appel Gemini intercepté)
 ```
 

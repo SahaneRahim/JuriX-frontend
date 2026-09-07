@@ -23,7 +23,7 @@ import { NAV_LINKS } from '../../../src/lib/nav';
 const API = process.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /** Pages publiques sans paramètre, toujours testables. */
-const STATIC_PAGES = ['/', '/chat', '/laws', '/about', '/search?q=loi', '/login'];
+const STATIC_PAGES = ['/', '/chat', '/laws', '/about', '/search?q=loi', '/login', '/signup'];
 
 /**
  * Un href est-il interne au site ?
@@ -235,7 +235,7 @@ test.describe('Contenu rendu par le serveur', () => {
   });
 
   test('les pages sans valeur d’index portent noindex, et les autres non', async ({ request }) => {
-    for (const chemin of ['/search?q=loi', '/chat', '/login', '/admin']) {
+    for (const chemin of ['/search?q=loi', '/chat', '/login', '/signup', '/admin']) {
       const html = await (await request.get(chemin)).text();
       expect(html, `${chemin} devrait être en noindex`).toMatch(
         /<meta[^>]+name="robots"[^>]+content="noindex, follow"/,

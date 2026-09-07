@@ -9,27 +9,38 @@ if (!global.window) {
   global.window = {} as unknown as Window & typeof globalThis;
 }
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-// `as unknown as Storage` et non `as any` : le double cast dit exactement ce
-// qu'on affirme — cet objet TIENT LIEU de Storage sans en implementer toute la
-// surface (`length`, `key()`). `any` desactivait le controle sur la ligne
-// entiere, y compris sur le nom de la globale.
-global.localStorage = localStorageMock as unknown as Storage;
+// Stockage local et de session : une VRAIE implementation en memoire.
+//
+// C'etaient auparavant quatre `vi.fn()` sans corps. `getItem` rendait donc
+// toujours `undefined`, quoi qu'on ait ecrit — et tout test qui ecrivait puis
+// relisait passait sans rien prouver. Un test de persistance de session
+// affirmant `toBeNull()` apres un `setItem` etait vert, alors que le code
+// aurait pu ne rien enregistrer du tout.
+//
+// Un stockage qui avale les ecritures est pire qu'aucun stockage : il rend les
+// tests optimistes en silence.
+function stockageEnMemoire(): Storage {
+  let donnees: Record<string, string> = {};
+  return {
+    getItem: (cle: string) => (cle in donnees ? donnees[cle] : null),
+    setItem: (cle: string, valeur: string) => {
+      donnees[cle] = String(valeur);
+    },
+    removeItem: (cle: string) => {
+      delete donnees[cle];
+    },
+    clear: () => {
+      donnees = {};
+    },
+    key: (index: number) => Object.keys(donnees)[index] ?? null,
+    get length() {
+      return Object.keys(donnees).length;
+    },
+  } as Storage;
+}
 
-// Mock sessionStorage
-const sessionStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-global.sessionStorage = sessionStorageMock as unknown as Storage;
+global.localStorage = stockageEnMemoire();
+global.sessionStorage = stockageEnMemoire();
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -46,12 +57,11 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Reset mocks before each test
+// Isolation entre tests : vider le stockage, plutot que remettre a zero des
+// compteurs d'appels qui n'existent plus.
 beforeEach(() => {
-  localStorageMock.getItem.mockClear();
-  localStorageMock.setItem.mockClear();
-  localStorageMock.removeItem.mockClear();
-  sessionStorageMock.getItem.mockClear();
-  sessionStorageMock.setItem.mockClear();
-  sessionStorageMock.removeItem.mockClear();
+  // Appels optionnels : un test peut remplacer la globale par son propre
+  // stub, qui ne porte pas forcement toute la surface de Storage.
+  localStorage?.clear?.();
+  sessionStorage?.clear?.();
 });
