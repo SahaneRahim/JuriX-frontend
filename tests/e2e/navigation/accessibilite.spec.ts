@@ -28,6 +28,16 @@ const PAGES_PUBLIQUES = [
   '/login',
   '/compare',
   '/signup',
+  // Les trois pages de recuperation de compte. Les deux dernieres sont
+  // visitees avec un jeton bidon : elles sont donc balayees DANS LEUR ETAT
+  // D'ERREUR, qui est justement celui qu'on oublie de rendre accessible.
+  '/forgot-password',
+  '/reset-password/jeton-invalide-pour-le-test',
+  '/verify-email/jeton-invalide-pour-le-test',
+  // Les atterrissages sans jeton, ou les pages a jeton reecrivent l'URL. Sans
+  // eux, un rechargement apres usage d'un lien de courriel tombait sur une 404.
+  '/reset-password',
+  '/verify-email',
 ];
 
 test.describe('Structure des pages', () => {

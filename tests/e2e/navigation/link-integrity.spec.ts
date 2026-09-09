@@ -23,7 +23,18 @@ import { NAV_LINKS } from '../../../src/lib/nav';
 const API = process.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /** Pages publiques sans paramètre, toujours testables. */
-const STATIC_PAGES = ['/', '/chat', '/laws', '/about', '/search?q=loi', '/login', '/signup'];
+const STATIC_PAGES = [
+  '/',
+  '/chat',
+  '/laws',
+  '/about',
+  '/search?q=loi',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+];
 
 /**
  * Un href est-il interne au site ?

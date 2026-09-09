@@ -201,6 +201,17 @@
       </button>
     </form>
 
+    <!-- Le lien n'existait pas, et c'était volontaire : sans envoi d'e-mail,
+         il n'aurait mené nulle part, ce qui est pire que son absence. Il
+         apparaît maintenant que la réinitialisation existe réellement. -->
+    <p class="mt-4 text-center text-xs">
+      <a
+        href="/forgot-password"
+        data-testid="login-to-forgot"
+        class="font-medium text-blue-600 hover:underline">{$tr("login.forgotPassword")}</a
+      >
+    </p>
+
     <div class="mt-6">
       <BoutonGoogle on:credential={connexionGoogle} />
     </div>
