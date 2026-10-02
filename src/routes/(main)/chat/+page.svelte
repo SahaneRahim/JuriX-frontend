@@ -10,6 +10,7 @@
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { formatHeure } from "$lib/format";
+  import { blocsDeReponse } from "$lib/texte";
   import { language, tr } from "$lib/stores/language";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
 
@@ -541,11 +542,34 @@
               </div>
             {:else}
               <div class="space-y-3">
-                <p
-                  class="text-slate-700 dark:text-slate-200 leading-relaxed text-left"
+                <!--
+                  Rendu en NOEUDS Svelte, donc echappe par construction. Le
+                  prompt systeme du backend demande du markdown ; `{message.content}`
+                  l'affichait tel quel, astérisques comprises — c'est ce que
+                  montrait la capture « **Réponse directe** ». `blocsDeReponse`
+                  le reconnait ici plutot que de passer par `{@html}`, que ce
+                  depot s'interdit (voir la docstring de $lib/texte.ts). Meme
+                  motif que src/routes/laws/[id]/+page.svelte.
+                -->
+                <div
+                  class="space-y-3 text-slate-700 dark:text-slate-200 leading-relaxed text-left"
                 >
-                  {message.content}
-                </p>
+                  {#each blocsDeReponse(message.content) as bloc}
+                    {#if bloc.type === "titre"}
+                      <h5 class="font-bold text-slate-900 dark:text-white pt-1">
+                        {bloc.texte}
+                      </h5>
+                    {:else if bloc.type === "puce"}
+                      <p
+                        class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:text-blue-600 dark:before:text-blue-400"
+                      >
+                        {bloc.texte}
+                      </p>
+                    {:else}
+                      <p>{bloc.texte}</p>
+                    {/if}
+                  {/each}
+                </div>
 
                 {#if message.sources && message.sources.length > 0}
                   <div
