@@ -11,6 +11,7 @@
   import { onMount, tick } from "svelte";
   import { formatHeure } from "$lib/format";
   import { blocsDeReponse } from "$lib/texte";
+  import { lireEvenements } from "$lib/flux";
   import { language, tr } from "$lib/stores/language";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
 
@@ -230,7 +231,10 @@
       // `apiFetch` et non `fetch` : le jeton part enfin avec la question — ce
       // qui rattache la conversation au compte — et le 401 est traité au même
       // endroit que partout ailleurs dans l'application.
-      const response = await apiFetch("/rag/ask", {
+      // En FLUX : les premiers mots s'affichent pendant que le modèle écrit
+      // la suite. `/rag/ask` ne rendait rien avant la fin, soit une dizaine
+      // de secondes d'écran figé, parfois plus de trente.
+      const response = await apiFetch("/rag/ask/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -247,27 +251,7 @@
       });
 
       if (response.ok) {
-        const data = await response.json();
-        if (data.session_id) {
-          const conversationNeuve = data.session_id !== sessionId;
-          sessionId = data.session_id;
-          ecrireSessionChat(sessionId);
-          // Le titre est écrit par le serveur à la première interaction : la
-          // liste n'a de nouveau à montrer qu'à ce moment-là.
-          if (conversationNeuve) chargerConversations();
-        }
-        const aiMessage: ChatMessage = {
-          id: chatMessages.length + 1,
-          type: "assistant",
-          content:
-            data.answer ||
-            ($language.current === "fr"
-              ? "Je n'ai pas pu traiter votre demande."
-              : "I couldn't process your request."),
-          sources: data.sources || [],
-          timestamp: getCurrentTime(),
-        };
-        chatMessages = [...chatMessages, aiMessage];
+        await lireLaReponse(response);
       } else {
         if (response.status === 404) {
           // Conversation supprimée, ou devenue celle d'un autre compte après
@@ -309,6 +293,113 @@
     } finally {
       isTyping = false;
       await scrollToBottom();
+    }
+  }
+
+  /** Message d'erreur affiché pour un `error_code` du flux. */
+  function messageDErreur(code?: string): string {
+    return code === "quota"
+      ? t("chat.errorQuota")
+      : code === "overloaded"
+        ? t("chat.errorOverloaded")
+        : t("chat.errorServer");
+  }
+
+  /**
+   * Affiche la réponse au fil de l'eau.
+   *
+   * La bulle de l'assistant n'apparaît qu'au premier morceau de texte :
+   * jusque-là, l'indicateur de saisie reste à l'écran. Le dernier événement
+   * porte les sources et l'identifiant de conversation. Une panne pendant le
+   * flux arrive comme un événement (le statut HTTP est déjà parti en 200) ;
+   * le texte déjà reçu reste affiché, l'erreur s'ajoute dessous.
+   */
+  async function lireLaReponse(response: Response) {
+    let idReponse: number | null = null;
+    let termine = false;
+
+    const ajouterAuMessage = (champs: Partial<ChatMessage>) => {
+      chatMessages = chatMessages.map((m) => (m.id === idReponse ? { ...m, ...champs } : m));
+    };
+
+    for await (const evenement of lireEvenements(response)) {
+      if (evenement.error) {
+        chatMessages = [
+          ...chatMessages,
+          {
+            id: chatMessages.length + 1,
+            type: "error",
+            content: messageDErreur(evenement.error_code),
+            timestamp: getCurrentTime(),
+          },
+        ];
+        termine = true;
+        break;
+      }
+
+      if (evenement.chunk) {
+        if (idReponse === null) {
+          idReponse = chatMessages.length + 1;
+          isTyping = false;
+          chatMessages = [
+            ...chatMessages,
+            {
+              id: idReponse,
+              type: "assistant",
+              content: evenement.chunk,
+              sources: [],
+              timestamp: getCurrentTime(),
+            },
+          ];
+        } else {
+          const actuel = chatMessages.find((m) => m.id === idReponse);
+          ajouterAuMessage({ content: (actuel?.content ?? "") + evenement.chunk });
+        }
+        await scrollToBottom();
+      }
+
+      if (evenement.done) {
+        termine = true;
+        if (idReponse === null) {
+          // Fin sans aucun texte : une réponse vide reste signalée
+          idReponse = chatMessages.length + 1;
+          chatMessages = [
+            ...chatMessages,
+            {
+              id: idReponse,
+              type: "assistant",
+              content:
+                $language.current === "fr"
+                  ? "Je n'ai pas pu traiter votre demande."
+                  : "I couldn't process your request.",
+              timestamp: getCurrentTime(),
+            },
+          ];
+        }
+        ajouterAuMessage({ sources: (evenement.sources ?? []) as ChatMessage["sources"] });
+        if (evenement.session_id) {
+          const conversationNeuve = evenement.session_id !== sessionId;
+          sessionId = evenement.session_id;
+          ecrireSessionChat(sessionId);
+          // Le titre est écrit par le serveur à la première interaction : la
+          // liste n'a de nouveau à montrer qu'à ce moment-là.
+          if (conversationNeuve) chargerConversations();
+        }
+        break;
+      }
+    }
+
+    // Flux interrompu avant sa fin (réseau, serveur arrêté)
+    if (!termine) {
+      chatMessages = [
+        ...chatMessages,
+        {
+          id: chatMessages.length + 1,
+          type: "error",
+          content: t("chat.errorNetwork"),
+          timestamp: getCurrentTime(),
+        },
+      ];
     }
   }
 

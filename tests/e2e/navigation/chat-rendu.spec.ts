@@ -17,21 +17,23 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-const REPONSE_DE_BASE = {
-  session_id: 'sid-rendu',
-  confidence: 1,
-  retrieval_time_ms: 0,
-  generation_time_ms: 10,
-  total_time_ms: 10,
-  persona: 'citoyen',
-};
-
+/**
+ * Le chat lit la réponse EN FLUX (`/rag/ask/stream`, événements SSE) : le
+ * texte arrive en plusieurs morceaux, le dernier événement porte les sources.
+ */
 async function repondre(page: Page, corps: Record<string, unknown>) {
-  await page.route('**/api/v1/rag/ask', (route) =>
+  const { answer, sources, intent } = corps as { answer: string; sources: unknown[]; intent: string };
+  const moitie = Math.floor(answer.length / 2);
+  const evenements = [
+    { chunk: answer.slice(0, moitie), done: false },
+    { chunk: answer.slice(moitie), done: false },
+    { chunk: '', done: true, sources, intent, confidence: 1, session_id: 'sid-rendu' },
+  ];
+  await page.route('**/api/v1/rag/ask/stream', (route) =>
     route.fulfill({
       status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ...REPONSE_DE_BASE, ...corps }),
+      contentType: 'text/event-stream',
+      body: evenements.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(''),
     }),
   );
 }
@@ -91,7 +93,6 @@ test.describe('Rendu des réponses du chat', () => {
         },
       ],
       intent: 'juridique',
-      retrieval_time_ms: 180,
     });
 
     await poser(page, 'quelle est la durée du permis de recherche ?');
@@ -99,5 +100,20 @@ test.describe('Rendu des réponses du chat', () => {
     const journal = page.getByRole('log');
     await expect(journal.getByText('Sources', { exact: true })).toBeVisible();
     await expect(journal.locator('a[href*="/laws/42"]')).toBeVisible();
+  });
+
+  test('une panne en cours de flux s’affiche en erreur, sans fausse réponse', async ({ page }) => {
+    await page.route('**/api/v1/rag/ask/stream', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: `data: ${JSON.stringify({ chunk: '', done: true, error: 'quota', error_code: 'quota' })}\n\n`,
+      }),
+    );
+
+    await poser(page, 'quelle est la durée du permis de recherche ?');
+
+    await expect(page.getByTestId('chat-error')).toBeVisible();
+    await expect(page.getByTestId('chat-error')).toContainText('quota');
   });
 });
