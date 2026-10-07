@@ -26,59 +26,59 @@ interface Traduction {
 const EN: Record<string, Traduction> = {
   'droit constitutionnel': {
     name: 'Constitutional Law',
-    description: 'Constitution, institutions and elections',
+    description: 'Constitution, institutions, elections and public powers',
   },
   'droit administratif': {
     name: 'Administrative Law',
-    description: 'Organisation and operation of public services',
+    description: 'Organisation and operation of public services and local authorities',
   },
   'fonction publique': {
     name: 'Civil Service',
-    description: 'Status of public servants, careers and honours',
+    description: 'Status of public servants, careers, appointments and honours',
   },
   'droit international': {
     name: 'International Law',
-    description: 'Ratified treaties, conventions and agreements',
+    description: 'Ratified treaties, conventions and bilateral agreements',
   },
   'finances publiques et fiscalité': {
     name: 'Public Finance and Taxation',
-    description: 'State budget, taxes, customs and borrowing',
+    description: 'State budget, taxation, customs, public loans and financing',
   },
-  'droit pénal': {
-    name: 'Criminal Law',
-    description: 'Offences and penalties',
+  'droit pénal et procédure pénale': {
+    name: 'Criminal Law and Criminal Procedure',
+    description: 'Offences, penalties, prosecutions and military justice',
   },
-  'procédure pénale': {
-    name: 'Criminal Procedure',
-    description: 'Investigation, prosecution and judgment in criminal matters',
+  'droit civil et procédure civile': {
+    name: 'Civil Law and Civil Procedure',
+    description: 'Persons, obligations, contracts, civil proceedings and enforcement',
   },
-  'droit civil': {
-    name: 'Civil Law',
-    description: 'Persons, property, obligations and contracts',
-  },
-  'procédure civile': {
-    name: 'Civil Procedure',
-    description: 'Civil proceedings and enforcement',
-  },
-  'droit de la famille': {
-    name: 'Family Law',
-    description: 'Marriage, filiation, succession and civil status',
+  'droit des personnes, de la famille et état civil': {
+    name: 'Law of Persons, Family and Civil Status',
+    description: 'Marriage, filiation, succession, civil status, national ID and nationality',
   },
   'droit du travail et sécurité sociale': {
     name: 'Labour Law and Social Security',
-    description: 'Employment relations and social welfare',
+    description: 'Employment relations, collective agreements, trade unions and social security',
   },
-  'droit des affaires et ohada': {
-    name: 'Business Law and OHADA',
-    description: 'Companies, commerce and OHADA uniform acts',
+  'droit des affaires, banque et ohada': {
+    name: 'Business Law, Banking and OHADA',
+    description: 'Companies, commerce, banking secrecy, public procurement and OHADA law',
   },
   'droit foncier et domanial': {
     name: 'Land and State Property Law',
-    description: 'State domain, land titles and expropriation',
+    description: 'State domain, land titles, expropriation and cadastre',
   },
   "droit de l'environnement et des ressources naturelles": {
     name: 'Environmental and Natural Resources Law',
-    description: 'Environment, mining, forests, water and hydrocarbons',
+    description: 'Environment, mining, forests, water, hydrocarbons and biodiversity',
+  },
+  'santé publique et sécurité sanitaire': {
+    name: 'Public Health and Health Safety',
+    description: 'Public health, medicine, pharmacy, health safety and radiological security',
+  },
+  'éducation, recherche, culture et médias': {
+    name: 'Education, Research, Culture and Media',
+    description: 'Education, universities, research, culture, heritage, media and official languages',
   },
 };
 

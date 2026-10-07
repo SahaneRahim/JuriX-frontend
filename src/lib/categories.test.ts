@@ -14,12 +14,12 @@ describe('categories', () => {
   });
 
   it('traduit un nom en anglais, insensible a la casse', () => {
-    expect(nomCategorie('Droit Pénal', 'en')).toBe('Criminal Law');
-    expect(nomCategorie('DROIT PÉNAL', 'en')).toBe('Criminal Law');
+    expect(nomCategorie('Droit Pénal et Procédure Pénale', 'en')).toBe('Criminal Law and Criminal Procedure');
+    expect(nomCategorie('DROIT PÉNAL ET PROCÉDURE PÉNALE', 'en')).toBe('Criminal Law and Criminal Procedure');
   });
 
   it('rend le nom francais tel quel en francais', () => {
-    expect(nomCategorie('Droit Pénal', 'fr')).toBe('Droit Pénal');
+    expect(nomCategorie('Droit Pénal et Procédure Pénale', 'fr')).toBe('Droit Pénal et Procédure Pénale');
   });
 
   it('rend un nom inconnu tel quel plutot que rien', () => {
@@ -28,10 +28,10 @@ describe('categories', () => {
   });
 
   it('prefere la traduction a la description en base, et retombe dessus sinon', () => {
-    expect(descriptionCategorie('Droit Civil', 'Personnes, biens…', 'en')).toBe(
-      'Persons, property, obligations and contracts',
+    expect(descriptionCategorie('Droit Civil et Procédure Civile', 'Personnes, biens…', 'en')).toBe(
+      'Persons, obligations, contracts, civil proceedings and enforcement',
     );
-    expect(descriptionCategorie('Droit Civil', 'Personnes, biens…', 'fr')).toBe('Personnes, biens…');
+    expect(descriptionCategorie('Droit Civil et Procédure Civile', 'Personnes, biens…', 'fr')).toBe('Personnes, biens…');
     expect(descriptionCategorie('Droit Spatial', 'Orbites', 'en')).toBe('Orbites');
     expect(descriptionCategorie('Droit Spatial', null, 'en')).toBe('');
   });
