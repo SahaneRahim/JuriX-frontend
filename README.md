@@ -1,7 +1,7 @@
 # JuriX — interface
 
 SvelteKit 2 (syntaxe Svelte 4 sur moteur Svelte 5), TypeScript strict, Tailwind,
-déploiement Vercel. L'interface d'une plateforme de recherche dans le droit
+site statique (adapter-static). L'interface d'une plateforme de recherche dans le droit
 camerounais : recherche plein texte et sémantique, lecture de documents,
 assistant conversationnel, administration du corpus.
 
@@ -21,6 +21,22 @@ Le backend doit tourner en parallèle — voir le README de `JuriX-backend-main`
 Sans lui, l'interface s'affiche et annonce l'indisponibilité plutôt que de
 présenter des listes vides comme des résultats ; trois tests e2e vérifient
 précisément ce comportement.
+
+## Construire pour la production
+
+Le front est un **site statique** : aucune page n'a de code serveur, tout passe
+par l'API. `npm run build` rend le dossier `build/`, que n'importe quel serveur
+web sert tel quel, à une condition : renvoyer `index.html` pour toute route
+inconnue, sans quoi un lien profond (`/laws/123`) répond 404.
+
+```bash
+VITE_API_URL=https://jurix.exemple.cm npm run build     # dossier build/
+```
+
+`VITE_API_URL` est **figée au build**. En production, le front et l'API sont
+servis sous le même domaine, par la même VM (voir `deploiement/oracle` dans le
+dépôt backend) : l'API répond sous `/api/v1`, d'où une seule URL, et aucun
+CORS.
 
 ## Vérifier
 
