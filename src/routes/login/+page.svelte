@@ -11,6 +11,7 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { authStore } from "$lib/stores/auth";
+  import { reconcilierPersonaALaConnexion } from "$lib/persona-compte";
   import { tr } from "$lib/stores/language";
   import "../../app.css";
 
@@ -65,6 +66,7 @@
     full_name?: string | null;
     username?: string;
     access_token: string;
+    persona?: string | null;
   }) {
     authStore.login(
       {
@@ -75,6 +77,8 @@
       },
       data.access_token,
     );
+    // Le profil enregistré sur le compte l'emporte sur celui du navigateur.
+    reconcilierPersonaALaConnexion(data);
     await goto(destinationFor(data.role), { replaceState: true });
   }
 
