@@ -53,6 +53,31 @@ describe('blocsDeReponse', () => {
     ]);
   });
 
+  it('garde le numero des listes numerotees', () => {
+    // Les profils avocat et etudiant demandent des listes numerotees : le
+    // numero etait reconnu puis jete, et l'ordre des etapes se perdait.
+    const blocs = blocsDeReponse('1. Premier\n2) Second\n- Puce');
+
+    expect(blocs).toEqual([
+      { type: 'puce', texte: 'Premier', numero: 1 },
+      { type: 'puce', texte: 'Second', numero: 2 },
+      { type: 'puce', texte: 'Puce' },
+    ]);
+    expect('numero' in blocs[2]).toBe(false);
+  });
+
+  it('assemble une reponse du profil avocat', () => {
+    const blocs = blocsDeReponse(
+      "**Conditions**\n1. Une infraction prevue par l'article 318 du Code Penal\n2. Un prejudice",
+    );
+
+    expect(blocs.map((b) => [b.type, b.numero])).toEqual([
+      ['titre', undefined],
+      ['puce', 1],
+      ['puce', 2],
+    ]);
+  });
+
   it('retire l emphase a l interieur d une ligne', () => {
     const blocs = blocsDeReponse("Selon l'**article 35**, toute _transaction_ est soumise.");
 

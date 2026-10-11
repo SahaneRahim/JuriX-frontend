@@ -30,6 +30,16 @@ export interface Bloc {
   type: TypeDeBloc;
   /** Texte déjà débarrassé de ses marqueurs. Rendu en nœud de texte. */
   texte: string;
+  /**
+   * Numéro d'une puce de liste numérotée (« 1. », « 2) »), tel qu'écrit.
+   *
+   * Les profils avocat et étudiant du backend demandent des listes numérotées
+   * (`app/services/prompts.py`) : la puce reconnaissait le numéro puis le
+   * jetait, et le chat posait « • » à la place — l'ordre des étapes se
+   * perdait. Le bloc reste de type `puce`, ce qui laisse intacts les
+   * affichages qui ne connaissent pas ce champ (explication d'article).
+   */
+  numero?: number;
 }
 
 /** Une ligne entièrement entre `**` ou `__` : un titre de section. */
@@ -116,7 +126,14 @@ export function blocsDeReponse(texte: string): Bloc[] {
     if (puce) {
       viderParagraphe();
       const t = sansEmphase(puce[2]);
-      if (t) blocs.push({ type: 'puce', texte: t });
+      const chiffres = /^\d+/.exec(puce[1]);
+      if (t) {
+        blocs.push(
+          chiffres
+            ? { type: 'puce', texte: t, numero: Number(chiffres[0]) }
+            : { type: 'puce', texte: t },
+        );
+      }
       continue;
     }
 

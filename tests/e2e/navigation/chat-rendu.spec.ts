@@ -63,6 +63,21 @@ test.describe('Rendu des réponses du chat', () => {
     await expect(journal.getByText('premier point')).toBeVisible();
   });
 
+  test('les listes numérotées gardent leur numéro', async ({ page }) => {
+    // Profils avocat et étudiant : l'ordre des étapes compte.
+    await repondre(page, {
+      answer: '1. premier point\n2. second point',
+      sources: [],
+      intent: 'juridique',
+    });
+
+    await poser(page, 'quelles sont les étapes ?');
+
+    const journal = page.getByRole('log');
+    await expect(journal.getByText('second point')).toBeVisible();
+    await expect(journal).toContainText('2.');
+  });
+
   test('une réponse conversationnelle n’affiche aucune source', async ({ page }) => {
     await repondre(page, {
       answer:

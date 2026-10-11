@@ -650,6 +650,16 @@
                       <h5 class="font-bold text-slate-900 dark:text-white pt-1">
                         {bloc.texte}
                       </h5>
+                    {:else if bloc.type === "puce" && bloc.numero !== undefined}
+                      <!-- Le numero est du texte reel, lu par les lecteurs
+                           d'ecran, et non un `content:` CSS. -->
+                      <p class="pl-7 relative">
+                        <span
+                          class="absolute left-0 w-6 text-right font-semibold text-blue-600 dark:text-blue-400"
+                          >{bloc.numero}.</span
+                        >
+                        {bloc.texte}
+                      </p>
                     {:else if bloc.type === "puce"}
                       <p
                         class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:text-blue-600 dark:before:text-blue-400"
