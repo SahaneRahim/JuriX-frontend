@@ -4,6 +4,8 @@
   import { onMount } from "svelte";
   import { formatDate } from "$lib/format";
   import { language, tr } from "$lib/stores/language";
+  import { PERSONA_ICONE, PERSONA_SLUG } from "$lib/stores/persona";
+  import { repartitionParProfil } from "$lib/repartition-profils";
   import type { AnalyticsOverview, AnalyticsSearch, AnalyticsUsage, Law } from '$lib/types';
 
 let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws: 0 };
@@ -77,6 +79,15 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
   }
 
   onMount(loadStats);
+
+  // Conversations par profil, sur la fenetre de `/analytics/usage`. La ligne
+  // « Profil general » compte les refus de la question du profil, et ceux
+  // qui ont choisi ce profil depuis l'en-tete.
+  $: lignesProfils = repartitionParProfil(usage.personas_usage);
+  $: pourcentage = new Intl.NumberFormat($language.current, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
 </script>
 
 <div class="mb-8 flex items-center justify-between">
@@ -242,4 +253,51 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
       </a>
     </div>
   </div>
+
+  <section
+    class="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+    aria-labelledby="admin-profils-titre"
+    data-testid="admin-profils"
+  >
+    <div class="mb-6 flex items-center justify-between">
+      <h3 id="admin-profils-titre" class="font-bold text-slate-900">
+        {$tr("admin.personasTitle")}
+      </h3>
+      <span class="text-sm text-slate-500"
+        >{$tr("admin.lastDays").replace("{n}", String(usage.window_days ?? 7))}</span
+      >
+    </div>
+    {#if lignesProfils.length > 0}
+      <ul class="space-y-4">
+        {#each lignesProfils as ligne (ligne.cle)}
+          <li data-testid="admin-profil" data-profil={ligne.profil ?? ligne.cle}>
+            <div class="mb-1 flex items-center justify-between gap-4 text-sm">
+              <span class="flex items-center gap-2 font-medium text-slate-700">
+                <span class="material-icons text-base text-slate-400" aria-hidden="true"
+                  >{ligne.profil ? PERSONA_ICONE[ligne.profil] : "help_outline"}</span
+                >
+                {ligne.profil === "general"
+                  ? $tr("persona.general")
+                  : ligne.profil
+                    ? $tr(`persona.${PERSONA_SLUG[ligne.profil]}.nom`)
+                    : ligne.cle}
+              </span>
+              <span class="tabular-nums text-slate-600"
+                >{ligne.conversations} · {pourcentage.format(ligne.part)}</span
+              >
+            </div>
+            <div class="h-2 rounded-full bg-slate-100" aria-hidden="true">
+              <div
+                class="h-2 rounded-full bg-blue-500"
+                style="width: {Math.max(ligne.part * 100, 1)}%"
+              ></div>
+            </div>
+          </li>
+        {/each}
+      </ul>
+      <p class="mt-4 text-xs text-slate-500">{$tr("admin.personasNote")}</p>
+    {:else}
+      <p class="py-6 text-center text-sm text-slate-500">{$tr("admin.personasEmpty")}</p>
+    {/if}
+  </section>
 {/if}

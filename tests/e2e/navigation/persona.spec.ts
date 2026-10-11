@@ -77,11 +77,14 @@ function jetonValide(): string {
 }
 
 /** Une session ouverte, posée avant chaque chargement de page. */
-async function connecte(page: Page) {
-  await page.addInitScript((jeton) => {
-    localStorage.setItem('jurix-auth-token', jeton);
-    localStorage.setItem('jurix-auth-user', JSON.stringify({ id: 7, email: 'rahim@jurix.cm', role: 'user' }));
-  }, jetonValide());
+async function connecte(page: Page, role = 'user') {
+  await page.addInitScript(
+    ({ jeton, role }) => {
+      localStorage.setItem('jurix-auth-token', jeton);
+      localStorage.setItem('jurix-auth-user', JSON.stringify({ id: 7, email: 'rahim@jurix.cm', role }));
+    },
+    { jeton: jetonValide(), role },
+  );
 }
 
 test.describe('Le chat suit le profil', () => {
@@ -363,5 +366,43 @@ test.describe('Le profil suit le compte', () => {
 
     await expect.poll(() => envois.length).toBe(1);
     expect(envois[0]).toEqual({ persona: 'avocat' });
+  });
+});
+
+test.describe('Le tableau de bord', () => {
+  test('compte les conversations par profil, profil général compris', async ({ page }) => {
+    await connecte(page, 'admin');
+    const reponses: Record<string, unknown> = {
+      '/analytics/overview': { total_laws: 0, by_language: {}, recent_laws: 0 },
+      '/analytics/usage': {
+        window_days: 7, conversations: 4, questions_asked: 0, answers_generated: 0,
+        searches: 0, active_users: 1, median_answer_time_ms: 0,
+        // « étudiant » en NFD, comme une ligne écrite avant la normalisation.
+        personas_usage: { avocat: 2, general: 1, 'e\u0301tudiant': 1 },
+      },
+      '/analytics/search': {
+        window_days: 7, total_searches: 0, median_response_time_ms: 0,
+        p95_response_time_ms: 0, max_response_time_ms: 0, cache_hit_rate_percent: 0,
+      },
+      '/laws/': [],
+      '/auth/me': { persona: null },
+    };
+    await page.route('**/api/v1/**', (route) => {
+      const chemin = new URL(route.request().url()).pathname.replace(/^.*\/api\/v1/, '');
+      const corps = reponses[chemin];
+      return corps === undefined
+        ? route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
+        : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) });
+    });
+
+    await page.goto('/admin');
+
+    const lignes = page.getByTestId('admin-profil');
+    await expect(lignes).toHaveCount(3);
+    await expect(lignes.nth(0)).toHaveAttribute('data-profil', 'avocat');
+    await expect(lignes.nth(0)).toContainText('50');
+    await expect(lignes.nth(1)).toHaveAttribute('data-profil', 'étudiant');
+    await expect(lignes.nth(2)).toContainText('Profil général');
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
   });
 });
