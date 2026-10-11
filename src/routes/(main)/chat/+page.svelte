@@ -11,6 +11,7 @@
     PERSONA_SLUG,
     champPersona,
     normaliserPersona,
+    ouvrirChoixPersona,
     personaDeLaSessionMemorisee,
     personaStore,
     type Persona,
@@ -649,6 +650,14 @@
           >{PERSONA_ICONE[personaAffiche ?? "general"]}</span
         >
         <span>{t("persona.chatLabel")} : <strong>{nomDuProfil}</strong></span>
+        <button
+          type="button"
+          data-testid="chat-persona-change"
+          aria-haspopup="dialog"
+          on:click={ouvrirChoixPersona}
+          class="rounded-md px-2 py-0.5 font-semibold text-blue-700 underline hover:no-underline dark:text-blue-300"
+          >{t("persona.change")}</button
+        >
       </div>
     </div>
 

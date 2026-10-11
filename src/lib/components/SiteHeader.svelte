@@ -18,6 +18,12 @@
   import { authStore } from "$lib/stores/auth";
   import { language, switchLanguage, tr } from "$lib/stores/language";
   import { themeStore } from "$lib/stores/theme";
+  import {
+    PERSONA_ICONE,
+    PERSONA_SLUG,
+    ouvrirChoixPersona,
+    personaStore,
+  } from "$lib/stores/persona";
 
   /**
    * `transparent` pour le groupe (main), dont le header flotte au-dessus du
@@ -48,6 +54,11 @@
   function onKeydown(event: KeyboardEvent) {
     if (mobileOpen && event.key === "Escape") mobileOpen = false;
   }
+
+  $: nomDuProfil = $personaStore.persona
+    ? $tr(`persona.${PERSONA_SLUG[$personaStore.persona]}.nom`)
+    : $tr("persona.general");
+  $: libelleDuProfil = $tr("persona.toggleLabel").replace("{persona}", nomDuProfil);
 
   function logout() {
     authStore.logout();
@@ -151,6 +162,20 @@
       {:else}
         <span class="material-icons text-lg" aria-hidden="true">dark_mode</span>
       {/if}
+    </button>
+
+    <!-- Le profil : icône seule entre md et lg, où la barre est déjà chargée. -->
+    <button
+      on:click={ouvrirChoixPersona}
+      data-testid="persona-toggle"
+      aria-haspopup="dialog"
+      aria-label={libelleDuProfil}
+      class="h-8 px-2 flex items-center gap-1 rounded-lg bg-transparent dark:bg-white/5 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors"
+    >
+      <span class="material-icons text-lg" aria-hidden="true"
+        >{PERSONA_ICONE[$personaStore.persona ?? "general"]}</span
+      >
+      <span class="hidden lg:inline text-xs font-semibold">{nomDuProfil}</span>
     </button>
 
     <!--
@@ -269,6 +294,17 @@
         >
           <span class="material-icons text-lg"
              aria-hidden="true">{$themeStore === "dark" ? "light_mode" : "dark_mode"}</span
+          >
+        </button>
+        <button
+          on:click={ouvrirChoixPersona}
+          data-testid="persona-toggle-mobile"
+          aria-haspopup="dialog"
+          aria-label={libelleDuProfil}
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500"
+        >
+          <span class="material-icons text-lg" aria-hidden="true"
+            >{PERSONA_ICONE[$personaStore.persona ?? "general"]}</span
           >
         </button>
       </div>

@@ -1,5 +1,6 @@
 /**
- * Le profil (persona) : ce que le chat envoie, et ce qu'il propose.
+ * Le profil (persona) : la question d'entrée, sa mémoire, et ce que le chat
+ * envoie et propose.
  *
  * CE QUE CE FICHIER PROTÈGE.
  * - Le chat envoyait `persona: "citoyen"` en dur : il ne répondait qu'aux
@@ -8,12 +9,19 @@
  * - Les suggestions étaient figées (« Licenciement abusif »…), dans la
  *   première langue chargée. Elles suivent le profil ET la langue, et un clic
  *   les envoie.
- * - Une conversation rouverte continue avec SON profil.
+ * - Une conversation rouverte continue avec SON profil ; changer de profil en
+ *   pleine conversation en ouvre une nouvelle.
+ * - La question est posée à la première visite, jamais sur les pages de
+ *   compte ni d'administration. Un choix est gardé ; un refus vaut pour la
+ *   visite (cookie de session), nouveaux onglets compris.
+ * - Le profil suit le compte : adopté au démarrage, envoyé à chaque
+ *   changement.
  *
  * Tout est intercepté : aucun backend requis, aucun quota dépensé. Le profil
  * est posé dans le stockage avant le chargement de la page.
  */
 
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { SUGGESTIONS } from '../../../src/lib/suggestions';
@@ -34,15 +42,23 @@ async function profilGeneral(context: BrowserContext) {
   await context.addCookies([{ name: 'jurix-persona-refus', value: '1', url: 'http://localhost:4173' }]);
 }
 
-/** Répond en flux et garde le corps de chaque requête. */
+/**
+ * Répond en flux et garde le corps de chaque requête. Comme le serveur, le
+ * dernier événement renvoie le profil de la conversation : celui de la
+ * requête, `general` s'il est omis.
+ */
 async function repondre(page: Page, final: Record<string, unknown> = {}) {
   const corps: Record<string, unknown>[] = [];
   await page.route('**/api/v1/rag/ask/stream', (route) => {
-    corps.push(route.request().postDataJSON());
+    const demande = route.request().postDataJSON();
+    corps.push(demande);
     const evenements = [
       { chunk: 'Selon les textes, ', done: false },
       { chunk: 'voici la réponse.', done: false },
-      { chunk: '', done: true, sources: [], confidence: 1, session_id: 'sid-profil', ...final },
+      {
+        chunk: '', done: true, sources: [], confidence: 1, session_id: 'sid-profil',
+        persona: demande.persona ?? 'general', ...final,
+      },
     ];
     return route.fulfill({
       status: 200,
@@ -51,6 +67,21 @@ async function repondre(page: Page, final: Record<string, unknown> = {}) {
     });
   });
   return corps;
+}
+
+/** Un JWT dont seule la charge compte : la signature n'est jamais vérifiée côté client. */
+function jetonValide(): string {
+  const charge = { sub: 'rahim@jurix.cm', exp: Math.floor(Date.now() / 1000) + 86_400 };
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64(charge)}.signature-non-verifiee`;
+}
+
+/** Une session ouverte, posée avant chaque chargement de page. */
+async function connecte(page: Page) {
+  await page.addInitScript((jeton) => {
+    localStorage.setItem('jurix-auth-token', jeton);
+    localStorage.setItem('jurix-auth-user', JSON.stringify({ id: 7, email: 'rahim@jurix.cm', role: 'user' }));
+  }, jetonValide());
 }
 
 test.describe('Le chat suit le profil', () => {
@@ -122,19 +153,9 @@ test.describe('Le chat suit le profil', () => {
 });
 
 test.describe('Une conversation rouverte garde son profil', () => {
-  /** Un JWT dont seule la charge compte : la signature n'est jamais vérifiée côté client. */
-  function jetonValide(): string {
-    const charge = { sub: 'rahim@jurix.cm', exp: Math.floor(Date.now() / 1000) + 86_400 };
-    const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
-    return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64(charge)}.signature-non-verifiee`;
-  }
-
   test('rouverte en avocat, elle continue en avocat malgré un profil citoyen', async ({ page }) => {
     await profil(page, 'citoyen');
-    await page.addInitScript((jeton) => {
-      localStorage.setItem('jurix-auth-token', jeton);
-      localStorage.setItem('jurix-auth-user', JSON.stringify({ id: 7, email: 'rahim@jurix.cm', role: 'user' }));
-    }, jetonValide());
+    await connecte(page);
     const conversation = {
       session_id: 'sid-1', title: 'Abus de confiance', persona: 'avocat', language: 'fr',
       created_at: '2026-10-01T10:00:00', updated_at: '2026-10-01T10:05:00',
@@ -172,5 +193,175 @@ test.describe('Une conversation rouverte garde son profil', () => {
     await expect(page.getByRole('log')).toContainText('voici la réponse');
     expect(corps[0].persona).toBe('avocat');
     expect(corps[0].session_id).toBe('sid-1');
+  });
+});
+
+test.describe('La question « Qui êtes-vous ? »', () => {
+  test('posée à la première visite, sur l accueil comme sur une page profonde', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('persona-dialog')).toHaveAttribute('data-mode', 'accueil');
+
+    await page.goto('/about');
+    await expect(page.getByTestId('persona-dialog')).toBeVisible();
+  });
+
+  for (const chemin of ['/login', '/signup', '/forgot-password', '/reset-password/jeton-x', '/verify-email/jeton-x', '/admin']) {
+    test(`jamais posée sur ${chemin}`, async ({ page }) => {
+      await page.goto(chemin);
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+    });
+  }
+
+  for (const theme of ['light', 'dark']) {
+    test(`accessible, ouverte, en thème ${theme}`, async ({ page }) => {
+      await page.addInitScript((t) => localStorage.setItem('jurix-theme', t), theme);
+      await page.goto('/');
+      await expect(page.getByTestId('persona-dialog')).toBeVisible();
+
+      const resultats = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      const graves = resultats.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+
+      expect(graves, graves.map((v) => `${v.id} — ${v.nodes.length} noeud(s)`).join('\n')).toEqual([]);
+    });
+  }
+
+  test('un choix est gardé : rechargement et nouvel onglet', async ({ page, context }) => {
+    await page.goto('/');
+    await page.getByTestId('persona-choice-entrepreneur').click();
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+
+    const autre = await context.newPage();
+    await autre.goto('/about');
+    await autre.waitForLoadState('networkidle');
+    await expect(autre.getByTestId('persona-dialog')).toHaveCount(0);
+    expect(await autre.evaluate(() => localStorage.getItem('jurix-persona'))).toBe('entrepreneur');
+  });
+
+  test('un refus vaut pour la visite, nouveaux onglets compris, et revient à la suivante', async ({ page, context, browser, baseURL }) => {
+    await page.goto('/');
+    await page.getByTestId('persona-skip').click();
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('jurix-persona'))).toBeNull();
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+
+    // Même visite, nouvel onglet : le cookie de session est partagé.
+    const onglet = await context.newPage();
+    await onglet.goto('/laws');
+    await onglet.waitForLoadState('networkidle');
+    await expect(onglet.getByTestId('persona-dialog')).toHaveCount(0);
+
+    // Visite suivante : nouveau navigateur, la question revient.
+    const suivante = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const nouvelle = await suivante.newPage();
+    await nouvelle.goto('/');
+    await expect(nouvelle.getByTestId('persona-dialog')).toBeVisible();
+    await suivante.close();
+  });
+
+  test('Échap vaut « Ne pas répondre », et la première tabulation atteint le lien d évitement', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('persona-dialog')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+
+    await page.keyboard.press('Tab');
+    await expect(page.locator(':focus')).toHaveAttribute('href', '#contenu');
+  });
+
+  test('sur mobile, le profil se change depuis le menu', async ({ page }) => {
+    await profil(page, 'citoyen');
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.goto('/about');
+
+    await page.getByTestId('nav-mobile-toggle').click();
+    await page.getByTestId('persona-toggle-mobile').click();
+
+    await expect(page.getByTestId('persona-dialog')).toHaveAttribute('data-mode', 'changement');
+  });
+});
+
+test.describe('Changer de profil', () => {
+  test('en pleine conversation, un nouveau profil démarre une conversation neuve', async ({ page }) => {
+    await profil(page, 'citoyen');
+    const corps = await repondre(page);
+
+    await page.goto('/chat');
+    const champ = page.getByRole('textbox').first();
+    await champ.fill('Quelles sont les sanctions ?');
+    await champ.press('Enter');
+    await expect(page.getByRole('log')).toContainText('voici la réponse');
+    expect(await page.evaluate(() => localStorage.getItem('jurix-chat-session'))).toBe('sid-profil');
+
+    await page.getByTestId('persona-toggle').click();
+    await page.getByTestId('persona-choice-avocat').click();
+
+    await expect(page.getByTestId('chat-persona')).toHaveAttribute('data-persona', 'avocat');
+    await expect(page.getByRole('log')).not.toContainText('Quelles sont les sanctions ?');
+    await expect(page.getByTestId('chat-suggestion').first()).toHaveText(SUGGESTIONS.fr.avocat[0]);
+    expect(await page.evaluate(() => localStorage.getItem('jurix-chat-session'))).toBeNull();
+
+    await page.getByTestId('chat-suggestion').first().click();
+    await expect.poll(() => corps.length).toBe(2);
+    expect(corps[1].persona).toBe('avocat');
+    expect('session_id' in corps[1]).toBe(false);
+  });
+
+  test('Échap ferme sans rien changer et rend le focus au bouton', async ({ page }) => {
+    await profil(page, 'étudiant');
+    await page.goto('/about');
+
+    await page.getByTestId('persona-toggle').click();
+    await expect(page.getByTestId('persona-dialog')).toHaveAttribute('data-mode', 'changement');
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+    await expect(page.getByTestId('persona-toggle')).toBeFocused();
+    expect(await page.evaluate(() => localStorage.getItem('jurix-persona'))).toBe('étudiant');
+  });
+});
+
+test.describe('Le profil suit le compte', () => {
+  test('au démarrage, le profil du compte est adopté, sans question', async ({ page }) => {
+    await connecte(page);
+    await page.route('**/api/v1/auth/me', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ persona: 'entrepreneur' }) }),
+    );
+
+    await page.goto('/about');
+
+    await expect(page.getByTestId('persona-toggle')).toHaveAttribute('aria-label', /Entrepreneur/);
+    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('jurix-persona'))).toBe('entrepreneur');
+  });
+
+  test('connecté, un changement part sur le compte', async ({ page }) => {
+    await connecte(page);
+    const envois: unknown[] = [];
+    await page.route('**/api/v1/auth/me', (route) => {
+      if (route.request().method() === 'PATCH') {
+        envois.push(route.request().postDataJSON());
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ persona: 'avocat' }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ persona: 'citoyen' }) });
+    });
+
+    await page.goto('/about');
+    await page.getByTestId('persona-toggle').click();
+    await page.getByTestId('persona-choice-avocat').click();
+
+    await expect.poll(() => envois.length).toBe(1);
+    expect(envois[0]).toEqual({ persona: 'avocat' });
   });
 });

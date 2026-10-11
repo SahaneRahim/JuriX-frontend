@@ -21,6 +21,17 @@ export default defineConfig({
   ],
   use: {
     baseURL: 'http://localhost:4173',
+    // Un profil deja choisi : sans lui, la question « Qui etes-vous ? »
+    // couvrirait chaque page a la premiere visite, et chaque clic des specs
+    // existants buterait sur elle. « citoyen » garde aussi le corps des
+    // requetes du chat identique a l'ancien `persona: "citoyen"` en dur.
+    // tests/e2e/navigation/persona.spec.ts repart d'un navigateur vide.
+    storageState: {
+      cookies: [],
+      origins: [
+        { origin: 'http://localhost:4173', localStorage: [{ name: 'jurix-persona', value: 'citoyen' }] },
+      ],
+    },
     // `on-first-retry` ne produisait JAMAIS de trace en local, ou retries vaut
     // 0 : un echec local ne laissait aucun element de diagnostic.
     trace: 'retain-on-failure',

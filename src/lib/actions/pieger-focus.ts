@@ -35,15 +35,27 @@ function focusables(racine: HTMLElement): HTMLElement[] {
   );
 }
 
-export function piegerFocus(noeud: HTMLElement) {
+export interface OptionsPiegerFocus {
+  /**
+   * Sélecteur, dans la boîte, de l'élément qui reçoit le focus à l'ouverture.
+   * Le choix du profil l'utilise pour poser le focus sur son TITRE : sur la
+   * première carte, elle aurait eu l'air présélectionnée.
+   */
+  initial?: string;
+}
+
+export function piegerFocus(noeud: HTMLElement, options: OptionsPiegerFocus = {}) {
   // Mémorisé AVANT de déplacer le focus, pour pouvoir le rendre à la fermeture.
   const precedent = document.activeElement as HTMLElement | null;
 
+  const initial = options.initial ? noeud.querySelector<HTMLElement>(options.initial) : null;
   const premier = focusables(noeud)[0];
   // Repli sur le conteneur lui-même : une modale sans aucun élément focusable
   // (un écran de progression, par exemple) doit tout de même recevoir le focus,
   // sinon les touches ne lui parviennent pas.
-  if (premier) {
+  if (initial) {
+    initial.focus();
+  } else if (premier) {
     premier.focus();
   } else {
     noeud.setAttribute('tabindex', '-1');
@@ -61,7 +73,16 @@ export function piegerFocus(noeud: HTMLElement) {
 
     const debut = liste[0];
     const fin = liste[liste.length - 1];
-    const actif = document.activeElement;
+    const actif = document.activeElement as HTMLElement | null;
+
+    // Focus sur un élément hors de la liste (le titre, en tabindex=-1) : Tab
+    // va au premier, Maj+Tab au dernier. Sinon Maj+Tab depuis le titre
+    // sortait de la boîte.
+    if (!actif || !liste.includes(actif)) {
+      event.preventDefault();
+      (event.shiftKey ? fin : debut).focus();
+      return;
+    }
 
     // Le cycle est explicite dans les deux sens : sans cela, Tab depuis le
     // dernier élément sortirait vers la page, et Maj+Tab depuis le premier

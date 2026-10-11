@@ -7,10 +7,64 @@
    * monter ici la poserait aussi sur `/admin/*`, qui a sa propre barre latérale,
    * et sur `/login`.
    *
-   * Il porte en revanche deux choses qui n'ont de sens qu'au niveau du document.
+   * Il porte en revanche ce qui n'a de sens qu'au niveau du document : la
+   * langue, la question du profil, et la synchronisation du profil avec le
+   * compte.
    */
+  import { onMount, tick } from "svelte";
+  import { afterNavigate } from "$app/navigation";
+  import { page } from "$app/stores";
+  import ChoixPersona from "$lib/components/ChoixPersona.svelte";
+  import { synchroniserPersonaAuDemarrage } from "$lib/persona-compte";
   import { language } from "$lib/stores/language";
+  import {
+    choixPersonaOuvert,
+    fermerChoixPersona,
+    personaStore,
+    questionAPoser,
+  } from "$lib/stores/persona";
   import "../app.css";
+
+  /**
+   * La question du profil vit ICI : c'est le seul layout qui couvre toutes les
+   * pages d'entrée (un lien profond vers /laws/123 compris) sans être re-monté
+   * d'une page à l'autre. Elle attend la synchronisation avec le compte, pour
+   * ne jamais apparaître en éclair devant un utilisateur connecté qui a déjà
+   * un profil.
+   */
+  let compteVerifie = false;
+  let agentUtilisateur = "";
+
+  onMount(() => {
+    agentUtilisateur = navigator.userAgent;
+    synchroniserPersonaAuDemarrage().finally(() => (compteVerifie = true));
+  });
+
+  // Une boîte de changement ne survit pas à une navigation (retour vers /login…).
+  afterNavigate(() => fermerChoixPersona());
+
+  $: accueil =
+    compteVerifie &&
+    questionAPoser($personaStore, $page.route.id, Boolean($page.error), agentUtilisateur);
+  let dialogue: "accueil" | "changement" | null = null;
+  $: dialogue = $choixPersonaOuvert ? "changement" : accueil ? "accueil" : null;
+
+  // Fermée, la boîte de CHANGEMENT rend le focus au bouton qui l'a ouverte. Si
+  // la page était encore inerte à cet instant, le focus tombe sur <body> : on
+  // le rattrape. En accueil, on le laisse au début du document, pour que la
+  // première tabulation atteigne le lien d'évitement.
+  let modePrecedent: typeof dialogue = null;
+  $: if (dialogue !== modePrecedent) {
+    const ferme = modePrecedent === "changement" && dialogue === null;
+    modePrecedent = dialogue;
+    if (ferme) {
+      tick().then(() => {
+        if (document.activeElement === document.body) {
+          document.querySelector<HTMLElement>('[data-testid="persona-toggle"]')?.focus();
+        }
+      });
+    }
+  }
 
   /**
    * `lang` du document, synchronisé sur la langue de l'interface.
@@ -31,4 +85,12 @@
   }
 </script>
 
-<slot />
+<!-- `display: contents` : l'enveloppe ne crée aucune boîte, la mise en page
+     des pages ne change pas. `inert` rend la page inerte derrière la question. -->
+<div style="display: contents" inert={dialogue !== null}>
+  <slot />
+</div>
+
+{#if dialogue}
+  <ChoixPersona mode={dialogue} />
+{/if}
