@@ -2,6 +2,7 @@ import { get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { API_URL } from '$lib/api';
 import { effacerSessionChat } from '$lib/chat-session';
+import { oublierPersona } from '$lib/stores/persona';
 
 /**
  * Rôles reconnus par le backend.
@@ -135,6 +136,9 @@ function createAuthStore() {
       // Meme raison qu'a la connexion : le fil ne doit pas survivre au
       // changement de session.
       effacerSessionChat();
+      // Le profil aussi : sur un appareil partage, la profession du compte ne
+      // doit pas rester. Il revient a la reconnexion, depuis le compte.
+      oublierPersona();
       if (browser && jeton) {
         fetch(`${API_URL}/auth/logout`, {
           method: 'POST',

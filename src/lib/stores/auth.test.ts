@@ -24,6 +24,20 @@ describe('authStore et la session de chat', () => {
     expect(lireSessionChat()).toBeNull();
   });
 
+  it('la deconnexion efface le profil du navigateur', () => {
+    // Appareil partage : la profession du compte ne doit pas rester. Le refus
+    // de session evite que la question s'ouvre a l'instant meme.
+    authStore.login(UTILISATEUR, 'jeton');
+    localStorage.setItem('jurix-persona', 'avocat');
+    localStorage.setItem('jurix-persona-a-envoyer', '1');
+
+    authStore.logout();
+
+    expect(localStorage.getItem('jurix-persona')).toBeNull();
+    expect(localStorage.getItem('jurix-persona-a-envoyer')).toBeNull();
+    expect(document.cookie).toContain('jurix-persona-refus=1');
+  });
+
   it('la deconnexion efface la conversation en cours', () => {
     authStore.login(UTILISATEUR, 'jeton');
     ecrireSessionChat('ma-conversation');

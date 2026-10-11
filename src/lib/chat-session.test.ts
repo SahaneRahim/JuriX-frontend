@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ecrireSessionChat, effacerSessionChat, lireSessionChat } from './chat-session';
+import {
+  ecrireSessionChat,
+  effacerSessionChat,
+  lirePersonaSessionChat,
+  lireSessionChat,
+} from './chat-session';
 
 describe('chat-session', () => {
   beforeEach(() => localStorage.clear());
@@ -30,5 +35,17 @@ describe('chat-session', () => {
     ecrireSessionChat('9f1c-abcd');
     ecrireSessionChat(null);
     expect(lireSessionChat()).toBeNull();
+  });
+
+  it('memorise le profil de la conversation avec son identifiant', () => {
+    ecrireSessionChat('sid-1', 'avocat');
+    expect(lirePersonaSessionChat()).toBe('avocat');
+
+    ecrireSessionChat('sid-2', null);
+    expect(lirePersonaSessionChat()).toBe('general');
+
+    effacerSessionChat();
+    expect(lireSessionChat()).toBeNull();
+    expect(lirePersonaSessionChat()).toBeNull();
   });
 });
