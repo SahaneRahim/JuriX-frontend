@@ -41,15 +41,23 @@ CORS.
 ## Vérifier
 
 ```bash
-npm test                # 52 tests unitaires (vitest)
-npm run test:e2e        # 58 tests de bout en bout (playwright)
+npm test                # 166 tests unitaires (vitest)
+npm run test:e2e        # 168 tests de bout en bout (playwright)
 npm run check           # types (svelte-check) — doit rendre 0 erreur
 npm run lint            # eslint
 npm run build           # build de production
 ```
 
-`npm run test:e2e` démarre son propre serveur de développement s'il n'y en a pas
-déjà un, et réutilise celui qui tourne le cas échéant.
+`npm run test:e2e` construit le site et le sert sur le port 4173. Il ne réutilise
+jamais un serveur déjà lancé : un serveur de développement sur du code ancien
+ferait passer les tests sur autre chose que ce qu'on croit mesurer. Le port 4173
+doit donc être libre ; le développement, sur 5173, peut tourner en même temps.
+
+Chaque test e2e part d'un navigateur où le profil **citoyen** est déjà choisi
+(`storageState` dans `playwright.config.ts`) : sans cette graine, la question du
+profil masquerait chaque page. Un fichier qui doit partir d'un navigateur vide
+le déclare, comme `persona.spec.ts` :
+`test.use({ storageState: { cookies: [], origins: [] } })`.
 
 ## Ce que couvrent les tests
 
@@ -66,18 +74,70 @@ identifiant absent ou non numérique, le contenu rendu par le serveur, la
 politique `noindex`, l'accessibilité au clavier et au lecteur d'écran
 (balayage axe-core), et la dégradation quand le backend est injoignable.
 
+Le profil a son propre fichier, `persona.spec.ts` : question posée à la première
+visite et jamais sur les routes exclues, choix et refus mémorisés, changement en
+pleine conversation, synchronisation avec le compte, et corps exact des
+requêtes du chat.
+
+## Le profil
+
+Le chat répond selon un profil : **citoyen**, **étudiant**, **avocat** ou
+**entrepreneur**. Le profil change le registre et le niveau de détail de la
+réponse, et les questions suggérées à l'accueil du chat. Sans profil, le chat
+répond en **profil général**, et la requête omet le champ `persona`.
+
+- **La question** est posée à la première visite, dans une fenêtre centrée, sur
+  n'importe quelle page d'entrée, un lien profond compris. Elle ne l'est jamais
+  sur `/login`, `/signup`, `/forgot-password`, `/reset-password/*`,
+  `/verify-email/*`, `/admin*`, sur une page d'erreur, ni pour un robot
+  d'indexation (reconnu à son user agent).
+- **« Ne pas répondre »**, ou Échap, donne le profil général pour la visite. Le
+  refus est gardé dans un cookie de session, `jurix-persona-refus`, que les
+  onglets partagent : la question revient à la visite suivante. Il n'est jamais
+  envoyé au compte.
+- **Le choix** est gardé dans le navigateur (`jurix-persona`, localStorage) et,
+  pour un utilisateur connecté, sur son compte (`PATCH /auth/me`), qui le suit
+  d'un appareil à l'autre :
+  - à la connexion, le profil du compte l'emporte ; un compte sans profil ne
+    reçoit pas le choix fait avant la connexion, et la question reviendra à la
+    visite suivante ;
+  - au démarrage, un envoi resté en attente (`jurix-persona-a-envoyer`) est
+    renvoyé ; sinon le compte fait foi, absence de profil comprise ;
+  - la déconnexion efface le profil du navigateur : sur un appareil partagé, la
+    profession est une donnée personnelle.
+
+  Cette synchronisation appelle `fetch`, pas `apiFetch` : en arrière-plan, elle
+  ne doit ni déconnecter ni rediriger qui que ce soit.
+- **Changer de profil** se fait depuis l'en-tête et depuis le chat
+  (« Changer »). Une conversation garde un seul profil : en changer ouvre une
+  nouvelle conversation, et une conversation rouverte continue avec le sien.
+- **Les suggestions** (`src/lib/suggestions.ts`) existent pour chaque profil et
+  chaque langue. Chacune a été vérifiée contre le corpus avec
+  `scripts/eval/comparer_mistral.py --dry-run --questions-libres` (dépôt
+  backend), qui interroge la recherche sans appeler le modèle de langue. Une
+  suggestion sans extrait pertinent a été remplacée : le corpus n'a ni Code du
+  travail ni Actes uniformes OHADA.
+- **Le tableau de bord** d'administration compte les conversations par profil.
+  La ligne « Profil général » regroupe les refus de la question et le choix
+  explicite de ce profil.
+
 ## Organisation
 
 ```
 src/lib/
-  api.ts          API_URL, apiFetch (injecte le jeton, gère le 401), WebSocket
-  nav.ts          manifeste de navigation, source des liens ET des tests
-  format.ts       dates — une seule implémentation, il y en avait huit
-  pagination.ts   pagination — une seule règle, il y en avait quatre
-  seo.ts          titres, descriptions, URL canoniques
-  highlight.ts    rendu du surlignage <mark> venu de ts_headline
-  stores/         language (i18n), auth, theme
-  components/     SearchBar, SearchResultCard, StatusBadge, ImagePdfViewer, admin/
+  api.ts             API_URL, apiFetch (injecte le jeton, gère le 401), WebSocket
+  nav.ts             manifeste de navigation, source des liens ET des tests
+  format.ts          dates — une seule implémentation, il y en avait huit
+  pagination.ts      pagination — une seule règle, il y en avait quatre
+  seo.ts             titres, descriptions, URL canoniques
+  highlight.ts       rendu du surlignage <mark> venu de ts_headline
+  suggestions.ts     questions suggérées par le chat, par profil et par langue
+  persona-compte.ts  le profil et le compte (GET et PATCH /auth/me)
+  chat-session.ts    conversation en cours, et son profil
+  stores/            language (i18n), auth, theme, persona
+  actions/           piegerFocus : le focus clavier des fenêtres modales
+  components/        SearchBar, SearchResultCard, StatusBadge, ImagePdfViewer,
+                     ChoixPersona (la question du profil), admin/
 src/routes/
   (main)/         accueil et assistant conversationnel
   laws/           liste et lecture des documents, explication d'un article par l'IA

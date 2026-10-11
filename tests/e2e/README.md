@@ -44,9 +44,34 @@ tests/e2e/
 └── navigation/
     ├── accessibilite.spec.ts          # axe sur les pages publiques
     ├── backend-down.spec.ts           # comportement backend eteint
+    ├── chat-rendu.spec.ts             # rendu des reponses du chat
+    ├── comparaison.spec.ts            # grille de comparaison sourcee
+    ├── conversations.spec.ts          # panneau des conversations
     ├── explication-article.spec.ts    # bouton « Expliquer l'article »
-    └── link-integrity.spec.ts         # aucun lien mort, rendu serveur
+    ├── inscription.spec.ts            # inscription et connexion
+    ├── link-integrity.spec.ts         # aucun lien mort, rendu serveur
+    ├── mot-de-passe-oublie.spec.ts    # recuperation de compte
+    └── persona.spec.ts                # question du profil, chat selon le profil
 ```
+
+### Stockage de départ : un profil déjà choisi
+
+À la première visite, le site demande le profil de l'utilisateur dans une
+fenêtre modale qui rend le reste de la page inerte. Pour que les tests ne la
+rencontrent pas à chaque page, `playwright.config.ts` démarre chaque test avec
+`jurix-persona=citoyen` dans le localStorage (`use.storageState`). Les requêtes
+du chat portent donc `persona: "citoyen"`, comme avant l'arrivée des profils.
+
+Un fichier qui doit partir d'un navigateur vide — c'est le cas de
+`persona.spec.ts` — le déclare en tête :
+
+```typescript
+test.use({ storageState: { cookies: [], origins: [] } });
+```
+
+Le refus de la question (« Ne pas répondre ») vit dans un cookie de session,
+`jurix-persona-refus` : un test le pose avec `context.addCookies`, et un
+nouveau contexte (`browser.newContext`) simule la visite suivante.
 
 ## ✍️ Écrire des Tests
 
