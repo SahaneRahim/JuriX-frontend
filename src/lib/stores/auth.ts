@@ -89,6 +89,17 @@ function getInitialState(): AuthState {
         console.error('Failed to parse user data:', e);
       }
     }
+
+    // Une session finie sans deconnexion (jeton expire, illisible) : on fait
+    // ce que la deconnexion aurait fait. Sinon le profil du compte restait a
+    // la personne suivante sur ce navigateur, et son envoi en attente partait
+    // sur le compte de celle-ci a sa premiere connexion.
+    if (token || userStr) {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(USER_STORAGE_KEY);
+      effacerSessionChat();
+      oublierPersona();
+    }
   }
 
   return {

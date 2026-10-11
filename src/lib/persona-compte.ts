@@ -6,9 +6,11 @@
  * - à la connexion, un profil enregistré sur le compte l'emporte ; un compte
  *   SANS profil n'hérite pas du choix fait dans le navigateur avant la
  *   connexion — la question sera reposée à la visite suivante ;
- * - au démarrage, connecté : un envoi en attente est renvoyé ; sinon le compte
- *   fait foi, `null` compris (un « Profil général » choisi sur un autre
- *   appareil n'est pas annulé par celui-ci) ;
+ * - au démarrage, connecté : un envoi en attente est renvoyé, sans faire
+ *   attendre la page ; sinon le compte fait foi, `null` compris (un « Profil
+ *   général » choisi sur un autre appareil n'est pas annulé par celui-ci). Une
+ *   réponse devenue périmée pendant l'appel (choix, autre onglet,
+ *   déconnexion) est ignorée ;
  * - un changement explicite s'écrit d'abord dans le navigateur, puis sur le
  *   compte ;
  * - « Ne pas répondre » vaut pour la visite : jamais envoyé au compte.
@@ -80,18 +82,31 @@ export function refuserPourCetteSession(): void {
 export async function synchroniserPersonaAuDemarrage(): Promise<void> {
   if (!get(authStore).isAuthenticated) return;
   if (lireAEnvoyer()) {
-    await envoyer(get(personaStore).persona);
+    // Sans attendre : la question du profil attend la fin de cette fonction,
+    // et un backend lent la retenait sans borne. Le profil local fait foi.
+    void envoyer(get(personaStore).persona);
     return;
   }
-  const choixAvant = get(personaStore).choix;
+  const { choix: choixAvant, persona: personaAvant } = get(personaStore);
+  const jetonAvant = get(authStore).token;
   const controleur = new AbortController();
   const minuterie = setTimeout(() => controleur.abort(), DELAI_MS);
   try {
     const reponse = await fetch(`${API_URL}/auth/me`, { headers: authHeaders(), signal: controleur.signal });
     if (!reponse.ok) return;
     const valeur = lireValeurDuCompte(await reponse.json());
-    // Un choix fait pendant l'appel l'emporte sur la réponse, déjà périmée.
-    if (valeur === undefined || get(personaStore).choix !== choixAvant) return;
+    // Réponse périmée : un choix dans cet onglet, un profil changé par un
+    // autre onglet, ou une déconnexion (le profil du compte reviendrait chez
+    // la personne suivante) pendant l'appel.
+    const { choix, persona } = get(personaStore);
+    if (
+      valeur === undefined ||
+      choix !== choixAvant ||
+      persona !== personaAvant ||
+      get(authStore).token !== jetonAvant
+    ) {
+      return;
+    }
     personaStore.appliquerDepuisCompte(valeur);
   } catch {
     /* hors ligne ou délai dépassé : le profil local reste */
@@ -102,11 +117,13 @@ export async function synchroniserPersonaAuDemarrage(): Promise<void> {
 
 /** À la connexion (mot de passe, inscription, Google), avec la réponse du serveur. */
 export function reconcilierPersonaALaConnexion(reponse: unknown): void {
+  // Un envoi en attente appartient à la session précédente, peut-être à un
+  // AUTRE compte : il ne part jamais sur celui-ci.
+  ecrireAEnvoyer(false);
   const valeur = lireValeurDuCompte(reponse);
   // Compte sans profil : on ne lui donne pas le choix du navigateur (décision
   // de l'utilisateur) ; la question reviendra à la visite suivante.
   if (!valeur) return;
-  ecrireAEnvoyer(false);
   personaStore.appliquerDepuisCompte(valeur);
 }
 

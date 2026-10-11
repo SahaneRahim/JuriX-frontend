@@ -143,13 +143,23 @@ export function lirePersona(): Persona | null {
   }
 }
 
+/**
+ * La mémoire a-t-elle gardé la dernière écriture ? Stockage plein ou bloqué,
+ * cookies refusés : `relire` effaçait alors, au retour sur l'onglet, le choix
+ * que la page tenait en mémoire, et la question se rouvrait.
+ */
+let personaRelisible = true;
+let refusRelisible = true;
+
 function ecrirePersona(persona: Persona | null): void {
   if (typeof localStorage === 'undefined') return;
   try {
     if (persona) localStorage.setItem(CLE_PERSONA, persona);
     else localStorage.removeItem(CLE_PERSONA);
+    personaRelisible = lirePersona() === persona;
   } catch {
     /* stockage indisponible : le profil vaut pour la page */
+    personaRelisible = false;
   }
 }
 
@@ -170,8 +180,11 @@ function ecrireRefusSession(refus: boolean): void {
     document.cookie = refus
       ? `${COOKIE_REFUS}=1; Path=/; SameSite=Lax${secure}`
       : `${COOKIE_REFUS}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    // Un cookie refusé ne lève rien : seule la relecture le révèle.
+    refusRelisible = lireRefusSession() === refus;
   } catch {
     /* cookies bloqués : le refus vaut pour la page */
+    refusRelisible = false;
   }
 }
 
@@ -238,13 +251,14 @@ function creerPersonaStore() {
 
     /** Changement passif : relit la mémoire (autre onglet, retour sur la page). */
     relire(): void {
-      const persona = lirePersona();
-      const refuseCetteSession = lireRefusSession();
-      update((e) =>
-        e.persona === persona && e.refuseCetteSession === refuseCetteSession
+      update((e) => {
+        // Une mémoire qui n'a pas gardé la dernière écriture ne fait pas foi.
+        const persona = personaRelisible ? lirePersona() : e.persona;
+        const refuseCetteSession = refusRelisible ? lireRefusSession() : e.refuseCetteSession;
+        return e.persona === persona && e.refuseCetteSession === refuseCetteSession
           ? e
-          : { ...e, persona, refuseCetteSession },
-      );
+          : { ...e, persona, refuseCetteSession };
+      });
     },
 
     /**
@@ -261,6 +275,8 @@ function creerPersonaStore() {
 
     /** Réservé aux tests : relit la mémoire et remet `choix` à zéro. */
     _reinitialiser(): void {
+      personaRelisible = true;
+      refusRelisible = true;
       set(etatInitial());
     },
   };

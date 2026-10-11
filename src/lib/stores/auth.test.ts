@@ -7,6 +7,45 @@ import { authStore } from './auth';
 
 const UTILISATEUR = { id: 1, email: 'a@b.cm', role: 'user' as const };
 
+describe('une session finie sans deconnexion', () => {
+  it('jeton expire au demarrage : traite comme une deconnexion', async () => {
+    // Sinon le profil du compte, et son envoi en attente, passaient a la
+    // personne suivante sur ce navigateur.
+    const expire = `x.${btoa(JSON.stringify({ exp: 1 }))}.y`;
+    localStorage.setItem('jurix-auth-token', expire);
+    localStorage.setItem('jurix-auth-user', JSON.stringify(UTILISATEUR));
+    localStorage.setItem('jurix-persona', 'avocat');
+    localStorage.setItem('jurix-persona-a-envoyer', '1');
+    ecrireSessionChat('sid-du-compte', 'avocat');
+    vi.resetModules();
+
+    const { authStore: neuf } = await import('./auth');
+
+    let etat: { isAuthenticated: boolean } | undefined;
+    neuf.subscribe((s) => (etat = s))();
+    expect(etat?.isAuthenticated).toBe(false);
+    expect(localStorage.getItem('jurix-auth-token')).toBeNull();
+    expect(localStorage.getItem('jurix-persona')).toBeNull();
+    expect(localStorage.getItem('jurix-persona-a-envoyer')).toBeNull();
+    expect(localStorage.getItem('jurix-chat-session')).toBeNull();
+  });
+
+  it('jeton valide : rien n est efface', async () => {
+    const valide = `x.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.y`;
+    localStorage.setItem('jurix-auth-token', valide);
+    localStorage.setItem('jurix-auth-user', JSON.stringify(UTILISATEUR));
+    localStorage.setItem('jurix-persona', 'avocat');
+    vi.resetModules();
+
+    const { authStore: neuf } = await import('./auth');
+
+    let etat: { isAuthenticated: boolean } | undefined;
+    neuf.subscribe((s) => (etat = s))();
+    expect(etat?.isAuthenticated).toBe(true);
+    expect(localStorage.getItem('jurix-persona')).toBe('avocat');
+  });
+});
+
 describe('authStore et la session de chat', () => {
   beforeEach(() => {
     localStorage.clear();

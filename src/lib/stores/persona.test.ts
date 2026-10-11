@@ -149,6 +149,46 @@ describe('personaStore', () => {
     expect(lireRefusSession()).toBe(true);
   });
 
+  it('un autre onglet : l evenement storage relit le profil', () => {
+    localStorage.setItem('jurix-persona', 'avocat');
+
+    window.dispatchEvent(new StorageEvent('storage', { key: 'jurix-persona' }));
+
+    expect(get(personaStore).persona).toBe('avocat');
+    expect(get(personaStore).choix).toBe(0);
+  });
+
+  it('stockage plein : relire ne defait pas le choix tenu par la page', () => {
+    // Lecture possible, ecriture refusee : un stockage plein.
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => { throw new Error('plein'); },
+      removeItem: () => {},
+      clear: () => {},
+    });
+    try {
+      personaStore.choisir('entrepreneur');
+      personaStore.relire(); // retour sur l'onglet
+
+      expect(get(personaStore).persona).toBe('entrepreneur');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('cookies refuses : relire ne defait pas le refus tenu par la page', () => {
+    // Un cookie refuse ne leve rien : l'ecriture est silencieusement ignoree.
+    Object.defineProperty(document, 'cookie', { configurable: true, get: () => '', set: () => {} });
+    try {
+      personaStore.refuser();
+      personaStore.relire();
+
+      expect(get(personaStore).refuseCetteSession).toBe(true);
+    } finally {
+      delete (document as unknown as { cookie?: string }).cookie;
+    }
+  });
+
   it('un stockage qui leve ne casse rien', () => {
     const casse = {
       getItem: () => { throw new Error('bloque'); },
