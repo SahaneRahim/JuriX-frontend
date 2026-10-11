@@ -152,7 +152,12 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: searchQuery,
-          mode: "text",
+          // Hybride (mots + sens), comme le chat. En « text », la page ne
+          // trouvait la bonne loi dans son top 10 que pour 26,5 % des 102
+          // questions du jeu d'evaluation, et rien du tout pour 26 d'entre
+          // elles ; l'hybride, 82,4 % et aucune page vide
+          // (scripts/eval/evaluer_recherche.py, cote backend).
+          mode: "hybrid",
           limit: RESULTS_PER_PAGE,
           // `offset` existe depuis toujours dans SearchRequest : la pagination
           // affichée n'était simplement jamais envoyée.
