@@ -6,8 +6,20 @@
     lireSessionChat,
   } from "$lib/chat-session";
   import { authStore } from "$lib/stores/auth";
+  import {
+    PERSONA_ICONE,
+    PERSONA_SLUG,
+    champPersona,
+    normaliserPersona,
+    personaDeLaSessionMemorisee,
+    personaStore,
+    type Persona,
+  } from "$lib/stores/persona";
+  import { suggestionsPour } from "$lib/suggestions";
+  import { cleDErreurHttp } from "$lib/chat-erreurs";
   import type { ConversationSummary } from "$lib/types";
   import { page } from "$app/stores";
+  import { get } from "svelte/store";
   import { onMount, tick } from "svelte";
   import { formatHeure } from "$lib/format";
   import { blocsDeReponse } from "$lib/texte";
@@ -54,30 +66,16 @@
   // Reactive translation shorthand
   $: t = $tr;
 
-  // Chat messages state – initialized reactively so welcome message updates with language
+  /** Les messages de la conversation, sans l'accueil (dérivé plus bas). */
   let chatMessages: ChatMessage[] = [];
-  let initialized = false;
 
-  function initMessages() {
-    chatMessages = [
-      {
-        id: 1,
-        type: "assistant",
-        content: t("chat.welcome"),
-        suggestions:
-          $language.current === "fr"
-            ? ["Licenciement abusif", "Création d'entreprise", "Code pénal"]
-            : ["Wrongful dismissal", "Business creation", "Criminal code"],
-        timestamp: getCurrentTime(),
-      },
-    ];
-    initialized = true;
-  }
-
-  // Re-init welcome message when language changes
-  $: if ($language.current && !initialized) {
-    initMessages();
-  }
+  /**
+   * Identifiants des messages. Ils valaient `chatMessages.length + 1`, alors
+   * que les messages d'une conversation rouverte gardent l'identifiant du
+   * serveur : deux messages pouvaient partager une clé de `{#each}`.
+   */
+  let dernierId = 0;
+  const nouvelId = () => ++dernierId;
 
   // `formatHeure` vit dans $lib/format avec les autres formats de date ; la
   // page en portait une copie locale avec sa propre table de locales.
@@ -90,6 +88,43 @@
 
   /** Identifiant de conversation rendu par le serveur, renvoyé au message suivant. */
   let sessionId: string | null = null;
+
+  /**
+   * Le profil de la conversation en cours : fixé au premier message, puis
+   * gardé. Une conversation garde un seul profil ; changer de profil en
+   * démarre une neuve. `null` : profil général.
+   */
+  let personaConversation: Persona | null = null;
+
+  /** Conversation rouverte depuis le panneau : pas de message d'accueil au-dessus. */
+  let conversationRestauree = false;
+
+  /**
+   * Génération de la conversation affichée, et le flux en cours. Une nouvelle
+   * conversation pendant qu'une réponse arrive incrémente la génération et
+   * annule le flux : sans cela, la fin de l'ancienne réponse s'écrivait dans
+   * la nouvelle conversation, ou y affichait une fausse erreur réseau.
+   */
+  let generation = 0;
+  let controleur: AbortController | null = null;
+
+  // L'ORDRE DES `$:` COMPTE : en mode legacy, ils s'exécutent dans l'ordre du
+  // source (voir explication-article.spec.ts). Chacun après ce qu'il lit.
+  $: conversationEnCours = sessionId !== null || chatMessages.some((m) => m.type === "user");
+  $: personaAffiche = conversationEnCours ? personaConversation : $personaStore.persona;
+  // L'accueil est DÉRIVÉ du profil et de la langue. Construit une seule fois,
+  // il restait dans la première langue et ne suivait aucun profil.
+  $: bienvenue = {
+    id: 0,
+    type: "assistant",
+    content: t("chat.welcome"),
+    suggestions: [...suggestionsPour(personaAffiche, $language.current)],
+    timestamp: "",
+  } as ChatMessage;
+  $: messagesAffiches = conversationRestauree ? chatMessages : [bienvenue, ...chatMessages];
+  $: nomDuProfil = personaAffiche
+    ? t(`persona.${PERSONA_SLUG[personaAffiche]}.nom`)
+    : t("persona.general");
 
   /** Dernière question envoyée, pour que « Réessayer » ait quelque chose à renvoyer. */
   let lastQuestion = "";
@@ -136,18 +171,22 @@
       return;
     }
     const detail = await reponse.json();
+    abandonnerLaReponseEnCours();
     sessionId = detail.session_id;
-    ecrireSessionChat(sessionId);
+    // Rouverte, la conversation continue avec SON profil (`general` donne
+    // le profil général), quel que soit le profil global.
+    personaConversation = normaliserPersona(detail.persona);
+    conversationRestauree = true;
+    ecrireSessionChat(sessionId, personaConversation);
     chatMessages = (detail.messages ?? []).map(
-      (m: { id: number; role: string; content: string; sources?: unknown[] }) => ({
-        id: m.id,
+      (m: { role: string; content: string; sources?: unknown[] }) => ({
+        id: nouvelId(),
         type: m.role === "user" ? "user" : "assistant",
         content: m.content,
         sources: (m.sources ?? []) as ChatMessage["sources"],
         timestamp: "",
       }),
     );
-    initialized = true;
     panneauOuvert = false;
     await scrollToBottom();
   }
@@ -167,12 +206,21 @@
     if (sessionId === conversation.session_id) nouvelleConversation();
   }
 
+  /** Annule la réponse qui arrive peut-être encore, et l'oublie. */
+  function abandonnerLaReponseEnCours() {
+    generation += 1;
+    controleur?.abort();
+    controleur = null;
+    isTyping = false;
+  }
+
   function nouvelleConversation() {
+    abandonnerLaReponseEnCours();
     sessionId = null;
+    personaConversation = null;
+    conversationRestauree = false;
+    chatMessages = [];
     effacerSessionChat();
-    initialized = false;
-    initMessages();
-    initialized = true;
     panneauOuvert = false;
   }
 
@@ -202,7 +250,7 @@
       chatMessages = [
         ...chatMessages,
         {
-          id: chatMessages.length + 1,
+          id: nouvelId(),
           type: "error",
           content: t("chat.errorTooShort"),
           timestamp: getCurrentTime(),
@@ -213,9 +261,13 @@
     }
 
     lastQuestion = query;
+    // Le profil de la conversation est fixé à son premier message.
+    if (!conversationEnCours) personaConversation = get(personaStore).persona;
+    const gen = generation;
+    controleur = new AbortController();
 
     const userMessage: ChatMessage = {
-      id: chatMessages.length + 1,
+      id: nouvelId(),
       type: "user",
       content: query,
       timestamp: getCurrentTime(),
@@ -237,9 +289,12 @@
       const response = await apiFetch("/rag/ask/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controleur.signal,
         body: JSON.stringify({
           question: query,
-          persona: "citoyen", // Default persona for general chat
+          // Le profil de la conversation, omis en profil général. Il valait
+          // « citoyen » en dur : le chat ne répondait qu'aux citoyens.
+          ...champPersona(personaConversation),
           language: $language.current,
           // `session_id` etait renvoye par le serveur et jete par le client :
           // chaque message ouvrait donc une conversation NEUVE, et l'historique
@@ -250,8 +305,9 @@
         }),
       });
 
+      if (gen !== generation) return;
       if (response.ok) {
-        await lireLaReponse(response);
+        await lireLaReponse(response, gen);
       } else {
         if (response.status === 404) {
           // Conversation supprimée, ou devenue celle d'un autre compte après
@@ -261,38 +317,37 @@
           effacerSessionChat();
           chargerConversations();
         }
+        // 503 = le fournisseur est saturé, pas une panne. Le dire, sinon
+        // l'utilisateur renonce là où un second essai aboutirait.
+        const corps = response.status === 422 ? await response.json().catch(() => null) : null;
         chatMessages = [
           ...chatMessages,
           {
-            id: chatMessages.length + 1,
+            id: nouvelId(),
             type: "error",
-            // 503 = le fournisseur est saturé, pas une panne. Le dire, sinon
-            // l'utilisateur renonce là où un second essai aboutirait.
-            content:
-              response.status === 503
-                ? t("chat.errorOverloaded")
-                : response.status === 429
-                  ? t("chat.errorQuota")
-                  : response.status === 404
-                    ? t("chat.errorConversationGone")
-                    : t("chat.errorServer"),
+            content: t(cleDErreurHttp(response.status, corps)),
             timestamp: getCurrentTime(),
           },
         ];
       }
     } catch (error) {
+      // Annulé par une nouvelle conversation : rien à dire dans celle-ci.
+      if (gen !== generation) return;
       chatMessages = [
         ...chatMessages,
         {
-          id: chatMessages.length + 1,
+          id: nouvelId(),
           type: "error",
           content: t("chat.errorNetwork"),
           timestamp: getCurrentTime(),
         },
       ];
     } finally {
-      isTyping = false;
-      await scrollToBottom();
+      if (gen === generation) {
+        isTyping = false;
+        controleur = null;
+        await scrollToBottom();
+      }
     }
   }
 
@@ -314,7 +369,7 @@
    * flux arrive comme un événement (le statut HTTP est déjà parti en 200) ;
    * le texte déjà reçu reste affiché, l'erreur s'ajoute dessous.
    */
-  async function lireLaReponse(response: Response) {
+  async function lireLaReponse(response: Response, gen: number) {
     let idReponse: number | null = null;
     let termine = false;
 
@@ -323,11 +378,12 @@
     };
 
     for await (const evenement of lireEvenements(response)) {
+      if (gen !== generation) return;
       if (evenement.error) {
         chatMessages = [
           ...chatMessages,
           {
-            id: chatMessages.length + 1,
+            id: nouvelId(),
             type: "error",
             content: messageDErreur(evenement.error_code),
             timestamp: getCurrentTime(),
@@ -339,7 +395,7 @@
 
       if (evenement.chunk) {
         if (idReponse === null) {
-          idReponse = chatMessages.length + 1;
+          idReponse = nouvelId();
           isTyping = false;
           chatMessages = [
             ...chatMessages,
@@ -362,7 +418,7 @@
         termine = true;
         if (idReponse === null) {
           // Fin sans aucun texte : une réponse vide reste signalée
-          idReponse = chatMessages.length + 1;
+          idReponse = nouvelId();
           chatMessages = [
             ...chatMessages,
             {
@@ -377,10 +433,15 @@
           ];
         }
         ajouterAuMessage({ sources: (evenement.sources ?? []) as ChatMessage["sources"] });
+        // Le profil effectif, tel que le serveur l'a enregistré (`general`
+        // donne le profil général).
+        if (evenement.persona !== undefined) {
+          personaConversation = normaliserPersona(evenement.persona);
+        }
         if (evenement.session_id) {
           const conversationNeuve = evenement.session_id !== sessionId;
           sessionId = evenement.session_id;
-          ecrireSessionChat(sessionId);
+          ecrireSessionChat(sessionId, personaConversation);
           // Le titre est écrit par le serveur à la première interaction : la
           // liste n'a de nouveau à montrer qu'à ce moment-là.
           if (conversationNeuve) chargerConversations();
@@ -390,11 +451,11 @@
     }
 
     // Flux interrompu avant sa fin (réseau, serveur arrêté)
-    if (!termine) {
+    if (!termine && gen === generation) {
       chatMessages = [
         ...chatMessages,
         {
-          id: chatMessages.length + 1,
+          id: nouvelId(),
           type: "error",
           content: t("chat.errorNetwork"),
           timestamp: getCurrentTime(),
@@ -403,8 +464,9 @@
     }
   }
 
+  /** Un clic ENVOIE la suggestion : un seul geste, surtout sur téléphone. */
   function handleSuggestionClick(suggestion: string) {
-    chatInput = suggestion;
+    handleSendChatMessage(suggestion);
   }
 
   function handleChatKeydown(event: KeyboardEvent) {
@@ -418,8 +480,20 @@
     // Reprise du fil laissé au chargement précédent : sans cette ligne, un
     // simple F5 perdait la conversation, qui restait pourtant en base.
     sessionId = lireSessionChat();
+    // Une session sans profil mémorisé date d'avant les profils : citoyen.
+    if (sessionId) personaConversation = personaDeLaSessionMemorisee();
     chargerConversations();
-    if (!initialized) initMessages();
+
+    // Un NOUVEAU choix de l'utilisateur (en-tête, boîte de dialogue) démarre
+    // une conversation neuve si le profil change. Un changement passif
+    // (compte, autre onglet) ne compte pas : il ne touche pas `choix`, et ne
+    // doit pas effacer une conversation rouverte.
+    let dernierChoix = get(personaStore).choix;
+    const desabonner = personaStore.subscribe((etat) => {
+      if (etat.choix === dernierChoix) return;
+      dernierChoix = etat.choix;
+      if (conversationEnCours && etat.persona !== personaConversation) nouvelleConversation();
+    });
 
     // Entrée profonde depuis /laws/[id] : « Poser une question à l'Assistant
     // IA » arrive ici avec le sujet déjà rédigé. La question est PRÉ-REMPLIE et
@@ -429,6 +503,10 @@
     if (q) chatInput = q;
 
     scrollToBottom();
+    return () => {
+      desabonner();
+      controleur?.abort();
+    };
   });
 </script>
 
@@ -550,7 +628,7 @@
   >
     <!-- Version Badge -->
     <div
-      class="flex items-center gap-2 px-6 py-4 bg-gray-50 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
+      class="flex flex-wrap items-center gap-2 px-6 py-4 bg-gray-50 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
     >
       <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
       <span
@@ -560,6 +638,18 @@
           ? "IA Juridique Camerounaise V2.0"
           : "Cameroonian Legal AI V2.0"}
       </span>
+      <!-- Le profil auquel le chat répond : celui de la conversation en cours,
+           sinon le profil choisi. -->
+      <div
+        class="ml-auto flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
+        data-testid="chat-persona"
+        data-persona={personaAffiche ?? "general"}
+      >
+        <span class="material-icons text-base text-blue-600 dark:text-blue-400" aria-hidden="true"
+          >{PERSONA_ICONE[personaAffiche ?? "general"]}</span
+        >
+        <span>{t("persona.chatLabel")} : <strong>{nomDuProfil}</strong></span>
+      </div>
     </div>
 
     <!-- Messages Area -->
@@ -579,7 +669,7 @@
       aria-label={t("chat.header")}
       class="p-6 space-y-6 min-h-[400px] max-h-[500px] overflow-y-auto"
     >
-      {#each chatMessages as message (message.id)}
+      {#each messagesAffiches as message (message.id)}
         <div
           class="flex gap-4 {message.type === 'user' ? 'flex-row-reverse' : ''}"
         >
@@ -645,7 +735,7 @@
                 <div
                   class="space-y-3 text-slate-700 dark:text-slate-200 leading-relaxed text-left"
                 >
-                  {#each blocsDeReponse(message.content) as bloc}
+                  {#each blocsDeReponse(message.content) as bloc, i (i)}
                     {#if bloc.type === "titre"}
                       <h5 class="font-bold text-slate-900 dark:text-white pt-1">
                         {bloc.texte}
@@ -680,7 +770,7 @@
                       {$language.current === "fr" ? "Sources" : "Sources"}
                     </p>
                     <ul class="space-y-2">
-                      {#each message.sources as source}
+                      {#each message.sources as source, i (i)}
                         <li>
                           <!-- article_number en parametre : la page /laws/[id]
                                reconstruit sa liste d'articles depuis le texte,
@@ -709,7 +799,7 @@
 
                 {#if message.details}
                   <ul class="space-y-2 ml-4 text-left">
-                    {#each message.details as detail}
+                    {#each message.details as detail, i (i)}
                       <li class="text-slate-600 dark:text-slate-300">
                         • <strong class="text-slate-800 dark:text-white"
                           >{detail.title}</strong
@@ -720,16 +810,14 @@
                 {/if}
 
                 {#if message.suggestions}
-                  <div class="flex flex-wrap items-center gap-2 mt-4">
-                    <span class="text-sm text-slate-500"
-                      >{$language.current === "fr"
-                        ? "Suggestions:"
-                        : "Suggestions:"}</span
-                    >
-                    {#each message.suggestions as suggestion}
+                  <div class="flex flex-wrap items-center gap-2 mt-4" data-testid="chat-suggestions">
+                    <span class="text-sm text-slate-500">{t("chat.suggestionsLabel")}</span>
+                    {#each message.suggestions as suggestion (suggestion)}
                       <button
                         on:click={() => handleSuggestionClick(suggestion)}
-                        class="px-4 py-1.5 text-sm font-medium rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all"
+                        data-testid="chat-suggestion"
+                        disabled={isTyping}
+                        class="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-1.5 text-sm font-medium rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all"
                       >
                         {suggestion}
                       </button>

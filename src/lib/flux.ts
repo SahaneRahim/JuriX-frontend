@@ -18,6 +18,8 @@ export interface EvenementDeFlux {
   sources?: unknown[];
   confidence?: number;
   session_id?: string;
+  /** Profil effectif de la conversation (dernier événement) ; `general` sans profil. */
+  persona?: string;
   intent?: string;
   error?: string;
   error_code?: 'quota' | 'overloaded' | 'server';
