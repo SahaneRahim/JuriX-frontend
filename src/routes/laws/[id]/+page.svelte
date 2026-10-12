@@ -273,16 +273,22 @@
     return trouve?.page_number && trouve.page_number > 1 ? trouve.page_number : 1;
   })();
 
-  // Des que la liste est prete, se placer sur l'article demande. Comparaison
-  // normalisee : "1er", "1ER" et "1" designent le meme article.
-  $: if (flatArticles.length > 0 && requestedArticle) {
-    const wanted = normaliseArticleNumber(requestedArticle);
-    const found = flatArticles.findIndex(
-      (a) => normaliseArticleNumber(a.number) === wanted,
-    );
-    if (found >= 0 && found !== currentArticleIndex) {
-      currentArticleIndex = found;
-    }
+  /**
+   * Se place sur l'article demandé par `?article=`. Comparaison normalisée :
+   * "1er", "1ER" et "1" désignent le même article.
+   *
+   * Appelée par un bloc `$:` placé APRÈS `parseContent` (voir plus bas) : placé
+   * ici, avant lui, il lisait une liste encore vide, puis `parseContent`
+   * remettait l'index à 0 — un lien « article 94 » du chat ouvrait l'article 1.
+   * Ses seules dépendances sont la liste et l'article demandé : lire
+   * `currentArticleIndex` dans le bloc le relançait à chaque « Suivant », et
+   * ramenait le lecteur à l'article du lien.
+   */
+  function allerALArticleDemande(articles: ArticleTDM[], demande: string | null) {
+    if (articles.length === 0 || !demande) return;
+    const wanted = normaliseArticleNumber(demande);
+    const found = articles.findIndex((a) => normaliseArticleNumber(a.number) === wanted);
+    if (found >= 0) currentArticleIndex = found;
   }
 
   /**
@@ -441,6 +447,7 @@
   $: law = data.law;
   $: error = data.erreur ? $tr(data.erreur) : "";
   $: parseContent(law?.content ?? "");
+  $: allerALArticleDemande(flatArticles, requestedArticle);
 
   /**
    * L'article affiche. DECLARE APRES `parseContent`, et ce n'est pas cosmetique.

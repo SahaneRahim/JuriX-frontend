@@ -117,6 +117,56 @@ test.describe('Rendu des réponses du chat', () => {
     await expect(journal.locator('a[href*="/laws/42"]')).toBeVisible();
   });
 
+  test('une source dit quel article de quel texte, et ouvre CET article', async ({ page }) => {
+    // Le texte ouvert par le lien : l'article 33 n'est pas le premier.
+    await page.route('**/api/v1/laws/42', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 42, reference: 'PRC-9001', type: 'loi', language: 'fr', category_id: null,
+          status: 'published', publication_date: null, articles: [], article_count: 3,
+          detected_language: null, language_confidence: null, suggested_categories: null,
+          category_confidence: null, file_id: null, original_filename: null,
+          title: 'Loi N°2023/014 du 19 décembre 2023 portant Code Minier',
+          content: [
+            'ARTICLE 1.- Objet', 'La présente loi régit les activités minières.',
+            'ARTICLE 2.- Définitions', 'Au sens de la présente loi, on entend par mine…',
+            'ARTICLE 33.- Durée du permis', 'Le permis de recherche est accordé pour trois ans.',
+            'ARTICLE 34.- Renouvellement', 'Le permis est renouvelable deux fois.',
+          ].join('\n\n'),
+        }),
+      }),
+    );
+    await repondre(page, {
+      answer: 'Selon l’article 33 du Code Minier, le permis est accordé pour trois ans.',
+      sources: [{
+        law_id: 42, law_reference: 'PRC-9001',
+        law_title: 'Loi N°2023/014 du 19 décembre 2023 portant Code Minier',
+        article_number: '33', article_id: 900,
+        excerpt: 'Le permis de recherche est accordé pour trois ans.', relevance_score: 0.91,
+      }],
+      intent: 'juridique',
+    });
+
+    await poser(page, 'quelle est la durée du permis de recherche ?');
+
+    // Le nom du texte, jamais sa cote interne.
+    const source = page.getByTestId('chat-source');
+    await expect(source).toContainText('Article 33 — Code Minier');
+    await expect(source).not.toContainText('PRC-9001');
+
+    await source.click();
+
+    await expect(page).toHaveURL(/\/laws\/42\?article=33$/);
+    await expect(page.locator('article.article')).toContainText('trois ans');
+    await expect(page.locator('article.article')).not.toContainText('activités minières');
+
+    // « Suivant » avance : le lien ne ramène pas le lecteur à l'article 33.
+    await page.locator('.article-navigation button').last().click();
+    await expect(page.locator('article.article')).toContainText('renouvelable');
+  });
+
   test('une panne en cours de flux s’affiche en erreur, sans fausse réponse', async ({ page }) => {
     await page.route('**/api/v1/rag/ask/stream', (route) =>
       route.fulfill({

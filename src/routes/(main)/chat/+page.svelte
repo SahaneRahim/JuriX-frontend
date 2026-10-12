@@ -17,6 +17,7 @@
     type Persona,
   } from "$lib/stores/persona";
   import { suggestionsPour } from "$lib/suggestions";
+  import { libelleDeSource, nomCourtDuTexte } from "$lib/sources";
   import { cleDErreurHttp } from "$lib/chat-erreurs";
   import type { ConversationSummary } from "$lib/types";
   import { page } from "$app/stores";
@@ -798,19 +799,25 @@
                           <!-- article_number en parametre : la page /laws/[id]
                                reconstruit sa liste d'articles depuis le texte,
                                elle ne connait pas les identifiants de ligne. -->
+                          <!-- Le nom du texte et non sa cote interne : « PRC-4722 »
+                               ne disait pas qu'il s'agissait du Code pénal.
+                               L'intitulé complet suit, pour lever toute ambiguïté. -->
                           <a
                             href={source.article_number
                               ? `/laws/${source.law_id}?article=${encodeURIComponent(source.article_number)}`
                               : `/laws/${source.law_id}`}
+                            data-testid="chat-source"
                             class="block rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                           >
-                            <span class="text-sm font-medium text-slate-800 dark:text-white">
-                              {source.law_reference}
-                              {#if source.article_number}
-                                — article {source.article_number}
-                              {/if}
+                            <span class="block text-sm font-medium text-slate-800 dark:text-white line-clamp-2">
+                              {libelleDeSource(source)}
                             </span>
-                            <span class="block text-xs text-slate-500 line-clamp-2">
+                            {#if source.law_title && source.law_title !== nomCourtDuTexte(source.law_title, source.law_reference)}
+                              <span class="block truncate text-xs text-slate-500 dark:text-slate-400" title={source.law_title}>
+                                {source.law_title}
+                              </span>
+                            {/if}
+                            <span class="mt-1 block text-xs text-slate-500 line-clamp-2">
                               {source.excerpt}
                             </span>
                           </a>
