@@ -62,6 +62,8 @@
   // State
   let chatInput = "";
   let isTyping = false;
+  /** Une question est partie et sa réponse n'est pas finie. */
+  let envoiEnCours = false;
   let messagesContainer: HTMLDivElement;
 
   // Reactive translation shorthand
@@ -213,10 +215,14 @@
     controleur?.abort();
     controleur = null;
     isTyping = false;
+    envoiEnCours = false;
   }
 
   function nouvelleConversation() {
     abandonnerLaReponseEnCours();
+    // « Réessayer » ne doit pas reposer, sous le nouveau profil, la question
+    // de la conversation quittée.
+    lastQuestion = "";
     sessionId = null;
     personaConversation = null;
     conversationRestauree = false;
@@ -242,7 +248,11 @@
    */
   async function handleSendChatMessage(question?: string) {
     const query = (question ?? chatInput).trim();
-    if (!query) return;
+    // Une seule question à la fois, jusqu'à la FIN de la réponse. `isTyping`
+    // retombe au premier morceau : une suggestion cliquée pendant le flux
+    // partait sans session_id, ouvrait une seconde conversation sur le
+    // serveur et coupait le fil en deux.
+    if (!query || envoiEnCours) return;
 
     // Le schéma serveur impose `min_length=5` sur `question`. Sans ce contrôle,
     // une question de quatre lettres rendait un 422 que l'écran affichait en
@@ -266,6 +276,7 @@
     if (!conversationEnCours) personaConversation = get(personaStore).persona;
     const gen = generation;
     controleur = new AbortController();
+    envoiEnCours = true;
 
     const userMessage: ChatMessage = {
       id: nouvelId(),
@@ -321,6 +332,8 @@
         // 503 = le fournisseur est saturé, pas une panne. Le dire, sinon
         // l'utilisateur renonce là où un second essai aboutirait.
         const corps = response.status === 422 ? await response.json().catch(() => null) : null;
+        // Le corps se lit en différé : la conversation a pu changer entre-temps.
+        if (gen !== generation) return;
         chatMessages = [
           ...chatMessages,
           {
@@ -346,6 +359,7 @@
     } finally {
       if (gen === generation) {
         isTyping = false;
+        envoiEnCours = false;
         controleur = null;
         await scrollToBottom();
       }
@@ -654,7 +668,7 @@
           type="button"
           data-testid="chat-persona-change"
           aria-haspopup="dialog"
-          on:click={ouvrirChoixPersona}
+          on:click={() => ouvrirChoixPersona(personaAffiche)}
           class="rounded-md px-2 py-0.5 font-semibold text-blue-700 underline hover:no-underline dark:text-blue-300"
           >{t("persona.change")}</button
         >
@@ -825,7 +839,7 @@
                       <button
                         on:click={() => handleSuggestionClick(suggestion)}
                         data-testid="chat-suggestion"
-                        disabled={isTyping}
+                        disabled={envoiEnCours}
                         class="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-1.5 text-sm font-medium rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all"
                       >
                         {suggestion}
@@ -886,7 +900,7 @@
              authentifié), et le bouton n'avait de toute façon aucun on:click. -->
         <button
           on:click={() => handleSendChatMessage()}
-          disabled={!chatInput.trim()}
+          disabled={!chatInput.trim() || envoiEnCours}
           aria-label={t("chat.send")}
           class="w-10 h-10 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white flex items-center justify-center transition-all hover:scale-105 disabled:hover:scale-100"
         >

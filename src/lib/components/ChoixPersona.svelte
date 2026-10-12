@@ -24,13 +24,14 @@
     PERSONA_SLUG,
     fermerChoixPersona,
     personaStore,
+    profilDuChoix,
     type Persona,
   } from "$lib/stores/persona";
 
   export let mode: "accueil" | "changement" = "accueil";
 
   $: t = $tr;
-  $: actuel = $personaStore.persona;
+  $: actuel = $profilDuChoix !== undefined ? $profilDuChoix : $personaStore.persona;
 
   function choisir(persona: Persona) {
     fermerChoixPersona();
@@ -60,8 +61,16 @@
     fermer();
   }
 
+  // Le fond ne ferme que sur un clic simple, commencé ET fini sur lui. Un
+  // double-clic sur le bouton d'ouverture tombait au second clic sur le fond
+  // déjà affiché : la boîte s'ouvrait et se refermait. Un glisser depuis une
+  // carte, relâché sur le fond, fermait aussi.
+  let pressionSurLeFond = false;
+
   function surLeFond(event: MouseEvent) {
-    if (event.target === event.currentTarget && mode === "changement") fermerChoixPersona();
+    const ferme = pressionSurLeFond && event.detail <= 1 && event.target === event.currentTarget;
+    pressionSurLeFond = false;
+    if (ferme && mode === "changement") fermerChoixPersona();
   }
 </script>
 
@@ -70,8 +79,9 @@
 <div
   class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
   role="presentation"
+  on:pointerdown={(e) => (pressionSurLeFond = e.target === e.currentTarget)}
   on:click={surLeFond}
-  transition:fade={{ duration: 120 }}
+  in:fade={{ duration: 120 }}
 >
   <div
     role="dialog"
@@ -165,11 +175,17 @@
       {/each}
     </div>
 
+    <!-- En changement, le profil général est un choix comme les autres : il
+         porte « actuel », et reçoit le focus à l'ouverture. -->
     <button
       type="button"
       data-testid="persona-skip"
+      aria-current={mode === "changement" && actuel === null ? "true" : undefined}
       on:click={sansProfil}
-      class="mt-4 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+      class="mt-4 w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700 {mode ===
+        'changement' && actuel === null
+        ? 'border-blue-500 bg-blue-50 dark:bg-slate-700'
+        : 'border-slate-200 dark:border-slate-600'}"
     >
       {mode === "accueil"
         ? t("persona.skip")

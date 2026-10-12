@@ -49,19 +49,34 @@
   let dialogue: "accueil" | "changement" | null = null;
   $: dialogue = $choixPersonaOuvert ? "changement" : accueil ? "accueil" : null;
 
-  // Fermée, la boîte de CHANGEMENT rend le focus au bouton qui l'a ouverte. Si
-  // la page était encore inerte à cet instant, le focus tombe sur <body> : on
-  // le rattrape. En accueil, on le laisse au début du document, pour que la
-  // première tabulation atteigne le lien d'évitement.
+  // Fermée, la boîte de CHANGEMENT rend le focus au bouton qui l'a ouverte
+  // (en-tête, menu mobile ou chat). Si la page était encore inerte à cet
+  // instant, le focus tombe sur <body> : on le rattrape. En accueil, on le
+  // laisse au début du document, pour que la première tabulation atteigne le
+  // lien d'évitement.
+  //
+  // Ouverte, la boîte bloque aussi le défilement de la page derrière elle.
   let modePrecedent: typeof dialogue = null;
-  $: if (dialogue !== modePrecedent) {
+  let ouvreur: HTMLElement | null = null;
+  let debordementAvant = "";
+  $: if (typeof document !== "undefined" && dialogue !== modePrecedent) {
+    if (modePrecedent === null) {
+      debordementAvant = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    } else if (dialogue === null) {
+      document.body.style.overflow = debordementAvant;
+    }
+    if (dialogue === "changement" && modePrecedent !== "changement") {
+      ouvreur = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     const ferme = modePrecedent === "changement" && dialogue === null;
     modePrecedent = dialogue;
     if (ferme) {
+      const cible = ouvreur;
       tick().then(() => {
-        if (document.activeElement === document.body) {
-          document.querySelector<HTMLElement>('[data-testid="persona-toggle"]')?.focus();
-        }
+        if (document.activeElement !== document.body) return;
+        const visible = cible?.isConnected && cible.offsetParent !== null;
+        (visible ? cible : document.querySelector<HTMLElement>('[data-testid="persona-toggle"]'))?.focus();
       });
     }
   }

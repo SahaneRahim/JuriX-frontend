@@ -67,6 +67,7 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
       }
 
       if (overviewRes.ok) overview = await overviewRes.json();
+      usageDisponible = usageRes.ok;
       if (usageRes.ok) usage = await usageRes.json();
       if (searchRes.ok) searchStats = await searchRes.json();
       if (lawsRes.ok) dernieresLois = await lawsRes.json();
@@ -83,6 +84,10 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
   // Conversations par profil, sur la fenetre de `/analytics/usage`. La ligne
   // « Profil general » compte les refus de la question du profil, et ceux
   // qui ont choisi ce profil depuis l'en-tete.
+  // Indisponible n'est pas zero : une panne de `/analytics/usage`, ou un
+  // backend sans `personas_usage`, ne s'affiche pas « aucune conversation ».
+  let usageDisponible = false;
+  $: profilsMesures = usageDisponible && usage.personas_usage != null;
   $: lignesProfils = repartitionParProfil(usage.personas_usage);
   $: pourcentage = new Intl.NumberFormat($language.current, {
     style: "percent",
@@ -267,7 +272,11 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
         >{$tr("admin.lastDays").replace("{n}", String(usage.window_days ?? 7))}</span
       >
     </div>
-    {#if lignesProfils.length > 0}
+    {#if !profilsMesures}
+      <p class="py-6 text-center text-sm text-slate-500" data-testid="admin-profils-indisponible">
+        {$tr("admin.personasUnavailable")}
+      </p>
+    {:else if lignesProfils.length > 0}
       <ul class="space-y-4">
         {#each lignesProfils as ligne (ligne.cle)}
           <li data-testid="admin-profil" data-profil={ligne.profil ?? ligne.cle}>

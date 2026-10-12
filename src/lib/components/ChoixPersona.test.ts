@@ -10,7 +10,12 @@ vi.mock('$lib/persona-compte', () => ({
 }));
 
 import { changerPersona, refuserPourCetteSession } from '$lib/persona-compte';
-import { choixPersonaOuvert } from '$lib/stores/persona';
+import {
+  choixPersonaOuvert,
+  fermerChoixPersona,
+  ouvrirChoixPersona,
+  personaStore,
+} from '$lib/stores/persona';
 import ChoixPersona from './ChoixPersona.svelte';
 
 // jsdom n'a pas l'API Web Animations, dont les transitions de Svelte 5 ont
@@ -26,7 +31,9 @@ describe('ChoixPersona', () => {
   beforeEach(() => {
     vi.mocked(changerPersona).mockClear();
     vi.mocked(refuserPourCetteSession).mockClear();
-    choixPersonaOuvert.set(false);
+    fermerChoixPersona();
+    localStorage.clear();
+    personaStore._reinitialiser();
   });
   afterEach(() => cleanup());
 
@@ -86,5 +93,61 @@ describe('ChoixPersona', () => {
     await fireEvent.keyDown(window, { key: 'a' });
 
     expect(refuserPourCetteSession).not.toHaveBeenCalled();
+  });
+
+  describe('le fond, en changement', () => {
+    function fond() {
+      return document.querySelector('[role="presentation"]') as HTMLElement;
+    }
+
+    it('un clic simple sur le fond ferme', async () => {
+      ouvrirChoixPersona();
+      render(ChoixPersona, { props: { mode: 'changement' } });
+
+      await fireEvent.pointerDown(fond());
+      await fireEvent.click(fond(), { detail: 1 });
+
+      expect(get(choixPersonaOuvert)).toBe(false);
+    });
+
+    it('le second clic d un double-clic sur le bouton d ouverture ne ferme pas', async () => {
+      ouvrirChoixPersona();
+      render(ChoixPersona, { props: { mode: 'changement' } });
+
+      await fireEvent.pointerDown(fond());
+      await fireEvent.click(fond(), { detail: 2 });
+
+      expect(get(choixPersonaOuvert)).toBe(true);
+    });
+
+    it('un glisser commence sur une carte et relache sur le fond ne ferme pas', async () => {
+      ouvrirChoixPersona();
+      const { getByTestId } = render(ChoixPersona, { props: { mode: 'changement' } });
+
+      await fireEvent.pointerDown(getByTestId('persona-choice-avocat'));
+      await fireEvent.click(fond(), { detail: 1 });
+
+      expect(get(choixPersonaOuvert)).toBe(true);
+    });
+  });
+
+  it('depuis le chat, « Actuel » est le profil de la conversation affichee', () => {
+    // Profil choisi citoyen, conversation avocat rouverte.
+    personaStore.choisir('citoyen');
+    ouvrirChoixPersona('avocat');
+    const { getByTestId } = render(ChoixPersona, { props: { mode: 'changement' } });
+
+    expect(getByTestId('persona-choice-avocat').getAttribute('aria-current')).toBe('true');
+    expect(getByTestId('persona-choice-citoyen').getAttribute('aria-current')).toBeNull();
+    expect(document.activeElement).toBe(getByTestId('persona-choice-avocat'));
+  });
+
+  it('en changement, le profil general est marque actuel et recoit le focus', () => {
+    personaStore.refuser();
+    ouvrirChoixPersona();
+    const { getByTestId } = render(ChoixPersona, { props: { mode: 'changement' } });
+
+    expect(getByTestId('persona-skip').getAttribute('aria-current')).toBe('true');
+    expect(document.activeElement).toBe(getByTestId('persona-skip'));
   });
 });

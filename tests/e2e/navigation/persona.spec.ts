@@ -105,7 +105,8 @@ test.describe('Le chat suit le profil', () => {
   });
 
   test('« étudiant » part en NFC, la forme que le serveur attend', async ({ page }) => {
-    await profil(page, 'étudiant');
+    // Mémorisé en NFD : la normalisation doit le ramener en NFC.
+    await profil(page, 'e\u0301tudiant');
     const corps = await repondre(page, { persona: 'étudiant' });
 
     await page.goto('/chat');
@@ -196,6 +197,19 @@ test.describe('Une conversation rouverte garde son profil', () => {
     await expect(page.getByRole('log')).toContainText('voici la réponse');
     expect(corps[0].persona).toBe('avocat');
     expect(corps[0].session_id).toBe('sid-1');
+
+    // « Changer » marque le profil de la CONVERSATION, et Échap rend le focus
+    // au bouton du chat.
+    const changer = page.getByTestId('chat-persona-change');
+    await changer.click();
+    await expect(page.getByTestId('persona-choice-avocat')).toHaveAttribute('aria-current', 'true');
+    await page.keyboard.press('Escape');
+    await expect(changer).toBeFocused();
+
+    // Choisir ce profil-là ne remplace pas la conversation.
+    await changer.click();
+    await page.getByTestId('persona-choice-avocat').click();
+    await expect(page.getByRole('log')).toContainText('Et la tentative ?');
   });
 });
 
@@ -396,6 +410,7 @@ test.describe('Le tableau de bord', () => {
     });
 
     await page.goto('/admin');
+    await page.waitForLoadState('networkidle');
 
     const lignes = page.getByTestId('admin-profil');
     await expect(lignes).toHaveCount(3);
@@ -404,5 +419,20 @@ test.describe('Le tableau de bord', () => {
     await expect(lignes.nth(1)).toHaveAttribute('data-profil', 'étudiant');
     await expect(lignes.nth(2)).toContainText('Profil général');
     await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+  });
+
+  test('une panne de la mesure ne s affiche pas comme zéro conversation', async ({ page }) => {
+    await connecte(page, 'admin');
+    await page.route('**/api/v1/**', (route) => {
+      const chemin = new URL(route.request().url()).pathname.replace(/^.*\/api\/v1/, '');
+      if (chemin === '/analytics/usage') return route.fulfill({ status: 500, body: '{}' });
+      const corps = chemin === '/laws/' ? [] : chemin === '/auth/me' ? { persona: null } : {};
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) });
+    });
+
+    await page.goto('/admin');
+
+    await expect(page.getByTestId('admin-profils-indisponible')).toBeVisible();
+    await expect(page.getByTestId('admin-profils')).not.toContainText('Aucune conversation');
   });
 });

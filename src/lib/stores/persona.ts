@@ -286,8 +286,24 @@ export const personaStore = creerPersonaStore();
 
 /** Ouverture de la boîte de dialogue en mode « changement » (en-tête, chat). */
 export const choixPersonaOuvert = writable(false);
-export const ouvrirChoixPersona = (): void => choixPersonaOuvert.set(true);
-export const fermerChoixPersona = (): void => choixPersonaOuvert.set(false);
+
+/**
+ * Le profil que la boîte marque « Actuel ». Depuis le chat, c'est celui de la
+ * conversation affichée, qui peut différer du profil choisi (conversation
+ * rouverte) : la boîte marquait l'autre, et le choisir « pour ne rien changer »
+ * remplaçait la conversation. `undefined` : le profil choisi.
+ */
+export const profilDuChoix = writable<Persona | null | undefined>(undefined);
+
+export function ouvrirChoixPersona(affiche?: Persona | null): void {
+  profilDuChoix.set(affiche);
+  choixPersonaOuvert.set(true);
+}
+
+export function fermerChoixPersona(): void {
+  choixPersonaOuvert.set(false);
+  profilDuChoix.set(undefined);
+}
 
 export function oublierPersona(): void {
   personaStore.oublier();

@@ -166,7 +166,7 @@
 
     <!-- Le profil : icône seule entre md et lg, où la barre est déjà chargée. -->
     <button
-      on:click={ouvrirChoixPersona}
+      on:click={() => ouvrirChoixPersona()}
       data-testid="persona-toggle"
       aria-haspopup="dialog"
       aria-label={libelleDuProfil}
@@ -297,7 +297,7 @@
           >
         </button>
         <button
-          on:click={ouvrirChoixPersona}
+          on:click={() => ouvrirChoixPersona()}
           data-testid="persona-toggle-mobile"
           aria-haspopup="dialog"
           aria-label={libelleDuProfil}
