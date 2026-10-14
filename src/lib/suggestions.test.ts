@@ -30,8 +30,10 @@ describe('suggestions du chat', () => {
   });
 
   it('aucune question hors du corpus (ni jurisprudence ni methode)', () => {
+    // « licenciement » n'est plus interdit : le Code du travail (loi 92/007)
+    // est dans le corpus depuis le 2026-10-14.
     const tout = JSON.stringify(SUGGESTIONS).toLowerCase();
-    for (const interdit of ['jurisprudence', 'case law', 'cas pratique', 'licenciement']) {
+    for (const interdit of ['jurisprudence', 'case law', 'cas pratique']) {
       expect(tout).not.toContain(interdit);
     }
   });
