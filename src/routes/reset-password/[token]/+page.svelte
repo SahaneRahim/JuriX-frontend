@@ -35,7 +35,11 @@
   // l'URL ne porte plus le segment, seule cette variable garde le jeton.
   let jetonEnvoye = "";
 
+  // Envoi inactif jusqu'au montage : voir login/+page.svelte.
+  let monte = false;
+
   onMount(() => {
+    monte = true;
     jetonEnvoye = jeton;
     // Le jeton disparaît de la barre d'adresse et de l'historique du
     // navigateur : une capture d'écran, un partage d'écran ou un collègue
@@ -269,7 +273,7 @@
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !monte}
             data-testid="reset-submit"
             class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >

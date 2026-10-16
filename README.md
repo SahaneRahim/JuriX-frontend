@@ -1,7 +1,7 @@
 # JuriX — interface
 
 SvelteKit 2 (syntaxe Svelte 4 sur moteur Svelte 5), TypeScript strict, Tailwind,
-site statique (adapter-static). L'interface d'une plateforme de recherche dans le droit
+rendu serveur (adapter-node). L'interface d'une plateforme de recherche dans le droit
 camerounais : recherche plein texte et sémantique, lecture de documents,
 assistant conversationnel, administration du corpus.
 
@@ -24,13 +24,14 @@ précisément ce comportement.
 
 ## Construire pour la production
 
-Le front est un **site statique** : aucune page n'a de code serveur, tout passe
-par l'API. `npm run build` rend le dossier `build/`, que n'importe quel serveur
-web sert tel quel, à une condition : renvoyer `index.html` pour toute route
-inconnue, sans quoi un lien profond (`/laws/123`) répond 404.
+Les pages sont **rendues par le serveur** (adapter-node) : le HTML d'une fiche,
+d'une liste ou d'une catégorie arrive complet, lisible par un moteur qui
+n'exécute pas le JavaScript. Seuls `/admin` et `/chat` restent rendus dans le
+navigateur (`ssr = false`), en `noindex`.
 
 ```bash
 VITE_API_URL=https://jurix.exemple.cm npm run build     # dossier build/
+ORIGIN=https://jurix.exemple.cm API_INTERNE=http://api:8000 node build
 ```
 
 `VITE_API_URL` est **figée au build**. En production, le front et l'API sont
@@ -38,20 +39,54 @@ servis sous le même domaine, par la même VM (voir `deploiement/oracle` dans le
 dépôt backend) : l'API répond sous `/api/v1`, d'où une seule URL, et aucun
 CORS.
 
+Le serveur lit ses autres réglages **au démarrage** (voir `.env.example`) :
+
+- `ORIGIN` : l'origine publique, la même que celle de `VITE_API_URL`. Elle fixe
+  l'adresse des URL canoniques et celle à laquelle les `load` comparent l'API.
+  Sans elle, le serveur la déduit de l'en-tête `Host` reçu : une autre adresse
+  (alias www, IP de la VM) ferait prendre l'API pour une autre origine, et les
+  pages tomberaient en 503.
+- `API_INTERNE` : l'adresse de l'API sur le réseau du serveur. Le rendu y envoie
+  ses appels au lieu de ressortir par l'adresse publique
+  (`src/hooks.server.ts`). Jamais dans le `.env` de développement.
+- `PORT` et `HOST` : 3000 et 0.0.0.0 par défaut.
+
+À l'exécution, seuls `build/` et `package.json` servent : les dépendances sont
+intégrées au build.
+
+Quand l'API ne répond pas (ou au-delà de 8 s), l'accueil, une fiche, `/laws` et
+une catégorie répondent **503** au rendu serveur : c'est le signal d'une panne
+passagère pour un moteur, là où une page 200 « Impossible de charger » serait
+indexée telle quelle. La cause est écrite dans le journal du serveur
+(`[503] /laws : API indisponible (…)`). En navigation dans le navigateur, ces
+pages gardent leur message et leur bouton de reprise.
+
 ## Vérifier
 
 ```bash
-npm test                # 166 tests unitaires (vitest)
-npm run test:e2e        # 168 tests de bout en bout (playwright)
+npm test                # 315 tests unitaires (vitest)
+npm run test:e2e        # 191 tests de bout en bout (playwright)
 npm run check           # types (svelte-check) — doit rendre 0 erreur
 npm run lint            # eslint
 npm run build           # build de production
 ```
 
-`npm run test:e2e` construit le site et le sert sur le port 4173. Il ne réutilise
+`npm run test:e2e` construit le site et le sert (`node build`) sur le port 4173. Il ne réutilise
 jamais un serveur déjà lancé : un serveur de développement sur du code ancien
 ferait passer les tests sur autre chose que ce qu'on croit mesurer. Le port 4173
 doit donc être libre ; le développement, sur 5173, peut tourner en même temps.
+Le même build est servi une seconde fois sur 4174, avec une API injoignable
+(`API_INTERNE` vers un nom qui ne se résout pas) : `panne-api.spec.ts` y vérifie les 503 du
+rendu serveur, que `page.route` ne peut pas provoquer.
+
+Sans backend, les tests qui demandent l'API ou ses données sont sautés. Avant un
+commit, lancer la suite backend allumé, avec `E2E_EXIGER_BACKEND=1` : un test
+sauté devient alors un échec, et une suite verte prouve vraiment le rendu
+serveur.
+
+```bash
+E2E_EXIGER_BACKEND=1 npm run test:e2e
+```
 
 Chaque test e2e part d'un navigateur où le profil **citoyen** est déjà choisi
 (`storageState` dans `playwright.config.ts`) : sans cette graine, la question du
@@ -125,7 +160,9 @@ répond en **profil général**, et la requête omet le champ `persona`.
 
 ```
 src/lib/
-  api.ts             API_URL, apiFetch (injecte le jeton, gère le 401), WebSocket
+  config.ts          API_URL, WS_URL : les adresses de l'API, sans effet de bord
+  api.ts             apiFetch (injecte le jeton, gère le 401), WebSocket
+  identifiant.ts     identifiants lus dans les URL (/laws/<id>, /categories/<id>)
   nav.ts             manifeste de navigation, source des liens ET des tests
   format.ts          dates — une seule implémentation, il y en avait huit
   pagination.ts      pagination — une seule règle, il y en avait quatre
@@ -138,6 +175,9 @@ src/lib/
   actions/           piegerFocus : le focus clavier des fenêtres modales
   components/        SearchBar, SearchResultCard, StatusBadge, ImagePdfViewer,
                      ChoixPersona (la question du profil), admin/
+src/hooks.server.ts  rendu serveur : noindex des pages privées, appels de
+                     l'API par le réseau interne, journal des erreurs sans jeton
+src/error.html       page de dernier recours, sans JavaScript
 src/routes/
   (main)/         accueil et assistant conversationnel
   laws/           liste et lecture des documents, explication d'un article par l'IA
@@ -146,6 +186,7 @@ src/routes/
   signup/         création de compte (nom, adresse, mot de passe, ou Google)
   compare/        comparaison de deux régimes, grille sourcée cellule par cellule
   admin/          tableau de bord, documents, import en masse, comptes
+  robots.txt/     robots.txt, en texte (et non la page de l'application)
 tests/e2e/        playwright : navigation, accessibilité, backend indisponible,
                   inscription, conversations enregistrées,
                   explication d'article, comparaison (appel Gemini intercepté)

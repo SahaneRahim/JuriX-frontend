@@ -21,9 +21,12 @@ const CLE = 'jurix-chat-session';
  */
 const CLE_PERSONA = 'jurix-chat-persona';
 
+// `window` d'abord : Node 25 expose un localStorage global, propre au processus
+// et partage par tous les visiteurs du serveur. Seul le navigateur stocke.
+
 /** L'identifiant en cours, ou `null`. */
 export function lireSessionChat(): string | null {
-  if (typeof localStorage === 'undefined') return null;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
   try {
     const valeur = localStorage.getItem(CLE);
     // Une chaîne vide n'est pas un identifiant : la traiter comme absente
@@ -42,7 +45,7 @@ export function lireSessionChat(): string | null {
  * change pas ; `null` : profil général.
  */
 export function ecrireSessionChat(sessionId: string | null, persona?: string | null): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   try {
     if (sessionId && sessionId.trim()) {
       localStorage.setItem(CLE, sessionId);
@@ -61,7 +64,7 @@ export function ecrireSessionChat(sessionId: string | null, persona?: string | n
  * le normalise), ou `null` quand la clé est absente.
  */
 export function lirePersonaSessionChat(): string | null {
-  if (typeof localStorage === 'undefined') return null;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
   try {
     return localStorage.getItem(CLE_PERSONA);
   } catch {

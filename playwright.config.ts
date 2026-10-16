@@ -44,14 +44,20 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
+  webServer: [{
     // BUILD DE PRODUCTION, et non serveur de developpement.
     //
     // Vite compile chaque route a la premiere requete : le premier affichage
     // d'une page pouvait prendre plusieurs secondes, retardant d'autant
     // l'hydratation. C'etait la principale source de variance de cette suite.
     // Le build est compile une fois, puis servi tel quel.
-    command: 'npm run build && npm run preview -- --port 4173 --strictPort',
+    // `node build`, et non `vite preview` : c'est le serveur de production
+    // (adapter-node), avec sa lecture de l'environnement et ORIGIN. vite
+    // preview rend avec un serveur generique, et un mauvais adaptateur y
+    // passerait inapercu. Sans ORIGIN, adapter-node suppose https : l'origine
+    // de la page et celle des appels a l'API ne concorderaient plus.
+    command: 'npm run build && node build',
+    env: { PORT: '4173', HOST: '127.0.0.1', ORIGIN: 'http://localhost:4173' },
     url: 'http://localhost:4173',
     // JAMAIS de reutilisation : `reuseExistingServer` acceptait n'importe quel
     // serveur trouve sur le port, y compris un serveur de developpement lance
@@ -61,5 +67,20 @@ export default defineConfig({
     // coexistent sans se confondre.
     reuseExistingServer: false,
     timeout: 180000,
-  },
+  }, {
+    // Le MEME build, servi une seconde fois avec une API injoignable :
+    // API_INTERNE vise un nom qui ne se resout pas (.invalid, reserve a cet
+    // usage), comme une adresse mal recopiee. C'est le seul moyen de faire echouer les
+    // appels que le serveur fait lui-meme (page.route ne voit que ceux du
+    // navigateur), donc de verifier les 503 du rendu serveur et la reecriture
+    // de src/hooks.server.ts (tests/e2e/navigation/panne-api.spec.ts).
+    // Demarre apres le premier, build compris : Playwright lance ses serveurs
+    // l'un apres l'autre. La sonde vise un fichier : toutes les pages qui
+    // appellent l'API y repondent 503.
+    command: 'node build',
+    env: { PORT: '4174', HOST: '127.0.0.1', ORIGIN: 'http://localhost:4174', API_INTERNE: 'http://api-injoignable.invalid:8000' },
+    url: 'http://localhost:4174/favicon.svg',
+    reuseExistingServer: false,
+    timeout: 30000,
+  }],
 });

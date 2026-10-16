@@ -25,6 +25,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { SUGGESTIONS } from '../../../src/lib/suggestions';
+import { cliquerJusqualEffet } from '../hydratation';
 
 // Ce fichier part d'un navigateur VIDE : la graine commune de
 // playwright.config.ts (un profil citoyen déjà choisi) fausserait ses cas.
@@ -272,9 +273,11 @@ test.describe('La question « Qui êtes-vous ? »', () => {
     await page.waitForLoadState('networkidle');
     await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
 
-    // Même visite, nouvel onglet : le cookie de session est partagé.
+    // Même visite, nouvel onglet : le cookie de session est partagé. /about et
+    // non /laws : sans backend, /laws répond 503, et la page d'erreur ne pose
+    // jamais la question, quel que soit le cookie.
     const onglet = await context.newPage();
-    await onglet.goto('/laws');
+    expect((await onglet.goto('/about'))?.status()).toBe(200);
     await onglet.waitForLoadState('networkidle');
     await expect(onglet.getByTestId('persona-dialog')).toHaveCount(0);
 
@@ -302,7 +305,9 @@ test.describe('La question « Qui êtes-vous ? »', () => {
     await page.setViewportSize({ width: 375, height: 800 });
     await page.goto('/about');
 
-    await page.getByTestId('nav-mobile-toggle').click();
+    // /about arrive rendue par le serveur : le bouton du menu existe avant
+    // l'hydratation, et un clic parti trop tôt serait perdu.
+    await cliquerJusqualEffet(page.getByTestId('nav-mobile-toggle'), page.getByTestId('persona-toggle-mobile'));
     await page.getByTestId('persona-toggle-mobile').click();
 
     await expect(page.getByTestId('persona-dialog')).toHaveAttribute('data-mode', 'changement');
@@ -339,8 +344,10 @@ test.describe('Changer de profil', () => {
     await profil(page, 'étudiant');
     await page.goto('/about');
 
-    await page.getByTestId('persona-toggle').click();
-    await expect(page.getByTestId('persona-dialog')).toHaveAttribute('data-mode', 'changement');
+    await cliquerJusqualEffet(
+      page.getByTestId('persona-toggle'),
+      page.locator('[data-testid="persona-dialog"][data-mode="changement"]'),
+    );
     await page.keyboard.press('Escape');
 
     await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
@@ -375,7 +382,7 @@ test.describe('Le profil suit le compte', () => {
     });
 
     await page.goto('/about');
-    await page.getByTestId('persona-toggle').click();
+    await cliquerJusqualEffet(page.getByTestId('persona-toggle'), page.getByTestId('persona-choice-avocat'));
     await page.getByTestId('persona-choice-avocat').click();
 
     await expect.poll(() => envois.length).toBe(1);

@@ -17,7 +17,25 @@
  *    traverser toute la navigation, à chaque page.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { cliquerJusqualEffet } from '../hydratation';
+
+/**
+ * Ouvre la page et vérifie que c'est bien ELLE qui est auditée.
+ *
+ * API ou base éteinte, '/' et '/laws' répondent 503 avec la page d'erreur, qui
+ * a elle aussi un h1, un main, un titre et des contrôles nommés : chaque
+ * contrôle passerait contre une autre page. Elles sont alors sautées — et le
+ * test échoue avec E2E_EXIGER_BACKEND=1.
+ */
+async function ouvrir(page: Page, chemin: string): Promise<void> {
+  const statut = (await page.goto(chemin))?.status() ?? 0;
+  if (statut === 503) {
+    if (process.env.E2E_EXIGER_BACKEND === '1') expect(statut, `${chemin} : API indisponible`).toBe(200);
+    test.skip(true, `${chemin} : API indisponible (503)`);
+  }
+  expect(statut, `${chemin} : statut`).toBeLessThan(400);
+}
 
 const PAGES_PUBLIQUES = [
   '/',
@@ -43,7 +61,7 @@ const PAGES_PUBLIQUES = [
 test.describe('Structure des pages', () => {
   for (const chemin of PAGES_PUBLIQUES) {
     test(`${chemin} : un h1, un main, un titre`, async ({ page }) => {
-      await page.goto(chemin);
+      await ouvrir(page, chemin);
 
       // Exactement un h1 : /chat et /login n'en avaient aucun, et le h1 du
       // layout est masqué sur /chat depuis que le hero y est caché.
@@ -73,7 +91,7 @@ test.describe('Lien d’évitement', () => {
 test.describe('Cible du lien d’évitement', () => {
   for (const chemin of PAGES_PUBLIQUES) {
     test(`${chemin} : #contenu existe`, async ({ page }) => {
-      await page.goto(chemin);
+      await ouvrir(page, chemin);
       // Un lien d'evitement sans ancre correspondante ne mene nulle part : il
       // donne l'illusion du raccourci sans le rendre. Cinq pages sur huit
       // etaient dans ce cas.
@@ -85,7 +103,7 @@ test.describe('Cible du lien d’évitement', () => {
 test.describe('Icônes décoratives', () => {
   for (const chemin of ['/', '/search?q=loi', '/laws']) {
     test(`${chemin} : aucune ligature lue à voix haute`, async ({ page }) => {
-      await page.goto(chemin);
+      await ouvrir(page, chemin);
 
       // Une ligature Material Icons est du TEXTE : sans aria-hidden, un lecteur
       // d'écran annonce « search », « menu », « balance » au fil de la page.
@@ -100,7 +118,7 @@ test.describe('Icônes décoratives', () => {
 test.describe('Noms accessibles', () => {
   for (const chemin of PAGES_PUBLIQUES) {
     test(`${chemin} : aucun lien ni bouton anonyme`, async ({ page }) => {
-      await page.goto(chemin);
+      await ouvrir(page, chemin);
 
       // Piege appris a nos depens : masquer une icone avec aria-hidden est
       // correct pour une icone DECORATIVE, mais si elle est le seul contenu
@@ -143,10 +161,12 @@ test.describe('Langue du document', () => {
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
 
-    await page.getByTestId('lang-en').click();
+    // La page arrive rendue par le serveur, html[lang="fr"] compris : le bouton
+    // existe avant que Svelte ne s'y attache, et un clic parti trop tôt est
+    // perdu. On clique jusqu'à voir l'effet.
     // `app/app.html` fixait lang="fr" en dur : tout le contenu anglais était
     // annoncé avec la prononciation française.
-    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await cliquerJusqualEffet(page.getByTestId('lang-en'), page.locator('html[lang="en"]'));
 
     await page.getByTestId('lang-fr').click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
@@ -156,7 +176,7 @@ test.describe('Langue du document', () => {
 test.describe('Champs de formulaire', () => {
   for (const chemin of PAGES_PUBLIQUES) {
     test(`${chemin} : tout champ porte un nom accessible`, async ({ page }) => {
-      await page.goto(chemin);
+      await ouvrir(page, chemin);
 
       const sansNom = await page.$$eval(
         'input:not([type="hidden"]), select, textarea',
@@ -191,7 +211,7 @@ import AxeBuilder from '@axe-core/playwright';
 test.describe('Balayage axe-core', () => {
   for (const chemin of PAGES_PUBLIQUES) {
     test(`${chemin} : aucune violation serieuse`, async ({ page }) => {
-      await page.goto(chemin);
+      await ouvrir(page, chemin);
 
       const resultats = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

@@ -154,6 +154,25 @@ export interface Law {
 }
 
 /**
+ * Les listes ne reçoivent que ce qu'elles affichent : leurs `load` serveur
+ * trient les champs avant que la réponse parte vers le navigateur, l'API
+ * renvoyant chaque texte EN ENTIER avec une douzaine de champs inutiles ici.
+ */
+
+/** Ligne de /laws (src/routes/laws/+page.server.ts). */
+export type LoiDeListe = Pick<Law, 'id' | 'title' | 'reference' | 'publication_date' | 'article_count' | 'type'>;
+
+/**
+ * Document d'une catégorie (src/routes/categories/[id]/+page.server.ts).
+ * `content` n'y porte qu'un extrait : rien de ce qui reçoit ce type ne doit le
+ * prendre pour le document entier.
+ */
+export type LawResume = Pick<Law, 'id' | 'title' | 'publication_date'> & {
+  /** Extrait de 300 caractères, sans les marqueurs `<<PAGE:n>>`. */
+  content: string;
+};
+
+/**
  * `ArticleResponse`.
  *
  * Un article complet, avec son contenu. `GET /laws/{id}` ne rend PAS ce type :

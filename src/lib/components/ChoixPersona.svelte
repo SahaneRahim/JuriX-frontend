@@ -76,8 +76,14 @@
 
 <svelte:window on:keydown|capture={surTouche} />
 
+<!--
+  Ancree en haut, et non centree : centree, la boite se deplacait en entier a
+  chaque nouvelle mesure de son contenu (arrivee des polices, icones qui
+  passent du mot « gavel » au pictogramme). Lighthouse comptait ce
+  deplacement : 0,15 de decalage de mise en page sur chaque premiere visite.
+-->
 <div
-  class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+  class="fixed inset-0 z-[60] flex items-start justify-center bg-slate-900/60 p-4 pt-[8vh] backdrop-blur-sm"
   role="presentation"
   on:pointerdown={(e) => (pressionSurLeFond = e.target === e.currentTarget)}
   on:click={surLeFond}
@@ -154,8 +160,10 @@
             ? 'border-blue-500 bg-blue-50 dark:bg-slate-700'
             : 'border-slate-200 dark:border-slate-600'}"
         >
-          <span class="material-icons text-2xl text-blue-600 dark:text-blue-400" aria-hidden="true"
-            >{PERSONA_ICONE[persona]}</span
+          <!-- Taille fixe : avant la police, le mot de la ligature est plus large. -->
+          <span
+            class="material-icons inline-block h-6 w-6 shrink-0 overflow-hidden text-2xl leading-6 text-blue-600 dark:text-blue-400"
+            aria-hidden="true">{PERSONA_ICONE[persona]}</span
           >
           <span class="min-w-0">
             <span class="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">

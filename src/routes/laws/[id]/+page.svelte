@@ -8,6 +8,7 @@
   import { formatDate } from "$lib/format";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
   import { blocsDeReponse } from "$lib/texte";
+  import { LONGUEUR_MAX_NUMERO, normaliserNumeroArticle } from "$lib/article";
 
   /** Rempli par `+page.ts`. Un identifiant inexistant n'arrive plus ici : 404. */
   export let data;
@@ -20,7 +21,10 @@
   // trouves par la recherche. La page reconstruit sa liste depuis le texte du
   // document : elle ne connait pas les identifiants de ligne, seulement les
   // numeros.
-  $: requestedArticle = $page.url.searchParams.get("article");
+  // Borne : la valeur vient de l'URL et passe par des expressions rendues au
+  // serveur (voir $lib/article).
+  $: requestedArticle =
+    $page.url.searchParams.get("article")?.slice(0, LONGUEUR_MAX_NUMERO) || null;
 
   // -- State --
   // `law` et `error` ne sont plus des variables locales : elles sont derivees de
@@ -266,9 +270,9 @@
    */
   $: pageDemandee = (() => {
     if (!requestedArticle) return 1;
-    const wanted = normaliseArticleNumber(requestedArticle);
+    const wanted = normaliserNumeroArticle(requestedArticle);
     const trouve = (law?.articles ?? []).find(
-      (a) => normaliseArticleNumber(a.number) === wanted,
+      (a) => normaliserNumeroArticle(a.number) === wanted,
     );
     return trouve?.page_number && trouve.page_number > 1 ? trouve.page_number : 1;
   })();
@@ -286,8 +290,8 @@
    */
   function allerALArticleDemande(articles: ArticleTDM[], demande: string | null) {
     if (articles.length === 0 || !demande) return;
-    const wanted = normaliseArticleNumber(demande);
-    const found = articles.findIndex((a) => normaliseArticleNumber(a.number) === wanted);
+    const wanted = normaliserNumeroArticle(demande);
+    const found = articles.findIndex((a) => normaliserNumeroArticle(a.number) === wanted);
     if (found >= 0) currentArticleIndex = found;
   }
 
@@ -307,15 +311,6 @@
     }
   }
 
-  function normaliseArticleNumber(value: string | number | undefined) {
-    if (value === undefined || value === null) return "";
-    return String(value)
-      .trim()
-      .toUpperCase()
-      .replace(/^(ARTICLE|ART\.?|SECTION)\s+/, "")
-      .replace(/^(\d+)\s*(ER|ÈRE|ERE)$/, "$1")
-      .replace(/[.:\-\s]+$/, "");
-  }
   // Reactive: Translator shorthand
   $: t = translations[currentLanguage];
 

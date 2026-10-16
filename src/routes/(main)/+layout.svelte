@@ -19,22 +19,12 @@
   $: isChat = $page.route.id === "/(main)/chat";
 </script>
 
-<svelte:head>
-  <!--
-    Pas de <title> ici. Les deux pages de ce groupe montent MetaSeo, qui en
-    émet un : le navigateur garde le PREMIER, donc celui du gabarit gagnait et
-    les titres de page ne s'affichaient jamais. Il utilisait en plus la forme
-    « JuriX - x », retirée au profit de « x — JuriX » par $lib/seo.
-  -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
-  <link
-    href="https://fonts.googleapis.com/icon?family=Material+Icons"
-    rel="stylesheet"
-  />
-</svelte:head>
+<!--
+  Pas de <svelte:head> ici, donc pas de <title>. Les deux pages de ce groupe
+  montent MetaSeo, qui en émet un : le navigateur garde le PREMIER, donc celui
+  du gabarit gagnait et les titres de page ne s'affichaient jamais. Les polices
+  sont déclarées dans le gabarit racine.
+-->
 
 <div
   class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark transition-colors duration-300 min-h-screen flex flex-col font-body"
@@ -164,10 +154,6 @@
 </div>
 
 <style>
-  :global(body) {
-    font-family: "Inter", sans-serif;
-  }
-
   .sliding-pill-tabs {
     transition:
       left 0.4s cubic-bezier(0.4, 0, 0.2, 1),

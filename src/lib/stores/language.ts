@@ -395,6 +395,9 @@ export const translations = {
     'error.notFoundBody': 'Le lien est peut-être périmé, ou l\'adresse comporte une faute. Voici par où repartir.',
     'error.genericTitle': 'Quelque chose s\'est mal passé',
     'error.genericBody': 'Réessayez dans un instant. Si le problème persiste, revenez à l\'accueil.',
+    'error.unavailableTitle': 'Service momentanément indisponible',
+    'error.unavailableBody': 'Les textes ne peuvent pas être chargés pour l\'instant. Réessayez dans quelques minutes.',
+    'error.retry': 'Réessayer',
     // 'nav.signup' est de nouveau utilisée : `POST /api/v1/auth/signup` existe
     // depuis l'ouverture des comptes publics, et l'en-tête y renvoie.
 
@@ -845,6 +848,9 @@ export const translations = {
     'error.notFoundBody': 'The link may be outdated, or the address has a typo. Here is where to go next.',
     'error.genericTitle': 'Something went wrong',
     'error.genericBody': 'Try again in a moment. If the problem persists, head back home.',
+    'error.unavailableTitle': 'Service temporarily unavailable',
+    'error.unavailableBody': 'The texts cannot be loaded right now. Please try again in a few minutes.',
+    'error.retry': 'Try again',
 
     // Footer
     'footer.rights': '© 2025 JuriX. All rights reserved. Access to law for everyone.',

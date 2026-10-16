@@ -134,8 +134,10 @@ const CLE_PERSONA = 'jurix-persona';
 const CLE_A_ENVOYER = 'jurix-persona-a-envoyer';
 const COOKIE_REFUS = 'jurix-persona-refus';
 
+// `window` d'abord : Node 25 expose un localStorage global, propre au processus
+// et partage par tous les visiteurs du serveur. Seul le navigateur stocke.
 export function lirePersona(): Persona | null {
-  if (typeof localStorage === 'undefined') return null;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
   try {
     return normaliserPersona(localStorage.getItem(CLE_PERSONA));
   } catch {
@@ -152,7 +154,7 @@ let personaRelisible = true;
 let refusRelisible = true;
 
 function ecrirePersona(persona: Persona | null): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   try {
     if (persona) localStorage.setItem(CLE_PERSONA, persona);
     else localStorage.removeItem(CLE_PERSONA);
@@ -189,7 +191,7 @@ function ecrireRefusSession(refus: boolean): void {
 }
 
 export function lireAEnvoyer(): boolean {
-  if (typeof localStorage === 'undefined') return false;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false;
   try {
     return localStorage.getItem(CLE_A_ENVOYER) === '1';
   } catch {
@@ -198,7 +200,7 @@ export function lireAEnvoyer(): boolean {
 }
 
 export function ecrireAEnvoyer(enAttente: boolean): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   try {
     if (enAttente) localStorage.setItem(CLE_A_ENVOYER, '1');
     else localStorage.removeItem(CLE_A_ENVOYER);

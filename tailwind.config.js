@@ -1,5 +1,6 @@
 import forms from '@tailwindcss/forms';
 import typography from '@tailwindcss/typography';
+import defaultTheme from 'tailwindcss/defaultTheme';
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -22,8 +23,13 @@ export default {
         "secondary-text-dark": "#94A3B8",
       },
       fontFamily: {
-        display: ["Inter", "sans-serif"],
-        body: ["Inter", "sans-serif"],
+        // « Inter Variable » : la police auto-hebergee (@fontsource-variable/inter).
+        // `sans` est la police du <html> (preflight) et de la classe font-sans :
+        // toutes les pages sont en Inter, y compris celles qui ne posent ni
+        // font-body ni font-display (fiches, connexion, fenetre des profils).
+        sans: ["Inter Variable", ...defaultTheme.fontFamily.sans],
+        display: ["Inter Variable", "Inter", "sans-serif"],
+        body: ["Inter Variable", "Inter", "sans-serif"],
       },
       boxShadow: {
         'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',

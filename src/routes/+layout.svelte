@@ -23,6 +23,12 @@
     personaStore,
     questionAPoser,
   } from "$lib/stores/persona";
+  // Polices servies par le site lui-meme, et non par fonts.googleapis.com :
+  // leurs feuilles de style bloquaient l'affichage (1,1 s pour Material Icons
+  // et 0,2 s pour Inter, mesure Lighthouse mobile), sur deux origines tierces.
+  // Inter est declaree dans app.css (font-display: optional) ; les deux sont
+  // prechargees par src/hooks.server.ts.
+  import "material-icons/iconfont/filled.css";
   import "../app.css";
 
   /**

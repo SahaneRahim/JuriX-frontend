@@ -30,6 +30,20 @@ function locale(lang: Language): string {
 }
 
 /**
+ * Analyse une date de l'API.
+ *
+ * L'API rend ses horodatages SANS fuseau (« 2026-10-15T00:30:00 »), alors
+ * qu'ils sont en UTC, et `new Date` lit une telle chaine en heure LOCALE. Au
+ * Cameroun (UTC+1), entre 0 h et 1 h, le navigateur ecrivait la veille et le
+ * serveur (UTC) le jour meme : le texte changeait a l'hydratation. Une date
+ * seule (« 2016-07-12 ») est deja lue en UTC ; une chaine qui porte son fuseau
+ * reste telle quelle.
+ */
+function lireDate(valeur: string): Date {
+  return new Date(/T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(valeur) ? `${valeur}Z` : valeur);
+}
+
+/**
  * Date longue : « 4 mai 2026 ».
  *
  * Rend `DATE_ABSENTE` sur une valeur nulle, vide ou impossible à analyser —
@@ -38,12 +52,16 @@ function locale(lang: Language): string {
  */
 export function formatDate(valeur: string | null | undefined, lang: Language): string {
   if (!valeur) return DATE_ABSENTE;
-  const d = new Date(valeur);
+  const d = lireDate(valeur);
   if (Number.isNaN(d.getTime())) return DATE_ABSENTE;
+  // timeZone UTC : une date seule (« 2016-07-12 ») se lit minuit UTC. Formatee
+  // dans le fuseau local, elle donnait la veille a l'ouest d'UTC, et le
+  // serveur (UTC) et le navigateur n'ecrivaient pas le meme jour.
   return d.toLocaleDateString(locale(lang), {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
@@ -53,12 +71,13 @@ export function formatDateCourte(
   lang: Language,
 ): string {
   if (!valeur) return DATE_ABSENTE;
-  const d = new Date(valeur);
+  const d = lireDate(valeur);
   if (Number.isNaN(d.getTime())) return DATE_ABSENTE;
   return d.toLocaleDateString(locale(lang), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
@@ -68,7 +87,7 @@ export function formatDateHeure(
   lang: Language,
 ): string {
   if (!valeur) return DATE_ABSENTE;
-  const d = new Date(valeur);
+  const d = lireDate(valeur);
   if (Number.isNaN(d.getTime())) return DATE_ABSENTE;
   return d.toLocaleString(locale(lang));
 }

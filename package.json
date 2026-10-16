@@ -13,25 +13,28 @@
     "test:e2e": "playwright test",
     "test:e2e:nav": "playwright test tests/e2e/navigation",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "start": "node build"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@fontsource-variable/inter": "^5.3.0",
     "@playwright/test": "^1.40.0",
-    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.3.1",
-    "@types/node": "^20.10.0",
+    "@types/node": "^24.19.2",
     "autoprefixer": "^10.4.23",
     "eslint": "^9.39.5",
     "eslint-plugin-svelte": "^3.23.0",
     "globals": "^17.12.0",
     "happy-dom": "^20.1.0",
     "jsdom": "^27.4.0",
+    "material-icons": "^1.13.14",
     "postcss": "^8.5.6",
     "prettier": "^3.1.0",
     "prettier-plugin-svelte": "^4.1.1",
@@ -44,5 +47,8 @@
     "vite": "^6.0.0",
     "vitest": "^3.2.7"
   },
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=22.20"
+  }
 }

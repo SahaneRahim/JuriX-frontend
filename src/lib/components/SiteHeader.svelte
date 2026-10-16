@@ -157,11 +157,12 @@
       class="w-8 h-8 flex items-center justify-center rounded-lg bg-transparent dark:bg-white/5 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
       aria-label={$tr("a11y.toggleTheme")}
     >
-      {#if $themeStore === "dark"}
-        <span class="material-icons text-lg" aria-hidden="true">light_mode</span>
-      {:else}
-        <span class="material-icons text-lg" aria-hidden="true">dark_mode</span>
-      {/if}
+      <!-- Les deux icônes, alternées en CSS par la classe `dark` que pose
+           app.html avant le premier affichage. Le serveur ne connaît pas le
+           thème choisi (localStorage) : un {#if} sur le store dessinait la lune,
+           puis la remplaçait par le soleil à l'hydratation. -->
+      <span class="material-icons text-lg dark:hidden" aria-hidden="true">dark_mode</span>
+      <span class="material-icons text-lg hidden dark:inline-block" aria-hidden="true">light_mode</span>
     </button>
 
     <!-- Le profil : icône seule entre md et lg, où la barre est déjà chargée. -->
@@ -292,9 +293,8 @@
           aria-label={$tr("a11y.toggleTheme")}
           class="ml-2 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500"
         >
-          <span class="material-icons text-lg"
-             aria-hidden="true">{$themeStore === "dark" ? "light_mode" : "dark_mode"}</span
-          >
+          <span class="material-icons text-lg dark:hidden" aria-hidden="true">dark_mode</span>
+          <span class="material-icons text-lg hidden dark:inline-block" aria-hidden="true">light_mode</span>
         </button>
         <button
           on:click={() => ouvrirChoixPersona()}

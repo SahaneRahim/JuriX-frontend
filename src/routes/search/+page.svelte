@@ -20,9 +20,14 @@
   import type { SearchResponse, Category, SearchResult } from '$lib/types';
 
 // State
-  let searchQuery = "";
+  // Lus depuis l'URL des l'initialisation, au serveur comme dans le navigateur :
+  // le HTML servi porte deja la requete et son titre, et ne montre des
+  // squelettes que s'il y a une recherche a faire. Initialises a vide, le
+  // champ arrivait vide et desactive (isLoading), puis basculait a
+  // l'hydratation.
+  let searchQuery = $page.url.searchParams.get("q") ?? "";
   let activeTab = "all";
-  let isLoading = true;
+  let isLoading = searchQuery.trim() !== "";
   let results: SearchResult[] = [];
   let totalResults = 0;
   let searchTimeMs = 0;
@@ -335,17 +340,6 @@
   canonique={urlCanonique($page.url)}
   indexable={false}
 />
-
-<svelte:head>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
-  <link
-    href="https://fonts.googleapis.com/icon?family=Material+Icons"
-    rel="stylesheet"
-  />
-</svelte:head>
 
 <div
   class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-body min-h-screen flex flex-col transition-colors duration-300"
@@ -703,10 +697,6 @@
 </div>
 
 <style>
-  :global(body) {
-    font-family: "Inter", sans-serif;
-  }
-
   /* Smooth transitions for sliding pill */
   .sliding-pill {
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);

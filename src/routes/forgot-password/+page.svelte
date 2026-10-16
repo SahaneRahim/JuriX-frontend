@@ -12,6 +12,7 @@
    * l'utilisateur a tapé — pas même un rappel de l'adresse, qui suffirait à
    * différencier les deux rendus.
    */
+  import { onMount } from "svelte";
   import { API_URL } from "$lib/api";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
@@ -21,6 +22,9 @@
   let email = "";
   let error = "";
   let loading = false;
+  // Envoi inactif jusqu'au montage : voir login/+page.svelte.
+  let monte = false;
+  onMount(() => (monte = true));
   // Bascule vers l'écran de confirmation : le formulaire disparaît alors, pour
   // qu'un second envoi ne soit pas la réaction réflexe à l'absence d'e-mail.
   let envoye = false;
@@ -124,7 +128,7 @@
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !monte}
             data-testid="forgot-submit"
             class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >

@@ -5,30 +5,23 @@
  */
 
 /**
- * PIÈGE À CONNAÎTRE EN DÉVELOPPEMENT : les `load` sont soumis à la liste CORS
- * du backend.
+ * PIÈGE : les `load` UNIVERSELS sont soumis à la liste CORS du backend, en
+ * développement comme en production.
  *
- * En développement, SvelteKit émule les règles CORS du navigateur pour le
- * `fetch` d'un `load` UNIVERSEL, y compris pendant le rendu serveur — c'est
- * volontaire, cela fait apparaître tout de suite ce qui casserait côté client.
- * Or `JuriX-backend-main/app/main.py` n'autorise que `localhost:5173`,
- * `localhost:4173` et `127.0.0.1:5173`.
+ * Pendant le rendu serveur, SvelteKit émule les règles CORS du navigateur pour
+ * le `fetch` d'un `load` universel dès que l'URL n'est pas de la même origine
+ * que la page. En développement, `JuriX-backend-main/app/main.py` n'autorise
+ * que `localhost:5173`, `localhost:4173` et `127.0.0.1:5173` : lancé sur un
+ * AUTRE port, le serveur rend des pages silencieusement dégradées (« backend
+ * indisponible ») alors que le backend répond à un `curl`.
  *
- * Conséquence observée : lancé sur un AUTRE port, le serveur de développement
- * rend des pages silencieusement dégradées — le `load` tombe dans sa branche
- * d'erreur, la page affiche « backend indisponible » alors que le backend
- * répond parfaitement à un `curl`. Rien dans la console ne le dit.
- *
- * Donc : `vite dev` sur 5173, ou ajouter le port à `ALLOWED_ORIGINS` côté
- * backend. En production la question ne se pose pas, la fonction serverless
- * n'applique aucune règle CORS — mais le domaine doit de toute façon y figurer
- * pour les appels du navigateur.
+ * En production, l'API est sur le MÊME domaine que les pages : ORIGIN (serveur
+ * Node) et VITE_API_URL doivent valoir exactement https://<domaine>, sinon
+ * les `load` universels échouent : l'accueil et les fiches tombent en 503. Les
+ * adresses vivent dans $lib/config, sans effet de bord.
  */
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-export const WS_BASE_URL = import.meta.env.VITE_WS_URL || API_BASE_URL.replace(/^http/, 'ws');
-
-export const API_URL = `${API_BASE_URL}/api/v1`;
-export const WS_URL = `${WS_BASE_URL}/api/v1`;
+export { API_BASE_URL, API_URL, WS_BASE_URL, WS_URL } from '$lib/config';
+import { API_URL, WS_URL } from '$lib/config';
 
 import { browser } from '$app/environment';
 import { get } from 'svelte/store';

@@ -25,7 +25,11 @@
   let error = "";
   let loading = false;
 
+  // Envoi inactif jusqu'au montage : voir login/+page.svelte.
+  let monte = false;
+
   onMount(() => {
+    monte = true;
     if ($authStore.isAuthenticated) goto("/", { replaceState: true });
   });
 
@@ -210,7 +214,7 @@
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !monte}
           data-testid="signup-submit"
           class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >

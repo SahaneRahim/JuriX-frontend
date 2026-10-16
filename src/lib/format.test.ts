@@ -33,4 +33,22 @@ describe('formatDate', () => {
     expect(courte).not.toContain('janvier');
     expect(courte).toContain('2026');
   });
+
+  it("lit un horodatage sans fuseau comme de l'UTC, quel que soit le fuseau local", () => {
+    // L'API rend « 2026-10-15T00:30:00 », en UTC mais sans le dire. Lu en heure
+    // locale a Douala (UTC+1), il devenait le 14 octobre dans le navigateur et
+    // restait le 15 au serveur : le texte changeait a l'hydratation.
+    const avant = process.env.TZ;
+    process.env.TZ = 'Africa/Douala';
+    try {
+      expect(formatDate('2026-10-15T00:30:00', 'fr')).toBe('15 octobre 2026');
+      expect(formatDate('2026-10-15T00:30:00.123456', 'fr')).toBe('15 octobre 2026');
+      // Une chaine qui porte son fuseau n'est pas touchee.
+      expect(formatDate('2026-10-15T00:30:00+01:00', 'fr')).toBe('14 octobre 2026');
+      expect(formatDateHeure('2026-10-15T00:30:00', 'fr')).toContain('01:30');
+    } finally {
+      if (avant === undefined) delete process.env.TZ;
+      else process.env.TZ = avant;
+    }
+  });
 });

@@ -19,7 +19,7 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { urlCanonique } from "$lib/seo";
 
-  /** Rempli par `+page.ts`, qui lit filtres et pagination dans l'URL. */
+  /** Rempli par `+page.server.ts`, qui lit filtres et pagination dans l'URL. */
   export let data;
 
   // Tout est derive de `data` de facon REACTIVE. Une simple affectation

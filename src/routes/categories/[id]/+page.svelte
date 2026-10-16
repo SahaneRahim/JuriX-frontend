@@ -9,7 +9,7 @@
   import type { FiltreLangue } from "$lib/types";
   import { fly } from "svelte/transition";
 
-  /** Rempli par `+page.ts`. Une catégorie absente n'arrive plus ici : 404. */
+  /** Rempli par `+page.server.ts`. Une catégorie absente n'arrive plus ici : 404. */
   export let data;
 
   // L'identifiant vient de la BASE, plus d'un slug devine.
@@ -19,7 +19,7 @@
   // rien ne correspondait jamais pour les types de texte — elle basculait sur
   // une recherche plein texte du mot « loi », qui remonte tous les decrets :
   // d'ou des decrets affiches dans « Lois ». Ce repli est supprime, et la
-  // validation de l'identifiant a rejoint `+page.ts` : une categorie
+  // validation de l'identifiant a rejoint `+page.server.ts` : une categorie
   // introuvable repond desormais 404 au lieu de rendre une page vide en 200.
 
   /** Filtre de texte, purement client : il n'y a pas d'endpoint pour cela. */
@@ -61,6 +61,12 @@
   }
 
 
+  /**
+   * Filtre local sur le titre et l'EXTRAIT (300 caractères) : le texte intégral
+   * ne quitte plus le serveur (+page.server.ts). Un mot qui n'apparaît que plus
+   * loin dans le texte ne fait donc plus remonter le document ; chercher DANS
+   * les textes est le rôle de la recherche du site.
+   */
   $: filteredDocuments = documents.filter(
     (doc) =>
       searchQuery === "" ||
@@ -243,12 +249,15 @@
             `law_id` ni `date`. Les deux branches gauches etaient donc toujours
             indefinies — du code defensif contre une forme qui n'existe pas, que
             le typage a rendu visible.
+
+            Aucun delai par rang a l'apparition : avec 50 documents, le dernier
+            n'arrivait qu'apres 2,9 s en navigation dans le navigateur.
           -->
-          {#each filteredDocuments as doc, i}
+          {#each filteredDocuments as doc}
             <a
               href="/laws/{doc.id}"
               class="group block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
-              in:fly={{ y: 20, duration: 400, delay: i * 50 }}
+              in:fly={{ y: 20, duration: 400 }}
             >
               <div class="p-5 flex gap-5 items-start">
                 <!-- Icon Box -->

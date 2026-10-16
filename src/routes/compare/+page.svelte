@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { API_URL } from "$lib/api";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
@@ -11,6 +12,10 @@
   let sujetB = "";
   let resultat: ComparisonResponse | null = null;
   let enCours = false;
+  // Envoi inactif jusqu'au montage : voir login/+page.svelte. Un Entrée avant
+  // l'hydratation rechargeait la page en GET et vidait les deux champs.
+  let monte = false;
+  onMount(() => (monte = true));
   let erreur = "";
 
   /**
@@ -137,7 +142,7 @@
       </label>
       <button
         type="submit"
-        disabled={enCours}
+        disabled={enCours || !monte}
         data-testid="compare-submit"
         class="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
       >

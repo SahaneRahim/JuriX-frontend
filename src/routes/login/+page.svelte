@@ -51,7 +51,17 @@
     return ["admin", "superadmin"].includes(role ?? "") ? "/admin" : "/";
   }
 
+  // Envoi inactif jusqu'au montage. La page arrive rendue par le serveur : un
+  // Entrée avant l'hydratation (fréquent sur un mobile lent) enverrait le
+  // formulaire en GET, rechargeant la page et perdant la saisie. Un bouton
+  // d'envoi inactif bloque aussi l'envoi implicite par Entrée. Sans JavaScript,
+  // l'opération est de toute façon impossible. Pour la même raison, jamais
+  // d'attribut `name` sur ces champs sans method="post" : en GET, le mot de
+  // passe partirait dans l'URL.
+  let monte = false;
+
   onMount(() => {
+    monte = true;
     // Déjà connecté : inutile de repasser par le formulaire.
     if ($authStore.isAuthenticated) {
       goto(destinationFor($authStore.user?.role), { replaceState: true });
@@ -197,7 +207,7 @@
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !monte}
         data-testid="login-submit"
         class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
