@@ -17,7 +17,15 @@
  * « https://jurix.cm//api/v1 », un chemin que ni l'API ni la reecriture de
  * src/hooks.server.ts ne reconnaissent.
  */
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+function normaliserUrl(url: string | undefined, defaut: string): string {
+  const propre = (url || defaut).trim().replace(/\/+$/, '');
+  if (propre && !propre.startsWith('http://') && !propre.startsWith('https://')) {
+    return `https://${propre}`;
+  }
+  return propre;
+}
+
+export const API_BASE_URL = normaliserUrl(import.meta.env.VITE_API_URL, 'http://localhost:8000');
 export const WS_BASE_URL = (import.meta.env.VITE_WS_URL || API_BASE_URL.replace(/^http/, 'ws')).replace(/\/+$/, '');
 
 export const API_URL = `${API_BASE_URL}/api/v1`;
