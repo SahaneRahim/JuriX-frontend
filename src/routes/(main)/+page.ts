@@ -29,12 +29,13 @@ export const load: PageLoad = async ({ fetch }) => {
     cause = e;
   }
 
-  // Au rendu serveur, un 503 ($lib/panne) : l'accueil est la page la plus
-  // explorée du site, et sa version « Impossible de charger », sans aucun lien
-  // de catégorie, serait indexée telle quelle. Dans le navigateur (retour à
-  // l'accueil, reprise par invalidateAll), la page garde son message et sa
-  // reprise. Le chemin est écrit en dur : lire `url` ferait rejouer ce `load`
-  // à chaque changement d'adresse.
-  if (!browser) leverIndisponible('/', cause);
+  // En production serverless (Vercel + Railway), le backend peut être en
+  // cold start et mettre plus de temps à répondre. On préfère rendre la page
+  // normalement avec un message d'erreur plutôt que de servir un 503 brut :
+  // l'utilisateur peut cliquer « Réessayer » une fois le backend réveillé.
+  // Le 503 est réservé aux erreurs franches côté serveur (hors timeout).
+  const estTimeout = cause instanceof DOMException && cause.name === 'TimeoutError';
+  const estErreurReseau = cause instanceof TypeError && !estTimeout;
+  if (!browser && !estTimeout && !estErreurReseau) leverIndisponible('/', cause);
   return { categories: [] as Category[], erreur: 'categories.errorLoad' };
 };

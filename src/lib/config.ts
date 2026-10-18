@@ -19,6 +19,11 @@
  */
 const PRODUCTION_API = 'https://jurix-backend-production-3c0d.up.railway.app';
 
+/** Supprime la barre oblique finale d'une URL. */
+function normaliserUrl(url: string, _fallback: string): string {
+  return url.replace(/\/+$/, '');
+}
+
 function resoudreApiUrl(): string {
   const envUrl = (typeof process !== 'undefined' && process.env?.VITE_API_URL) || import.meta.env.VITE_API_URL;
   if (envUrl && envUrl !== 'http://localhost:8000') {
@@ -46,4 +51,4 @@ export const WS_URL = `${WS_BASE_URL}/api/v1`;
  * d'attendre une API figee : sans borne, une navigation restait suspendue
  * aussi longtemps que l'API, et le rendu serveur jusqu'a 5 min.
  */
-export const DELAI_API_MS = 8000;
+export const DELAI_API_MS = 25_000;
