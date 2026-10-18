@@ -17,16 +17,25 @@
  * « https://jurix.cm//api/v1 », un chemin que ni l'API ni la reecriture de
  * src/hooks.server.ts ne reconnaissent.
  */
-function normaliserUrl(url: string | undefined, defaut: string): string {
-  const propre = (url || defaut).trim().replace(/\/+$/, '');
-  if (propre && !propre.startsWith('http://') && !propre.startsWith('https://')) {
-    return `https://${propre}`;
+const PRODUCTION_API = 'https://jurix-backend-production-3c0d.up.railway.app';
+
+function resoudreApiUrl(): string {
+  const envUrl = (typeof process !== 'undefined' && process.env?.VITE_API_URL) || import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl !== 'http://localhost:8000') {
+    return envUrl;
   }
-  return propre;
+  if (import.meta.env.DEV) {
+    return envUrl || 'http://localhost:8000';
+  }
+  return PRODUCTION_API;
 }
 
-export const API_BASE_URL = normaliserUrl(import.meta.env.VITE_API_URL, 'http://localhost:8000');
-export const WS_BASE_URL = (import.meta.env.VITE_WS_URL || API_BASE_URL.replace(/^http/, 'ws')).replace(/\/+$/, '');
+export const API_BASE_URL = normaliserUrl(resoudreApiUrl(), PRODUCTION_API);
+export const WS_BASE_URL = (
+  (typeof process !== 'undefined' && process.env?.VITE_WS_URL) ||
+  import.meta.env.VITE_WS_URL ||
+  API_BASE_URL.replace(/^http/, 'ws')
+).replace(/\/+$/, '');
 
 export const API_URL = `${API_BASE_URL}/api/v1`;
 export const WS_URL = `${WS_BASE_URL}/api/v1`;
