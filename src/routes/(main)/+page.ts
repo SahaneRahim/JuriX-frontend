@@ -1,6 +1,4 @@
-import { browser } from '$app/environment';
 import { API_URL, DELAI_API_MS } from '$lib/config';
-import { leverIndisponible } from '$lib/panne';
 import type { Category } from '$lib/types';
 import type { PageLoad } from './$types';
 
@@ -29,13 +27,8 @@ export const load: PageLoad = async ({ fetch }) => {
     cause = e;
   }
 
-  // En production serverless (Vercel + Railway), le backend peut être en
-  // cold start et mettre plus de temps à répondre. On préfère rendre la page
-  // normalement avec un message d'erreur plutôt que de servir un 503 brut :
-  // l'utilisateur peut cliquer « Réessayer » une fois le backend réveillé.
-  // Le 503 est réservé aux erreurs franches côté serveur (hors timeout).
-  const estTimeout = cause instanceof DOMException && cause.name === 'TimeoutError';
-  const estErreurReseau = cause instanceof TypeError && !estTimeout;
-  if (!browser && !estTimeout && !estErreurReseau) leverIndisponible('/', cause);
+  // Sur Vercel (serverless), on ne lève jamais de 503 sur la page d'accueil :
+  // un cold start Railway ou un timeout réseau ne doit pas rendre la page
+  // inaccessible. On affiche la page normalement avec un bouton « Réessayer ».
   return { categories: [] as Category[], erreur: 'categories.errorLoad' };
 };
