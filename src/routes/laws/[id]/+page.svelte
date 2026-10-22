@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { onDestroy, onMount, tick } from "svelte";
   import { API_URL } from '$lib/api';
+  import { piegerFocus } from "$lib/actions/pieger-focus";
   import ImagePdfViewer from "$lib/components/ImagePdfViewer.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
-  import { invalidateAll } from "$app/navigation";
+  import { afterNavigate, invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
   import { language, switchLanguage, tr } from "$lib/stores/language";
   import { formatDate } from "$lib/format";
@@ -41,6 +43,9 @@
       loading: "Chargement...",
       return: "Retour à l'accueil",
       toc: "Table des matières",
+      // Libellé court du bouton qui ouvre le sommaire sous `lg` : il partage
+      // la barre Précédent / Suivant d'un écran de 320 px.
+      toc_open: "Sommaire",
       filter: "Filtrer les articles...",
       no_result: "Aucun résultat",
       law_decree: "Loi / Décret",
@@ -79,6 +84,7 @@
       loading: "Loading...",
       return: "Back to Home",
       toc: "Table of Contents",
+      toc_open: "Contents",
       filter: "Filter articles...",
       no_result: "No result",
       law_decree: "Law / Decree",
@@ -318,21 +324,173 @@
   function navigateToPrevious() {
     if (currentArticleIndex > 0) {
       currentArticleIndex--;
-      scrollToTop();
+      allerAuDebutDeLArticle();
     }
   }
 
   function navigateToNext() {
     if (currentArticleIndex < flatArticles.length - 1) {
       currentArticleIndex++;
-      scrollToTop();
+      allerAuDebutDeLArticle();
     }
   }
 
   function jumpToArticle(index: number) {
     currentArticleIndex = index;
-    scrollToTop();
+    // Sur téléphone, le choix se fait dans le panneau du sommaire, qui
+    // recouvre justement le texte demandé.
+    tocOuvert = false;
+    allerAuDebutDeLArticle();
   }
+
+  /**
+   * Barre Précédent / Suivant du haut : début de l'article, et cible du
+   * défilement. La barre plutôt que le titre de l'article : elle reste sous
+   * le doigt pour enchaîner les « Suivant ».
+   */
+  let debutArticle: HTMLElement | undefined;
+
+  /**
+   * Amène le début de l'article juste sous le fil d'Ariane collant (marge
+   * `scroll-mt-*` de la barre).
+   *
+   * Remplace un `window.scrollTo({ top: 0 })`, qui renvoyait le lecteur
+   * au-dessus du titre, des boutons et, s'il était ouvert, du document
+   * d'origine : sur téléphone, 450 à 1 000 px à redescendre à chaque article.
+   *
+   * Après `tick()` : si le panneau du sommaire vient de se fermer, la page doit
+   * avoir retrouvé son défilement. Animation douce, sauf pour qui a demandé
+   * moins de mouvement — et pour un lien profond, où le saut est immédiat.
+   */
+  async function allerAuDebutDeLArticle(immediat = false) {
+    if (typeof window === "undefined") return;
+    await tick();
+    const moinsDeMouvement = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    debutArticle?.scrollIntoView({
+      block: "start",
+      behavior: immediat || moinsDeMouvement ? "auto" : "smooth",
+    });
+  }
+
+  /**
+   * Sommaire en panneau, sous `lg`.
+   *
+   * La colonne du sommaire n'existait qu'à partir de 1 024 px, sans rien à sa
+   * place en dessous : sur téléphone et tablette en portrait, un code de 199
+   * articles ne se parcourait qu'un article à la fois. Le MÊME élément sert de
+   * colonne sur grand écran et de panneau qui monte du bas sur petit écran :
+   * une seule liste dans le DOM, donc un seul bouton par article pour les
+   * lecteurs d'écran et pour les tests.
+   */
+  let tocOuvert = false;
+
+  function ouvrirSommaire() {
+    tocOuvert = true;
+  }
+
+  function fermerSommaire() {
+    tocOuvert = false;
+  }
+
+  // Un double appui sur « Sommaire » tombait, au second appui, sur le fond tout
+  // juste affiché : le panneau s'ouvrait et se refermait aussitôt. Même garde
+  // que le fond de ChoixPersona.
+  function surLeFond(event: MouseEvent) {
+    if (event.detail <= 1) fermerSommaire();
+  }
+
+  // Le garde est dans le gestionnaire : <svelte:window> ne peut pas vivre dans
+  // un bloc (même motif que SiteHeader).
+  function surTouche(event: KeyboardEvent) {
+    if (tocOuvert && event.key === "Escape") fermerSommaire();
+  }
+
+  /**
+   * `piegerFocus`, armé seulement pendant que le sommaire est ouvert en
+   * panneau.
+   *
+   * L'élément est aussi la colonne du grand écran : posée telle quelle,
+   * l'action volerait le focus dès le chargement de la page sur ordinateur.
+   * Elle s'arme à l'ouverture — sur l'article en cours, `aria-current`, pour
+   * que la liste s'ouvre là où en est le lecteur — et se désarme à la
+   * fermeture, en rendant le focus au bouton « Sommaire ».
+   */
+  function piegerSiOuvert(noeud: HTMLElement, ouvert: boolean) {
+    let piege: ReturnType<typeof piegerFocus> | null = null;
+    let voulu = false;
+
+    function appliquer(actif: boolean) {
+      voulu = actif;
+      if (!actif) {
+        piege?.destroy();
+        piege = null;
+        return;
+      }
+      // Après le rendu : la classe qui affiche le panneau peut être posée
+      // après cet appel, et `piegerFocus` écarte les éléments encore masqués.
+      tick().then(() => {
+        if (voulu && !piege) piege = piegerFocus(noeud, { initial: '[aria-current="true"]' });
+      });
+    }
+
+    appliquer(ouvert);
+    return {
+      update: appliquer,
+      destroy() {
+        voulu = false;
+        piege?.destroy();
+        piege = null;
+      },
+    };
+  }
+
+  // Panneau ouvert, la page derrière lui ne défile plus : même verrou que sous
+  // la boîte du profil (src/routes/+layout.svelte), qui rend en fermant la
+  // valeur trouvée en ouvrant.
+  let debordementAvant: string | null = null;
+
+  function verrouillerDefilement(verrouille: boolean) {
+    if (typeof document === "undefined") return;
+    if (verrouille && debordementAvant === null) {
+      debordementAvant = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    } else if (!verrouille && debordementAvant !== null) {
+      document.body.style.overflow = debordementAvant;
+      debordementAvant = null;
+    }
+  }
+
+  onDestroy(() => verrouillerDefilement(false));
+
+  onMount(() => {
+    // Passé à `lg` (tablette tournée, fenêtre agrandie), le panneau redevient
+    // la colonne : le fermer retire le fond et rend le défilement.
+    const grandEcran = window.matchMedia("(min-width: 1024px)");
+    const surChangement = (event: MediaQueryListEvent) => {
+      if (event.matches) tocOuvert = false;
+    };
+    grandEcran.addEventListener("change", surChangement);
+    return () => grandEcran.removeEventListener("change", surChangement);
+  });
+
+  /**
+   * Lien profond `?article=94` (citation du chat, résultat de recherche) :
+   * l'article était bien sélectionné, mais la page restait en haut, l'article
+   * sous la ligne de flottaison.
+   *
+   * Dans `afterNavigate`, et non au montage : SvelteKit remet la page en haut
+   * APRÈS le montage, à chaque navigation. Rien n'est fait quand la page a déjà
+   * une position — retour arrière, ou rechargement qui la restaure : la
+   * remplacer ferait perdre au lecteur l'endroit où il en était.
+   */
+  afterNavigate(({ type }) => {
+    tocOuvert = false;
+    if (type === "popstate" || window.scrollY > 0 || !requestedArticle) return;
+    const voulu = normaliserNumeroArticle(requestedArticle);
+    if (flatArticles.some((a) => normaliserNumeroArticle(a.number) === voulu)) {
+      allerAuDebutDeLArticle(true);
+    }
+  });
 
   // ---------------------------------------------------------------------------
   // Explication de l'article par le modèle
@@ -422,13 +580,6 @@
     }
   }
 
-  function scrollToTop() {
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }
-
-
   /**
    * Le document vient du `load`, et sa table des matieres est recalculee a
    * CHAQUE changement de `data.law`.
@@ -478,6 +629,13 @@
       return { ...section, articles: filteredArticles };
     })
     .filter((s) => s.articles.length > 0);
+
+  // Lu par les deux barres Précédent / Suivant et par le bouton du sommaire.
+  // Placé, comme tout bloc `$:` qui lit `flatArticles`, APRÈS `parseContent`.
+  $: compteur =
+    flatArticles.length > 0 ? `${currentArticleIndex + 1} / ${flatArticles.length}` : "0 / 0";
+
+  $: verrouillerDefilement(tocOuvert);
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
@@ -500,29 +658,53 @@
 
 <SiteHeader />
 
+<svelte:window on:keydown={surTouche} />
+
+<!-- `min-h-app` (app.css) et non `min-h-screen min-h-dvh` : Tailwind écrit
+     `.min-h-dvh` AVANT `.min-h-screen`, et la paire valait toujours 100vh. -->
 <div
-  class="page text-slate-900 dark:text-gray-100 bg-[#F8F9FA] dark:bg-slate-900 min-h-screen font-sans"
+  class="page text-slate-900 dark:text-gray-100 bg-[#F8F9FA] dark:bg-slate-900 min-h-app font-sans"
 >
   <!-- Breadcrumb & Top Nav -->
+  <!--
+    Compacté sous `sm` : il reste collé en haut de l'écran pendant toute la
+    lecture. Sur deux ou trois lignes (retour | Explorer › Catégorie › titre,
+    plus la bascule FR/EN), il prenait environ 80 px, soit 12 % d'un téléphone
+    en portrait et un quart en paysage. Il n'y garde que le retour et le
+    titre ; la langue se change dans le menu de l'en-tête.
+
+    z-40 et non z-50 : le panneau du menu mobile de l'en-tête (z-50) doit
+    passer devant lui quand on fait défiler la page menu ouvert.
+
+    `sm:court:` (téléphone en paysage, plus de 640 px de large) et non
+    `court:` seul : Tailwind écrit les règles `court:` AVANT celles de `sm:`,
+    qui l'emporteraient.
+  -->
   <div
-    class="breadcrumb bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 py-4 px-0 sticky top-0 z-50 shadow-sm"
+    class="breadcrumb bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 py-1 sm:py-4 sm:court:py-1.5 px-0 sticky top-0 z-40 shadow-sm"
   >
     <div
-      class="container mx-auto px-4 max-w-[1400px] flex items-center justify-between"
+      class="container mx-auto px-3 sm:px-4 max-w-[1400px] flex items-center justify-between gap-3"
     >
       <!-- Left: Breadcrumb -->
+      <!-- Sur une seule ligne : seul le titre se tronque (`min-w-0`), les
+           autres morceaux gardent leur largeur. -->
       <div
-        class="flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+        class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
       >
+        <!-- 44 px sous `sm`, où il n'est plus qu'une flèche : son nom passe
+             par aria-label, le libellé visible étant masqué. -->
         <button
-          class="mr-2 flex items-center gap-1 text-gray-500 hover:text-blue-600 transition-colors"
+          class="-ml-3 inline-flex h-11 w-11 shrink-0 items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors sm:ml-0 sm:mr-2 sm:h-auto sm:w-auto"
           on:click={() => window.history.back()}
+          aria-label={t.return}
         >
           <svg
-            class="w-4 h-4"
+            class="w-4 h-4 shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            aria-hidden="true"
             ><path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -530,13 +712,13 @@
               d="M10 19l-7-7m0 0l7-7m-7 7h18"
             /></svg
           >
-          <span class="hidden sm:inline">{t.return}</span>
+          <span class="hidden sm:inline whitespace-nowrap">{t.return}</span>
         </button>
-        <span class="text-gray-300">|</span>
-        <a href="/" class="hover:text-blue-600 transition-colors"
+        <span class="hidden sm:inline text-gray-300 dark:text-slate-600" aria-hidden="true">|</span>
+        <a href="/" class="hidden sm:inline shrink-0 whitespace-nowrap hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >{t.explorer}</a
         >
-        <svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"
+        <svg class="hidden sm:block w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
           ><path
             d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
           /></svg
@@ -546,22 +728,24 @@
                ramenait à l'accueil. La route /categories/[id] existe. -->
           <a
             href="/categories/{law.category_id}"
-            class="hover:text-blue-600 transition-colors">{t.category} {law.category_id}</a
+            class="hidden sm:inline shrink-0 whitespace-nowrap hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t.category} {law.category_id}</a
           >
-          <svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"
+          <svg class="hidden sm:block w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
             ><path
               d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
             /></svg
           >
         {/if}
         <span
-          class="font-medium text-gray-900 dark:text-white truncate max-w-[200px] sm:max-w-[400px]"
+          class="min-w-0 truncate font-medium text-gray-900 dark:text-white sm:max-w-[400px]"
           >{law?.title || t.loading}</span
         >
       </div>
 
       <!-- Right: Language Switcher -->
-      <div class="flex items-center gap-3">
+      <!-- Masquée sous `sm` : doublon de la bascule du menu de l'en-tête, elle
+           prenait la place du titre. -->
+      <div class="hidden sm:flex items-center gap-3">
         <div class="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
           <button
             class="px-2 py-1 text-xs font-bold rounded shadow-sm transition-all {currentLanguage ===
@@ -569,6 +753,7 @@
               ? 'bg-white dark:bg-slate-700 text-blue-600'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'}"
             on:click={() => setLanguage("fr")}
+            aria-pressed={currentLanguage === "fr"}
           >
             FR
           </button>
@@ -578,6 +763,7 @@
               ? 'bg-white dark:bg-slate-700 text-blue-600'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'}"
             on:click={() => setLanguage("en")}
+            aria-pressed={currentLanguage === "en"}
           >
             EN
           </button>
@@ -597,12 +783,12 @@
       <h2 class="text-2xl font-bold text-gray-700 dark:text-gray-300">
         {error}
       </h2>
-      <div class="mt-6 flex items-center justify-center gap-3">
+      <div class="mt-6 flex flex-wrap items-center justify-center gap-3 px-4">
         <button
           type="button"
           on:click={() => invalidateAll()}
           data-testid="law-retry"
-          class="px-5 py-2 rounded-lg border border-slate-300 dark:border-slate-600 font-medium hover:border-primary hover:text-primary transition-colors"
+          class="min-h-11 sm:min-h-0 px-5 py-2 rounded-lg border border-slate-300 dark:border-slate-600 font-medium hover:border-primary hover:text-primary transition-colors"
         >
           {$tr("common.retry")}
         </button>
@@ -619,45 +805,92 @@
   -->
   {:else if law}
     <!-- Main Content -->
-    <div class="main-content py-8">
-      <div class="container mx-auto px-4 max-w-[1400px]">
-        <div class="layout grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
+    <div class="main-content py-4 sm:py-8">
+      <div class="container mx-auto px-3 sm:px-4 max-w-[1400px]">
+        <!-- `minmax(0, 1fr)` et non `1fr` (qui vaut minmax(auto, 1fr)) : un
+             mot insécable, une cote ou une URL élargissait la colonne de
+             lecture au-delà de l'écran entre 1 024 et 1 280 px. -->
+        <div class="layout grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-8">
+          {#if tocOuvert}
+            <!-- Fond du panneau du sommaire. Au-dessus du fil d'Ariane (z-40),
+                 sous la boîte du profil (z-[60]). -->
+            <div
+              class="fond-sommaire fixed inset-0 z-[55] bg-slate-900/50 lg:hidden"
+              role="presentation"
+              on:click={surLeFond}
+            ></div>
+          {/if}
           <!-- Sidebar -->
-          <aside
-            class="sidebar hidden lg:block sticky top-24 h-fit max-h-[calc(100vh-100px)] overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 shadow-sm"
+          <!--
+            Colonne collante à partir de `lg` ; en dessous, masquée, ou panneau
+            qui monte du bas une fois ouverte par le bouton « Sommaire » des
+            barres Précédent / Suivant. Le titre et le filtre restent visibles,
+            seule la liste défile. Hauteurs maximales : <style> en fin de
+            fichier, avec un repli pour les navigateurs sans unité dvh.
+          -->
+          <div
+            id="sommaire"
+            data-testid="law-toc"
+            class="sidebar sommaire flex-col bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 {tocOuvert
+              ? 'fixed inset-x-0 bottom-0 z-[56] flex rounded-t-2xl border-t shadow-2xl pb-zone-sure px-zone-sure'
+              : 'hidden'} lg:sticky lg:inset-auto lg:top-24 lg:z-auto lg:flex lg:h-fit lg:rounded-xl lg:border lg:p-0 lg:shadow-sm"
+            class:ouvert={tocOuvert}
+            role={tocOuvert ? "dialog" : undefined}
+            aria-modal={tocOuvert ? "true" : undefined}
+            aria-labelledby={tocOuvert ? "sommaire-titre" : undefined}
+            use:piegerSiOuvert={tocOuvert}
           >
-            <div class="sidebar-header mb-4">
-              <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+            <div
+              class="sidebar-header flex shrink-0 items-center justify-between gap-3 px-4 pt-2 lg:mb-4 lg:px-6 lg:pt-6"
+            >
+              <h2 id="sommaire-titre" class="text-lg font-bold text-gray-900 dark:text-white">
                 {t.toc}
               </h2>
+              <button
+                type="button"
+                class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white lg:hidden"
+                on:click={fermerSommaire}
+                aria-label={$tr("common.close")}
+                data-testid="law-toc-close"
+              >
+                <span class="material-icons" aria-hidden="true">close</span>
+              </button>
             </div>
 
             <div
-              class="search-box flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 mb-6 focus-within:ring-2 focus-within:ring-blue-500"
+              class="search-box mx-4 mb-3 mt-1 flex shrink-0 items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 lg:mx-6 lg:mb-6 lg:mt-0"
             >
               <svg
-                class="w-4 h-4 text-gray-500 mr-2"
+                class="w-4 h-4 shrink-0 text-gray-500 mr-2"
                 viewBox="0 0 16 16"
                 fill="currentColor"
+                aria-hidden="true"
               >
                 <path
                   d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"
                 />
               </svg>
+              <!-- 16 px sous `lg`, là où il vit dans le panneau tactile : en
+                   dessous, iOS zoome sur la page au focus et ne dézoome pas. -->
               <input
                 type="text"
-                class="bg-transparent border-none outline-none w-full text-sm text-gray-900 dark:text-white placeholder-gray-400"
+                class="bg-transparent border-none outline-none w-full min-w-0 text-base lg:text-sm text-gray-900 dark:text-white placeholder-gray-400"
                 placeholder={t.filter}
                 bind:value={searchQuery}
           aria-label={t.filter}
               />
             </div>
 
-            <div class="toc space-y-6">
+            <nav
+              class="toc min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-6 lg:px-6 lg:pb-6"
+              aria-labelledby="sommaire-titre"
+            >
               {#each filteredTOC as section}
                 <div class="toc-section">
+                  <!-- Collé en haut de la liste qui défile : on sait toujours
+                       dans quel titre ou chapitre on se trouve. -->
                   <div
-                    class="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3"
+                    class="sticky top-0 z-[1] bg-white dark:bg-slate-800 py-1 mb-2 lg:mb-3 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest coupe-mots"
                   >
                     {section.title}
                   </div>
@@ -667,11 +900,15 @@
                         currentArticle &&
                         article.number === currentArticle.number &&
                         article.title === currentArticle.title}
+                      <!-- `aria-current` : l'article en cours n'était signalé
+                           que par la couleur. Il sert aussi de point d'entrée
+                           du focus à l'ouverture du panneau. -->
                       <button
-                        class="text-left px-3 py-2 rounded-md text-sm transition-all duration-200
+                        class="text-left px-3 py-3 lg:py-2 rounded-md text-base lg:text-sm transition-all duration-200
                                  {isActive
                           ? 'bg-blue-50 text-blue-600 font-medium dark:bg-blue-900/30 dark:text-blue-400'
                           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'}"
+                        aria-current={isActive ? "true" : undefined}
                         on:click={() => {
                           // Find index in flat list
                           const idx = flatArticles.findIndex(
@@ -689,32 +926,37 @@
               {/each}
 
               {#if filteredTOC.length === 0}
-                <div class="text-sm text-gray-500 italic">{t.no_result}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400 italic">{t.no_result}</div>
               {/if}
-            </div>
-          </aside>
+            </nav>
+          </div>
 
           <!-- Content Column -->
+          <!-- `min-w-0` : élément de grille, il ne doit pas s'élargir sur son
+               contenu le plus large. -->
           <main
             id="contenu"
-            class="content bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 md:p-10 shadow-sm relative"
+            class="content min-w-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 sm:p-6 md:p-10 shadow-sm relative"
           >
             <!-- Document Header -->
             <div
-              class="document-header border-b border-gray-100 dark:border-slate-700 pb-8 mb-8"
+              class="document-header border-b border-gray-100 dark:border-slate-700 pb-6 mb-6 sm:pb-8 sm:mb-8"
             >
-              <div class="document-meta flex items-center gap-3 mb-4">
+              <!-- Passe à la ligne : sur téléphone, la cote et la date
+                   écrasaient le badge sur deux lignes. Les cotes du type
+                   « N°2018/9387/CAB/PM » n'ont aucune coupure possible. -->
+              <div class="document-meta flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
                 <span
-                  class="inline-block px-3 py-1 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 rounded-md text-xs font-bold uppercase tracking-wide"
+                  class="inline-block shrink-0 whitespace-nowrap px-3 py-1 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 rounded-md text-xs font-bold uppercase tracking-wide"
                 >
                   {t.law_decree}
                 </span>
-                <span class="text-sm text-gray-500"
+                <span class="min-w-0 coupe-mots text-sm text-gray-500"
                   >{law.reference || "Loi No " + law.id} - {formatDate(law.publication_date, currentLanguage)}</span
                 >
               </div>
               <h1
-                class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight"
+                class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight coupe-mots"
               >
                 {law.title}
               </h1>
@@ -731,16 +973,26 @@
                 <!-- Etait code en dur a "2024". -->
                 <span>{t.updated} : {formatDate(law.updated_at || law.created_at, currentLanguage)}</span>
               </div>
-              <div class="document-actions flex gap-3">
+              <!--
+                Rangée qui passe à la ligne, chaque bouton s'étirant sur la
+                place libre (`flex-1`, rendu à sa largeur à partir de `sm`).
+                Elle ne passait pas à la ligne : les trois boutons demandaient
+                environ 400 px pour 280 disponibles à 360 px, et TOUTE la page
+                glissait de côté. Pas de grille à deux colonnes : « Document
+                original » ne tient pas dans une demi-largeur de téléphone, il
+                y aurait coupé son libellé sur deux lignes.
+              -->
+              <div class="document-actions flex flex-wrap gap-2 sm:gap-3">
                 <button
-                  class="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm font-medium transition-colors"
+                  class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm font-medium transition-colors"
                   on:click={copierLeLien}
                 >
                   <svg
-                    class="w-5 h-5"
+                    class="w-5 h-5 shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
+                    aria-hidden="true"
                     ><path
                       stroke-linecap="round"
                       stroke-linejoin="round"
@@ -763,11 +1015,11 @@
                        nom brut du fichier aspire
                        ("10691_decret-n-2026-164-du-..."). -->
                   <a
-                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm shadow-blue-600/20 transition-colors"
+                    class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm shadow-blue-600/20 transition-colors"
                     href={`${API_URL}/laws/${law.id}/download`}
                     download
                   >
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
+                    <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"
                       ><path
                         fill-rule="evenodd"
                         d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
@@ -781,7 +1033,7 @@
                   <button
                     on:click={() => (afficherDocument = !afficherDocument)}
                     data-testid="law-toggle-document"
-                    class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors {afficherDocument
+                    class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 rounded-lg text-sm font-medium border transition-colors {afficherDocument
                       ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300'
                       : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
                   >
@@ -793,11 +1045,11 @@
                        Bouton desactive et explique, plutot que masque sans
                        raison visible. -->
                   <button
-                    class="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                    class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed"
                     disabled
                     title={t.no_source_file}
                   >
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
+                    <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"
                       ><path
                         fill-rule="evenodd"
                         d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
@@ -810,49 +1062,85 @@
             </div>
 
             {#if afficherDocument && law.file_id}
+              <!-- Bord à bord sur téléphone (`-mx-4` annule la marge de la
+                   carte) : 32 px de plus pour la page, là où chaque pixel de
+                   largeur grossit le texte du PDF. -->
               <div
-                class="mt-6 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+                class="-mx-4 mt-6 mb-6 overflow-hidden border-y border-slate-200 dark:border-slate-700 sm:mx-0 sm:rounded-xl sm:border"
                 data-testid="law-document-viewer"
               >
-                <ImagePdfViewer
-                  url={`${API_URL}/laws/${law.id}/download`}
-                  initialPage={pageDemandee}
-                />
+                <!-- Recréée pour chaque document : SvelteKit réutilise la page
+                     d'une fiche à l'autre, et la visionneuse ne lit son
+                     adresse qu'au montage. Sans clé, /laws/2 aurait gardé les
+                     pages de /laws/1. -->
+                {#key law.id}
+                  <ImagePdfViewer
+                    url={`${API_URL}/laws/${law.id}/download`}
+                    initialPage={pageDemandee}
+                  />
+                {/key}
               </div>
             {/if}
 
             <!-- Navigation -->
+            <!--
+              Flèches seules sous `sm`, le nom passant par aria-label : en
+              français, « Précédent  12 / 199  Suivant » débordait dès 360 px.
+              Sous `lg`, où la colonne du sommaire n'existe pas, le compteur
+              devient le bouton qui l'ouvre. « Suivant » reste le DERNIER
+              bouton de la barre : les tests e2e le prennent par
+              `.article-navigation button` puis `.last()`.
+
+              Cible du défilement à chaque changement d'article : `scroll-mt-*`
+              suit la hauteur du fil d'Ariane collant (53 px sous `sm`, 65 px
+              au-dessus, 45 px en paysage), plus un peu d'air.
+            -->
             <div
-              class="article-navigation flex justify-between items-center bg-gray-50 dark:bg-slate-900/50 rounded-lg p-4 mb-10 border border-gray-100 dark:border-slate-700"
+              bind:this={debutArticle}
+              class="article-navigation flex justify-between items-center gap-2 bg-gray-50 dark:bg-slate-900/50 rounded-lg p-2 sm:p-4 mb-6 sm:mb-10 border border-gray-100 dark:border-slate-700 scroll-mt-16 sm:scroll-mt-20 sm:court:scroll-mt-14 lg:scroll-mt-24"
             >
               <button
-                class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
                 on:click={navigateToPrevious}
                 disabled={!flatArticles.length || currentArticleIndex === 0}
+                aria-label={t.previous}
               >
-                <svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
                   ><path
                     fill-rule="evenodd"
                     d="M9.78 12.78a.75.75 0 01-1.06 0L4.47 8.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 1.06L6.06 8l3.72 3.72a.75.75 0 010 1.06z"
                   /></svg
                 >
-                {t.previous}
+                <span class="hidden sm:inline">{t.previous}</span>
               </button>
-              <div class="text-sm font-medium text-gray-500">
-                {#if flatArticles.length > 0}
-                  {currentArticleIndex + 1} / {flatArticles.length}
-                {:else}
-                  0 / 0
-                {/if}
+              <button
+                type="button"
+                class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-md px-3 text-gray-700 dark:text-gray-200 hover:bg-white hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-blue-400 disabled:opacity-50 transition-colors lg:hidden"
+                on:click={ouvrirSommaire}
+                disabled={!flatArticles.length}
+                aria-haspopup="dialog"
+                aria-expanded={tocOuvert}
+                aria-controls="sommaire"
+                data-testid="law-toc-toggle"
+              >
+                <span class="material-icons text-xl" aria-hidden="true">toc</span>
+                <span class="flex min-w-0 flex-col items-start leading-tight">
+                  <span class="text-sm font-semibold">{t.toc_open}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{compteur}</span>
+                </span>
+              </button>
+              <div class="hidden lg:block text-sm font-medium text-gray-500">
+                {compteur}
               </div>
               <button
-                class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
                 on:click={navigateToNext}
                 disabled={!flatArticles.length ||
                   currentArticleIndex === flatArticles.length - 1}
+                aria-label={t.next}
               >
-                {t.next}
-                <svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"
+                <span class="hidden sm:inline">{t.next}</span>
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
                   ><path
                     fill-rule="evenodd"
                     d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
@@ -865,23 +1153,23 @@
             {#if currentArticle}
               <article class="article">
                 <div
-                  class="article-header flex justify-between items-start mb-6"
+                  class="article-header flex justify-between items-start gap-3 mb-6"
                 >
-                  <div>
+                  <div class="min-w-0">
                     <p
-                      class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1"
+                      class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 coupe-mots"
                     >
                       {currentArticle.sectionTitle || ""}
                     </p>
                     <h2
-                      class="text-3xl font-bold text-gray-900 dark:text-white"
+                      class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white"
                     >
                       {t.article_prefix}
                       {currentArticle.number}
                     </h2>
                   </div>
                   <span
-                    class="px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-bold uppercase tracking-wide"
+                    class="shrink-0 whitespace-nowrap px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-bold uppercase tracking-wide"
                   >
                     {t.in_force}
                   </span>
@@ -889,14 +1177,17 @@
 
                 {#if currentArticle.title && currentArticle.title !== `Article ${currentArticle.number}` && currentArticle.title !== `Texte de l'article ${currentArticle.number}`}
                   <h3
-                    class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-8"
+                    class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200 mb-6 sm:mb-8 coupe-mots"
                   >
                     {currentArticle.title}
                   </h3>
                 {/if}
 
+                <!-- 16 px sur téléphone (18 au-dessus), et coupure des cotes,
+                     URL et références sans espace, qui débordaient de la
+                     colonne. -->
                 <div
-                  class="article-content space-y-6 text-lg leading-relaxed text-gray-700 dark:text-gray-300"
+                  class="article-content space-y-4 sm:space-y-6 text-base sm:text-lg leading-relaxed text-gray-700 dark:text-gray-300 coupe-mots"
                 >
                   {#each currentArticle.content.split("\n") as paragraph}
                     {#if paragraph.trim()}
@@ -906,8 +1197,12 @@
                 </div>
 
                 <!-- AI Explanation -->
+                <!-- Empilé sous `sm` : l'icône de 48 px à côté du texte, avec
+                     ses marges, laissait environ 156 px de colonne à 360 px —
+                     une vingtaine de caractères par ligne pour l'explication,
+                     la fonction phare de la page. -->
                 <div
-                  class="ai-explanation mt-12 flex gap-6 p-6 bg-blue-50 dark:bg-slate-900/80 border border-blue-100 dark:border-slate-700 rounded-xl relative overflow-hidden"
+                  class="ai-explanation mt-8 sm:mt-12 flex flex-col sm:flex-row gap-3 sm:gap-6 p-4 sm:p-6 bg-blue-50 dark:bg-slate-900/80 border border-blue-100 dark:border-slate-700 rounded-xl relative overflow-hidden"
                 >
                   <!-- Decorative bg -->
                   <div
@@ -915,12 +1210,13 @@
                   ></div>
 
                   <div
-                    class="ai-icon w-12 h-12 shrink-0 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20"
+                    class="ai-icon w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20"
                   >
                     <svg
-                      class="w-6 h-6"
+                      class="w-5 h-5 sm:w-6 sm:h-6"
                       viewBox="0 0 24 24"
                       fill="currentColor"
+                      aria-hidden="true"
                     >
                       <path
                         d="M12 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM9.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"
@@ -930,7 +1226,7 @@
                       />
                     </svg>
                   </div>
-                  <div class="ai-content flex-1 z-10">
+                  <div class="ai-content flex-1 min-w-0 z-10 coupe-mots">
                     <h4
                       class="ai-title font-bold text-gray-900 dark:text-white mb-2"
                     >
@@ -950,15 +1246,15 @@
                       >
                         <span class="flex items-center gap-1" aria-hidden="true">
                           <span
-                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce"
+                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full motion-safe:animate-bounce"
                             style="animation-delay: 0ms"
                           ></span>
                           <span
-                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce"
+                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full motion-safe:animate-bounce"
                             style="animation-delay: 150ms"
                           ></span>
                           <span
-                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce"
+                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full motion-safe:animate-bounce"
                             style="animation-delay: 300ms"
                           ></span>
                         </span>
@@ -974,7 +1270,7 @@
                         <button
                           on:click={expliquerArticle}
                           data-testid="law-explain-retry"
-                          class="mt-2 underline font-medium hover:no-underline"
+                          class="mt-2 inline-flex min-h-11 items-center sm:min-h-0 underline font-medium hover:no-underline"
                         >
                           {$tr("common.retry")}
                         </button>
@@ -1014,7 +1310,7 @@
                       <button
                         on:click={expliquerArticle}
                         data-testid="law-explain-regenerate"
-                        class="mt-4 px-4 py-2 border border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400 hover:bg-blue-100 dark:hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors"
+                        class="mt-4 w-full sm:w-auto min-h-11 sm:min-h-0 px-4 py-2 border border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400 hover:bg-blue-100 dark:hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors"
                       >
                         {t.ai_regenerate}
                       </button>
@@ -1034,7 +1330,7 @@
                       <button
                         on:click={expliquerArticle}
                         data-testid="law-explain"
-                        class="ai-question-btn mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        class="ai-question-btn mt-6 w-full sm:w-auto min-h-11 sm:min-h-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                       >
                         {t.ai_explain}
                       </button>
@@ -1042,11 +1338,68 @@
                   </div>
                 </div>
               </article>
+
+              <!--
+                La barre, répétée sous l'article : elle n'existait qu'au-dessus,
+                et il fallait remonter tout un long article pour passer au
+                suivant. Classe distincte de `article-navigation` : les tests
+                qui visent la barre du haut la trouvent seule.
+              -->
+              <div
+                class="article-navigation-bas mt-8 sm:mt-10 flex justify-between items-center gap-2 bg-gray-50 dark:bg-slate-900/50 rounded-lg p-2 sm:p-4 border border-gray-100 dark:border-slate-700"
+              >
+                <button
+                  class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                  on:click={navigateToPrevious}
+                  disabled={currentArticleIndex === 0}
+                  aria-label={t.previous}
+                >
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
+                    ><path
+                      fill-rule="evenodd"
+                      d="M9.78 12.78a.75.75 0 01-1.06 0L4.47 8.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 1.06L6.06 8l3.72 3.72a.75.75 0 010 1.06z"
+                    /></svg
+                  >
+                  <span class="hidden sm:inline">{t.previous}</span>
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-md px-3 text-gray-700 dark:text-gray-200 hover:bg-white hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-blue-400 transition-colors lg:hidden"
+                  on:click={ouvrirSommaire}
+                  aria-haspopup="dialog"
+                  aria-expanded={tocOuvert}
+                  aria-controls="sommaire"
+                  data-testid="law-toc-toggle-bas"
+                >
+                  <span class="material-icons text-xl" aria-hidden="true">toc</span>
+                  <span class="flex min-w-0 flex-col items-start leading-tight">
+                    <span class="text-sm font-semibold">{t.toc_open}</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">{compteur}</span>
+                  </span>
+                </button>
+                <div class="hidden lg:block text-sm font-medium text-gray-500">
+                  {compteur}
+                </div>
+                <button
+                  class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                  on:click={navigateToNext}
+                  disabled={currentArticleIndex === flatArticles.length - 1}
+                  aria-label={t.next}
+                >
+                  <span class="hidden sm:inline">{t.next}</span>
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
+                    ><path
+                      fill-rule="evenodd"
+                      d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
+                    /></svg
+                  >
+                </button>
+              </div>
             {:else if flatArticles.length === 0 && law.content}
               <!-- Fallback if parsing failed but content exists -->
               <div class="prose dark:prose-invert max-w-none">
                 <p>{t.raw_fallback}</p>
-                <pre class="whitespace-pre-wrap font-sans">{law.content}</pre>
+                <pre class="whitespace-pre-wrap font-sans coupe-mots">{law.content}</pre>
               </div>
             {:else}
               <div class="py-20 text-center text-gray-500">{t.loading}</div>
@@ -1059,3 +1412,59 @@
 </div>
 
 <SiteFooter />
+
+<style>
+  /*
+   * Hauteurs maximales du sommaire. Ici plutot qu'en classes Tailwind : une
+   * classe `max-h-[80dvh]` n'ecrit que la valeur en dvh, et un navigateur qui
+   * ne la connait pas laisserait le panneau sans limite — fixe en bas de
+   * l'ecran, il deborderait par le haut sans pouvoir defiler. La valeur en vh,
+   * ecrite d'abord, sert de repli.
+   */
+  @media not all and (min-width: 1024px) {
+    .sommaire {
+      max-height: 80vh;
+      max-height: 80dvh;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .sommaire {
+      max-height: calc(100vh - 7rem);
+      max-height: calc(100dvh - 7rem);
+    }
+  }
+
+  /*
+   * Le panneau monte du bas et le fond apparait en fondu : le lecteur voit d'ou
+   * vient le sommaire et ou il retournera. Rien de tout cela pour qui a demande
+   * moins d'animations.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    .sommaire.ouvert {
+      animation: monter 0.2s ease-out;
+    }
+
+    .fond-sommaire {
+      animation: fondu 0.2s ease-out;
+    }
+  }
+
+  @keyframes monter {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fondu {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+</style>
