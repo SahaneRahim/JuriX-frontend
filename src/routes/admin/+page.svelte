@@ -95,17 +95,19 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
   });
 </script>
 
-<div class="mb-8 flex items-center justify-between">
-  <div>
-    <h1 class="text-3xl font-bold text-slate-900">{$tr("admin.dashboard")}</h1>
+<!-- Empilé sur téléphone : sur une seule ligne, l'heure de mise à jour et
+     « Actualiser » serraient le titre dans une colonne étroite. -->
+<div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+  <div class="min-w-0">
+    <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">{$tr("admin.dashboard")}</h1>
     <p class="mt-1 text-slate-500">{$tr("admin.dashboardDesc")}</p>
   </div>
-  <div class="flex items-center gap-3">
-    <span class="text-sm font-medium text-slate-500"
+  <div class="flex flex-wrap items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
+    <span class="text-xs font-medium text-slate-500 sm:text-sm"
       >{$tr("admin.lastUpdate")}: {new Date().toLocaleTimeString()}</span
     >
     <button
-      class="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-900/5 hover:bg-slate-50 disabled:opacity-60"
+      class="min-h-11 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-900/5 hover:bg-slate-50 disabled:opacity-60 sm:min-h-0"
       on:click={loadStats}
       disabled={loading}
       data-testid="admin-refresh"
@@ -125,19 +127,21 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
   <div
     role="alert"
     data-testid="admin-error"
-    class="rounded-xl border border-red-200 bg-red-50 p-8 text-center"
+    class="rounded-xl border border-red-200 bg-red-50 p-6 text-center sm:p-8"
   >
     <p class="mb-4 font-medium text-red-700">{erreur}</p>
     <button
       on:click={loadStats}
       data-testid="admin-retry"
-      class="rounded-lg bg-red-600 px-5 py-2 font-semibold text-white hover:bg-red-700"
+      class="min-h-11 rounded-lg bg-red-600 px-5 py-2 font-semibold text-white hover:bg-red-700"
       >{$tr("common.retry")}</button
     >
   </div>
 {:else}
-  <!-- Stats Grid -->
-  <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+  <!-- Quatre colonnes seulement à partir de xl : à lg, la barre latérale
+       laisse environ 700 px, et quatre cartes de 160 px y écrasaient valeurs
+       et icônes. -->
+  <div class="mb-6 grid gap-4 sm:mb-8 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
     <StatsCard
       title={$tr("admin.totalDocs")}
       value={overview.total_laws?.toString() || "0"}
@@ -169,13 +173,16 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
     />
   </div>
 
-  <!-- Charts & Activity -->
-  <div class="grid gap-6 lg:grid-cols-3">
+  <!-- `grid-cols-1` explicite et `lg:col-span-2` : sans eux, sous lg, la carte
+       du graphique ouvrait deux colonnes implicites dimensionnées sur leur
+       contenu, et les titres tronqués des derniers documents élargissaient
+       la page au-delà de l'écran. -->
+  <div class="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
     <!-- Search Activity Chart -->
     <div
-      class="col-span-2 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      class="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:col-span-2"
     >
-      <div class="mb-6 flex items-center justify-between">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 sm:mb-6">
         <h3 class="font-bold text-slate-900">{$tr("admin.searchActivity")}</h3>
         <!-- La fenêtre d'observation est affichée plutôt que choisie : le
              backend accepte désormais `?days=`, mais un sélecteur suppose des
@@ -186,29 +193,37 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
       </div>
 
       <!-- Placeholder Chart -->
-      <div class="relative h-64 w-full">
+      <div class="relative h-48 w-full sm:h-64">
         {#if searchStats.modes_usage}
-          <div class="flex h-full items-end justify-between px-4">
-            {#each Object.entries(searchStats.modes_usage) as [mode, count], i}
-              <div
-                class="group relative flex flex-col items-center gap-2"
-                style="width: 30%"
-              >
-                <div
-                  class="w-full rounded-t-lg bg-blue-500 opacity-80 hover:opacity-100 transition-all"
-                  style="height: {Math.max(
-                    (Number(count) / searchStats.total_searches) * 100,
-                    5,
-                  )}%"
-                ></div>
-                <span class="text-xs font-medium capitalize text-slate-600"
+          <!-- Colonnes en flex-1 et non à 30 % chacune : dès quatre modes, les
+               barres dépassaient du graphique. Chaque barre vit dans une piste
+               de hauteur définie, sans quoi son pourcentage de hauteur ne se
+               résout pas. Le nombre de requêtes est écrit au-dessus de la
+               barre : en info-bulle de survol, il n'apparaissait jamais au
+               doigt. -->
+          <div class="flex h-full gap-3 px-2 sm:gap-6 sm:px-4">
+            {#each Object.entries(searchStats.modes_usage) as [mode, count] (mode)}
+              <div class="flex min-w-0 flex-1 flex-col items-center gap-1">
+                <span class="text-xs font-semibold tabular-nums text-slate-700"
+                  >{count}<span class="sr-only"> {$tr("admin.requests")}</span></span
+                >
+                <div class="flex min-h-0 w-full flex-1 items-end">
+                  <div
+                    class="w-full rounded-t-lg bg-blue-500 opacity-80 hover:opacity-100 transition-all"
+                    style="height: {Math.min(
+                      100,
+                      Math.max(
+                        searchStats.total_searches
+                          ? (Number(count) / searchStats.total_searches) * 100
+                          : 0,
+                        5,
+                      ),
+                    )}%"
+                  ></div>
+                </div>
+                <span class="max-w-full truncate text-xs font-medium capitalize text-slate-600"
                   >{mode}</span
                 >
-                <div
-                  class="absolute -top-8 hidden rounded-md bg-slate-900 px-2 py-1 text-xs text-white group-hover:block"
-                >
-                  {count} {$tr("admin.requests")}
-                </div>
               </div>
             {/each}
           </div>
@@ -223,11 +238,11 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
     </div>
 
     <!-- Recent Uploads -->
-    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h3 class="mb-4 font-bold text-slate-900">{$tr("admin.latestDocs")}</h3>
       <div class="space-y-4">
         {#if dernieresLois.length > 0}
-          {#each dernieresLois as law}
+          {#each dernieresLois as law (law.id)}
             <div class="flex items-start gap-3">
               <div
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600"
@@ -252,7 +267,7 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
       </div>
       <a
         href="/admin/documents"
-        class="mt-6 block w-full text-center rounded-lg py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
+        class="mt-6 block w-full text-center rounded-lg py-3 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors sm:py-2"
       >
         {$tr("admin.viewAll")}
       </a>
@@ -260,11 +275,11 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
   </div>
 
   <section
-    class="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+    class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:p-6"
     aria-labelledby="admin-profils-titre"
     data-testid="admin-profils"
   >
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 sm:mb-6">
       <h3 id="admin-profils-titre" class="font-bold text-slate-900">
         {$tr("admin.personasTitle")}
       </h3>
@@ -281,7 +296,7 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
         {#each lignesProfils as ligne (ligne.cle)}
           <li data-testid="admin-profil" data-profil={ligne.profil ?? ligne.cle}>
             <div class="mb-1 flex items-center justify-between gap-4 text-sm">
-              <span class="flex items-center gap-2 font-medium text-slate-700">
+              <span class="coupe-mots flex min-w-0 items-center gap-2 font-medium text-slate-700">
                 <span class="material-icons text-base text-slate-400" aria-hidden="true"
                   >{ligne.profil ? PERSONA_ICONE[ligne.profil] : "help_outline"}</span
                 >
@@ -291,7 +306,7 @@ let overview: AnalyticsOverview = { total_laws: 0, by_language: {}, recent_laws:
                     ? $tr(`persona.${PERSONA_SLUG[ligne.profil]}.nom`)
                     : ligne.cle}
               </span>
-              <span class="tabular-nums text-slate-600"
+              <span class="shrink-0 tabular-nums text-slate-600"
                 >{ligne.conversations} · {pourcentage.format(ligne.part)}</span
               >
             </div>

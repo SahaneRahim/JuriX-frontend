@@ -21,19 +21,21 @@
   };
 </script>
 
-<div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-  <div class="flex items-start justify-between">
-    <div>
+<!-- Plus compacte sur téléphone, où quatre cartes s'empilent ; l'icône ne
+     rétrécit pas (shrink-0) quand le titre est long. -->
+<div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md sm:p-6">
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0">
       <p class="text-sm font-medium text-slate-500">{title}</p>
-      <h3 class="mt-2 text-2xl font-bold text-slate-900">{value}</h3>
+      <h3 class="coupe-mots mt-2 text-xl font-bold text-slate-900 sm:text-2xl">{value}</h3>
     </div>
-    <div class="flex h-12 w-12 items-center justify-center rounded-xl {colorClasses[color]}">
-      <span class="text-xl">{icon}</span>
+    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 {colorClasses[color]}">
+      <span class="text-lg sm:text-xl">{icon}</span>
     </div>
   </div>
-  
+
   {#if change}
-    <div class="mt-4 flex items-center gap-2 text-sm">
+    <div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <span class="flex items-center font-medium {trendColors[trend]}">
         {#if trend === 'up'}
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="mr-1 h-3 w-3">

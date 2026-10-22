@@ -1,6 +1,7 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api';
   import { onMount } from "svelte";
+  import { browser } from "$app/environment";
   import UploadModal from "$lib/components/admin/UploadModal.svelte";
   import EditModal from "$lib/components/admin/EditModal.svelte";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
@@ -23,6 +24,28 @@ let documents: Law[] = [];
   let selectedCategoryId: string = "";
   let selectedLanguage: string = "";
   let selectedStatus: string = "";
+
+  /**
+   * Tableau à partir de md, cartes en dessous.
+   *
+   * Le tableau coupait au lieu de défiler : à 1 024 px la colonne Actions
+   * était déjà rognée, et sur téléphone seuls les titres restaient visibles.
+   * Une seule variante est RENDUE, plutôt que masquée en CSS : StatusBadge
+   * porte un data-testid, qui se serait retrouvé en double sur chaque ligne.
+   *
+   * La page n'est jamais rendue par le serveur (le layout attend la garde
+   * d'authentification, posée dans onMount) : la largeur se lit dès la création.
+   */
+  const REQUETE_TABLEAU = "(min-width: 768px)";
+  let tableau = browser && window.matchMedia(REQUETE_TABLEAU).matches;
+
+  onMount(() => {
+    const requete = window.matchMedia(REQUETE_TABLEAU);
+    const suivre = () => (tableau = requete.matches);
+    suivre();
+    requete.addEventListener("change", suivre);
+    return () => requete.removeEventListener("change", suivre);
+  });
 
   onMount(async () => {
     await Promise.all([fetchDocuments(), fetchCategories()]);
@@ -171,7 +194,9 @@ let documents: Law[] = [];
     }
   }
 
-  $: visiblePages = pagesVisibles(currentPage, totalPages);
+  // Trois numéros sous md : avec cinq, plus les flèches, la rangée dépassait
+  // la largeur d'un téléphone de 360 px.
+  $: visiblePages = pagesVisibles(currentPage, totalPages, tableau ? 5 : 3);
 </script>
 
 <UploadModal bind:show={showUploadModal} on:refresh={fetchDocuments} />
@@ -181,22 +206,26 @@ let documents: Law[] = [];
   on:refresh={fetchDocuments}
 />
 
-<div class="mb-8 flex items-center justify-between">
-  <div>
-    <h1 class="text-3xl font-bold text-slate-900">
+<!-- Empilé sous md, et boutons qui passent à la ligne : côte à côte avec le
+     titre, « Import en lot » et « Nouveau document » débordaient de l'écran.
+     `flex-auto` : chacun garde sa largeur naturelle, et occupe toute la ligne
+     quand les deux n'y tiennent plus. -->
+<div class="mb-6 flex flex-col gap-4 sm:mb-8 md:flex-row md:items-center md:justify-between">
+  <div class="min-w-0">
+    <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
       {$tr("admin.docManagement")}
     </h1>
     <p class="mt-1 text-slate-500">
       {$tr("admin.docManagementDesc")}
     </p>
   </div>
-  <div class="flex items-center gap-3">
+  <div class="flex flex-wrap gap-2 sm:gap-3 md:shrink-0">
     <!-- /admin/documents/batch-upload existait mais n'était liée depuis nulle
          part : la page n'était atteignable qu'en tapant l'URL à la main. -->
     <a
       href="/admin/documents/batch-upload"
       data-testid="doc-batch-upload-link"
-      class="flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-2.5 font-semibold text-slate-700 transition-all hover:border-blue-400 hover:text-blue-700"
+      class="flex min-h-11 flex-auto items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 font-semibold text-slate-700 transition-all hover:border-blue-400 hover:text-blue-700 sm:flex-none sm:px-5"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -217,7 +246,7 @@ let documents: Law[] = [];
     <button
       on:click={() => (showUploadModal = true)}
       data-testid="doc-new"
-      class="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-700 hover:scale-105"
+      class="flex min-h-11 flex-auto items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-700 motion-safe:hover:scale-105 sm:flex-none sm:px-5"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -238,11 +267,20 @@ let documents: Law[] = [];
   </div>
 </div>
 
-<!-- Filters -->
+<!-- Filters : sur une seule rangée sans retour à la ligne, chaque liste aussi
+     large que sa plus longue option (« Toutes catégories », noms de
+     catégories), il fallait environ 600 px, et la barre débordait de la carte
+     et de la page. Grille sous xl. Champs à 16 px sur téléphone : en dessous,
+     iOS zoome au focus.
+     En rangée, à partir de xl, les listes plafonnent à 14 rem et la recherche
+     garde au moins 16 rem : à 1 280 px, la liste des catégories s'élargissait
+     jusqu'à son plus long nom et ne laissait qu'environ 155 px au champ de
+     recherche. Un nom ainsi coupé finit par « … » plutôt qu'en plein mot
+     (`text-ellipsis`, que Chrome et Firefox appliquent aux listes). -->
 <div
-  class="mb-6 flex gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+  class="mb-6 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-3 sm:gap-4 sm:p-4 xl:flex"
 >
-  <div class="relative flex-1">
+  <div class="relative min-w-0 sm:col-span-3 xl:min-w-[16rem] xl:flex-1">
     <svg
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
@@ -260,24 +298,24 @@ let documents: Law[] = [];
     <input
       type="text"
       placeholder={$tr("admin.searchDoc")}
-      class="w-full rounded-lg border-slate-200 pl-10 text-sm focus:border-blue-500 focus:ring-blue-500"
+      class="w-full rounded-lg border-slate-200 pl-10 text-base focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
       bind:value={searchQuery}
           aria-label={$tr("a11y.searchField")}
     />
   </div>
   <select
-    class="rounded-lg border-slate-200 text-sm text-slate-600 focus:border-blue-500 focus:ring-blue-500"
+    class="w-full min-w-0 text-ellipsis rounded-lg border-slate-200 text-base text-slate-600 focus:border-blue-500 focus:ring-blue-500 sm:text-sm xl:w-auto xl:max-w-[14rem]"
     bind:value={selectedCategoryId}
           aria-label={$tr("a11y.filterCategory")}
     on:change={applyFilters}
   >
     <option value="">{$tr("admin.allCategories")}</option>
-    {#each categories as category}
+    {#each categories as category (category.id)}
       <option value={category.id}>{nomCategorie(category.name, $language.current)}</option>
     {/each}
   </select>
   <select
-    class="rounded-lg border-slate-200 text-sm text-slate-600 focus:border-blue-500 focus:ring-blue-500"
+    class="w-full min-w-0 text-ellipsis rounded-lg border-slate-200 text-base text-slate-600 focus:border-blue-500 focus:ring-blue-500 sm:text-sm xl:w-auto xl:max-w-[14rem]"
     bind:value={selectedLanguage}
           aria-label={$tr("a11y.filterLanguage")}
     on:change={applyFilters}
@@ -287,7 +325,7 @@ let documents: Law[] = [];
     <option value="en">🇬🇧 English</option>
   </select>
   <select
-    class="rounded-lg border-slate-200 text-sm text-slate-600 focus:border-blue-500 focus:ring-blue-500"
+    class="w-full min-w-0 text-ellipsis rounded-lg border-slate-200 text-base text-slate-600 focus:border-blue-500 focus:ring-blue-500 sm:text-sm xl:w-auto xl:max-w-[14rem]"
     bind:value={selectedStatus}
           aria-label={$tr("a11y.filterStatus")}
     on:change={applyFilters}
@@ -304,101 +342,159 @@ let documents: Law[] = [];
 <div
   class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
 >
-  <table class="w-full text-left text-sm text-slate-600">
-    <thead class="bg-slate-50 text-xs uppercase text-slate-500">
-      <tr>
-        <th class="px-6 py-4 font-semibold">{$tr("admin.docTitle")}</th>
-        <th class="px-6 py-4 font-semibold">{$tr("admin.language")}</th>
-        <th class="px-6 py-4 font-semibold">{$tr("admin.dateAdded")}</th>
-        <th class="px-6 py-4 font-semibold">{$tr("admin.status")}</th>
-        <th class="px-6 py-4 font-semibold text-right"
-          >{$tr("admin.actions")}</th
-        >
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-100">
-      {#if loading}
-        <tr
-          ><td colspan="5" class="px-6 py-4 text-center"
-            >{$tr("admin.loading")}</td
-          ></tr
-        >
-        {:else if erreur}
-          <!-- Sans cette branche, un serveur injoignable affichait « Aucun
-               document trouve » : l'operateur concluait que la base etait vide. -->
+  <!-- Les états (chargement, erreur, liste vide) sont rendus une fois, hors
+       des deux variantes : en lignes de tableau, il aurait fallu les recopier
+       dans les cartes, data-testid compris. -->
+  {#if loading}
+    <p class="px-6 py-4 text-center text-sm text-slate-600">{$tr("admin.loading")}</p>
+  {:else if erreur}
+    <!-- Sans cette branche, un serveur injoignable affichait « Aucun
+         document trouve » : l'operateur concluait que la base etait vide. -->
+    <div class="px-4 py-16 text-center sm:px-6" role="alert">
+      <p class="mb-4 font-medium text-red-700" data-testid="docs-error">{erreur}</p>
+      <button
+        on:click={fetchDocuments}
+        data-testid="docs-retry"
+        class="min-h-11 rounded-lg bg-red-600 px-5 py-2 font-semibold text-white hover:bg-red-700"
+        >{$tr("common.retry")}</button
+      >
+    </div>
+  {:else if filteredDocuments.length === 0}
+    <p class="px-6 py-4 text-center text-sm text-slate-600">{$tr("admin.noDocFound")}</p>
+  {:else if tableau}
+    <!-- Seul le tableau défile : la pagination, en dessous, reste en place
+         au lieu de partir avec lui hors de l'écran. Sous xl, la langue et la
+         date d'ajout quittent leurs colonnes pour une ligne sous le titre,
+         comme le nom dans le tableau des comptes : entre 768 et 1 100 px
+         environ, ces deux colonnes ne laissaient au titre que 110 à 120 px,
+         soit 10 à 14 lignes par document. -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm text-slate-600">
+        <thead class="bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
-            <td colspan="6" class="px-6 py-16 text-center" role="alert">
-              <p class="mb-4 font-medium text-red-700" data-testid="docs-error">{erreur}</p>
-              <button
-                on:click={fetchDocuments}
-                data-testid="docs-retry"
-                class="rounded-lg bg-red-600 px-5 py-2 font-semibold text-white hover:bg-red-700"
-                >{$tr("common.retry")}</button
-              >
-            </td>
-          </tr>
-      {:else if filteredDocuments.length === 0}
-        <tr
-          ><td colspan="5" class="px-6 py-4 text-center"
-            >{$tr("admin.noDocFound")}</td
-          ></tr
-        >
-      {:else}
-        {#each paginatedDocuments as doc}
-          <tr class="hover:bg-slate-50/80 transition-colors">
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-3">
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-slate-500"
-                >
-                  📄
-                </div>
-                <div>
-                  <span class="block font-medium text-slate-900"
-                    >{doc.title}</span
-                  >
-                  <span class="text-xs text-slate-500"
-                    >{doc.reference || ""}</span
-                  >
-                </div>
-              </div>
-            </td>
-            <td class="px-6 py-4">
-              <span class="uppercase text-xs font-bold"
-                >{doc.language || "N/A"}</span
-              >
-            </td>
-            <td class="px-6 py-4"
-              >{formatDate(doc.created_at, $language.current)}</td
+            <th class="px-4 py-4 font-semibold xl:px-6">{$tr("admin.docTitle")}</th>
+            <th class="hidden px-4 py-4 font-semibold xl:table-cell xl:px-6">{$tr("admin.language")}</th>
+            <th class="hidden px-4 py-4 font-semibold xl:table-cell xl:px-6">{$tr("admin.dateAdded")}</th>
+            <th class="px-4 py-4 font-semibold xl:px-6">{$tr("admin.status")}</th>
+            <th class="px-4 py-4 font-semibold text-right xl:px-6"
+              >{$tr("admin.actions")}</th
             >
-            <td class="px-6 py-4">
-              <StatusBadge status={doc.status} size="sm" />
-            </td>
-            <td class="px-6 py-4 text-right">
-              <button
-                on:click={() => editDocument(doc)}
-                class="font-medium text-blue-600 hover:text-blue-800 mr-3 transition-colors"
-              >
-                {$tr("admin.edit")}
-              </button>
-              <button
-                on:click={() => deleteDocument(doc.id, doc.title)}
-                class="font-medium text-red-600 hover:text-red-800 transition-colors"
-              >
-                {$tr("admin.delete")}
-              </button>
-            </td>
           </tr>
-        {/each}
-      {/if}
-    </tbody>
-  </table>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {#each paginatedDocuments as doc (doc.id)}
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="px-4 py-4 xl:px-6">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-500"
+                  >
+                    📄
+                  </div>
+                  <!-- Les cotes sans espace (« N°2018/9387/CAB/PM ») se
+                       coupent au lieu d'élargir la colonne. -->
+                  <div class="coupe-mots min-w-0">
+                    <span class="block font-medium text-slate-900"
+                      >{doc.title}</span
+                    >
+                    <span class="text-xs text-slate-500"
+                      >{doc.reference || ""}</span
+                    >
+                    <!-- Langue et date sous xl, où leurs colonnes sont
+                         masquées. En liste de définitions, comme dans les
+                         cartes : privé de son en-tête de colonne, « FR » seul
+                         ne dirait rien au lecteur d'écran. -->
+                    <dl
+                      class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 xl:hidden"
+                    >
+                      <dt class="sr-only">{$tr("admin.language")}</dt>
+                      <dd class="font-bold uppercase">{doc.language || "N/A"}</dd>
+                      <dt class="sr-only">{$tr("admin.dateAdded")}</dt>
+                      <dd>{formatDate(doc.created_at, $language.current)}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </td>
+              <td class="hidden px-4 py-4 xl:table-cell xl:px-6">
+                <span class="uppercase text-xs font-bold"
+                  >{doc.language || "N/A"}</span
+                >
+              </td>
+              <td class="hidden whitespace-nowrap px-4 py-4 xl:table-cell xl:px-6"
+                >{formatDate(doc.created_at, $language.current)}</td
+              >
+              <td class="px-4 py-4 xl:px-6">
+                <StatusBadge status={doc.status} size="sm" />
+              </td>
+              <!-- 44 px de haut sur tablette, au doigt ; liens texte à partir
+                   de lg, comme avant. -->
+              <td class="whitespace-nowrap px-4 py-4 text-right xl:px-6">
+                <button
+                  on:click={() => editDocument(doc)}
+                  class="mr-1 inline-flex min-h-11 items-center px-2 font-medium text-blue-600 hover:text-blue-800 transition-colors lg:mr-3 lg:min-h-0 lg:px-0"
+                >
+                  {$tr("admin.edit")}
+                </button>
+                <button
+                  on:click={() => deleteDocument(doc.id, doc.title)}
+                  class="inline-flex min-h-11 items-center px-2 font-medium text-red-600 hover:text-red-800 transition-colors lg:min-h-0 lg:px-0"
+                >
+                  {$tr("admin.delete")}
+                </button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {:else}
+    <!-- Une carte par document, sous md : titre sur deux lignes au plus,
+         cote coupée au besoin, puis langue et date, puis des actions de
+         44 px sur toute la largeur. -->
+    <ul class="divide-y divide-slate-100">
+      {#each paginatedDocuments as doc (doc.id)}
+        <li class="space-y-3 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="coupe-mots line-clamp-2 font-medium text-slate-900" title={doc.title}>
+                {doc.title}
+              </p>
+              {#if doc.reference}
+                <p class="coupe-mots mt-0.5 text-xs text-slate-500">{doc.reference}</p>
+              {/if}
+            </div>
+            <StatusBadge status={doc.status} size="sm" />
+          </div>
+          <dl class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <dt class="sr-only">{$tr("admin.language")}</dt>
+            <dd class="font-bold uppercase">{doc.language || "N/A"}</dd>
+            <dt class="sr-only">{$tr("admin.dateAdded")}</dt>
+            <dd>{formatDate(doc.created_at, $language.current)}</dd>
+          </dl>
+          <div class="flex gap-2">
+            <button
+              on:click={() => editDocument(doc)}
+              class="h-11 flex-1 rounded-lg border border-slate-200 text-sm font-medium text-blue-600 hover:bg-blue-50"
+            >
+              {$tr("admin.edit")}
+            </button>
+            <button
+              on:click={() => deleteDocument(doc.id, doc.title)}
+              class="h-11 flex-1 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              {$tr("admin.delete")}
+            </button>
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   <!-- Pagination -->
   <div
-    class="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 px-6 py-4 gap-4"
+    class="flex flex-col items-center justify-between gap-3 border-t border-slate-100 px-4 py-4 sm:flex-row sm:gap-4 sm:px-6"
   >
-    <span class="text-sm text-slate-500">
+    <span class="text-center text-sm text-slate-500 sm:text-left">
       {$tr("admin.showing")}
       {startIndex + 1}-{Math.min(endIndex, filteredDocuments.length)}
       {$tr("admin.on")}
@@ -415,13 +511,20 @@ let documents: Law[] = [];
     </span>
 
     {#if totalPages > 1}
-      <div class="flex items-center gap-1">
+      <!-- Sur une seule ligne, «« Précédent 1-5 Suivant »» faisait 430 px :
+           Suivant et »» disparaissaient sur téléphone. Sous sm, «« et »»
+           s'effacent et Précédent / Suivant deviennent des flèches, nommées
+           par aria-label ; boutons de 44 px au doigt. Les flèches ont une
+           largeur fixe : avant la police d'icônes, le mot de la ligature
+           (« chevron_left ») est bien plus large que le pictogramme. -->
+      <div class="flex flex-wrap items-center justify-center gap-1">
         <!-- First page button -->
         <button
           on:click={() => goToPage(1)}
           disabled={currentPage === 1}
-          class="rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          class="hidden h-10 min-w-10 items-center justify-center rounded px-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed sm:inline-flex"
           title={$tr("admin.firstPage")}
+          aria-label={$tr("admin.firstPage")}
         >
           ««
         </button>
@@ -430,13 +533,15 @@ let documents: Law[] = [];
         <button
           on:click={prevPage}
           disabled={currentPage === 1}
-          class="rounded px-3 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label={$tr("admin.previous")}
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded px-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:min-w-10 sm:px-3"
         >
-          {$tr("admin.previous")}
+          <span class="material-icons w-5 overflow-hidden text-xl sm:hidden" aria-hidden="true">chevron_left</span>
+          <span class="hidden sm:inline">{$tr("admin.previous")}</span>
         </button>
 
         <!-- Page numbers -->
-        <div class="flex items-center gap-1 mx-2">
+        <div class="flex items-center gap-1 sm:mx-2">
           <!-- La branche « ... » a disparu avec l'ancienne fenetre a sept
                numeros : pagesVisibles rend une plage contigue de nombres, donc
                le rendu n'a plus a distinguer number et string. -->
@@ -445,7 +550,7 @@ let documents: Law[] = [];
               on:click={() => goToPage(pageNum)}
               data-testid="docs-page-{pageNum}"
               aria-current={pageNum === currentPage ? "page" : undefined}
-              class="rounded px-3 py-1 text-sm transition-colors {currentPage ===
+              class="inline-flex h-11 min-w-11 items-center justify-center rounded px-3 text-sm transition-colors sm:h-10 sm:min-w-10 {currentPage ===
               pageNum
                 ? 'bg-blue-600 text-white font-semibold'
                 : 'text-slate-600 hover:bg-slate-100'}"
@@ -459,17 +564,20 @@ let documents: Law[] = [];
         <button
           on:click={nextPage}
           disabled={currentPage === totalPages}
-          class="rounded px-3 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label={$tr("admin.next")}
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded px-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:min-w-10 sm:px-3"
         >
-          {$tr("admin.next")}
+          <span class="material-icons w-5 overflow-hidden text-xl sm:hidden" aria-hidden="true">chevron_right</span>
+          <span class="hidden sm:inline">{$tr("admin.next")}</span>
         </button>
 
         <!-- Last page button -->
         <button
           on:click={() => goToPage(totalPages)}
           disabled={currentPage === totalPages}
-          class="rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          class="hidden h-10 min-w-10 items-center justify-center rounded px-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed sm:inline-flex"
           title={$tr("admin.lastPage")}
+          aria-label={$tr("admin.lastPage")}
         >
           »»
         </button>

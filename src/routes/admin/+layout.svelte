@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
+  import { onDestroy, onMount } from "svelte";
+  import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/stores";
   import AdminSidebar from "$lib/components/admin/AdminSidebar.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
@@ -21,7 +21,9 @@
     "/admin/documents/batch-upload": "admin.batchUpload",
     "/admin/users": "admin.users",
   };
-  $: titreAdmin = `${$tr(TITRES_ADMIN[$page.url.pathname] ?? "admin.administration")} — Admin`;
+  // La clé seule sert aussi au titre de la barre du haut, sur téléphone.
+  $: cleTitre = TITRES_ADMIN[$page.url.pathname] ?? "admin.administration";
+  $: titreAdmin = `${$tr(cleTitre)} — Admin`;
 
   // Garde de confort uniquement. La vraie barrière est côté backend : chaque
   // endpoint d'administration exige un jeton et un rôle (401 / 403). Ce contrôle
@@ -61,7 +63,63 @@
     checked = false;
     redirectToLogin();
   }
+
+  /**
+   * Tiroir de navigation, sous lg.
+   *
+   * La barre latérale fixe de 256 px laissait 104 px de contenu à 360 px de
+   * large, et tout débordait sur la droite. Sous lg, elle devient un tiroir
+   * ouvert depuis la barre du haut, avec le patron du menu mobile de
+   * SiteHeader : fermé après chaque navigation et par Échap.
+   */
+  let menuOuvert = false;
+  /** Vrai à partir de lg, où la barre redevient la colonne fixe d'origine. */
+  let large = false;
+
+  afterNavigate(() => (menuOuvert = false));
+
+  // Le garde est dans le gestionnaire et non autour de <svelte:window> : Svelte
+  // exige que cet élément soit à la racine du composant, jamais dans un bloc.
+  function surTouche(event: KeyboardEvent) {
+    if (menuOuvert && event.key === "Escape") menuOuvert = false;
+  }
+
+  onMount(() => {
+    const requete = window.matchMedia("(min-width: 1024px)");
+    const suivre = () => {
+      large = requete.matches;
+      // Une tablette qu'on tourne passe à lg tiroir ouvert : il devient une
+      // colonne fixe, et garderait sinon le piège à focus et le verrou du
+      // défilement sans aucun moyen visible de les lever.
+      if (large) menuOuvert = false;
+    };
+    suivre();
+    requete.addEventListener("change", suivre);
+    return () => requete.removeEventListener("change", suivre);
+  });
+
+  // Ouvert, le tiroir fige la page derrière lui, comme le choix du profil
+  // (src/routes/+layout.svelte) : sans cela, un glisser sur le fond faisait
+  // défiler la liste dessous.
+  let debordementAvant = "";
+  let defilementBloque = false;
+  function bloquerDefilement(bloquer: boolean) {
+    if (typeof document === "undefined" || bloquer === defilementBloque) return;
+    if (bloquer) {
+      debordementAvant = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = debordementAvant;
+    }
+    defilementBloque = bloquer;
+  }
+  $: bloquerDefilement(menuOuvert);
+  // Une déconnexion depuis le tiroir ouvert quitte l'administration : le
+  // verrou ne doit pas survivre au layout.
+  onDestroy(() => bloquerDefilement(false));
 </script>
+
+<svelte:window on:keydown={surTouche} />
 
 <!-- Titre de repli pour tout l'espace d'administration. Trois pages sur
      quatre n'en avaient aucun : l'onglet du navigateur affichait l'URL, et un
@@ -82,18 +140,64 @@
 <MetaSeo titre={titreAdmin} indexable={false} />
 
 {#if checked}
-  <div class="min-h-screen bg-slate-50 font-sans text-slate-900">
-    <AdminSidebar />
+  <div class="min-h-app bg-slate-50 font-sans text-slate-900">
+    <!-- Barre du haut, sous lg seulement : la seule porte vers la navigation
+         une fois la barre latérale repliée. Elle garde le titre de la page en
+         vue pendant le défilement. -->
+    <header
+      data-testid="admin-topbar"
+      class="sticky top-0 z-20 border-b border-slate-200 bg-white pt-zone-sure px-zone-sure lg:hidden"
+    >
+      <div class="flex h-14 items-center gap-2 px-2">
+        <button
+          type="button"
+          on:click={() => (menuOuvert = true)}
+          data-testid="admin-menu-toggle"
+          aria-expanded={menuOuvert}
+          aria-controls="admin-sidebar"
+          aria-label={$tr("a11y.menu")}
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100"
+        >
+          <!-- Largeur fixe : avant la police d'icônes, le mot « menu » est
+               plus large que le pictogramme. -->
+          <span class="material-icons w-6 overflow-hidden" aria-hidden="true">menu</span>
+        </button>
+        <span class="min-w-0 truncate text-base font-semibold text-slate-900">{$tr(cleTitre)}</span>
+      </div>
+    </header>
 
-    <main class="ml-64 min-h-screen p-8 transition-all">
-      <div class="mx-auto max-w-6xl">
-        <slot />
+    <!-- Fond du tiroir : toujours rendu, pour s'estomper dans les deux sens ;
+         fermé, il laisse passer les clics. -->
+    <div
+      role="presentation"
+      aria-hidden="true"
+      on:click={() => (menuOuvert = false)}
+      class="fixed inset-0 z-30 bg-slate-900/40 transition-opacity duration-200 motion-reduce:transition-none lg:hidden {menuOuvert
+        ? 'opacity-100'
+        : 'pointer-events-none opacity-0'}"
+    ></div>
+
+    <AdminSidebar
+      ouvert={menuOuvert}
+      enTiroir={!large}
+      on:fermer={() => (menuOuvert = false)}
+    />
+
+    <!-- `inert` tiroir ouvert : la page derrière le fond ne doit plus être
+         parcourue, ni au clavier ni au lecteur d'écran. Les marges latérales
+         de zone sûre (encoche, en paysage) vivent ici, l'espacement du contenu
+         dans le bloc suivant : les deux se seraient écrasés sur un même élément. -->
+    <main inert={menuOuvert} class="px-zone-sure lg:ml-64">
+      <div class="p-4 sm:p-6 lg:p-8">
+        <div class="mx-auto max-w-6xl">
+          <slot />
+        </div>
       </div>
     </main>
   </div>
 {:else}
   <!-- Évite que l'interface d'administration apparaisse le temps de la redirection -->
-  <div class="flex min-h-screen items-center justify-center bg-slate-50">
+  <div class="flex min-h-app items-center justify-center bg-slate-50">
     <p class="text-sm text-slate-500">{$tr("admin.checkingSession")}</p>
   </div>
 {/if}

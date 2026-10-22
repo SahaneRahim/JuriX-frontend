@@ -255,23 +255,24 @@
 
 </script>
 
-<!-- Ni min-h-screen ni p-8 ici : admin/+layout.svelte fournit déjà le fond et
-     un p-8 autour du <slot />. Les cumuler doublait la marge de cette seule
-     page par rapport aux autres écrans d'administration. -->
+<!-- Ni min-h-screen ni marge ici : admin/+layout.svelte fournit déjà le fond
+     et l'espacement autour du <slot /> (p-4 à p-8 selon la largeur). Les
+     cumuler doublait la marge de cette seule page par rapport aux autres
+     écrans d'administration. -->
 <div>
 	<div class="max-w-7xl mx-auto">
 		<!-- Header -->
-		<div class="mb-8">
+		<div class="mb-6 sm:mb-8">
 			<!-- La page n'avait aucun retour : on n'y arrivait qu'en tapant l'URL. -->
 			<a
 				href="/admin/documents"
 				data-testid="batch-back-to-documents"
-				class="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-blue-600"
+				class="mb-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-blue-600 sm:min-h-0"
 			>
 				<span aria-hidden="true">←</span>
 				{$tr("admin.docManagement")}
 			</a>
-			<h1 class="text-3xl font-bold text-gray-900">
+			<h1 class="text-2xl font-bold text-gray-900 sm:text-3xl">
 				{$tr("admin.batchUpload")}
 			</h1>
 			<p class="mt-2 text-gray-600">
@@ -280,23 +281,30 @@
 		</div>
 
 		<!-- Upload Section -->
-		<div class="bg-white rounded-lg shadow-sm p-6 mb-8">
-			<h2 class="text-xl font-semibold mb-4">{$tr("admin.selectFiles")}</h2>
+		<div class="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
+			<h2 class="text-lg sm:text-xl font-semibold mb-4">{$tr("admin.selectFiles")}</h2>
 
-			<!-- Drag and Drop Zone -->
-			<div
-				class="border-2 border-dashed rounded-lg p-12 text-center transition-colors {isDragging
+			<!-- Drag and Drop Zone.
+			     Toute la zone est l'étiquette du champ : sur téléphone, sans
+			     glisser-déposer, seul le petit mot « parcourez » (60 × 20 px)
+			     ouvrait le sélecteur de fichiers. Le champ est sr-only et non
+			     plus `hidden` : il reste atteignable au clavier, et la zone
+			     s'entoure quand il a le focus. -->
+			<label
+				for="batch-files"
+				class="relative block cursor-pointer border-2 border-dashed rounded-lg p-6 sm:p-12 text-center transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30 {isDragging
 					? 'border-blue-500 bg-blue-50'
-					: 'border-gray-300'}"
+					: 'border-gray-300 hover:border-blue-400'}"
 				on:drop={handleDrop}
 				on:dragover|preventDefault={() => (isDragging = true)}
 				on:dragleave={() => (isDragging = false)}
 			>
 				<svg
-					class="mx-auto h-12 w-12 text-gray-500"
+					class="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-500"
 					stroke="currentColor"
 					fill="none"
 					viewBox="0 0 48 48"
+					aria-hidden="true"
 				>
 					<path
 						d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
@@ -305,21 +313,25 @@
 						stroke-linejoin="round"
 					/>
 				</svg>
+				<!-- « Glissez-déposez » ne parle qu'à une souris : au doigt, le
+				     texte dit ce que fait le geste disponible. -->
 				<p class="mt-2 text-sm text-gray-600">
-					{$tr("admin.dragDrop")}
-					<label class="text-blue-600 hover:text-blue-500 cursor-pointer">
-						{$tr("admin.browse")}
-						<input
-							type="file"
-							multiple
-							accept=".pdf"
-							class="hidden"
-							on:change={handleFileInput}
-						/>
-					</label>
+					<span class="sm:hidden">{$tr("admin.tapToChoose")}</span>
+					<span class="hidden sm:inline">
+						{$tr("admin.dragDrop")}
+						<span class="text-blue-600">{$tr("admin.browse")}</span>
+					</span>
 				</p>
 				<p class="mt-1 text-xs text-gray-500">{$tr("admin.fileLimit")}</p>
-			</div>
+				<input
+					id="batch-files"
+					type="file"
+					multiple
+					accept=".pdf"
+					class="sr-only"
+					on:change={handleFileInput}
+				/>
+			</label>
 
 			<!-- File List -->
 			<!-- Erreur de lot signalée par le serveur. Sans cet affichage, le
@@ -341,11 +353,15 @@
 					</h3>
 					<div class="space-y-2">
 						{#each files as file (file.id)}
+							<!-- Les noms de PDF, souvent sans espace
+							     (« 10691_decret-n-2026-164-du-… »), ne se coupaient
+							     pas et poussaient la ligne, puis la page, hors de
+							     l'écran : tronqués ici, en entier au survol. -->
 							<div
-								class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+								class="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg"
 							>
-								<div class="flex-1">
-									<p class="text-sm font-medium text-gray-900">
+								<div class="min-w-0 flex-1">
+									<p class="truncate text-sm font-medium text-gray-900" title={file.file.name}>
 										{file.file.name}
 									</p>
 									<p class="text-xs text-gray-500">
@@ -364,19 +380,24 @@
 								</div>
 
 								<!-- Status Badge -->
-								<div class="ml-4 flex items-center gap-2">
+								<div class="flex shrink-0 items-center gap-2">
 									<StatusBadge status={file.status} size="sm" />
 
+									<!-- Icône seule : le nom vient de aria-label, qui
+									     dit aussi QUEL fichier sera retiré. -->
 									{#if file.status === "pending"}
 										<button
+											type="button"
 											on:click={() => removeFile(file.id)}
-											class="text-red-600 hover:text-red-800"
+											aria-label={$tr("admin.removeFile").replace("{name}", file.file.name)}
+											class="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 hover:text-red-800"
 										>
 											<svg
 												class="w-5 h-5"
 												fill="none"
 												stroke="currentColor"
 												viewBox="0 0 24 24"
+												aria-hidden="true"
 											>
 												<path
 													stroke-linecap="round"
@@ -407,9 +428,9 @@
 		</div>
 
 		<!-- Documents List -->
-		<div class="bg-white rounded-lg shadow-sm p-6">
-			<div class="flex items-center justify-between mb-4">
-				<h2 class="text-xl font-semibold">{$tr("admin.documents")}</h2>
+		<div class="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+			<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+				<h2 class="text-lg sm:text-xl font-semibold">{$tr("admin.documents")}</h2>
 
 				<!-- Status Filter -->
 				<select
@@ -431,23 +452,23 @@
 					<thead class="bg-gray-50">
 						<tr>
 							<th
-								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>{$tr("admin.title")}</th
 							>
 							<th
-								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>{$tr("admin.reference")}</th
 							>
 							<th
-								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>{$tr("admin.status")}</th
 							>
 							<th
-								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>{$tr("admin.progress")}</th
 							>
 							<th
-								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>{$tr("admin.date")}</th
 							>
 						</tr>
@@ -455,23 +476,36 @@
 					<tbody class="bg-white divide-y divide-gray-200">
 						{#each laws as law (law.id)}
 							<tr class="hover:bg-gray-50">
-								<td class="px-6 py-4 whitespace-nowrap">
-									<div class="text-sm font-medium text-gray-900">
-										{law.title}
-									</div>
-									{#if law.processing_error}
-										<div class="text-xs text-red-600 mt-1">
-											{law.processing_error}
+								<!-- Le titre et l'erreur passent à la ligne : en
+								     `whitespace-nowrap`, une ligne prenait la largeur
+								     du plus long titre ou message d'erreur (600 à
+								     1 000 px), et les colonnes suivantes partaient
+								     loin de l'écran. Largeur bornée sur un bloc
+								     intérieur : sur une cellule de tableau, l'effet
+								     de min-width et max-width n'est pas défini, et
+								     max-width y est ignoré. -->
+								<td class="px-3 sm:px-6 py-4">
+									<div class="coupe-mots min-w-[14rem] max-w-md">
+										<div class="text-sm font-medium text-gray-900">
+											{law.title}
 										</div>
-									{/if}
+										{#if law.processing_error}
+											<div
+												class="line-clamp-3 text-xs text-red-600 mt-1"
+												title={law.processing_error}
+											>
+												{law.processing_error}
+											</div>
+										{/if}
+									</div>
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+								<td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500"
 									>{law.reference}</td
 								>
-								<td class="px-6 py-4 whitespace-nowrap">
+								<td class="px-3 sm:px-6 py-4 whitespace-nowrap">
 									<StatusBadge status={law.status} size="sm" />
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap">
+								<td class="px-3 sm:px-6 py-4 whitespace-nowrap">
 									{#if law.processing_progress !== null}
 										<div class="w-24 bg-gray-200 rounded-full h-2">
 											<div
@@ -483,7 +517,7 @@
 										<span class="text-sm text-gray-500">-</span>
 									{/if}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+								<td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 									{formatDateHeure(law.created_at, $language.current)}
 								</td>
 							</tr>

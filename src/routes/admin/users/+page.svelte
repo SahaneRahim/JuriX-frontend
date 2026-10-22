@@ -13,6 +13,7 @@
    * et évite de bâtir une pagination serveur pour rien.
    */
   import { onMount } from "svelte";
+  import { browser } from "$app/environment";
   import { apiFetch } from "$lib/api";
   import UserFormModal from "$lib/components/admin/UserFormModal.svelte";
   import { authStore } from "$lib/stores/auth";
@@ -38,6 +39,29 @@
   // Seul un superadmin peut supprimer (get_current_superadmin_user), et le
   // backend refuse la suppression de son propre compte.
   $: estSuperadmin = $authStore.user?.role === "superadmin";
+
+  /**
+   * Tableau à partir de md, cartes en dessous.
+   *
+   * Les six colonnes demandaient environ 870 px, et leur conteneur coupait au
+   * lieu de défiler : sur téléphone, Éditer et Supprimer étaient hors
+   * d'atteinte. Une seule des deux variantes est RENDUE, plutôt que masquée en
+   * CSS, pour que `user-edit` et `user-delete` restent uniques par compte.
+   *
+   * La page n'est jamais rendue par le serveur (le layout attend la garde
+   * d'authentification, posée dans onMount) : la largeur se lit dès la création,
+   * sans éclair de la mauvaise variante.
+   */
+  const REQUETE_TABLEAU = "(min-width: 768px)";
+  let tableau = browser && window.matchMedia(REQUETE_TABLEAU).matches;
+
+  onMount(() => {
+    const requete = window.matchMedia(REQUETE_TABLEAU);
+    const suivre = () => (tableau = requete.matches);
+    suivre();
+    requete.addEventListener("change", suivre);
+    return () => requete.removeEventListener("change", suivre);
+  });
 
   onMount(charger);
 
@@ -115,9 +139,11 @@
      les quatre pages. Deux <title> dans le document laisseraient gagner celui
      du layout, qui est rendu en premier. -->
 
-<div class="mb-8 flex items-center justify-between">
-  <div>
-    <h1 class="text-3xl font-bold text-slate-900">{$tr("admin.users")}</h1>
+<!-- Empilé sur téléphone, bouton sur toute la largeur : sur une seule ligne,
+     le titre de 30 px se tassait dans une colonne étroite. -->
+<div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+  <div class="min-w-0">
+    <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">{$tr("admin.users")}</h1>
     <p class="mt-1 text-slate-500">
       {$tr("admin.usersDesc")}
     </p>
@@ -125,7 +151,7 @@
   <button
     on:click={ouvrirCreation}
     data-testid="user-new"
-    class="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-700 hover:scale-105"
+    class="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-700 motion-safe:hover:scale-105 sm:shrink-0"
   >
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -141,19 +167,27 @@
   </button>
 </div>
 
-<div class="mb-6 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4">
+<!-- Grille sous md : le `min-w-64` du champ débordait de la carte dès 320 px.
+     Champs à 16 px sur téléphone (text-base) : en dessous, iOS zoome au focus
+     et ne dézoome pas. Listes en `pl-3 pr-10` et non `px-3` : `px-3` écrasait
+     les 2,5 rem que le plugin forms réserve à droite pour son chevron, et à
+     partir de md, où chaque liste prend la largeur de son libellé, le chevron
+     recouvrait la fin du texte (« Tous statut⌄s »). -->
+<div
+  class="mb-6 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-2 sm:p-4 md:flex md:flex-wrap"
+>
   <input
     bind:value={recherche}
           aria-label={$tr("a11y.searchField")}
     data-testid="user-search"
     placeholder={$tr("admin.users.searchPlaceholder")}
-    class="min-w-64 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+    class="w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-blue-500 sm:col-span-2 sm:text-sm md:w-auto md:min-w-64 md:flex-1"
   />
   <select
     bind:value={filtreRole}
           aria-label={$tr("a11y.filterRole")}
     data-testid="user-filter-role"
-    class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+    class="w-full min-w-0 rounded-lg border border-slate-300 py-2 pl-3 pr-10 text-base sm:text-sm md:w-auto"
   >
     <option value="all">{$tr("admin.users.allRoles")}</option>
     <option value="user">{$tr("admin.role.user")}</option>
@@ -164,7 +198,7 @@
     bind:value={filtreStatut}
           aria-label={$tr("a11y.filterStatus")}
     data-testid="user-filter-status"
-    class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+    class="w-full min-w-0 rounded-lg border border-slate-300 py-2 pl-3 pr-10 text-base sm:text-sm md:w-auto"
   >
     <option value="all">{$tr("admin.allStatuses")}</option>
     <option value="active">{$tr("admin.users.activePlural")}</option>
@@ -180,39 +214,49 @@
     <button
       on:click={charger}
       data-testid="user-retry"
-      class="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+      class="min-h-11 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
       >{$tr("common.retry")}</button
     >
   </div>
 {:else if filtres.length === 0}
   <p class="py-16 text-center text-slate-500">{$tr("admin.users.none")}</p>
-{:else}
-  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+{:else if tableau}
+  <!-- Le conteneur défile au lieu de couper : un email long ne repousse plus
+       la colonne des actions hors d'atteinte. Sous xl, où la barre latérale
+       laisse environ 700 px, le nom rejoint la cellule du compte au lieu
+       d'occuper sa propre colonne. -->
+  <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
     <table class="w-full text-left text-sm">
       <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
         <tr>
-          <th class="px-6 py-3">{$tr("admin.users.account")}</th>
-          <th class="px-6 py-3">{$tr("admin.users.name")}</th>
-          <th class="px-6 py-3">{$tr("admin.user.role")}</th>
-          <th class="px-6 py-3">{$tr("admin.status")}</th>
-          <th class="px-6 py-3">{$tr("admin.users.lastLogin")}</th>
-          <th class="px-6 py-3 text-right">{$tr("admin.actions")}</th>
+          <th class="px-4 py-3 xl:px-6">{$tr("admin.users.account")}</th>
+          <th class="hidden px-4 py-3 xl:table-cell xl:px-6">{$tr("admin.users.name")}</th>
+          <th class="px-4 py-3 xl:px-6">{$tr("admin.user.role")}</th>
+          <th class="px-4 py-3 xl:px-6">{$tr("admin.status")}</th>
+          <th class="px-4 py-3 xl:px-6">{$tr("admin.users.lastLogin")}</th>
+          <th class="px-4 py-3 text-right xl:px-6">{$tr("admin.actions")}</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100">
         {#each visibles as u (u.id)}
           <tr class="hover:bg-slate-50">
-            <td class="px-6 py-4">
-              <div class="font-medium text-slate-900">{u.email}</div>
-              <div class="text-xs text-slate-500">@{u.username}</div>
+            <!-- coupe-mots : une adresse ne se coupe pas d'elle-meme. Sans lui, la
+                 colonne prenait la largeur de l'adresse la plus longue et, de 768
+                 a 1 100 px, poussait les boutons Editer et Supprimer hors du cadre. -->
+            <td class="px-4 py-4 xl:px-6">
+              <div class="coupe-mots font-medium text-slate-900">{u.email}</div>
+              <div class="coupe-mots text-xs text-slate-500">@{u.username}</div>
+              {#if u.full_name}
+                <div class="text-xs text-slate-500 xl:hidden">{u.full_name}</div>
+              {/if}
             </td>
-            <td class="px-6 py-4 text-slate-600">{u.full_name || "—"}</td>
-            <td class="px-6 py-4">
+            <td class="hidden px-4 py-4 text-slate-600 xl:table-cell xl:px-6">{u.full_name || "—"}</td>
+            <td class="px-4 py-4 xl:px-6">
               <span class="rounded-full px-2.5 py-1 text-xs font-semibold {styleRole(u.role)}"
                 >{u.role}</span
               >
             </td>
-            <td class="px-6 py-4">
+            <td class="px-4 py-4 xl:px-6">
               <span
                 class="rounded-full px-2.5 py-1 text-xs font-semibold {u.is_active
                   ? 'bg-green-100 text-green-700'
@@ -220,12 +264,13 @@
                 >{u.is_active ? $tr("admin.users.activeOne") : $tr("admin.users.inactiveOne")}</span
               >
             </td>
-            <td class="px-6 py-4 text-slate-500">{formatDateCourte(u.last_login_at, $language.current)}</td>
-            <td class="px-6 py-4 text-right">
+            <td class="px-4 py-4 text-slate-500 xl:px-6">{formatDateCourte(u.last_login_at, $language.current)}</td>
+            <!-- 44 px de haut sur tablette, au doigt ; compacts à partir de lg. -->
+            <td class="whitespace-nowrap px-4 py-4 text-right xl:px-6">
               <button
                 on:click={() => ouvrirEdition(u)}
                 data-testid="user-edit"
-                class="mr-2 rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                class="mr-2 inline-flex min-h-11 items-center rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 lg:min-h-0"
                 >{$tr("admin.edit")}</button
               >
               <!--
@@ -238,7 +283,7 @@
                 <button
                   on:click={() => supprimer(u)}
                   data-testid="user-delete"
-                  class="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                  class="inline-flex min-h-11 items-center rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 lg:min-h-0"
                   >{$tr("admin.delete")}</button
                 >
               {/if}
@@ -248,26 +293,85 @@
       </tbody>
     </table>
   </div>
+{:else}
+  <!-- Une carte par compte, sous md : l'email entier (coupé au besoin plutôt
+       que tronqué, c'est lui qui identifie le compte), puis le statut, puis
+       des actions de 44 px sur toute la largeur. -->
+  <ul class="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+    {#each visibles as u (u.id)}
+      <li class="space-y-3 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="coupe-mots font-medium text-slate-900">{u.email}</p>
+            <p class="coupe-mots text-xs text-slate-500">@{u.username}</p>
+            {#if u.full_name}
+              <p class="coupe-mots text-xs text-slate-500">{u.full_name}</p>
+            {/if}
+          </div>
+          <span
+            class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold {styleRole(u.role)}"
+            >{u.role}</span
+          >
+        </div>
+        <dl class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          <div>
+            <dt class="sr-only">{$tr("admin.status")}</dt>
+            <dd>
+              <span
+                class="rounded-full px-2.5 py-1 font-semibold {u.is_active
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-slate-100 text-slate-500'}"
+                >{u.is_active ? $tr("admin.users.activeOne") : $tr("admin.users.inactiveOne")}</span
+              >
+            </dd>
+          </div>
+          <div class="flex flex-wrap gap-x-1">
+            <dt class="text-slate-500">{$tr("admin.users.lastLogin")}</dt>
+            <dd class="text-slate-700">{formatDateCourte(u.last_login_at, $language.current)}</dd>
+          </div>
+        </dl>
+        <div class="flex gap-2">
+          <button
+            on:click={() => ouvrirEdition(u)}
+            data-testid="user-edit"
+            class="h-11 flex-1 rounded-lg border border-slate-200 text-sm font-medium text-blue-600 hover:bg-blue-50"
+            >{$tr("admin.edit")}</button
+          >
+          <!-- Même règle que le tableau : rendu seulement si la suppression
+               peut aboutir. -->
+          {#if estSuperadmin && u.id !== $authStore.user?.id}
+            <button
+              on:click={() => supprimer(u)}
+              data-testid="user-delete"
+              class="h-11 flex-1 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50"
+              >{$tr("admin.delete")}</button
+            >
+          {/if}
+        </div>
+      </li>
+    {/each}
+  </ul>
+{/if}
 
-  {#if totalPages > 1}
-    <nav class="mt-6 flex items-center justify-center gap-2" aria-label={$tr("a11y.pagination")}>
-      <button
-        on:click={() => (page = Math.max(1, page - 1))}
-        disabled={page === 1}
-        data-testid="user-page-prev"
-        class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50"
-        >{$tr("admin.previous")}</button
-      >
-      <span class="px-2 text-sm text-slate-500">{$tr("admin.page")} {page} / {totalPages}</span>
-      <button
-        on:click={() => (page = Math.min(totalPages, page + 1))}
-        disabled={page === totalPages}
-        data-testid="user-page-next"
-        class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50"
-        >{$tr("admin.next")}</button
-      >
-    </nav>
-  {/if}
+<!-- Hors des deux variantes : la pagination ne dépend pas de la largeur. -->
+{#if !chargement && !erreur && totalPages > 1}
+  <nav class="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label={$tr("a11y.pagination")}>
+    <button
+      on:click={() => (page = Math.max(1, page - 1))}
+      disabled={page === 1}
+      data-testid="user-page-prev"
+      class="inline-flex min-h-11 items-center rounded-lg border border-slate-200 px-4 text-sm disabled:opacity-50 sm:min-h-0 sm:px-3 sm:py-1.5"
+      >{$tr("admin.previous")}</button
+    >
+    <span class="px-2 text-sm text-slate-500">{$tr("admin.page")} {page} / {totalPages}</span>
+    <button
+      on:click={() => (page = Math.min(totalPages, page + 1))}
+      disabled={page === totalPages}
+      data-testid="user-page-next"
+      class="inline-flex min-h-11 items-center rounded-lg border border-slate-200 px-4 text-sm disabled:opacity-50 sm:min-h-0 sm:px-3 sm:py-1.5"
+      >{$tr("admin.next")}</button
+    >
+  </nav>
 {/if}
 
 <UserFormModal bind:show={modaleOuverte} user={userEnCours} on:saved={charger} />

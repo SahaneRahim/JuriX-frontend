@@ -119,37 +119,65 @@ let title = '';
   function onKeydown(e: KeyboardEvent) {
     if (show && e.key === 'Escape') close();
   }
+
+  // Ouverte, la modale fige la page derrière elle, comme le choix du profil
+  // (src/routes/+layout.svelte) : sur téléphone, un glisser sur le fond ou sur
+  // l'en-tête du panneau faisait défiler la liste des documents dessous.
+  // `window.document` : la prop `document` (le texte édité) masque ici le
+  // document du navigateur.
+  function bloquerDefilement(_noeud: HTMLElement) {
+    const corps = window.document.body;
+    const avant = corps.style.overflow;
+    corps.style.overflow = 'hidden';
+    return {
+      destroy() {
+        corps.style.overflow = avant;
+      },
+    };
+  }
 </script>
 
 <svelte:window on:keydown={onKeydown} />
 
 {#if show}
-  <div 
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+  <!--
+    Panneau collé en bas sur téléphone, boîte centrée à partir de sm.
+
+    Centrée et sans hauteur bornée, la boîte dépassait les écrans courts
+    (paysage, iPhone SE, clavier ouvert) : la croix et « Enregistrer » sortaient
+    de l'écran, hors d'atteinte. Désormais seul le corps défile, en-tête et pied
+    restent visibles. La hauteur maximale se rapporte au voile, fixe en inset-0,
+    qui suit déjà l'écran réellement visible (barre d'adresse, clavier Android)
+    sans dépendre de l'unité dvh, absente des navigateurs Android anciens.
+  -->
+  <div
+    class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
     on:click={close}
     role="presentation"
     data-testid="edit-modal"
+    use:bloquerDefilement
   >
     <div
       use:piegerFocus
-      class="w-full max-w-4xl rounded-2xl bg-white shadow-2xl"
+      class="flex max-h-[calc(100%-1rem)] w-full max-w-4xl flex-col rounded-t-2xl bg-white shadow-2xl sm:max-h-[90%] sm:rounded-2xl"
       on:click|stopPropagation
       role="dialog"
       aria-modal="true"
       aria-label={$tr("admin.doc.editTitle")}
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-        <h2 class="text-2xl font-bold text-slate-900">{$tr("admin.doc.editTitle")}</h2>
-        <button on:click={close} class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-600" aria-label={$tr("common.close")}>
-          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-2 sm:px-6 sm:py-4">
+        <h2 class="min-w-0 text-xl font-bold text-slate-900 sm:text-2xl">{$tr("admin.doc.editTitle")}</h2>
+        <button on:click={close} class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600" aria-label={$tr("common.close")}>
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
-      
-      <!-- Body -->
-      <div class="max-h-[70vh] overflow-y-auto p-6">
+
+      <!-- Body : overscroll-contain, pour qu'arrivé au bout le défilement ne
+           passe pas à la page derrière. -->
+      <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
         <div class="space-y-4">
           <!-- Title -->
           <div>
@@ -163,8 +191,9 @@ let title = '';
             />
           </div>
           
-          <!-- Reference and Category -->
-          <div class="grid grid-cols-2 gap-4">
+          <!-- Reference and Category : une colonne sur téléphone, où deux
+               colonnes ne laissaient qu'environ 115 px à chaque champ. -->
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label for="edit-reference" class="mb-2 block text-sm font-semibold text-slate-700">{$tr("admin.reference")}</label>
               <input
@@ -184,7 +213,7 @@ let title = '';
                 class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="">{$tr("admin.doc.noCategory")}</option>
-                {#each categories as cat}
+                {#each categories as cat (cat.id)}
                   <option value={String(cat.id)}>{cat.icon} {nomCategorie(cat.name, $langueInterface.current)}</option>
                 {/each}
               </select>
@@ -210,41 +239,49 @@ let title = '';
           <!-- Content -->
           <div>
             <label for="edit-content" class="mb-2 block text-sm font-semibold text-slate-700">{$tr("admin.doc.content")}</label>
+            <!-- 16 px sur téléphone (text-base) : en 14 px, iOS zoomait au
+                 focus. Sur écran court (paysage), la zone de texte est
+                 plafonnée pour tenir dans le corps défilant au lieu d'y
+                 ajouter un second défilement à rallonge. -->
             <textarea
               id="edit-content"
               bind:value={content}
               rows="12"
-              class="w-full rounded-lg border border-slate-300 px-4 py-2.5 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              class="w-full rounded-lg border border-slate-300 px-4 py-2.5 font-mono text-base focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:text-sm court:max-h-40"
               placeholder={$tr("admin.doc.contentPlaceholder")}
-            />
+            ></textarea>
             <p class="mt-1 text-xs text-slate-500">{content.length} {$tr("admin.doc.chars")}</p>
           </div>
         </div>
       </div>
-      
-      <!-- Footer -->
-      <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
-        <button
-          on:click={close}
-          class="rounded-lg px-5 py-2.5 font-semibold text-slate-700 hover:bg-slate-100"
-        >
-          {$tr("common.cancel")}
-        </button>
-        <button
-          on:click={save}
-          disabled={isSaving}
-          class="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 disabled:opacity-50"
-        >
-          {#if isSaving}
-            <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-            </svg>
-            {$tr("common.saving")}
-          {:else}
-            {$tr("common.save")}
-          {/if}
-        </button>
+
+      <!-- Footer : la zone sûre garde les boutons au-dessus de la barre
+           d'accueil de l'iPhone ; sur téléphone, deux boutons de 44 px à
+           parts égales. -->
+      <div class="shrink-0 border-t border-slate-200 pb-zone-sure">
+        <div class="flex items-center justify-end gap-3 px-4 py-3 sm:px-6 sm:py-4">
+          <button
+            on:click={close}
+            class="inline-flex h-11 flex-1 items-center justify-center rounded-lg px-5 font-semibold text-slate-700 hover:bg-slate-100 sm:flex-none"
+          >
+            {$tr("common.cancel")}
+          </button>
+          <button
+            on:click={save}
+            disabled={isSaving}
+            class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 font-semibold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 disabled:opacity-50 sm:flex-none"
+          >
+            {#if isSaving}
+              <svg class="h-5 w-5 motion-safe:animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              </svg>
+              {$tr("common.saving")}
+            {:else}
+              {$tr("common.save")}
+            {/if}
+          </button>
+        </div>
       </div>
     </div>
   </div>
