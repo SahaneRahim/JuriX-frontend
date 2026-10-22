@@ -18,14 +18,17 @@
 
 <MetaSeo titre={$tr("lien.usedTitle")} indexable={false} />
 
+<!-- Même coquille que login/+page.svelte : colonne de la hauteur de l'écran
+     visible, carte ancrée en haut sous sm, liens texte de 44 px. -->
+<div class="flex min-h-app flex-col">
 <SiteHeader />
 
-<main id="contenu">
+<main id="contenu" class="flex flex-1 flex-col">
   <div
-    class="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-slate-50 px-4 py-10 font-sans dark:bg-slate-900"
+    class="flex flex-1 items-start justify-center bg-slate-50 px-4 py-6 font-sans dark:bg-slate-900 sm:items-center sm:py-10"
   >
     <div
-      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8"
     >
       <h1
         class="mb-4 flex items-center justify-center gap-2 text-xl font-bold text-slate-900 dark:text-white"
@@ -40,18 +43,19 @@
       <a
         href="/"
         data-testid="lien-to-home"
-        class="mt-6 inline-block w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+        class="mt-6 inline-block w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 sm:py-2"
       >
         {$tr("verify.goHome")}
       </a>
-      <p class="mt-4 text-xs">
+      <p class="mt-1 text-sm sm:mt-4 sm:text-xs">
         <a
           href="/login"
           data-testid="lien-to-login"
-          class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+          class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
           >{$tr("forgot.backToLogin")}</a
         >
       </p>
     </div>
   </div>
 </main>
+</div>

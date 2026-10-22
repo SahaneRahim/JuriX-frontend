@@ -9,10 +9,11 @@
   // l'accueil au lieu de /chat.
   import SiteFooter from '$lib/components/SiteFooter.svelte';
   import SiteHeader from '$lib/components/SiteHeader.svelte';
+  import ChatFab from '$lib/components/ChatFab.svelte';
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import SearchResultCard from "$lib/components/SearchResultCard.svelte";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { tr, language } from "$lib/stores/language";
   import { nomCategorie } from "$lib/categories";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
@@ -50,6 +51,43 @@
   let dateRange: "all" | "year" | "5y" = "all";
   let selectedCategoryIds: number[] = [];
   let categories: { id: number; name: string }[] = [];
+
+  /**
+   * Filtres repliés sous `lg`.
+   *
+   * Dépliés d'office, avec trois dates et quatorze catégories, ils occupaient
+   * environ 650 px AU-DESSUS des résultats : un écran de téléphone entier
+   * avant le premier résultat. À partir de `lg`, la colonne latérale les
+   * montre toujours, et cet état n'y change plus rien.
+   */
+  let filtresOuverts = false;
+
+  // Ce qu'annonce le bouton « Filtres (N) » : ce qui est réglé DANS le
+  // panneau. Les onglets et le tri restent visibles, ils ne comptent pas.
+  $: nombreFiltresActifs =
+    selectedCategoryIds.length + (dateRange !== "all" ? 1 : 0);
+
+  /** Début de la colonne des résultats, où ramène un changement de page. */
+  let resultatsEl: HTMLElement | undefined;
+
+  function allerAuxResultats() {
+    // Passé en JavaScript, `behavior: "smooth"` ignore la préférence
+    // « réduire les animations » : elle est donc lue ici.
+    const sansAnimation = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    resultatsEl?.scrollIntoView?.({
+      block: "start",
+      behavior: sansAnimation ? "auto" : "smooth",
+    });
+  }
+
+  /** Referme le panneau (sous lg) et ramène au premier résultat. */
+  async function voirLesResultats() {
+    filtresOuverts = false;
+    await tick();
+    allerAuxResultats();
+  }
 
   async function loadCategories() {
     try {
@@ -92,18 +130,31 @@
 
   $: totalPages = nombreDePages(totalResults, RESULTS_PER_PAGE);
 
-  function goToPage(n: number) {
+  async function goToPage(n: number) {
     if (n < 1 || n > totalPages || n === currentPage) return;
     currentPage = n;
     performSearch();
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    // Au début des RÉSULTATS, et non en haut de la page : sous lg, le haut de
+    // la page, ce sont le titre, la barre de recherche et les filtres, qu'il
+    // fallait redescendre à chaque page. `tick` d'abord, pour viser la page
+    // déjà passée aux squelettes de chargement, à sa hauteur d'arrivée.
+    await tick();
+    allerAuxResultats();
   }
 
   /**
    * Fenêtre de pagination : au plus 5 numéros centrés sur la page courante.
    * Les numéros étaient codés en dur (« 1 2 3 ») et sans `on:click`.
+   *
+   * Sous sm, seuls les 3 numéros de `pagesTelephone` restent affichés : sept
+   * boutons de 40 px débordaient d'un écran de 320 px. Les deux autres sont
+   * masqués en CSS plutôt que retirés par une requête média en JavaScript :
+   * pas d'écouteur à tenir, et l'affichage est juste dès la première image.
+   * Masquer suffit, car la fenêtre de 3 est toujours incluse dans celle de 5
+   * (même page courante, mêmes bornes 1 et totalPages).
    */
   $: visiblePages = pagesVisibles(currentPage, totalPages);
+  $: pagesTelephone = pagesVisibles(currentPage, totalPages, 3);
 
   $: tabFilters = [
     {
@@ -341,16 +392,22 @@
   indexable={false}
 />
 
+<!-- min-h-app (100dvh, repli 100vh, dans app.css) et non `min-h-screen
+     min-h-dvh` : Tailwind range ces deux classes par ordre alphabétique, si bien
+     que min-h-screen passait APRÈS et que la valeur en dvh n'était jamais
+     appliquée. -->
 <div
-  class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-body min-h-screen flex flex-col transition-colors duration-300"
+  class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-body min-h-app flex flex-col transition-colors duration-300"
 >
   <SiteHeader />
 
   <!-- Main Content -->
-  <main id="contenu" class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+  <main id="contenu" class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8 sm:pt-8 w-full">
     <!-- Search Header -->
-    <div class="mb-10">
-      <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-6">
+    <div class="mb-6 sm:mb-10">
+      <!-- coupe-mots : la requête est recopiée telle quelle dans le titre, et
+           une suite sans espace (référence, URL collée) débordait de l'écran. -->
+      <h1 class="text-2xl sm:text-3xl font-bold coupe-mots text-slate-900 dark:text-white mb-4 sm:mb-6">
         {#if searchQuery}
           {$tr("search.resultsFor")} "{searchQuery}"
         {:else}
@@ -379,10 +436,14 @@
       </div>
 
       <!-- Tabs -->
-      <div class="flex gap-3 mt-6 overflow-x-auto pb-2">
+      <!-- Sous sm, la bande défile jusqu'aux bords de l'écran (-mx-4 px-4) :
+           coupée par la marge de la page, elle cachait le dernier onglet sans
+           rien qui invite à la faire glisser. L'aimantation (snap) arrête le
+           geste au début d'un onglet, scroll-px-4 tient compte de la marge. -->
+      <div class="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto overscroll-x-contain px-4 pb-2 mt-4 sm:mx-0 sm:mt-6 sm:scroll-px-0 sm:gap-3 sm:px-0">
         {#each tabFilters as tab}
           <button
-            class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all {activeTab ===
+            class="flex min-h-11 shrink-0 snap-start items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all {activeTab ===
             tab.id
               ? 'bg-slate-100 dark:bg-slate-700 text-primary shadow-sm'
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
@@ -396,44 +457,82 @@
     </div>
 
     <!-- Layout -->
-    <div class="flex flex-col lg:flex-row gap-8">
+    <div class="flex flex-col lg:flex-row gap-4 lg:gap-8">
       <!-- Sidebar Filters -->
       <aside class="w-full lg:w-64 flex-shrink-0">
-        <div
-          class="bg-white dark:bg-card-dark rounded-2xl border border-slate-100 dark:border-slate-700/50 p-6 sticky top-24 shadow-soft"
+        <!-- Bouton de repli, sous lg seulement. L'aria-label ne fait que
+             compléter le libellé visible par le nombre de filtres actifs, que
+             la pastille ne montre qu'en chiffre. -->
+        <button
+          type="button"
+          on:click={() => (filtresOuverts = !filtresOuverts)}
+          aria-expanded={filtresOuverts}
+          aria-controls="filtres-recherche"
+          aria-label={nombreFiltresActifs > 0
+            ? `${$tr("search.filters")} (${nombreFiltresActifs})`
+            : undefined}
+          data-testid="search-filters-toggle"
+          class="lg:hidden inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-card-dark px-4 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-soft hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
         >
-          <div class="flex items-center justify-between mb-4">
+          <span class="material-icons text-lg" aria-hidden="true">tune</span>
+          {$tr("search.filters")}
+          {#if nombreFiltresActifs > 0}
+            <span
+              class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-white"
+              >{nombreFiltresActifs}</span
+            >
+          {/if}
+          <span
+            class="material-icons text-lg transition-transform motion-reduce:transition-none {filtresOuverts
+              ? 'rotate-180'
+              : ''}"
+            aria-hidden="true">expand_more</span
+          >
+        </button>
+
+        <!-- Un seul panneau pour toutes les tailles : replié ou non sous lg,
+             toujours affiché à partir de lg. Collant sur grand écran, il est
+             borné à la hauteur de la fenêtre : avec quatorze catégories, le
+             bas sortait de l'écran tant qu'on n'avait pas atteint la fin de
+             la liste. Lignes de 44 px sous lg, compactées ensuite. -->
+        <div
+          id="filtres-recherche"
+          class="{filtresOuverts
+            ? 'mt-3 block'
+            : 'hidden'} lg:mt-0 lg:block bg-white dark:bg-card-dark rounded-2xl border border-slate-100 dark:border-slate-700/50 p-5 sm:p-6 shadow-soft lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain"
+        >
+          <div class="flex items-center justify-between mb-2 lg:mb-4">
             <h3 class="font-bold text-slate-900 dark:text-white">
               {$tr("search.filters")}
             </h3>
             <button
               on:click={resetFilters}
               data-testid="search-reset"
-              class="text-xs text-primary font-medium hover:underline"
+              class="-mr-2 inline-flex min-h-11 items-center rounded-lg px-2 text-sm lg:min-h-0 lg:py-1 lg:text-xs text-primary font-medium hover:underline"
               >{$tr("search.reset")}</button
             >
           </div>
 
           <!-- Date Filter -->
-          <div class="mb-6">
+          <div class="mb-4 lg:mb-6">
             <h4
-              class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3"
+              class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 lg:mb-3"
             >
               {$tr("search.datePublication")}
             </h4>
-            <div class="space-y-2">
+            <div class="grid sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-1 lg:gap-y-2">
               {#each [{ v: "all", label: $tr("search.allTime") }, { v: "year", label: $tr("search.thisYear") }, { v: "5y", label: $tr("search.last5Years") }] as { v, label }}
-                <label class="flex items-center gap-2 cursor-pointer group">
+                <label class="flex min-h-11 items-center gap-3 lg:min-h-0 lg:gap-2 cursor-pointer group">
                   <input
                     type="radio"
                     name="date"
                     value={v}
                     bind:group={dateRange}
                     on:change={() => { currentPage = 1; performSearch(); }}
-                    class="form-radio text-primary border-slate-300 focus:ring-primary h-4 w-4"
+                    class="form-radio text-primary border-slate-300 focus:ring-primary h-5 w-5 shrink-0 lg:h-4 lg:w-4"
                   />
                   <span
-                    class="text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
+                    class="min-w-0 text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
                     >{label}</span
                   >
                 </label>
@@ -442,23 +541,24 @@
           </div>
 
           <!-- Category Filter -->
+          <!-- Deux colonnes de sm à lg : le panneau y prend toute la largeur. -->
           <div class="mb-6">
             <h4
-              class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3"
+              class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 lg:mb-3"
             >
               {$tr("search.category")}
             </h4>
-            <div class="space-y-2">
+            <div class="grid sm:grid-cols-2 sm:gap-x-4 lg:grid-cols-1 lg:gap-y-2">
               {#each categories as category (category.id)}
-                <label class="flex items-center gap-2 cursor-pointer group">
+                <label class="flex min-h-11 items-center gap-3 lg:min-h-0 lg:gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={selectedCategoryIds.includes(category.id)}
                     on:change={() => toggleCategory(category.id)}
-                    class="form-checkbox text-primary rounded border-slate-300 focus:ring-primary h-4 w-4"
+                    class="form-checkbox text-primary rounded border-slate-300 focus:ring-primary h-5 w-5 shrink-0 lg:h-4 lg:w-4"
                   />
                   <span
-                    class="text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
+                    class="min-w-0 text-sm text-secondary-text-light dark:text-secondary-text-dark group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
                     >{nomCategorie(category.name, $language.current)}</span
                   >
                 </label>
@@ -468,14 +568,32 @@
             </div>
           </div>
 
+          <!-- Sous lg, le panneau déplié s'intercale AU-DESSUS des résultats :
+               chaque case relance la recherche, mais le résultat arrive hors de
+               la vue. Ce bouton referme le panneau et y ramène, sans remonter
+               jusqu'au bouton « Filtres ». -->
+          <button
+            type="button"
+            on:click={voirLesResultats}
+            data-testid="search-filters-done"
+            class="lg:hidden flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+          >
+            {$tr("search.showResults")}
+          </button>
         </div>
       </aside>
 
       <!-- Results -->
-      <div class="flex-grow space-y-4">
+      <!-- min-w-0 : élément flex, la colonne ne descendait pas sous la largeur
+           de son contenu, et une carte au titre insécable l'élargissait
+           au-delà de l'écran. scroll-mt-4 : de l'air au-dessus quand
+           allerAuxResultats y amène. -->
+      <div bind:this={resultatsEl} class="min-w-0 flex-1 space-y-4 scroll-mt-4">
         <!-- Results Meta -->
+        <!-- Empilée sous sm : à côté du tri, la ligne d'état passait sur deux
+             ou trois lignes. -->
         <div
-          class="flex justify-between items-center text-sm text-secondary-text-light dark:text-secondary-text-dark pb-2"
+          class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm text-secondary-text-light dark:text-secondary-text-dark pb-2"
         >
           <!--
             role="status" (donc aria-live="polite") : apres une recherche, un
@@ -501,11 +619,13 @@
           </span>
           <div class="flex items-center gap-2">
             <span>{$tr("search.sortBy")}</span>
+            <!-- text-base sous sm : sous 16 px, iOS zoome la page au focus et
+                 ne la dézoome pas ensuite. -->
             <select
               bind:value={sortBy}
           aria-label={$tr("a11y.sortBy")}
               data-testid="search-sort"
-              class="bg-transparent border-none text-slate-900 dark:text-white font-medium focus:ring-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:rounded cursor-pointer pr-8 text-sm"
+              class="bg-transparent border-none text-slate-900 dark:text-white font-medium focus:ring-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:rounded cursor-pointer pr-8 min-h-11 sm:min-h-0 text-base sm:text-sm"
             >
               <option value="relevance">{$tr("search.relevance")}</option>
               <option value="date_desc">{$tr("search.recentDate")}</option>
@@ -519,7 +639,7 @@
           <div class="space-y-4">
             {#each [1, 2, 3] as _}
               <div
-                class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft animate-pulse"
+                class="bg-white dark:bg-card-dark p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft animate-pulse"
               >
                 <div
                   class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-20 mb-3"
@@ -540,7 +660,7 @@
           <!-- Empty State -->
         {:else if !searchQuery}
           <div
-            class="bg-white dark:bg-card-dark p-12 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft text-center"
+            class="bg-white dark:bg-card-dark p-8 sm:p-12 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft text-center"
           >
             <span
               class="material-icons text-6xl text-slate-300 dark:text-slate-600 mb-4"
@@ -564,7 +684,7 @@
           <div
             role="alert"
             data-testid="search-error"
-            class="bg-white dark:bg-card-dark p-12 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-soft text-center"
+            class="bg-white dark:bg-card-dark p-8 sm:p-12 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-soft text-center"
           >
             <span class="material-icons text-6xl text-red-300 mb-4"
                aria-hidden="true">cloud_off</span
@@ -575,7 +695,7 @@
             <button
               on:click={() => performSearch()}
               data-testid="search-retry"
-              class="mt-4 px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+              class="mt-4 min-h-11 px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
               >{$tr("common.retry")}</button
             >
           </div>
@@ -583,7 +703,7 @@
           <!-- No Results -->
         {:else if filteredResults.length === 0}
           <div
-            class="bg-white dark:bg-card-dark p-12 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft text-center"
+            class="bg-white dark:bg-card-dark p-8 sm:p-12 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft text-center"
           >
             <span
               class="material-icons text-6xl text-slate-300 dark:text-slate-600 mb-4"
@@ -636,17 +756,19 @@
             {/each}
           {/if}
 
-          <!-- Pagination : les numeros etaient codes en dur et sans on:click -->
+          <!-- Pagination : les numeros etaient codes en dur et sans on:click.
+               Boutons de 44 px sous sm, et trois numeros seulement (voir
+               pagesTelephone) : la rangee tient dans 288 px. -->
           {#if totalPages > 1}
             <nav
-              class="flex justify-center items-center gap-2 mt-8 pt-4"
+              class="flex flex-wrap justify-center items-center gap-1 sm:gap-2 mt-8 pt-4"
               aria-label={$tr("pagination.page")}
             >
               <button
                 on:click={() => goToPage(currentPage - 1)}
                 data-testid="search-page-prev"
                 aria-label={$tr("pagination.prev")}
-                class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                class="h-11 w-11 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                 disabled={currentPage === 1}
               >
                 <span class="material-icons" aria-hidden="true">chevron_left</span>
@@ -657,7 +779,9 @@
                   on:click={() => goToPage(n)}
                   data-testid="search-page-{n}"
                   aria-current={n === currentPage ? "page" : undefined}
-                  class="w-10 h-10 flex items-center justify-center rounded-xl font-medium transition-colors {n ===
+                  class="{pagesTelephone.includes(n)
+                    ? 'flex'
+                    : 'hidden sm:flex'} h-11 w-11 sm:h-10 sm:w-10 items-center justify-center rounded-xl font-medium transition-colors {n ===
                   currentPage
                     ? 'bg-primary text-white shadow-lg shadow-primary/25'
                     : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
@@ -669,7 +793,7 @@
                 on:click={() => goToPage(currentPage + 1)}
                 data-testid="search-page-next"
                 aria-label={$tr("pagination.next")}
-                class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                class="h-11 w-11 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                 disabled={currentPage === totalPages}
               >
                 <span class="material-icons" aria-hidden="true">chevron_right</span>
@@ -681,19 +805,15 @@
     </div>
   </main>
 
-  <!-- FAB -->
-  <div class="fixed bottom-6 right-6 z-40">
-    <!-- Pointait vers "/" : l'icône annonce l'assistant, la cible est /chat.
-         Le FAB équivalent de (main)/+layout.svelte pointe bien vers /chat. -->
-    <a
-      href="/chat"
-      aria-label={$tr("mode.chat")}
-      class="w-14 h-14 bg-primary text-white rounded-full shadow-lg hover:bg-indigo-700 transition-colors flex items-center justify-center"
-    >
-      <span class="material-icons text-2xl" aria-hidden="true">smart_toy</span>
-    </a>
-  </div>
-  <SiteFooter />
+  <!-- Bouton flottant de l'assistant, commun avec l'accueil : la copie locale
+       (56 px, bottom-6 right-6) divergeait de celle de (main)/+layout.svelte,
+       et aucune des deux ne tenait compte de la barre d'accueil de l'iPhone.
+       La place qu'il occupe en fin de défilement est réservée dans le pied de
+       page (reserverBouton), toujours rendu sous les résultats : la dernière
+       carte et la pagination remontent au-dessus du bouton sans qu'une marge
+       vide de plus soit ajoutée à <main>. -->
+  <ChatFab />
+  <SiteFooter reserverBouton />
 </div>
 
 <style>

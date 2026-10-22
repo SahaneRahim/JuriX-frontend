@@ -60,14 +60,17 @@
 <!-- Hors index : cette page n'apporte rien à une recherche. -->
 <MetaSeo titre={$tr("forgot.title")} indexable={false} />
 
+<!-- Même coquille que login/+page.svelte : colonne de la hauteur de l'écran
+     visible, carte ancrée en haut sous sm, liens texte de 44 px. -->
+<div class="flex min-h-app flex-col">
 <SiteHeader />
 
-<main id="contenu">
+<main id="contenu" class="flex flex-1 flex-col">
   <div
-    class="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-slate-50 px-4 py-10 font-sans dark:bg-slate-900"
+    class="flex flex-1 items-start justify-center bg-slate-50 px-4 py-6 font-sans dark:bg-slate-900 sm:items-center sm:py-10"
   >
     <div
-      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8"
     >
       <h1
         class="mb-2 flex items-center justify-center gap-2 text-xl font-bold text-slate-900 dark:text-white"
@@ -93,7 +96,7 @@
           </p>
         </div>
       {:else}
-        <p class="mb-8 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p class="mb-6 text-center text-sm text-slate-500 dark:text-slate-400 sm:mb-8">
           {$tr("forgot.subtitle")}
         </p>
 
@@ -112,7 +115,7 @@
               bind:value={email}
               required
               autocomplete="email"
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:py-2"
             />
           </div>
 
@@ -130,7 +133,7 @@
             type="submit"
             disabled={loading || !monte}
             data-testid="forgot-submit"
-            class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            class="w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
           >
             {loading ? $tr("forgot.submitting") : $tr("forgot.submit")}
           </button>
@@ -139,14 +142,15 @@
 
       <!-- Hors du {#if} : quel que soit l'état — formulaire, erreur réseau ou
            confirmation — il reste une sortie vers la connexion. -->
-      <p class="mt-6 text-center text-xs">
+      <p class="mt-3 text-center text-sm sm:mt-6 sm:text-xs">
         <a
           href="/login"
           data-testid="forgot-to-login"
-          class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+          class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
           >{$tr("forgot.backToLogin")}</a
         >
       </p>
     </div>
   </div>
 </main>
+</div>

@@ -31,15 +31,20 @@
 
 </script>
 
+<!-- p-4 sous sm : avec p-6 et un titre en text-xl, il restait 240 à 310 px de
+     texte sur un téléphone. -->
 <article
-  class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft hover:shadow-card hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden"
+  class="bg-white dark:bg-card-dark p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-soft hover:shadow-card motion-safe:hover:-translate-y-0.5 transition-all duration-300 motion-reduce:transition-none group relative overflow-hidden"
 >
   {#if highlight}
     <div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
   {/if}
 
-  <div class="flex justify-between items-start mb-2">
-    <div>
+  <!-- min-w-0 sur la colonne du titre : un élément flex ne descend pas sous la
+       largeur de son contenu, et un titre ou une cote sans espace
+       (« N°2018/9387/CAB/PM ») poussait le bouton de copie hors de la carte. -->
+  <div class="flex items-start justify-between gap-3 mb-2">
+    <div class="min-w-0 flex-1">
       <span
         class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium mb-3 {badge.color}"
       >
@@ -52,18 +57,20 @@
            contraire. Seul le petit lien en bas de carte navigait. -->
       <a href="/laws/{result.law_id}">
         <h2
-          class="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors cursor-pointer hover:underline"
+          class="text-lg sm:text-xl font-bold break-words text-slate-900 dark:text-white group-hover:text-primary transition-colors cursor-pointer hover:underline"
         >
           {result.title || $tr("search.noTitle")}
         </h2>
       </a>
     </div>
+    <!-- 44 px de côté : l'icône nue faisait 24 px, collée au titre. Les marges
+         négatives gardent l'icône alignée sur le coin de la carte. -->
     <button
       on:click={() => onCopy(result)}
       data-testid="search-copy-link"
       title={$tr("search.copyLink")}
       aria-label={$tr("search.copyLink")}
-      class="text-slate-500 hover:text-primary transition-colors"
+      class="-mr-2 -mt-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-primary transition-colors"
     >
       <span class="material-icons"
          aria-hidden="true">{copied
@@ -73,8 +80,10 @@
     </button>
   </div>
 
+  <!-- Trois lignes sous sm : deux lignes de 300 px ne disent presque rien du
+       passage trouvé. -->
   <p
-    class="text-secondary-text-light dark:text-secondary-text-dark mb-4 leading-relaxed line-clamp-2"
+    class="text-secondary-text-light dark:text-secondary-text-dark mb-4 leading-relaxed line-clamp-3 sm:line-clamp-2"
   >
     {#if result.highlights?.content}
       <!-- Le surlignage vient de ts_headline, qui n'echappe PAS le
@@ -94,13 +103,15 @@
        articles, et chacun mene directement au bon endroit du
        texte. -->
   {#if result.matched_articles && result.matched_articles.length > 0}
+    <!-- Puces de 44 px sous sm : à 26 px, viser « Article 12 » plutôt que son
+         voisin demandait de s'y reprendre. -->
     <div class="flex flex-wrap gap-2 mb-3">
       {#each result.matched_articles as article}
         <a
           href="/laws/{result.law_id}?article={encodeURIComponent(
             article.number,
           )}"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-primary hover:text-white transition-colors"
+          class="inline-flex min-h-11 items-center gap-1 px-3 sm:min-h-0 sm:px-2.5 sm:py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-sm sm:text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-primary hover:text-white transition-colors"
           title={article.title || ""}
         >
           <span class="material-icons text-sm" aria-hidden="true">article</span>
@@ -111,7 +122,7 @@
   {/if}
 
   <div
-    class="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-secondary-text-light dark:text-secondary-text-dark border-t border-slate-100 dark:border-slate-800 pt-4 mt-2"
+    class="flex flex-wrap items-center gap-y-2 gap-x-4 sm:gap-x-6 text-xs text-secondary-text-light dark:text-secondary-text-dark border-t border-slate-100 dark:border-slate-800 pt-4 mt-2"
   >
     {#if result.publication_date}
       <div class="flex items-center gap-1.5">
@@ -126,15 +137,17 @@
       </div>
     {/if}
     {#if result.reference}
-      <div class="flex items-center gap-1.5">
+      <!-- Une cote comme « DÉCRET N°2018/9387/CAB/PM » n'a aucune espace où
+           passer à la ligne : sans coupe-mots, elle débordait de la carte. -->
+      <div class="flex min-w-0 items-center gap-1.5">
         <span class="material-icons text-base" aria-hidden="true">tag</span>
-        {result.reference}
+        <span class="min-w-0 coupe-mots">{result.reference}</span>
       </div>
     {/if}
 
     <a
       href="/laws/{result.law_id}"
-      class="ml-auto flex items-center gap-1 text-primary font-medium hover:underline"
+      class="ml-auto inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-primary font-medium hover:underline"
     >
       {$tr("search.readFull")}
       <span class="material-icons text-sm" aria-hidden="true">arrow_forward</span>

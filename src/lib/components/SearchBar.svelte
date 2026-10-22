@@ -1,6 +1,6 @@
 <script lang="ts">
   import { API_URL } from '$lib/api';
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import { tr } from '$lib/stores/language';
   import { goto } from '$app/navigation';
 
@@ -14,6 +14,7 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
   let showSuggestions = false;
   let selectedIndex = -1;
   let debounceTimer: ReturnType<typeof setTimeout>;
+  let liste: HTMLDivElement | undefined;
 
   function handleSubmit() {
     if (value.trim()) {
@@ -64,12 +65,41 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
     } else if (event.key === 'ArrowDown') {
       event.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, suggestions.length - 1);
+      montrerLaSelection();
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, -1);
+      montrerLaSelection();
     } else if (event.key === 'Escape') {
       showSuggestions = false;
     }
+  }
+
+  /**
+   * Garde la suggestion choisie au clavier dans la partie visible de la liste.
+   *
+   * La liste a désormais une hauteur maximale et défile : sans cela, les
+   * flèches pouvaient sélectionner une entrée cachée sous le bas de la liste.
+   * Pas au survol de la souris : la liste défilerait sous le pointeur.
+   * `?.()` : jsdom, qui fait tourner les tests, n'implémente pas scrollIntoView.
+   */
+  async function montrerLaSelection() {
+    await tick();
+    liste
+      ?.querySelector(`#suggestion-${selectedIndex}`)
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  /**
+   * Un appui dans la liste ne retire pas le focus au champ.
+   *
+   * La liste défile désormais : saisir sa barre de défilement à la souris
+   * faisait perdre le focus au champ, et `handleBlur` la refermait 200 ms plus
+   * tard, en plein geste. Le clic sur une suggestion arrive comme avant, et sur
+   * un écran tactile un geste de défilement n'émet aucun `mousedown`.
+   */
+  function garderLeFocus(event: MouseEvent) {
+    event.preventDefault();
   }
 
   function selectSuggestion(suggestion: {id: number, title: string, reference: string}) {
@@ -94,9 +124,9 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
 
 <div class="relative w-full mx-auto transition-all duration-300 {size === 'large' ? 'max-w-2xl' : 'max-w-xl'}">
   <div class="relative flex items-center">
-    <div class="pointer-events-none absolute left-0 flex h-full items-center pl-4 text-slate-500">
+    <div class="pointer-events-none absolute left-0 flex h-full items-center text-slate-500 {size === 'large' ? 'pl-3.5 sm:pl-4' : 'pl-4'}">
       <svg
-        class="{size === 'large' ? 'h-6 w-6' : 'h-5 w-5'}"
+        class="{size === 'large' ? 'h-5 w-5 sm:h-6 sm:w-6' : 'h-5 w-5'}"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
@@ -119,6 +149,13 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
       role="listbox", aucun aria-activedescendant. Un lecteur d'ecran ne savait
       ni qu'une liste s'etait ouverte, ni quelle entree etait selectionnee — la
       fonction existait sans etre perceptible.
+
+      Marge droite = place réelle des boutons posés par-dessus le champ, à
+      chaque palier : sous sm, effacer (44 px) + rechercher (44 px) ; à partir
+      de md, le bouton porte son libellé et mesure environ 150 px. Avec un pr-28
+      unique, la fin d'une longue requête passait sous ces boutons. En grande
+      taille sur téléphone (py-5 et text-lg), il ne restait que 120 à 160 px
+      pour taper, et le texte indicatif était coupé.
     -->
     <input
       type="text"
@@ -128,7 +165,10 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
       aria-controls="suggestions-liste"
       aria-autocomplete="list"
       aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
-      class="w-full rounded-2xl border-none bg-white/90 py-4 pl-12 pr-28 text-slate-800 shadow-xl ring-1 ring-slate-900/5 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:shadow-2xl transition-all outline-none {size === 'large' ? 'text-lg py-5 pl-14' : 'text-base'}"
+      enterkeyhint="search"
+      class="w-full rounded-2xl border-none bg-white/90 text-slate-800 shadow-xl ring-1 ring-slate-900/5 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:shadow-2xl transition-all outline-none {size === 'large'
+        ? 'py-3.5 pl-11 pr-24 text-base sm:py-5 sm:pl-14 sm:pr-28 sm:text-lg md:pr-52'
+        : 'py-4 pl-12 pr-28 text-base md:pr-48'}"
       {placeholder}
       {value}
       on:input={handleInput}
@@ -139,11 +179,11 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
       autocomplete="off"
     />
 
-    <div class="absolute right-2 flex items-center gap-2">
+    <div class="absolute right-1.5 flex items-center gap-1 sm:right-2 sm:gap-2">
       {#if value}
         <button
           type="button"
-          class="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-red-500 transition-colors"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-red-500 transition-colors sm:h-9 sm:w-9"
           on:click={clearSearch}
           aria-label={$tr("search.clearSearch")}
         >
@@ -169,7 +209,7 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
       <button
         type="button"
         aria-label={$tr('search.button')}
-        class="flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 md:px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:scale-105 hover:shadow-blue-500/30 disabled:opacity-70 disabled:hover:scale-100 {size === 'large' ? 'md:px-8 md:py-3' : ''}"
+        class="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3 sm:px-4 py-2.5 font-semibold text-white shadow-lg transition-all motion-safe:hover:scale-105 hover:shadow-blue-500/30 disabled:opacity-70 disabled:hover:scale-100 {size === 'large' ? 'md:px-8 md:py-3' : 'md:px-6'}"
         on:click={handleSubmit}
         disabled={loading || !value.trim()}
       >
@@ -187,11 +227,26 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
 
   <!-- Autocomplete Suggestions Dropdown -->
   {#if showSuggestions && suggestions.length > 0}
+    <!--
+      Hauteur bornée, et défilement interne : avec le clavier ouvert, cinq
+      titres de loi sur plusieurs lignes descendaient sous le bas de l'écran
+      visible, hors d'atteinte. max-h-80 est le repli des navigateurs sans
+      unité dvh ; la variante supports- passe après lui quoi qu'il arrive,
+      alors que deux max-h-[…] simples sortent du CSS dans l'ordre
+      alphabétique, et le repli en vh l'emporterait.
+
+      Le focus reste dans le champ (aria-activedescendant) : ni la liste ni ses
+      options ne sont focalisables, volontairement, d'où l'exception, qui vaut
+      pour tout ce bloc. `garderLeFocus` n'y sert qu'à ne pas perdre le focus.
+    -->
+    <!-- svelte-ignore a11y_interactive_supports_focus -->
     <div
+      bind:this={liste}
       id="suggestions-liste"
       role="listbox"
       aria-label={$tr("a11y.searchField")}
-      class="absolute z-50 mt-2 w-full rounded-xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden"
+      class="absolute z-50 mt-2 w-full max-h-80 supports-[height:100dvh]:max-h-[min(20rem,45dvh)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl bg-white shadow-2xl ring-1 ring-slate-200"
+      on:mousedown={garderLeFocus}
     >
       {#each suggestions as suggestion, index (suggestion.id)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -199,15 +254,16 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
           id="suggestion-{index}"
           role="option"
           aria-selected={index === selectedIndex}
-          class="px-4 py-3 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0 {index === selectedIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}"
+          class="min-h-11 px-4 py-3 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0 {index === selectedIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}"
           on:click={() => selectSuggestion(suggestion)}
           on:mouseenter={() => selectedIndex = index}
         >
           <!-- Etait rendu avec {@html} : GET /search/suggest renvoie `row.title`
                brut, sans le moindre balisage. Le rendu HTML n'apportait donc
-               rien et exposait le titre de chaque loi comme vecteur. -->
-          <div class="font-medium text-slate-800">{suggestion.title}</div>
-          <div class="text-sm text-slate-500">{suggestion.reference}</div>
+               rien et exposait le titre de chaque loi comme vecteur.
+               Deux lignes au plus : la liste doit montrer plusieurs choix. -->
+          <div class="line-clamp-2 font-medium text-slate-800">{suggestion.title}</div>
+          <div class="coupe-mots text-sm text-slate-500">{suggestion.reference}</div>
         </div>
       {/each}
     </div>

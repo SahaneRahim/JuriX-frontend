@@ -141,14 +141,17 @@
      faire dans un moteur de recherche. -->
 <MetaSeo titre={$tr("reset.title")} indexable={false} />
 
+<!-- Même coquille que login/+page.svelte : colonne de la hauteur de l'écran
+     visible, carte ancrée en haut sous sm, liens texte de 44 px. -->
+<div class="flex min-h-app flex-col">
 <SiteHeader />
 
-<main id="contenu">
+<main id="contenu" class="flex flex-1 flex-col">
   <div
-    class="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-slate-50 px-4 py-10 font-sans dark:bg-slate-900"
+    class="flex flex-1 items-start justify-center bg-slate-50 px-4 py-6 font-sans dark:bg-slate-900 sm:items-center sm:py-10"
   >
     <div
-      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8"
     >
       <h1
         class="mb-2 flex items-center justify-center gap-2 text-xl font-bold text-slate-900 dark:text-white"
@@ -156,7 +159,7 @@
         <span class="text-3xl" aria-hidden="true">&#9878;</span>
         {$tr("reset.title")}
       </h1>
-      <p class="mb-8 text-center text-sm text-slate-500 dark:text-slate-400">
+      <p class="mb-6 text-center text-sm text-slate-500 dark:text-slate-400 sm:mb-8">
         {$tr("reset.subtitle")}
       </p>
 
@@ -170,11 +173,11 @@
         >
           {$tr("reset.success")}
         </p>
-        <p class="mt-6 text-center text-sm">
+        <p class="mt-3 text-center text-sm sm:mt-6">
           <a
             href="/login"
             data-testid="reset-to-login"
-            class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+            class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
             >{$tr("login.submit")}</a
           >
         </p>
@@ -197,15 +200,15 @@
         <a
           href="/forgot-password"
           data-testid="reset-ask-new-link"
-          class="mt-6 inline-block w-full rounded-lg bg-blue-600 px-4 py-2 text-center font-medium text-white transition-colors hover:bg-blue-700"
+          class="mt-6 inline-block w-full rounded-lg bg-blue-600 px-4 py-2.5 text-center font-medium text-white transition-colors hover:bg-blue-700 sm:py-2"
         >
           {$tr("reset.askNewLink")}
         </a>
-        <p class="mt-4 text-center text-xs">
+        <p class="mt-1 text-center text-sm sm:mt-4 sm:text-xs">
           <a
             href="/login"
             data-testid="reset-to-login"
-            class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+            class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
             >{$tr("login.submit")}</a
           >
         </p>
@@ -227,7 +230,7 @@
               minlength="8"
               autocomplete="new-password"
               aria-describedby="reset-password-hint"
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:py-2"
             />
             <!-- La règle est annoncée AVANT l'envoi : le serveur répond 422 sur
                  un mot de passe faible, autant ne pas le faire découvrir. -->
@@ -254,7 +257,7 @@
               required
               minlength="8"
               autocomplete="new-password"
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:py-2"
             />
           </div>
 
@@ -275,18 +278,18 @@
             type="submit"
             disabled={loading || !monte}
             data-testid="reset-submit"
-            class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            class="w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
           >
             {loading ? $tr("reset.submitting") : $tr("reset.submit")}
           </button>
         </form>
 
         <!-- Sortie permanente, même sans erreur. -->
-        <p class="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p class="mt-3 text-center text-sm text-slate-500 dark:text-slate-400 sm:mt-6 sm:text-xs">
           <a
             href="/login"
             data-testid="reset-to-login"
-            class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+            class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
             >{$tr("login.submit")}</a
           >
         </p>
@@ -294,3 +297,4 @@
     </div>
   </div>
 </main>
+</div>

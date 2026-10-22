@@ -154,22 +154,41 @@
      son apparition dans les resultats ne fait qu'exposer la porte d'entree. -->
 <MetaSeo titre={$tr("login.title")} indexable={false} />
 
+<!--
+  Coquille commune aux pages de compte (inscription, mot de passe oublié,
+  réinitialisation, vérification d'adresse) : une colonne de la hauteur de
+  l'écran visible (min-h-app : 100dvh, repli 100vh, dans app.css), dont
+  <main> prend tout ce que l'en-tête laisse, quelle que soit sa hauteur.
+  L'ancien `min-h-[calc(100vh-5rem)]` supposait un en-tête de 80 px exactement
+  (il en faisait 72), et 100vh compte la barre d'adresse mobile comme
+  repliée : la page défilait d'une hauteur de barre, même quand la carte
+  tenait dans l'écran.
+
+  Sous sm, la carte est ancrée en haut (items-start) : centrée, elle sautait
+  vers le haut à l'ouverture du clavier, qui réduit la page sur Android. Et
+  p-5 au lieu de p-8 : à 320 px, il ne restait que 222 px pour les champs.
+
+  Liens texte : bloc de 44 px de haut sous sm (py-3, text-sm), pour le doigt ;
+  les marges qui les entourent sont réduites d'autant, pour garder le même
+  espacement visible. Ils retrouvent leur taille d'origine à partir de sm.
+-->
+<div class="flex min-h-app flex-col">
 <SiteHeader />
 
-<main id="contenu">
-<div class="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-slate-50 px-4 font-sans">
-  <div class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+<main id="contenu" class="flex flex-1 flex-col">
+<div class="flex flex-1 items-start justify-center bg-slate-50 px-4 py-6 font-sans dark:bg-slate-900 sm:items-center sm:py-10">
+  <div class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8">
     <!-- La marque etait composee de deux <span> : la page n'avait aucun titre,
          de h1 a h6. Un lecteur d'ecran arrivait sur un formulaire sans savoir
          de quoi il s'agissait. -->
-    <h1 class="mb-8 flex items-center justify-center gap-2 font-bold text-slate-900">
+    <h1 class="mb-6 flex items-center justify-center gap-2 font-bold text-slate-900 dark:text-white sm:mb-8">
       <span class="text-3xl" aria-hidden="true">&#9878;</span>
       <span class="text-xl">JuriX</span>
     </h1>
 
     <form on:submit|preventDefault={handleSubmit} class="space-y-5">
       <div>
-        <label for="email" class="mb-1 block text-sm font-medium text-slate-700">
+        <label for="email" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
           {$tr("login.email")}
         </label>
         <input
@@ -180,12 +199,12 @@
           required
           autocomplete="username"
           placeholder="admin@jurix.cm"
-          class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:py-2"
         />
       </div>
 
       <div>
-        <label for="password" class="mb-1 block text-sm font-medium text-slate-700">
+        <label for="password" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
           {$tr("login.password")}
         </label>
         <input
@@ -195,12 +214,12 @@
           bind:value={password}
           required
           autocomplete="current-password"
-          class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:py-2"
         />
       </div>
 
       {#if error}
-        <p role="alert" data-testid="login-error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" data-testid="login-error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">
           {error}
         </p>
       {/if}
@@ -209,7 +228,7 @@
         type="submit"
         disabled={loading || !monte}
         data-testid="login-submit"
-        class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        class="w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
       >
         {loading ? $tr("login.submitting") : $tr("login.submit")}
       </button>
@@ -218,24 +237,25 @@
     <!-- Le lien n'existait pas, et c'était volontaire : sans envoi d'e-mail,
          il n'aurait mené nulle part, ce qui est pire que son absence. Il
          apparaît maintenant que la réinitialisation existe réellement. -->
-    <p class="mt-4 text-center text-xs">
+    <p class="mt-1 text-center text-sm sm:mt-4 sm:text-xs">
       <a
         href="/forgot-password"
         data-testid="login-to-forgot"
-        class="font-medium text-blue-600 hover:underline">{$tr("login.forgotPassword")}</a
+        class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0">{$tr("login.forgotPassword")}</a
       >
     </p>
 
-    <div class="mt-6">
+    <div class="mt-3 sm:mt-6">
       <BoutonGoogle on:credential={connexionGoogle} />
     </div>
 
-    <p class="mt-6 text-center text-xs text-slate-500">
+    <p class="mt-3 text-center text-sm text-slate-500 dark:text-slate-400 sm:mt-6 sm:text-xs">
       {$tr("login.noAccount")}
-      <a href="/signup" data-testid="login-to-signup" class="font-medium text-blue-600 hover:underline"
+      <a href="/signup" data-testid="login-to-signup" class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
         >{$tr("signup.submit")}</a
       >
     </p>
   </div>
 </div>
 </main>
+</div>

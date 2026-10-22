@@ -97,17 +97,20 @@
   indexable={false}
 />
 
-<div class="min-h-screen bg-background-light dark:bg-background-dark flex flex-col">
+<!-- min-h-app (app.css) : 100dvh avec repli 100vh. `min-h-screen min-h-dvh`
+     ne marche pas : Tailwind sort les deux classes par ordre alphabétique, et
+     la valeur en vh, écrite après, l'emporte toujours. -->
+<div class="min-h-app bg-background-light dark:bg-background-dark flex flex-col">
   <SiteHeader />
 
-  <main id="contenu" class="flex-1 max-w-6xl w-full mx-auto px-4 py-10">
-    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+  <main id="contenu" class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-10">
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
       {$tr("compare.title")}
     </h1>
-    <p class="text-gray-600 dark:text-gray-300 mb-8">{$tr("compare.subtitle")}</p>
+    <p class="text-gray-600 dark:text-gray-300 mb-6 sm:mb-8">{$tr("compare.subtitle")}</p>
 
     <form
-      class="grid gap-4 md:grid-cols-[1fr_1fr_auto] items-end mb-10"
+      class="grid gap-4 md:grid-cols-[1fr_1fr_auto] items-end mb-8 sm:mb-10"
       on:submit|preventDefault={comparer}
       data-testid="compare-form"
       novalidate
@@ -174,7 +177,7 @@
         <button
           on:click={comparer}
           data-testid="compare-retry"
-          class="mt-2 underline font-medium hover:no-underline"
+          class="mt-2 inline-flex min-h-11 items-center underline font-medium hover:no-underline md:min-h-0"
         >
           {$tr("common.retry")}
         </button>
@@ -192,48 +195,91 @@
             data-testid="compare-unmatched"
             class="mb-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200"
           >
-            <p class="font-semibold">
+            <p class="font-semibold coupe-mots">
               {$tr("compare.unmatched")} : {resultat.unmatched_citations.join(", ")}
             </p>
             <p class="text-sm mt-1">{$tr("compare.unmatchedHelp")}</p>
           </div>
         {/if}
 
-        <div class="overflow-x-auto">
-          <table class="w-full border-collapse text-sm">
+        <!--
+          Sous md, le MÊME tableau se range en cartes empilées, en CSS
+          seulement : une carte par critère, les deux sujets l'un sous l'autre.
+          Trois colonnes dans 328 px donnaient des cellules d'environ 100 px et
+          un défilement horizontal qui cachait le sujet B. Un second balisage,
+          masqué selon la largeur, aurait doublé les data-testid
+          (compare-toggle-0-a…, que le mode strict de Playwright veut uniques)
+          et les id src-{i}-{cote} visés par aria-controls.
+
+          Les rôles ARIA explicites gardent la sémantique de tableau : des
+          navigateurs (Safari notamment) la retirent dès qu'un élément de
+          tableau change de `display`. Comme l'en-tête de colonnes est masqué
+          sous md, chaque cellule y affiche le nom de son sujet, avec un filet
+          de couleur (bleu pour A, ambre pour B).
+
+          coupe-mots (overflow-wrap: anywhere) sous md seulement, et
+          break-words ensuite : `anywhere` ramène la largeur minimale d'une
+          cellule à un caractère, et l'algorithme des tableaux en profiterait
+          pour réduire une colonne au texte court à quelques dizaines de pixels.
+        -->
+        <div class="md:overflow-x-auto">
+          <!-- L'exception vaut pour tout le tableau : rôles redondants voulus. -->
+          <!-- svelte-ignore a11y_no_redundant_roles -->
+          <table role="table" class="block w-full border-collapse text-sm md:table">
             <caption class="sr-only">
               {$tr("compare.title")} : {resultat.subject_a} / {resultat.subject_b}
             </caption>
-            <thead>
+            <thead class="hidden md:table-header-group">
               <tr class="border-b-2 border-gray-300 dark:border-slate-600">
-                <th scope="col" class="text-left p-3 font-semibold text-gray-500 dark:text-gray-400 w-48">
+                <th scope="col" class="text-left p-3 font-semibold text-gray-500 dark:text-gray-400 md:w-40 lg:w-48">
                   {$tr("compare.criterion")}
                 </th>
-                <th scope="col" class="text-left p-3 font-semibold text-gray-900 dark:text-white">
+                <th scope="col" class="text-left p-3 font-semibold break-words text-gray-900 dark:text-white">
                   {resultat.subject_a}
                 </th>
-                <th scope="col" class="text-left p-3 font-semibold text-gray-900 dark:text-white">
+                <th scope="col" class="text-left p-3 font-semibold break-words text-gray-900 dark:text-white">
                   {resultat.subject_b}
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup" class="block space-y-4 md:table-row-group md:space-y-0">
               {#each resultat.rows as ligne, i}
-                <tr class="border-b border-gray-200 dark:border-slate-700 align-top">
+                <tr
+                  role="row"
+                  class="block rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-card-dark p-4 align-top md:table-row md:rounded-none md:border-0 md:border-b md:bg-transparent md:dark:bg-transparent md:p-0"
+                >
                   <th
                     scope="row"
-                    class="p-3 text-left font-medium text-gray-500 dark:text-gray-400"
+                    role="rowheader"
+                    class="block text-left text-base font-semibold coupe-mots md:break-words text-gray-900 dark:text-white md:table-cell md:p-3 md:text-sm md:font-medium md:text-gray-500 md:dark:text-gray-400"
                   >
                     {ligne.criterion}
                   </th>
                   {#each colonnes(ligne) as { cote, cellule }}
-                    <td class="p-3 text-gray-800 dark:text-gray-200">
+                    <td
+                      role="cell"
+                      class="mt-3 block border-l-4 pl-3 coupe-mots md:break-words text-gray-800 dark:text-gray-200 md:mt-0 md:table-cell md:border-l-0 md:p-3 {cote === 'a'
+                        ? 'border-blue-500 dark:border-blue-400'
+                        : 'border-amber-500 dark:border-amber-400'}"
+                    >
+                      <!-- Lu aussi par les lecteurs d'écran : sous md, c'est le
+                           seul lien entre la cellule et son sujet. -->
+                      <p
+                        class="mb-1 text-xs font-semibold md:hidden {cote === 'a'
+                          ? 'text-blue-700 dark:text-blue-300'
+                          : 'text-amber-700 dark:text-amber-300'}"
+                      >
+                        {cote === "a" ? resultat.subject_a : resultat.subject_b}
+                      </p>
                       <p class:italic={!cellule.sources.length}
                          class:text-gray-500={!cellule.sources.length}
                          class:dark:text-gray-500={!cellule.sources.length}>
                         {cellule.value}
                       </p>
                       {#if cellule.sources.length}
+                        <!-- Puces et bascule de 44 px sous md : ce sont les
+                             seuls moyens de vérifier une citation, et elles
+                             faisaient 20 px de haut. -->
                         <div
                           class="mt-2 flex flex-wrap gap-2 items-center"
                           aria-label={$tr("compare.sources")}
@@ -242,7 +288,7 @@
                             <a
                               href="/laws/{source.law_id}?article={encodeURIComponent(source.number)}"
                               title={source.law_title}
-                              class="text-xs px-2 py-0.5 rounded bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 hover:underline"
+                              class="inline-flex min-h-11 max-w-full items-center rounded px-3 py-1.5 text-sm md:min-h-0 md:px-2 md:py-0.5 md:text-xs bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 hover:underline"
                             >
                               {source.reference} · art. {source.number}
                             </a>
@@ -257,7 +303,7 @@
                               : $tr('compare.showText')} — {ligne.criterion}, {cote === 'a'
                               ? resultat.subject_a
                               : resultat.subject_b}"
-                            class="text-xs underline text-gray-500 dark:text-gray-400 hover:no-underline"
+                            class="inline-flex min-h-11 items-center px-1 text-sm md:min-h-0 md:px-0 md:text-xs underline text-gray-500 dark:text-gray-400 hover:no-underline"
                           >
                             {depliees.has(`${i}:${cote}`)
                               ? $tr("compare.hideText")
@@ -282,7 +328,10 @@
                                   {source.reference} — Art. {source.number}
                                   {#if source.page_number}· p. {source.page_number}{/if}
                                 </p>
-                                <p class="text-xs leading-relaxed whitespace-pre-line text-gray-700 dark:text-gray-300">
+                                <!-- text-sm sous md : le texte de l'article est
+                                     ce qu'on vient lire, 12 px sur un téléphone
+                                     ne s'y prêtent pas. -->
+                                <p class="text-sm md:text-xs leading-relaxed whitespace-pre-line text-gray-700 dark:text-gray-300">
                                   {source.content}
                                 </p>
                               </div>
