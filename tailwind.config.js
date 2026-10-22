@@ -53,8 +53,12 @@ export default {
     // Variante et non entree de `theme.screens` : un ecran `raw` desactive en
     // silence toutes les variantes `max-*` et `min-*` de Tailwind (« not
     // supported with a screens configuration containing objects »).
+    // `:root &` : une variante de plugin est ecrite AVANT sm:/md:/lg:, et un
+    // telephone en paysage depasse 640 px de large ; sans ce gain de
+    // specificite, `court:py-1` perdait toujours contre `sm:py-6`. Avec lui, la
+    // regle de l'ecran court l'emporte quel que soit l'ordre d'ecriture.
     plugin(({ addVariant }) => {
-      addVariant('court', '@media (max-height: 500px)');
+      addVariant('court', '@media (max-height: 500px) { :root & }');
     }),
   ],
 };
