@@ -127,6 +127,11 @@ export const translations = {
     'chat.conversationsError': 'Impossible de charger vos conversations.',
     'chat.errorConversationGone': 'Cette conversation n\'est plus accessible. Une nouvelle a été démarrée.',
     'chat.signInToKeep': 'Créez un compte pour conserver vos conversations.',
+    'chat.barTitle': 'Assistant JuriX',
+    'chat.backHome': 'Retour à l\'accueil',
+    'chat.scrollToLatest': 'Aller au dernier message',
+    'chat.showSources': 'Afficher les sources',
+    'chat.hideSources': 'Masquer les sources',
     'common.errorNetwork': 'Impossible de joindre le serveur.',
     'pdf.loading': 'Chargement du document…',
     'pdf.errorLoad': 'Impossible de charger le document.',
@@ -141,6 +146,12 @@ export const translations = {
     'pdf.zoomIn': 'Agrandir',
     'pdf.keyboardHint': 'Utilisez les flèches ← → pour naviguer',
     'pdf.pageAlt': 'Page {n}',
+    // Noms des boutons réduits à une flèche sur téléphone, et du cadre qui
+    // défile une fois la page agrandie.
+    'pdf.previousPage': 'Page précédente',
+    'pdf.nextPage': 'Page suivante',
+    'pdf.fitWidth': 'Ajuster à la largeur',
+    'pdf.viewer': 'Page du document',
     'login.title': 'Connexion',
     'login.email': 'Adresse email',
     'login.password': 'Mot de passe',
@@ -234,7 +245,10 @@ export const translations = {
     'batch.uploadFailed': 'Envoi impossible : {err}',
     // Hero section
     'hero.badge': 'IA Juridique Camerounaise',
-    'hero.title': 'Votre Assistant Juridique IA',
+    // Titre et mot en dégradé, rendus sur deux lignes : deux clés, et non un
+    // `.replace("IA", "")` qui ne trouvait rien dans le titre anglais.
+    'hero.title': 'Votre Assistant Juridique',
+    'hero.titleHighlight': 'IA',
     'hero.subtitle': 'Recherchez, consultez et comprenez les lois camerounaises avec l\'aide de l\'intelligence artificielle',
 
     // Mode switcher
@@ -307,6 +321,7 @@ export const translations = {
     // Search page filters & UI
     'search.filters': 'Filtres',
     'search.reset': 'Réinitialiser',
+    'search.showResults': 'Voir les résultats',
     'search.datePublication': 'Date de publication',
     'search.allTime': 'Toute période',
     'search.thisYear': 'Cette année',
@@ -489,6 +504,8 @@ export const translations = {
     'admin.selectFiles': 'Sélectionner les fichiers',
     'admin.dragDrop': 'Glissez-déposez vos fichiers PDF ici, ou',
     'admin.browse': 'parcourez',
+    'admin.tapToChoose': 'Touchez pour choisir des fichiers PDF',
+    'admin.removeFile': 'Retirer {name}',
     'admin.fileLimit': 'Limite: 1GB par fichier',
     'admin.selectedFiles': 'Fichiers sélectionnés',
     'admin.uploading': 'Upload en cours...',
@@ -579,6 +596,11 @@ export const translations = {
     'chat.conversationsError': 'Could not load your conversations.',
     'chat.errorConversationGone': 'This conversation is no longer available. A new one has started.',
     'chat.signInToKeep': 'Create an account to keep your conversations.',
+    'chat.barTitle': 'JuriX Assistant',
+    'chat.backHome': 'Back to home',
+    'chat.scrollToLatest': 'Jump to the latest message',
+    'chat.showSources': 'Show sources',
+    'chat.hideSources': 'Hide sources',
     'common.errorNetwork': 'Unable to reach the server.',
     'pdf.loading': 'Loading document…',
     'pdf.errorLoad': 'Unable to load the document.',
@@ -593,6 +615,10 @@ export const translations = {
     'pdf.zoomIn': 'Zoom in',
     'pdf.keyboardHint': 'Use the ← → arrow keys to navigate',
     'pdf.pageAlt': 'Page {n}',
+    'pdf.previousPage': 'Previous page',
+    'pdf.nextPage': 'Next page',
+    'pdf.fitWidth': 'Fit to width',
+    'pdf.viewer': 'Document page',
     'login.title': 'Sign in',
     'login.email': 'Email address',
     'login.password': 'Password',
@@ -686,7 +712,8 @@ export const translations = {
     'batch.uploadFailed': 'Upload failed: {err}',
     // Hero section
     'hero.badge': 'Cameroonian Legal AI',
-    'hero.title': 'Your AI Legal Assistant',
+    'hero.title': 'Your Legal Assistant',
+    'hero.titleHighlight': 'AI',
     'hero.subtitle': 'Search, consult and understand Cameroonian laws with the help of artificial intelligence',
 
     // Mode switcher
@@ -759,6 +786,7 @@ export const translations = {
     // Search page filters & UI
     'search.filters': 'Filters',
     'search.reset': 'Reset',
+    'search.showResults': 'Show results',
     'search.datePublication': 'Publication date',
     'search.allTime': 'All time',
     'search.thisYear': 'This year',
@@ -940,6 +968,8 @@ export const translations = {
     'admin.selectFiles': 'Select files',
     'admin.dragDrop': 'Drag and drop your PDF files here, or',
     'admin.browse': 'browse',
+    'admin.tapToChoose': 'Tap to choose PDF files',
+    'admin.removeFile': 'Remove {name}',
     'admin.fileLimit': 'Limit: 1GB per file',
     'admin.selectedFiles': 'Selected files',
     'admin.uploading': 'Uploading...',
