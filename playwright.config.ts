@@ -1,5 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// L'API que lit le site construit pour les tests : la meme que celle que les
+// specs interrogent directement (`VITE_API_URL ?? 'http://localhost:8000'`).
+//
+// PIEGE : src/lib/config.ts prend « http://localhost:8000 » — la valeur de
+// .env — pour « rien de precise » et, dans un build, se rabat sur l'API
+// Railway de production. Le site teste aurait parle a la production, ou a un
+// hote eteint, pendant que les specs lisaient la base locale. 127.0.0.1
+// designe le meme backend sans declencher ce repli.
+const API_DES_TESTS = (process.env.VITE_API_URL ?? 'http://localhost:8000').replace(
+  /^http:\/\/localhost:/,
+  'http://127.0.0.1:',
+);
+
+// Chrome de bureau sans sa taille d'ecran (1280x720) : le projet `responsif`
+// fixe les siennes, describe par describe.
+const { viewport: _tailleDeBureau, ...chromeSansTaille } = devices['Desktop Chrome'];
+
 export default defineConfig({
   testDir: './tests/e2e',
   // Sequentiel et mono-processus : les specs partagent un backend reel sur
@@ -42,6 +59,20 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // Les tailles d'ecran ont leur propre projet, ci-dessous : la suite
+      // habituelle reste celle d'avant, au viewport de bureau.
+      testIgnore: 'navigation/responsif.spec.ts',
+    },
+    {
+      // Le site sur six tailles d'ecran, du telephone de 360 px au bureau, et
+      // trois telephones courts pour le bouton flottant de l'accueil
+      // (tests/e2e/navigation/responsif.spec.ts). La spec fixe elle-meme
+      // chaque taille, emulation mobile et tactile comprises (`test.use` par
+      // describe) : le projet ne fournit que le navigateur.
+      //   npx playwright test --project=responsif
+      name: 'responsif',
+      testMatch: 'navigation/responsif.spec.ts',
+      use: chromeSansTaille,
     },
   ],
   webServer: [{
@@ -51,13 +82,28 @@ export default defineConfig({
     // d'une page pouvait prendre plusieurs secondes, retardant d'autant
     // l'hydratation. C'etait la principale source de variance de cette suite.
     // Le build est compile une fois, puis servi tel quel.
-    // `node build`, et non `vite preview` : c'est le serveur de production
-    // (adapter-node), avec sa lecture de l'environnement et ORIGIN. vite
-    // preview rend avec un serveur generique, et un mauvais adaptateur y
-    // passerait inapercu. Sans ORIGIN, adapter-node suppose https : l'origine
-    // de la page et celle des appels a l'API ne concorderaient plus.
-    command: 'npm run build && node build',
-    env: { PORT: '4173', HOST: '127.0.0.1', ORIGIN: 'http://localhost:4173' },
+    //
+    // `vite preview`, et non plus `node build`. Le site est deploye sur Vercel
+    // (svelte.config.js : adapter-vercel), dont le build ecrit .vercel/output
+    // et plus aucun serveur Node dans build/. `node build` y relancait le
+    // dernier build adapter-node reste sur le disque, sans la moindre erreur —
+    // la suite testait du code perime — ou echouait sur un clone neuf. vite
+    // preview sert la sortie propre a SvelteKit (.svelte-kit/output), la meme
+    // quel que soit l'adaptateur, avec les memes hooks (src/hooks.server.ts) ;
+    // l'environnement du processus, API_INTERNE comprise, arrive a
+    // $env/dynamic/private comme avec node build. Ce qu'il ne fait pas
+    // tourner, la fonction Vercel elle-meme, ne se verifie qu'au deploiement.
+    //
+    // Adresse et port en options : vite preview ne lit ni PORT ni HOST. ORIGIN
+    // n'a plus d'objet : l'origine des pages vient de l'en-tete Host, donc
+    // http://localhost:4173, celle de `baseURL`. --strictPort fait echouer le
+    // demarrage si le port est pris, au lieu de glisser sur le suivant — 4174,
+    // celui du second serveur.
+    //
+    // VITE_API_URL : voir API_DES_TESTS en tete de fichier. Figee dans le code
+    // au build, et relue par le serveur de preview.
+    command: 'npm run build && npx vite preview --host 127.0.0.1 --port 4173 --strictPort',
+    env: { VITE_API_URL: API_DES_TESTS },
     url: 'http://localhost:4173',
     // JAMAIS de reutilisation : `reuseExistingServer` acceptait n'importe quel
     // serveur trouve sur le port, y compris un serveur de developpement lance
@@ -77,8 +123,8 @@ export default defineConfig({
     // Demarre apres le premier, build compris : Playwright lance ses serveurs
     // l'un apres l'autre. La sonde vise un fichier : toutes les pages qui
     // appellent l'API y repondent 503.
-    command: 'node build',
-    env: { PORT: '4174', HOST: '127.0.0.1', ORIGIN: 'http://localhost:4174', API_INTERNE: 'http://api-injoignable.invalid:8000' },
+    command: 'npx vite preview --host 127.0.0.1 --port 4174 --strictPort',
+    env: { VITE_API_URL: API_DES_TESTS, API_INTERNE: 'http://api-injoignable.invalid:8000' },
     url: 'http://localhost:4174/favicon.svg',
     reuseExistingServer: false,
     timeout: 30000,

@@ -26,10 +26,9 @@ npx playwright test --debug
 # Exécuter un fichier de test spécifique
 npx playwright test tests/e2e/navigation/link-integrity.spec.ts
 
-# Exécuter les tests sur un navigateur spécifique
-npx playwright test --project=chromium
-npx playwright test --project=firefox
-npx playwright test --project=webkit
+# Exécuter un seul projet (voir playwright.config.ts)
+npx playwright test --project=chromium    # la suite habituelle, au viewport de bureau
+npx playwright test --project=responsif   # le site sur six tailles d'écran
 
 # Générer un rapport HTML
 npx playwright show-report
@@ -43,6 +42,7 @@ tests/e2e/
 ├── hydratation.ts                     # Helpers : cliquer/saisir apres hydratation
 └── navigation/
     ├── accessibilite.spec.ts          # axe sur les pages publiques
+    ├── avant-hydratation.spec.ts      # les pages avant leur JavaScript
     ├── backend-down.spec.ts           # comportement backend eteint
     ├── chat-rendu.spec.ts             # rendu des reponses du chat
     ├── comparaison.spec.ts            # grille de comparaison sourcee
@@ -51,8 +51,59 @@ tests/e2e/
     ├── inscription.spec.ts            # inscription et connexion
     ├── link-integrity.spec.ts         # aucun lien mort, rendu serveur
     ├── mot-de-passe-oublie.spec.ts    # recuperation de compte
-    └── persona.spec.ts                # question du profil, chat selon le profil
+    ├── panne-api.spec.ts              # API injoignable : 503 au rendu serveur
+    ├── persona.spec.ts                # question du profil, chat selon le profil
+    └── responsif.spec.ts              # six tailles d'ecran (projet responsif)
 ```
+
+### Le serveur de test
+
+`playwright.config.ts` construit le site (`npm run build`) puis le sert avec
+`vite preview` sur le port 4173, et une seconde fois sur 4174 avec une API
+injoignable (`panne-api.spec.ts`). Plus de `node build` : le site est déployé
+sur Vercel (adapter-vercel), dont le build ne produit plus de serveur Node, et
+`node build` relançait sans erreur un ancien build resté sur le disque.
+
+Le site construit lit l'API sur `VITE_API_URL`, `http://127.0.0.1:8000` par
+défaut : le même backend que celui que les specs interrogent. `localhost` est
+réécrit en `127.0.0.1` à dessein : `src/lib/config.ts` prend
+`http://localhost:8000` pour « rien de précisé » et, dans un build, se rabat sur
+l'API de production.
+
+### Les tailles d'écran : le projet `responsif`
+
+`navigation/responsif.spec.ts` ouvre les pages du site (accueil, chat, `/laws`,
+une loi, une catégorie, recherche, comparaison, à propos, connexion,
+inscription, administration) sur six tailles : 360×740, 390×844, 740×360
+(téléphone en paysage), 768×1024, 1024×768 (bascule de l'en-tête, pile sur
+`lg`) et 1440×900. Les trois premières sont émulées en téléphone : balise
+viewport prise en compte, écran tactile, agent Android. Sur trois téléphones
+courts (320×568, 360×584, 375×553), elle vérifie en plus que le bouton
+flottant de l'assistant ne couvre pas le bouton « Rechercher » de l'accueil.
+
+Pour chaque page et chaque taille :
+
+- la page ne glisse pas de côté (`scrollWidth <= innerWidth + 1`) ; en échec,
+  le message nomme les éléments qui dépassent, avec leur bord droit ;
+- une capture pleine page, `test-results/responsif/<page>-<largeur>x<hauteur>.png`,
+  jointe au rapport HTML. Un test voit ce qui dépasse, pas ce qui est
+  disgracieux : les captures sont à relire.
+
+En plus : la saisie et le bouton d'envoi du chat restent dans l'écran, avant et
+après une longue réponse ; sous 1 024 px, les conversations sont un tiroir qui
+s'ouvre et se referme ; en 390×844, le champ de recherche de l'accueil se voit
+sans défiler.
+
+Le projet `chromium` ignore ce fichier : la suite habituelle ne change pas, et
+`npm run test:e2e` lance les deux projets.
+
+Le chat, la recherche, la comparaison et l'administration sont interceptés
+(`page.route`) : aucun appel au modèle, aucun quota. L'accueil, `/laws`, une loi
+et une catégorie sont rendus par le serveur, dont `page.route` ne voit pas les
+appels : ils lisent la vraie API, et sont sautés quand elle est éteinte, sauf
+avec `E2E_EXIGER_BACKEND=1`. Le clavier virtuel, la barre d'adresse qui se
+replie et le zoom au doigt n'existent pas en émulation : ils se vérifient sur un
+vrai téléphone.
 
 ### Stockage de départ : un profil déjà choisi
 
