@@ -16,35 +16,43 @@
 
 <SiteHeader />
 
-<main id="contenu">
+<!-- `px-zone-sure` : marges de l'encoche d'un iPhone en paysage
+     (`viewport-fit=cover`) ; 0 partout ailleurs. -->
+<main id="contenu" class="px-zone-sure">
+<!-- `min-h-app` (app.css : 100dvh, repli 100vh) : 100vh compte la barre du navigateur
+     mobile comme repliée. Mode sombre : la page restait blanche quand tout le
+     reste du site passait au sombre. -->
 <div
-  class="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 relative"
+  class="min-h-app bg-slate-50 dark:bg-background-dark py-8 sm:py-12 px-4 sm:px-6 lg:px-8 relative"
   in:fade
 >
 
-  <div class="max-w-4xl mx-auto space-y-12 pt-8">
+  <div class="max-w-4xl mx-auto space-y-10 sm:space-y-12 pt-4 sm:pt-8">
     <!-- Hero Section -->
     <div class="text-center space-y-4">
       <h1
-        class="text-4xl font-extrabold text-slate-900 sm:text-5xl sm:tracking-tight lg:text-6xl"
+        class="text-4xl font-extrabold text-slate-900 dark:text-white sm:text-5xl sm:tracking-tight lg:text-6xl"
       >
-        {$tr("about.title")} <span class="text-blue-600">JuriX</span>
+        {$tr("about.title")} <span class="text-blue-600 dark:text-blue-400">JuriX</span>
       </h1>
-      <p class="max-w-2xl mx-auto text-xl text-slate-500">
+      <p class="max-w-2xl mx-auto text-lg sm:text-xl text-slate-500 dark:text-slate-400">
         {$tr("about.subtitle")}
       </p>
     </div>
 
-    <!-- Mission Card -->
+    <!-- Mission Card. 20 px de marge intérieure sur téléphone : à 32 px, il
+         ne restait que 224 px de texte sur un écran de 320 px. -->
     <div
-      class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 p-8 sm:p-12"
+      class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl dark:shadow-none overflow-hidden border border-slate-100 dark:border-slate-700 p-5 sm:p-8 lg:p-12"
     >
       <div class="space-y-6">
-        <h2 class="text-3xl font-bold text-slate-900">
+        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
           {$tr("about.mission.title")}
         </h2>
 
-        <div class="prose prose-lg text-slate-600 space-y-6">
+        <div
+          class="prose prose-base sm:prose-lg dark:prose-invert text-slate-600 dark:text-slate-300 space-y-6"
+        >
           <p>
             {$tr("about.mission.p1")}
           </p>
@@ -53,11 +61,11 @@
             {$tr("about.mission.p2")}
           </p>
 
-          <div class="grid md:grid-cols-2 gap-6 mt-8">
-            <div class="flex items-start space-x-4 p-4 bg-blue-50 rounded-lg">
+          <div class="grid sm:grid-cols-2 gap-4 sm:gap-6 mt-8">
+            <div class="flex items-start space-x-4 p-4 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-6 w-6 text-blue-600"
+                  class="h-6 w-6 text-blue-600 dark:text-blue-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -70,20 +78,20 @@
                   />
                 </svg>
               </div>
-              <div>
-                <h3 class="font-semibold text-gray-900">
+              <div class="min-w-0">
+                <h3 class="font-semibold text-gray-900 dark:text-white">
                   {$tr("about.centralization.title")}
                 </h3>
-                <p class="text-sm text-gray-600">
+                <p class="text-sm text-gray-600 dark:text-slate-300">
                   {$tr("about.centralization.desc")}
                 </p>
               </div>
             </div>
 
-            <div class="flex items-start space-x-4 p-4 bg-purple-50 rounded-lg">
+            <div class="flex items-start space-x-4 p-4 bg-purple-50 dark:bg-purple-500/10 rounded-lg">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-6 w-6 text-purple-600"
+                  class="h-6 w-6 text-purple-600 dark:text-purple-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -96,11 +104,11 @@
                   />
                 </svg>
               </div>
-              <div>
-                <h3 class="font-semibold text-gray-900">
+              <div class="min-w-0">
+                <h3 class="font-semibold text-gray-900 dark:text-white">
                   {$tr("about.ai.title")}
                 </h3>
-                <p class="text-sm text-gray-600">{$tr("about.ai.desc")}</p>
+                <p class="text-sm text-gray-600 dark:text-slate-300">{$tr("about.ai.desc")}</p>
               </div>
             </div>
           </div>
@@ -109,50 +117,57 @@
     </div>
 
     <!-- Creator Signature -->
-    <div class="text-center pt-8 border-t border-slate-200">
+    <div class="text-center pt-8 border-t border-slate-200 dark:border-slate-700">
       <p
-        class="text-sm text-slate-500 uppercase tracking-widest font-semibold mb-2"
+        class="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold mb-2"
       >
         {$tr("about.creator")}
       </p>
-      <h3 class="text-2xl font-serif text-slate-800 italic">
+      <h3 class="text-xl sm:text-2xl font-serif text-slate-800 dark:text-slate-100 italic">
         KANA SAHANE ABDELAZIZ RAHIM & AARON FOZEU
       </h3>
     </div>
 
     <!-- Contact Section -->
-    <div class="border-t border-slate-200 pt-8 pb-8">
-      <h2 class="text-2xl font-bold text-slate-900 text-center mb-8">
+    <!-- Contacts : trois colonnes seulement à partir de lg ; à md, la colonne
+         de 192 px écrasait l'adresse électronique. Liens de 44 px de haut, et
+         l'adresse peut se couper plutôt que d'élargir la carte. -->
+    <div class="border-t border-slate-200 dark:border-slate-700 pt-8 pb-8">
+      <h2 class="text-2xl font-bold text-slate-900 dark:text-white text-center mb-6 sm:mb-8">
         {$tr("about.contact.title")}
       </h2>
-      <div class="grid md:grid-cols-3 gap-6 text-center">
-        <div class="p-4 bg-white rounded-lg shadow-sm border border-slate-100">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 text-center">
+        <div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
           <div class="text-2xl mb-2">📞</div>
-          <div class="font-medium text-slate-900">
+          <div class="font-medium text-slate-900 dark:text-white">
             {$tr("about.contact.phone")}
           </div>
-          <a href="tel:+237693672462" class="text-blue-600 hover:underline"
+          <a
+            href="tel:+237693672462"
+            class="inline-flex min-h-11 items-center text-blue-600 dark:text-blue-400 hover:underline"
             >+237 693 67 24 62</a
           >
         </div>
-        <div class="p-4 bg-white rounded-lg shadow-sm border border-slate-100">
+        <div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
           <div class="text-2xl mb-2">💬</div>
-          <div class="font-medium text-slate-900">
+          <div class="font-medium text-slate-900 dark:text-white">
             {$tr("about.contact.whatsapp")}
           </div>
           <a
             href="https://wa.me/237696383736"
-            class="text-green-700 hover:underline">+237 696 38 37 36</a
+            class="inline-flex min-h-11 items-center text-green-700 dark:text-green-400 hover:underline"
+            >+237 696 38 37 36</a
           >
         </div>
-        <div class="p-4 bg-white rounded-lg shadow-sm border border-slate-100">
+        <div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
           <div class="text-2xl mb-2">📧</div>
-          <div class="font-medium text-slate-900">
+          <div class="font-medium text-slate-900 dark:text-white">
             {$tr("about.contact.email")}
           </div>
           <a
             href="mailto:rahimsahane@gmail.com"
-            class="text-blue-600 hover:underline">rahimsahane@gmail.com</a
+            class="inline-flex min-h-11 max-w-full items-center break-all text-blue-600 dark:text-blue-400 hover:underline"
+            >rahimsahane@gmail.com</a
           >
         </div>
       </div>

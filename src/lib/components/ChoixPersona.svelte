@@ -81,9 +81,20 @@
   chaque nouvelle mesure de son contenu (arrivee des polices, icones qui
   passent du mot « gavel » au pictogramme). Lighthouse comptait ce
   deplacement : 0,15 de decalage de mise en page sur chaque premiere visite.
+
+  C'est le FOND qui defile, et non la boite : avec `pt-[8vh]` et
+  `max-h-[90vh]`, unites qui ignorent la barre du navigateur mobile, le bas
+  de la boite (fin de la mention, « Ne pas repondre ») restait sous cette
+  barre, hors d'atteinte puisque la page derriere est bloquee. La boite garde
+  sa hauteur naturelle et le fond defile si elle depasse l'ecran visible,
+  telephone en paysage compris, sans dependre d'aucune unite de hauteur.
+  `overscroll-contain` : le defilement ne passe pas a la page. Marges hautes
+  et basses d'au moins la zone sure (encoche, barre d'accueil). `court:!pt-3`
+  (telephone en paysage) : Tailwind emet la variante `court` AVANT sm, dont
+  le `pt-[8vh]` l'emporterait sinon.
 -->
 <div
-  class="fixed inset-0 z-[60] flex items-start justify-center bg-slate-900/60 p-4 pt-[8vh] backdrop-blur-sm"
+  class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-900/60 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-sm sm:px-4 sm:pt-[8vh] court:!pt-3"
   role="presentation"
   on:pointerdown={(e) => (pressionSurLeFond = e.target === e.currentTarget)}
   on:click={surLeFond}
@@ -97,7 +108,7 @@
     data-testid="persona-dialog"
     data-mode={mode}
     use:piegerFocus={{ initial: mode === "accueil" ? "#persona-titre" : '[aria-current="true"]' }}
-    class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-800"
+    class="mb-[max(0.75rem,env(safe-area-inset-bottom))] w-full max-w-lg rounded-2xl bg-white p-4 shadow-xl dark:bg-slate-800 sm:mb-8 sm:p-6"
   >
     <div class="flex items-start justify-between gap-4">
       <h2
@@ -109,14 +120,15 @@
       </h2>
       <div class="flex shrink-0 items-center gap-1">
         <!-- La langue se choisit aussi ici : l'en-tête est inerte tant que la
-             question est ouverte. -->
+             question est ouverte. 44 px sur écran tactile (24 px auparavant),
+             l'aspect compact d'origine à partir de lg. -->
         <button
           type="button"
           data-testid="persona-lang-fr"
           aria-label="{t('a11y.switchTo')} français"
           aria-pressed={$language.current === "fr"}
           on:click={() => switchLanguage("fr")}
-          class="rounded-md px-2 py-1 text-xs font-bold {$language.current === 'fr'
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-md px-2 text-xs font-bold lg:h-auto lg:min-w-0 lg:py-1 {$language.current === 'fr'
             ? 'bg-blue-50 text-blue-700 dark:bg-white/10 dark:text-blue-300'
             : 'text-slate-600 dark:text-slate-300'}">FR</button
         >
@@ -126,7 +138,7 @@
           aria-label="{t('a11y.switchTo')} English"
           aria-pressed={$language.current === "en"}
           on:click={() => switchLanguage("en")}
-          class="rounded-md px-2 py-1 text-xs font-bold {$language.current === 'en'
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-md px-2 text-xs font-bold lg:h-auto lg:min-w-0 lg:py-1 {$language.current === 'en'
             ? 'bg-blue-50 text-blue-700 dark:bg-white/10 dark:text-blue-300'
             : 'text-slate-600 dark:text-slate-300'}">EN</button
         >
@@ -136,7 +148,7 @@
             data-testid="persona-dialog-close"
             aria-label={t("common.close")}
             on:click={fermerChoixPersona}
-            class="ml-1 flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+            class="ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white lg:h-8 lg:w-8"
           >
             <span class="material-icons text-lg" aria-hidden="true">close</span>
           </button>
@@ -155,7 +167,7 @@
           data-testid="persona-choice-{PERSONA_SLUG[persona]}"
           aria-current={mode === "changement" && actuel === persona ? "true" : undefined}
           on:click={() => choisir(persona)}
-          class="flex items-start gap-3 rounded-xl border p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-700 {mode ===
+          class="flex items-start gap-3 rounded-xl border p-3 text-left transition-colors sm:p-4 hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-700 {mode ===
             'changement' && actuel === persona
             ? 'border-blue-500 bg-blue-50 dark:bg-slate-700'
             : 'border-slate-200 dark:border-slate-600'}"
@@ -190,7 +202,7 @@
       data-testid="persona-skip"
       aria-current={mode === "changement" && actuel === null ? "true" : undefined}
       on:click={sansProfil}
-      class="mt-4 w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700 {mode ===
+      class="mt-4 min-h-11 w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700 {mode ===
         'changement' && actuel === null
         ? 'border-blue-500 bg-blue-50 dark:bg-slate-700'
         : 'border-slate-200 dark:border-slate-600'}"

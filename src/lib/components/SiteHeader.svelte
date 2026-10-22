@@ -24,6 +24,8 @@
     ouvrirChoixPersona,
     personaStore,
   } from "$lib/stores/persona";
+  import { prefersReducedMotion } from "svelte/motion";
+  import { slide } from "svelte/transition";
 
   /**
    * `transparent` pour le groupe (main), dont le header flotte au-dessus du
@@ -59,6 +61,7 @@
     ? $tr(`persona.${PERSONA_SLUG[$personaStore.persona]}.nom`)
     : $tr("persona.general");
   $: libelleDuProfil = $tr("persona.toggleLabel").replace("{persona}", nomDuProfil);
+  $: nomAffiche = $authStore.user?.name || $authStore.user?.email;
 
   function logout() {
     authStore.logout();
@@ -77,29 +80,47 @@
   >{$tr("a11y.skipToContent")}</a
 >
 
+<!--
+  Bascule bureau/mobile à lg (1 024 px), et non plus md : de 768 à 1 240 px,
+  la barre complète était plus large que l'écran et toute la page glissait de
+  côté. Au-dessus de lg, elle se compacte par paliers, calculés sur les
+  libellés français (les plus longs) et sur le pire cas, un administrateur
+  connecté :
+  - lg : « Accueil » masqué (le logo y mène déjà), boutons resserrés, nom de
+    l'utilisateur masqué, « Administration » réduit à son icône ;
+  - xl : « Accueil » et le nom (tronqué) reviennent ;
+  - 2xl : libellés complets (profil, « Administration »).
+
+  Marges latérales : 16 px, 24 px à partir de sm, 48 px à partir de lg, et au
+  moins la zone sûre (encoche d'un iPhone en paysage, `viewport-fit=cover`).
+-->
 <header
   data-testid="site-header"
-  class="w-full py-4 px-6 md:px-12 flex items-center justify-between relative z-50
+  class="relative z-50 flex w-full items-center justify-between gap-4 py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-4 sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] lg:px-12 xl:gap-6
     {variant === 'transparent'
     ? 'bg-transparent'
     : 'bg-white dark:bg-background-dark border-b border-gray-200 dark:border-white/10'}
     {sticky ? 'sticky top-0' : ''}"
 >
-  <!-- Logo -->
-  <a href="/" data-testid="site-logo" class="flex items-center gap-3 flex-1">
-    <div
-      class="bg-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/30"
-    >
-      <span class="material-icons text-white text-xl" aria-hidden="true">balance</span>
-    </div>
-    <span class="text-xl font-bold tracking-tight text-slate-900 dark:text-white"
-      >JuriX</span
-    >
-  </a>
+  <!-- Logo. Le lien n'occupe que le logo, et non toute la colonne : étiré
+       jusqu'au bouton du menu, un appui juste à côté de celui-ci ramenait à
+       l'accueil. -->
+  <div class="flex flex-1 items-center">
+    <a href="/" data-testid="site-logo" class="flex items-center gap-3 rounded-xl">
+      <div
+        class="bg-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/30"
+      >
+        <span class="material-icons text-white text-xl" aria-hidden="true">balance</span>
+      </div>
+      <span class="text-xl font-bold tracking-tight text-slate-900 dark:text-white"
+        >JuriX</span
+      >
+    </a>
+  </div>
 
   <!-- Navigation (bureau) -->
   <nav
-    class="hidden md:flex items-center justify-center gap-8 text-sm font-medium text-secondary-text-light dark:text-secondary-text-dark flex-1"
+    class="hidden lg:flex items-center justify-center gap-4 xl:gap-6 2xl:gap-8 text-sm font-medium text-secondary-text-light dark:text-secondary-text-dark flex-1"
   >
     {#each NAV_LINKS as lien (lien.href)}
       <!-- L'etat actif n'etait signale QUE par la couleur : invisible aux
@@ -107,19 +128,17 @@
            ce bleu du gris environnant. -->
       <a
         aria-current={lien.isActive(pathname) ? "page" : undefined}
-        class="hover:text-primary transition-colors whitespace-nowrap {lien.isActive(
-          pathname,
-        )
-          ? 'text-primary'
-          : ''}"
+        class="hover:text-primary transition-colors whitespace-nowrap {lien.href === '/'
+          ? 'hidden xl:inline'
+          : ''} {lien.isActive(pathname) ? 'text-primary' : ''}"
         href={lien.href}>{$tr(lien.key)}</a
       >
     {/each}
   </nav>
 
   <!-- Actions (bureau) -->
-  <div class="hidden md:flex items-center justify-end gap-3 flex-1">
-    <div class="h-4 w-px bg-white/10 mx-2"></div>
+  <div class="hidden lg:flex items-center justify-end gap-2 xl:gap-3 flex-1">
+    <div class="hidden xl:block h-4 w-px bg-white/10 mx-2"></div>
 
     <div
       class="relative flex items-center bg-gray-100 dark:bg-white/5 p-1 rounded-lg"
@@ -165,7 +184,8 @@
       <span class="material-icons text-lg hidden dark:inline-block" aria-hidden="true">light_mode</span>
     </button>
 
-    <!-- Le profil : icône seule entre md et lg, où la barre est déjà chargée. -->
+    <!-- Le profil : icône seule sous 2xl, où la barre est déjà chargée ; le
+         nom complet reste dans l'étiquette accessible. -->
     <button
       on:click={() => ouvrirChoixPersona()}
       data-testid="persona-toggle"
@@ -176,7 +196,7 @@
       <span class="material-icons text-lg" aria-hidden="true"
         >{PERSONA_ICONE[$personaStore.persona ?? "general"]}</span
       >
-      <span class="hidden lg:inline text-xs font-semibold">{nomDuProfil}</span>
+      <span class="hidden 2xl:inline text-xs font-semibold">{nomDuProfil}</span>
     </button>
 
     <!--
@@ -189,51 +209,62 @@
       ouverte : jusqu'ici, un utilisateur connecté ne voyait qu'un bouton de
       déconnexion.
     -->
-    <div class="flex items-center gap-3 ml-2">
+    <div class="flex items-center gap-2 xl:gap-3 ml-1 xl:ml-2">
       {#if $authStore.isAuthenticated}
         {#if isAdmin}
+          <!-- Icône seule sous 2xl : le libellé « Administration » faisait à
+               lui seul déborder la barre d'un administrateur à 1 280 px.
+               L'étiquette accessible et l'infobulle gardent le mot. -->
           <a
-            class="px-5 py-2 rounded-lg font-semibold text-sm transition-colors whitespace-nowrap bg-white text-blue-600 hover:bg-gray-50 border border-transparent shadow-sm dark:bg-white/5 dark:border-white/10 dark:text-blue-400 dark:hover:bg-white/10"
-            href="/admin">{$tr("nav.admin")}</a
+            class="inline-flex items-center px-2 2xl:px-5 py-2 rounded-lg font-semibold text-sm transition-colors whitespace-nowrap bg-white text-blue-600 hover:bg-gray-50 border border-transparent shadow-sm dark:bg-white/5 dark:border-white/10 dark:text-blue-400 dark:hover:bg-white/10"
+            href="/admin"
+            aria-label={$tr("nav.admin")}
+            title={$tr("nav.admin")}
           >
+            <span class="material-icons text-lg leading-5 2xl:hidden" aria-hidden="true"
+              >admin_panel_settings</span
+            >
+            <span class="hidden 2xl:inline">{$tr("nav.admin")}</span>
+          </a>
         {/if}
-        {#if $authStore.user?.name || $authStore.user?.email}
+        {#if nomAffiche}
           <span
             data-testid="user-name"
-            class="max-w-[10rem] truncate text-sm font-medium text-slate-600 dark:text-slate-300"
+            class="hidden xl:block max-w-[8rem] 2xl:max-w-[10rem] truncate text-sm font-medium text-slate-600 dark:text-slate-300"
             title={$authStore.user?.email}
-            >{$authStore.user?.name || $authStore.user?.email}</span
+            >{nomAffiche}</span
           >
         {/if}
         <button
           on:click={logout}
           data-testid="logout"
-          class="px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-lg whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
+          class="px-3 xl:px-4 2xl:px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-lg whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
           >{$tr("nav.logout")}</button
         >
       {:else}
         <a
-          class="px-5 py-2 rounded-lg font-semibold text-sm transition-all whitespace-nowrap text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+          class="px-3 xl:px-4 2xl:px-5 py-2 rounded-lg font-semibold text-sm transition-all whitespace-nowrap text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
           href="/login">{$tr("nav.login")}</a
         >
         <a
           data-testid="nav-signup"
-          class="px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-lg whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
+          class="px-3 xl:px-4 2xl:px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-lg whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
           href="/signup">{$tr("nav.signup")}</a
         >
       {/if}
     </div>
   </div>
 
-  <!-- Bascule mobile -->
-  <div class="flex md:hidden flex-1 justify-end">
+  <!-- Bascule mobile. 44 px de côté ; la marge négative aligne l'icône sur le
+       bord du contenu sans réduire la zone d'appui. -->
+  <div class="flex lg:hidden flex-1 justify-end">
     <button
       on:click={() => (mobileOpen = !mobileOpen)}
       data-testid="nav-mobile-toggle"
       aria-expanded={mobileOpen}
       aria-controls="site-nav-mobile"
       aria-label={$tr("a11y.menu")}
-      class="p-2 text-slate-600 dark:text-slate-300"
+      class="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
     >
       <span class="material-icons" aria-hidden="true">{mobileOpen ? "close" : "menu"}</span>
     </button>
@@ -241,22 +272,28 @@
 </header>
 
 <!--
-  Le bouton mobile n'avait aucun `on:click` : sous md, la navigation, le choix
+  Le bouton mobile n'avait aucun `on:click` : sous lg, la navigation, le choix
   de langue, le thème et la connexion étaient tous inaccessibles. Le panneau
   reprend donc ces quatre familles de contrôles, pas seulement les liens.
+
+  z-50 : au-dessus du bouton flottant de l'assistant (z-40), qui recouvrait
+  « Créer un compte » sur un téléphone en paysage. Il s'ouvre en glissant
+  (sauf mouvement réduit) et se ferme d'un coup : après une navigation, la
+  page d'arrivée s'affiche sans attendre qu'il se replie.
 -->
 {#if mobileOpen}
   <div
     id="site-nav-mobile"
     data-testid="nav-mobile-panel"
-    class="md:hidden border-b border-gray-200 dark:border-white/10 bg-white dark:bg-background-dark px-6 py-4 relative z-40"
+    class="lg:hidden relative z-50 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-background-dark py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))]"
+    in:slide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
   >
-    <nav class="flex flex-col gap-1">
+    <nav class="flex flex-col">
       {#each NAV_LINKS as lien (lien.href)}
         <a
           href={lien.href}
           aria-current={lien.isActive(pathname) ? "page" : undefined}
-          class="py-2 text-base font-medium transition-colors {lien.isActive(
+          class="-mx-2 flex min-h-11 items-center rounded-lg px-2 py-3 text-base font-medium transition-colors active:bg-slate-100 dark:active:bg-white/5 {lien.isActive(
             pathname,
           )
             ? 'text-primary'
@@ -265,77 +302,91 @@
       {/each}
     </nav>
 
-    <div
-      class="mt-4 pt-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between"
-    >
-      <div class="flex items-center gap-2">
+    <!--
+      Deux rangées et non une : réglages, puis compte. Sur une seule ligne,
+      FR, EN, thème, profil, « Se connecter » et « Créer un compte » faisaient
+      environ 350 px, contre 312 disponibles à 360 px : la page glissait de
+      côté et le dernier bouton était coupé.
+    -->
+    <div class="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3 dark:border-white/10">
+      <div class="flex flex-wrap items-center gap-2">
         <button
           on:click={() => switchLanguage("fr")}
           data-testid="lang-fr-mobile"
           aria-label="{$tr('a11y.switchTo')} français"
-          class="px-3 py-1 rounded-md text-xs font-bold {$language.current ===
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-bold {$language.current ===
           'fr'
             ? 'bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-blue-400'
-            : 'text-slate-500'}">FR</button
+            : 'text-slate-600 dark:text-slate-300'}">FR</button
         >
         <button
           on:click={() => switchLanguage("en")}
           data-testid="lang-en-mobile"
           aria-label="{$tr('a11y.switchTo')} English"
-          class="px-3 py-1 rounded-md text-xs font-bold {$language.current ===
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-bold {$language.current ===
           'en'
             ? 'bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-blue-400'
-            : 'text-slate-500'}">EN</button
+            : 'text-slate-600 dark:text-slate-300'}">EN</button
         >
         <button
           on:click={themeStore.toggle}
           data-testid="theme-toggle-mobile"
           aria-label={$tr("a11y.toggleTheme")}
-          class="ml-2 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500"
+          class="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 dark:text-slate-300"
         >
-          <span class="material-icons text-lg dark:hidden" aria-hidden="true">dark_mode</span>
-          <span class="material-icons text-lg hidden dark:inline-block" aria-hidden="true">light_mode</span>
+          <span class="material-icons text-xl dark:hidden" aria-hidden="true">dark_mode</span>
+          <span class="material-icons text-xl hidden dark:inline-block" aria-hidden="true">light_mode</span>
         </button>
         <button
           on:click={() => ouvrirChoixPersona()}
           data-testid="persona-toggle-mobile"
           aria-haspopup="dialog"
           aria-label={libelleDuProfil}
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 dark:text-slate-300"
         >
-          <span class="material-icons text-lg" aria-hidden="true"
+          <span class="material-icons text-xl" aria-hidden="true"
             >{PERSONA_ICONE[$personaStore.persona ?? "general"]}</span
           >
         </button>
       </div>
 
       {#if $authStore.isAuthenticated}
-        <div class="flex items-center gap-2">
+        <div class="grid grid-cols-2 gap-2">
+          {#if nomAffiche}
+            <p
+              data-testid="user-name-mobile"
+              class="col-span-2 truncate text-sm font-medium text-slate-600 dark:text-slate-300"
+              title={$authStore.user?.email}
+            >
+              {nomAffiche}
+            </p>
+          {/if}
           {#if isAdmin}
             <a
               href="/admin"
-              class="px-3 py-1.5 text-sm font-semibold text-blue-600 dark:text-blue-400"
+              class="flex h-11 items-center justify-center whitespace-nowrap rounded-lg border border-slate-200 px-2 text-sm font-semibold text-blue-600 dark:border-white/10 dark:text-blue-400"
               >{$tr("nav.admin")}</a
             >
           {/if}
           <button
             on:click={logout}
             data-testid="logout-mobile"
-            class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold"
-            >{$tr("nav.logout")}</button
+            class="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-blue-600 px-2 text-sm font-semibold text-white hover:bg-blue-700 {isAdmin
+              ? ''
+              : 'col-span-2'}">{$tr("nav.logout")}</button
           >
         </div>
       {:else}
-        <div class="flex items-center gap-2">
+        <div class="grid grid-cols-2 gap-2">
           <a
             href="/login"
-            class="px-3 py-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300"
+            class="flex h-11 items-center justify-center whitespace-nowrap rounded-lg border border-slate-200 px-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
             >{$tr("nav.login")}</a
           >
           <a
             href="/signup"
             data-testid="nav-signup-mobile"
-            class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold"
+            class="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-blue-600 px-2 text-sm font-semibold text-white hover:bg-blue-700"
             >{$tr("nav.signup")}</a
           >
         </div>
@@ -352,5 +403,11 @@
   */
   .sliding-pill {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sliding-pill {
+      transition: none;
+    }
   }
 </style>

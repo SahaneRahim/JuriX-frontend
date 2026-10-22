@@ -7,6 +7,7 @@
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
   import type { FiltreLangue } from "$lib/types";
+  import { prefersReducedMotion } from "svelte/motion";
   import { fly } from "svelte/transition";
 
   /** Rempli par `+page.server.ts`. Une catégorie absente n'arrive plus ici : 404. */
@@ -98,10 +99,13 @@
 <SiteHeader />
 
 <main id="contenu">
-<div class="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
-  <!-- Blue Header Section -->
+<!-- `min-h-app` (app.css : 100dvh, repli 100vh) : 100vh compte la barre du navigateur
+     mobile comme repliée. -->
+<div class="min-h-app bg-slate-50 dark:bg-slate-900 pb-20">
+  <!-- Blue Header Section. Marges latérales d'au moins la zone sûre (encoche
+       d'un iPhone en paysage) ; le bandeau, lui, reste bord à bord. -->
   <div
-    class="bg-blue-600 dark:bg-blue-800 text-white pb-32 pt-8 px-4 relative overflow-hidden"
+    class="bg-blue-600 dark:bg-blue-800 text-white pb-28 sm:pb-32 pt-6 sm:pt-8 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] relative overflow-hidden"
   >
     <!-- Background Pattern/Gradient (Optional) -->
     <div
@@ -112,26 +116,30 @@
       <!-- Back Link -->
       <a
         href="/"
-        class="inline-flex items-center gap-2 text-white/80 hover:text-white transition-colors mb-8 font-medium"
+        class="inline-flex min-h-11 items-center gap-2 text-white/80 hover:text-white transition-colors mb-2 sm:mb-4 font-medium"
       >
         <span class="material-icons text-sm" aria-hidden="true">arrow_back</span>
         {$tr("categories.backHome")}
       </a>
 
-      <!-- Icon & Title -->
-      <div class="flex items-center gap-6">
+      <!-- Icon & Title. Sur téléphone, le titre de 30 px tenait dans 200 à
+           240 px à côté d'une icône de 64 px, et un mot comme
+           « constitutionnel » était rogné par le bandeau. `min-w-0` laisse
+           la colonne de texte rétrécir, `hyphens-auto` coupe les mots longs
+           (la langue du document suit celle de l'interface). -->
+      <div class="flex items-start sm:items-center gap-4 sm:gap-6">
         <div
-          class="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 shadow-inner"
+          class="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 shadow-inner"
         >
-          <span class="text-4xl leading-none">{currentStyle.icon}</span>
+          <span class="text-3xl sm:text-4xl leading-none">{currentStyle.icon}</span>
         </div>
-        <div>
+        <div class="min-w-0">
           <h1
-            class="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight"
+            class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight break-words hyphens-auto"
           >
             {categoryTitle}
           </h1>
-          <p class="text-blue-100 text-lg opacity-90 max-w-2xl">
+          <p class="text-blue-100 text-base sm:text-lg opacity-90 max-w-2xl">
             {categoryDesc}
           </p>
         </div>
@@ -140,10 +148,10 @@
   </div>
 
   <!-- Main Content overlap -->
-  <div class="max-w-7xl mx-auto px-4 -mt-24 relative z-20">
+  <div class="max-w-7xl mx-auto pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] -mt-24 relative z-20">
     <!-- Search Bar Card -->
     <div
-      class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-700 p-2 mb-8 flex flex-col md:flex-row items-center gap-4"
+      class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-700 p-2 mb-6 sm:mb-8 flex flex-col md:flex-row items-center gap-2 md:gap-4"
     >
       <!-- Input -->
       <div class="flex-1 relative w-full">
@@ -160,30 +168,38 @@
         />
       </div>
 
-      <!-- Language Filter -->
+      <!-- Language Filter. Boutons de 44 px sur écran tactile (28 px
+           auparavant), l'aspect compact d'origine à partir de lg.
+           `aria-pressed` : l'état choisi n'était donné que par la couleur. -->
       <div
-        class="flex items-center gap-3 px-4 py-2 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-700 w-full md:w-auto justify-between md:justify-start"
+        class="flex items-center gap-3 px-2 sm:px-4 py-2 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-700 w-full md:w-auto justify-between md:justify-start"
       >
-        <span class="text-sm font-semibold text-slate-500 mr-2"
+        <span class="text-sm font-semibold text-slate-500 dark:text-slate-400 mr-2"
           >{$tr("categories.langLabel")} :</span
         >
         <div class="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
           <button
-            class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {selectedLanguage ===
+            type="button"
+            aria-pressed={selectedLanguage === "fr"}
+            class="inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-1.5 rounded-md text-xs font-bold transition-all lg:min-h-0 lg:min-w-0 {selectedLanguage ===
             'fr'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}"
             on:click={() => choisirLangue("fr")}>FR</button
           >
           <button
-            class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {selectedLanguage ===
+            type="button"
+            aria-pressed={selectedLanguage === "en"}
+            class="inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-1.5 rounded-md text-xs font-bold transition-all lg:min-h-0 lg:min-w-0 {selectedLanguage ===
             'en'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}"
             on:click={() => choisirLangue("en")}>EN</button
           >
           <button
-            class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {selectedLanguage ===
+            type="button"
+            aria-pressed={selectedLanguage === "all"}
+            class="inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-1.5 rounded-md text-xs font-bold transition-all lg:min-h-0 lg:min-w-0 {selectedLanguage ===
             'all'
               ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}"
@@ -213,7 +229,7 @@
           <span class="material-icons text-4xl mb-2" aria-hidden="true">error_outline</span>
           <p class="font-medium mb-4">{error}</p>
           <button
-            class="px-6 py-2 bg-white text-red-600 font-semibold rounded-lg shadow-sm border border-red-100 hover:bg-red-50 transition-colors"
+            class="min-h-11 px-6 py-2 bg-white text-red-600 font-semibold rounded-lg shadow-sm border border-red-100 hover:bg-red-50 transition-colors"
             on:click={() => invalidateAll()}
             data-testid="category-retry"
           >
@@ -222,22 +238,22 @@
         </div>
       {:else if filteredDocuments.length === 0}
         <div
-          class="text-center py-20 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100"
+          class="text-center py-12 sm:py-20 px-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700"
         >
           <div
-            class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"
+            class="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4"
           >
-            <span class="material-icons text-3xl text-slate-500"
+            <span class="material-icons text-3xl text-slate-500 dark:text-slate-400"
                aria-hidden="true">search_off</span
             >
           </div>
-          <p class="text-slate-900 font-medium mb-1">
+          <p class="text-slate-900 dark:text-white font-medium mb-1">
             {$tr("categories.noDocsTitle")}
           </p>
-          <p class="text-slate-500 text-sm">{$tr("categories.noDocsDesc")}</p>
+          <p class="text-slate-500 dark:text-slate-400 text-sm">{$tr("categories.noDocsDesc")}</p>
         </div>
       {:else}
-        <p class="text-sm font-medium text-slate-500 mb-4 pl-1">
+        <p class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-4 pl-1">
           {filteredDocuments.length}
           {$tr("categories.docsCount")}
         </p>
@@ -251,32 +267,40 @@
             le typage a rendu visible.
 
             Aucun delai par rang a l'apparition : avec 50 documents, le dernier
-            n'arrivait qu'apres 2,9 s en navigation dans le navigateur.
+            n'arrivait qu'apres 2,9 s en navigation dans le navigateur. Et
+            aucun glissement du tout quand le systeme demande moins de
+            mouvement.
+
+            Sur téléphone, la carte laissait 126 px (à 320) ou 166 px (à 360)
+            au titre et à l'extrait, d'où des cartes très hautes à un ou deux
+            mots par ligne : marges, écarts et icône réduits, chevron masqué
+            sous sm. `coupe-mots` : les cotes de texte sans espace
+            (« N°2018/9387/CAB/PM ») élargissaient la carte.
           -->
-          {#each filteredDocuments as doc}
+          {#each filteredDocuments as doc (doc.id)}
             <a
               href="/laws/{doc.id}"
-              class="group block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
-              in:fly={{ y: 20, duration: 400 }}
+              class="group block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg motion-safe:hover:-translate-y-0.5 active:bg-slate-50 dark:active:bg-slate-700/60 transition-all duration-300 overflow-hidden"
+              in:fly={{ y: 20, duration: prefersReducedMotion.current ? 0 : 400 }}
             >
-              <div class="p-5 flex gap-5 items-start">
+              <div class="p-4 sm:p-5 flex gap-3 sm:gap-5 items-start">
                 <!-- Icon Box -->
                 <div
-                  class="shrink-0 w-12 h-12 rounded-xl {currentStyle.bg} flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
+                  class="shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl {currentStyle.bg} flex items-center justify-center motion-safe:group-hover:scale-110 transition-transform duration-300"
                 >
-                  <span class="text-2xl leading-none">{currentStyle.icon}</span>
+                  <span class="text-xl sm:text-2xl leading-none">{currentStyle.icon}</span>
                 </div>
 
                 <!-- Content -->
                 <div class="flex-1 min-w-0 pt-0.5">
                   <h3
-                    class="text-lg font-bold text-slate-900 dark:text-white leading-tight mb-2 group-hover:text-blue-600 transition-colors"
+                    class="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors coupe-mots"
                   >
                     {doc.title || $tr("search.noTitle")}
                   </h3>
 
                   <p
-                    class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed"
+                    class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-3 sm:mb-4 leading-relaxed coupe-mots"
                   >
                     {(doc.content || $tr("categories.noPreview"))
                       .replace(/<<PAGE:?\s*\d+>>/gi, "")
@@ -285,10 +309,10 @@
                   </p>
 
                   <!-- Footer Tags -->
-                  <div class="flex items-center gap-3">
+                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <!-- Language Tag (Mock) -->
                     <span
-                      class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wide"
+                      class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 text-xs font-bold uppercase tracking-wide"
                     >
                       FR
                     </span>
@@ -296,7 +320,7 @@
                     <!-- Date -->
                     {#if doc.publication_date}
                       <span
-                        class="flex items-center gap-1.5 text-xs font-medium text-slate-500"
+                        class="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400"
                       >
                         <span class="material-icons text-[14px]"
                            aria-hidden="true">calendar_today</span
@@ -308,7 +332,7 @@
                 </div>
 
                 <!-- Chevron -->
-                <div class="self-center pl-2">
+                <div class="hidden sm:block self-center pl-2">
                   <span
                     class="material-icons text-slate-300 group-hover:text-blue-500 transition-colors"
                      aria-hidden="true">chevron_right</span
