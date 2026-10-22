@@ -3,7 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      viewport-fit=cover : sans lui, env(safe-area-inset-*) vaut toujours 0 et
+      la saisie du chat, les barres du bas et le bouton flottant ne peuvent pas
+      s'ecarter de l'encoche ni de la barre d'accueil de l'iPhone.
+      interactive-widget=resizes-content : sur Android, le clavier RETRECIT la
+      page au lieu de la recouvrir ; la saisie du chat, collee en bas, reste
+      au-dessus du clavier.
+      Ni maximum-scale ni user-scalable=no : le zoom au doigt sert a lire les
+      textes de loi et les pages PDF.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <!-- Couleur de la barre du navigateur mobile ; le script ci-dessous et
+         src/lib/stores/theme.ts la passent au fond sombre en mode sombre. -->
+    <meta name="theme-color" content="#f8f9fa" />
     <!--
       Theme pose AVANT le premier affichage : les pages arrivent rendues par le
       serveur, qui ne connait pas le choix (localStorage). Sans ce script, un
@@ -17,6 +33,7 @@
         var r = document.documentElement;
         r.classList.add(d ? 'dark' : 'light');
         r.setAttribute('data-theme', d ? 'dark' : 'light');
+        if (d) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0a1628');
       } catch (e) {}
     </script>
     %sveltekit.head%

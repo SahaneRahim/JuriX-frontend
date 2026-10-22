@@ -24,7 +24,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Fond et schema de couleurs au niveau du document : sans eux, le rebond du
+ * defilement (iOS, Android) et la barre de defilement restaient clairs en mode
+ * sombre, et les controles natifs (selects, barres) ignoraient le theme.
+ */
+@layer base {
+  html {
+    background-color: #f8f9fa;
+    color-scheme: light;
+  }
+  html.dark {
+    background-color: #0a1628;
+    color-scheme: dark;
+  }
+}
+
 @layer utilities {
+  /*
+   * Hauteur de l'ecran REELLEMENT visible. 100vh compte la barre d'adresse
+   * mobile comme repliee : une page de 100vh deborde toujours sous elle. La
+   * premiere declaration sert de repli aux navigateurs sans unite dvh.
+   */
+  .h-app {
+    height: 100vh;
+    height: 100dvh;
+  }
+  .min-h-app {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /*
+   * Coupe les mots sans espace qui feraient deborder un ecran etroit : cotes
+   * de textes (« N°2018/9387/CAB/PM »), URL, noms de fichiers. `anywhere`
+   * plutot que `break-word` : il compte aussi dans le calcul des largeurs
+   * minimales, donc une colonne flex ou une cellule ne s'elargit plus.
+   */
+  .coupe-mots {
+    overflow-wrap: anywhere;
+  }
+
+  /*
+   * Marges des zones sures (encoche, barre d'accueil de l'iPhone). Elles valent
+   * 0 sans viewport-fit=cover (pose dans app.html) et sur les ecrans sans
+   * encoche : sans risque ailleurs.
+   */
+  .pb-zone-sure {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-zone-sure {
+    padding-top: env(safe-area-inset-top);
+  }
+  .px-zone-sure {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
   .glass {
     @apply bg-white/70 backdrop-blur-lg border border-white/20 shadow-lg;
   }

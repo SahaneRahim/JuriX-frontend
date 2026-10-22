@@ -44,6 +44,11 @@ function applyTheme(theme: 'light' | 'dark') {
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
     root.setAttribute('data-theme', theme);
+    // Barre du navigateur mobile accordee au fond de la page (app.html pose la
+    // valeur initiale avant le premier affichage).
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#0a1628' : '#f8f9fa');
   }
 }
 

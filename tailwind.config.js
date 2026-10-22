@@ -6,8 +6,20 @@ import defaultTheme from 'tailwindcss/defaultTheme';
 export default {
   content: ["./src/**/*.{html,js,svelte,ts}"],
   darkMode: 'class',
+  // Les effets `hover:` ne s'appliquent qu'aux appareils qui survolent
+  // vraiment (souris, pave tactile). Sur un ecran tactile, un appui laissait la
+  // carte soulevee ou le bouton agrandi jusqu'au prochain appui ailleurs.
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
   theme: {
     extend: {
+      screens: {
+        // Ecran court : telephone en paysage (environ 360 px de haut). Sert a
+        // reduire les marges verticales la ou chaque ligne compte, sans toucher
+        // aux tablettes ni aux ordinateurs.
+        court: { raw: '(max-height: 500px)' },
+      },
       colors: {
         // Blue-600 et non Blue-500. #3B82F6 donnait 3,68:1 — sous le seuil AA de
         // 4,5 — DANS LES DEUX SENS : en texte sur fond blanc, et en texte blanc
