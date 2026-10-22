@@ -124,41 +124,19 @@
         {$tr("about.creator")}
       </p>
       <h3 class="text-xl sm:text-2xl font-serif text-slate-800 dark:text-slate-100 italic">
-        KANA SAHANE ABDELAZIZ RAHIM & AARON FOZEU
+        KANA SAHANE ABDELAZIZ RAHIM
       </h3>
     </div>
 
     <!-- Contact Section -->
-    <!-- Contacts : trois colonnes seulement à partir de lg ; à md, la colonne
-         de 192 px écrasait l'adresse électronique. Liens de 44 px de haut, et
-         l'adresse peut se couper plutôt que d'élargir la carte. -->
+    <!-- Un seul contact public, l'adresse électronique : la carte est centrée
+         et bornée en largeur. Lien de 44 px de haut, et l'adresse peut se
+         couper plutôt que d'élargir la carte. -->
     <div class="border-t border-slate-200 dark:border-slate-700 pt-8 pb-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-white text-center mb-6 sm:mb-8">
         {$tr("about.contact.title")}
       </h2>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 text-center">
-        <div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
-          <div class="text-2xl mb-2">📞</div>
-          <div class="font-medium text-slate-900 dark:text-white">
-            {$tr("about.contact.phone")}
-          </div>
-          <a
-            href="tel:+237693672462"
-            class="inline-flex min-h-11 items-center text-blue-600 dark:text-blue-400 hover:underline"
-            >+237 693 67 24 62</a
-          >
-        </div>
-        <div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
-          <div class="text-2xl mb-2">💬</div>
-          <div class="font-medium text-slate-900 dark:text-white">
-            {$tr("about.contact.whatsapp")}
-          </div>
-          <a
-            href="https://wa.me/237696383736"
-            class="inline-flex min-h-11 items-center text-green-700 dark:text-green-400 hover:underline"
-            >+237 696 38 37 36</a
-          >
-        </div>
+      <div class="mx-auto max-w-sm text-center">
         <div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
           <div class="text-2xl mb-2">📧</div>
           <div class="font-medium text-slate-900 dark:text-white">

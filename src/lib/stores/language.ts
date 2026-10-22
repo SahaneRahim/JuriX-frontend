@@ -533,8 +533,6 @@ export const translations = {
     'about.ai.desc': 'Explications claires et assistance juridique instantanée.',
     'about.creator': 'Conçu et réalisé par',
     'about.contact.title': 'Contact',
-    'about.contact.phone': 'Téléphone',
-    'about.contact.whatsapp': 'WhatsApp',
     'about.contact.email': 'Email',
   },
   en: {
@@ -997,8 +995,6 @@ export const translations = {
     'about.ai.desc': 'Clear explanations and instant legal assistance.',
     'about.creator': 'Designed and built by',
     'about.contact.title': 'Contact',
-    'about.contact.phone': 'Phone',
-    'about.contact.whatsapp': 'WhatsApp',
     'about.contact.email': 'Email',
   }
 };
