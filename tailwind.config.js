@@ -1,6 +1,7 @@
 import forms from '@tailwindcss/forms';
 import typography from '@tailwindcss/typography';
 import defaultTheme from 'tailwindcss/defaultTheme';
+import plugin from 'tailwindcss/plugin';
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -14,12 +15,6 @@ export default {
   },
   theme: {
     extend: {
-      screens: {
-        // Ecran court : telephone en paysage (environ 360 px de haut). Sert a
-        // reduire les marges verticales la ou chaque ligne compte, sans toucher
-        // aux tablettes ni aux ordinateurs.
-        court: { raw: '(max-height: 500px)' },
-      },
       colors: {
         // Blue-600 et non Blue-500. #3B82F6 donnait 3,68:1 — sous le seuil AA de
         // 4,5 — DANS LES DEUX SENS : en texte sur fond blanc, et en texte blanc
@@ -52,5 +47,14 @@ export default {
   plugins: [
     forms,
     typography,
+    // Variante `court:` : ecran court, telephone en paysage (environ 360 px de
+    // haut). Elle reduit les marges verticales la ou chaque ligne compte, sans
+    // toucher aux tablettes ni aux ordinateurs.
+    // Variante et non entree de `theme.screens` : un ecran `raw` desactive en
+    // silence toutes les variantes `max-*` et `min-*` de Tailwind (« not
+    // supported with a screens configuration containing objects »).
+    plugin(({ addVariant }) => {
+      addVariant('court', '@media (max-height: 500px)');
+    }),
   ],
 };

@@ -62,6 +62,8 @@
    * minimales, donc une colonne flex ou une cellule ne s'elargit plus.
    */
   .coupe-mots {
+    /* Repli pour les navigateurs sans `anywhere` (Safari avant 15.4). */
+    overflow-wrap: break-word;
     overflow-wrap: anywhere;
   }
 
