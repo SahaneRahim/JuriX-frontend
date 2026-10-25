@@ -1,10 +1,21 @@
 import { error } from '@sveltejs/kit';
+import type { Config } from '@sveltejs/adapter-vercel';
 import { API_URL, DELAI_API_MS } from '$lib/config';
 import { identifiantDepuis } from '$lib/identifiant';
 import { leverIndisponible, lireJson } from '$lib/panne';
 import type { Category, FiltreLangue, Law, LawResume } from '$lib/types';
 import { descriptionDepuis } from '$lib/seo';
 import type { PageServerLoad } from './$types';
+
+/**
+ * Catégorie mise en cache par Vercel (ISR) pendant 10 min : c'était la page la
+ * plus lente du site (2,6 à 4,4 s avant le premier octet, mesurés depuis le
+ * Cameroun). Seul `lang`, le filtre que lit le `load`, entre dans la clé du
+ * cache ; les autres paramètres n'atteignent pas la fonction.
+ */
+export const config: Config = {
+  isr: { expiration: 600, allowQuery: ['lang'] },
+};
 
 /**
  * Documents d'une catégorie.
@@ -26,8 +37,18 @@ import type { PageServerLoad } from './$types';
  *    inexistante : l'adresse existait aux yeux d'un moteur, d'un client HTTP et
  *    d'un moniteur, et seul le contenu affiché disait le contraire. `error(404)`
  *    rend le statut conforme à ce que la page montre.
+ *
+ * L'EN-TÊTE VIENT DE LA LISTE `GET /categories`, et non plus de
+ * `GET /categories/{id}`. Les deux rendent le même `CategoryResponse` (nom,
+ * description, icône, date, nombre de documents compté de la même façon) ;
+ * mais le détail fait charger par l'ORM toutes les lois de la catégorie et
+ * tous leurs articles pour n'en rendre que 206 octets : 1,9 s côté serveur
+ * pour le droit pénal, 7,4 s pour la fonction publique (1 277 lois). La liste
+ * est une seule requête agrégée (0,65 s). `limit=1000`, le maximum de l'API :
+ * une catégorie absente de la liste répond 404, la liste doit donc être
+ * complète (100 par défaut, pour 14 catégories aujourd'hui).
  */
-export const load: PageServerLoad = async ({ fetch, params, url, isDataRequest }) => {
+export const load: PageServerLoad = async ({ fetch, params, url }) => {
   // Contrôle avant tout appel : `/categories/abc` n'a aucune raison de
   // consommer une requête pour apprendre qu'il n'existe pas.
   const id = identifiantDepuis(params.id);
@@ -45,38 +66,30 @@ export const load: PageServerLoad = async ({ fetch, params, url, isDataRequest }
   // faire rejeter l'autre, et surtout ne doit pas laisser de promesse non
   // traitée derrière elle.
   const signal = AbortSignal.timeout(DELAI_API_MS);
-  const [reponseCategorie, reponseLois] = await Promise.allSettled([
-    fetch(`${API_URL}/categories/${id}`, { signal }),
+  const [reponseCategories, reponseLois] = await Promise.allSettled([
+    fetch(`${API_URL}/categories?limit=1000`, { signal }),
     fetch(`${API_URL}/laws/?${cible}`, { signal }),
   ]);
 
-  // Le 404 se décide APRÈS que les deux promesses sont réglées. Le lever plus
-  // tôt laisserait la requête des lois en vol, sans consommateur.
-  if (reponseCategorie.status === 'fulfilled' && reponseCategorie.value.status === 404) {
+  const lectureCategories = await lireJson<Category[]>(reponseCategories);
+  const lectureLois = await lireJson<Law[]>(reponseLois);
+
+  // API éteinte, en erreur ou hors délai : 503, au rendu comme en navigation.
+  // Une catégorie sans sa liste ne vaut pas mieux, pour un robot, qu'une page
+  // vide ; et mise en cache, une page amputée serait servie à tous pendant
+  // 10 min, à la place de la bonne version. Un 503 n'est jamais gardé : Vercel
+  // continue de servir la version précédente. `erreur` reste dans les données
+  // pour la page, toujours vide.
+  //
+  // Le 404 se décide APRÈS que les deux promesses sont réglées (le lever plus
+  // tôt laisserait la requête des lois en vol, sans consommateur), et sur une
+  // liste lisible seulement : une liste en panne ne prouve pas l'absence.
+  if (!lectureCategories.ok) leverIndisponible(`/categories/${id}`, lectureCategories.cause);
+  const categorie = lectureCategories.valeur.find((c) => c.id === id);
+  if (!categorie) {
     throw error(404, 'Catégorie introuvable');
   }
-
-  // API éteinte, en erreur ou hors délai : au rendu serveur (premier
-  // affichage, et tout ce que lit un robot), un 503 ($lib/panne). Une catégorie
-  // sans sa liste ne vaut pas mieux, pour un robot, qu'une page vide.
-  const lectureCategorie = await lireJson<Category>(reponseCategorie);
-  const lectureLois = await lireJson<Law[]>(reponseLois);
-  if (!lectureCategorie.ok || !lectureLois.ok) {
-    if (!isDataRequest) {
-      const cause = !lectureCategorie.ok ? lectureCategorie.cause : !lectureLois.ok ? lectureLois.cause : null;
-      leverIndisponible(`/categories/${id}`, cause);
-    }
-    // Dans le navigateur (requête de données), si la catégorie est là mais pas
-    // sa liste, l'en-tête s'affiche et l'erreur porte sur les documents seuls :
-    // plus honnête qu'une page entièrement en erreur, et qu'une liste vide
-    // silencieuse.
-    return {
-      categorie: lectureCategorie.ok ? lectureCategorie.valeur : null,
-      documents: [] as LawResume[],
-      lang,
-      erreur: 'categories.errorLoad',
-    };
-  }
+  if (!lectureLois.ok) leverIndisponible(`/categories/${id}`, lectureLois.cause);
 
   // Seuls les champs que la page affiche, et un extrait au lieu du texte.
   const documents: LawResume[] = lectureLois.valeur.map(({ id, title, publication_date, content }) => ({
@@ -85,5 +98,5 @@ export const load: PageServerLoad = async ({ fetch, params, url, isDataRequest }
     publication_date,
     content: descriptionDepuis(content, 300),
   }));
-  return { categorie: lectureCategorie.valeur, documents, lang, erreur: '' };
+  return { categorie, documents, lang, erreur: '' };
 };

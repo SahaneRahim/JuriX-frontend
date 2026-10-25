@@ -26,9 +26,10 @@
   // Polices servies par le site lui-meme, et non par fonts.googleapis.com :
   // leurs feuilles de style bloquaient l'affichage (1,1 s pour Material Icons
   // et 0,2 s pour Inter, mesure Lighthouse mobile), sur deux origines tierces.
-  // Inter est declaree dans app.css (font-display: optional) ; les deux sont
-  // prechargees par src/hooks.server.ts.
-  import "material-icons/iconfont/filled.css";
+  // Les deux sont declarees dans app.css : Inter (font-display: optional) et
+  // Material Icons, en sous-ensemble des seules icones affichees (3 Ko au lieu
+  // des 125 Ko de material-icons/iconfont/filled.css, importe ici jusque-la) ;
+  // les deux sont prechargees par src/hooks.server.ts.
   import "../app.css";
 
   /**

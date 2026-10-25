@@ -2,7 +2,10 @@ import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { API_BASE_URL, DELAI_API_MS } from '$lib/config';
 import inter from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url';
-import icones from 'material-icons/iconfont/material-icons.woff2?url';
+// Le sous-ensemble des icônes affichées (src/app.css), et non plus la police
+// complète du paquet material-icons : le même fichier que celui de la feuille
+// de style, donc le même nom haché, téléchargé une seule fois.
+import icones from '$lib/polices/material-icons.woff2?url';
 
 /**
  * Pages rendues dans le navigateur seulement (ssr = false) : le serveur n'en
@@ -22,6 +25,9 @@ function rendueDansLeNavigateur(chemin: string): boolean {
  * feuille de style. Mesure (Lighthouse mobile) : sans le prechargement de
  * Material Icons, dont les pictogrammes restent invisibles jusqu'a son arrivee
  * (font-display: block), le premier affichage reculait de pres d'une seconde.
+ * Material Icons n'est plus que le sous-ensemble des icones affichees (3 Ko,
+ * src/lib/polices) : son nom de fichier commence toujours par
+ * « material-icons », d'ou la meme expression.
  *
  * Les coquilles des pages rendues dans le navigateur ne recoivent rien de
  * SvelteKit (il ne collecte les polices que des pages rendues au serveur) : le
@@ -52,8 +58,65 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (privee) {
     reponse.headers.set('X-Robots-Tag', 'noindex, follow');
   }
-  return reponse;
+  return event.isDataRequest ? statutDesDonnees(reponse) : reponse;
 };
+
+/**
+ * Requête de données (`__data.json`, navigation dans le navigateur) dont un
+ * `load` serveur a levé une erreur.
+ *
+ * SvelteKit la sert en 200 et range l'erreur DANS le corps
+ * (`{"type":"error","status":503,...}`). Or les pages publiques sont mises en
+ * cache par Vercel (ISR, voir leurs +page.server.ts), `__data.json` compris, et
+ * Vercel garde tout 200 comme une version valide : la panne d'une seconde
+ * serait resservie à tous pendant toute l'expiration, à la place de la bonne
+ * version. Le statut de l'erreur passe donc dans la réponse HTTP : un 503
+ * n'est jamais mis en cache, et Vercel continue de servir la version
+ * précédente.
+ *
+ * Le navigateur n'y voit aucune différence : SvelteKit affiche la même page
+ * d'erreur, avec le même statut et le même message, qu'il trouve l'erreur dans
+ * le corps ou dans le statut (le corps garde l'erreur telle que le serveur l'a
+ * déjà rendue, sans repasser par handleError).
+ *
+ * Seules les réponses JSON en 200 sont lues : une réponse en flux
+ * (`text/sveltekit-data`, promesses non attendues) n'est ni lue ni bloquée.
+ */
+async function statutDesDonnees(reponse: Response): Promise<Response> {
+  if (reponse.status !== 200 || !reponse.headers.get('content-type')?.startsWith('application/json')) {
+    return reponse;
+  }
+  const corps = await reponse.clone().text();
+  // Lecture complète seulement si le corps peut contenir une erreur : une
+  // fiche de loi pèse plusieurs centaines de Ko.
+  if (!corps.includes('"type":"error"')) return reponse;
+
+  let erreur: NoeudEnErreur | undefined;
+  try {
+    erreur = (JSON.parse(corps) as { nodes?: unknown[] }).nodes?.find(estEnErreur);
+  } catch {
+    return reponse;
+  }
+  if (!erreur) return reponse;
+
+  const entetes = new Headers(reponse.headers);
+  // La longueur était celle du corps d'origine.
+  entetes.delete('content-length');
+  return new Response(JSON.stringify(erreur.error ?? { message: 'Internal Error' }), {
+    status: erreur.status ?? 500,
+    headers: entetes
+  });
+}
+
+interface NoeudEnErreur {
+  type: 'error';
+  status?: number;
+  error?: App.Error;
+}
+
+function estEnErreur(noeud: unknown): noeud is NoeudEnErreur {
+  return typeof noeud === 'object' && noeud !== null && (noeud as { type?: unknown }).type === 'error';
+}
 
 /**
  * Les `load` appellent l'API a son adresse publique (VITE_API_URL), la meme au

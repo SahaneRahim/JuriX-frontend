@@ -1,9 +1,23 @@
+import type { Config } from '@sveltejs/adapter-vercel';
 import { API_URL, DELAI_API_MS } from '$lib/config';
 import { identifiantDepuis } from '$lib/identifiant';
 import { TAILLE_PAGE_LOIS } from '$lib/pagination';
 import { leverIndisponible, lireJson } from '$lib/panne';
 import type { Category, Law, LoiDeListe } from '$lib/types';
 import type { PageServerLoad } from './$types';
+
+/**
+ * Liste mise en cache par Vercel (ISR) pendant 10 min : elle attendait l'API à
+ * chaque visite (1,8 à 2,3 s avant le premier octet, mesurés depuis le
+ * Cameroun) ; un document ingéré y apparaît au plus 10 min plus tard.
+ *
+ * La clé du cache porte les trois paramètres que lit `parametres()`, et eux
+ * seuls : chaque filtre et chaque page a sa version, et les autres paramètres
+ * (`utm_*`…) n'atteignent pas la fonction.
+ */
+export const config: Config = {
+  isr: { expiration: 600, allowQuery: ['page', 'category', 'lang'] },
+};
 
 /**
  * Chargement SERVEUR, et non universel : la page n'affiche que le titre, la
@@ -45,7 +59,7 @@ function parametres(url: URL) {
 /** Dernière page demandable : au-delà, `skip` dépasserait un entier 32 bits. */
 const PAGE_MAX = Math.floor(2_147_483_647 / TAILLE_PAGE_LOIS) - 1;
 
-export const load: PageServerLoad = async ({ fetch, url, isDataRequest }) => {
+export const load: PageServerLoad = async ({ fetch, url }) => {
   const { lang, category, page } = parametres(url);
 
   const params = new URLSearchParams({
@@ -59,27 +73,25 @@ export const load: PageServerLoad = async ({ fetch, url, isDataRequest }) => {
 
   // Les deux requêtes en parallèle : la liste des catégories ne dépend d'AUCUN
   // filtre, l'enchaîner derrière la liste des lois était une cascade gratuite
-  // qui doublait le temps d'affichage.
-  //
-  // `allSettled` et non `all` : l'échec des catégories ne doit pas vider la
-  // liste des documents. Les filtres sont un confort ; la liste est le contenu.
+  // qui doublait le temps d'affichage. `allSettled` : aucune promesse rejetée
+  // ne reste sans consommateur.
   const signal = AbortSignal.timeout(DELAI_API_MS);
   const [reponseLois, reponseCategories] = await Promise.allSettled([
     fetch(`${API_URL}/laws/?${params}`, { signal }),
     fetch(`${API_URL}/categories`, { signal }),
   ]);
 
-  const lectureCategories = await lireJson<Category[]>(reponseCategories);
-  const categories = lectureCategories.ok ? lectureCategories.valeur : [];
-
+  // PANNE DE L'API : 503 au rendu comme en navigation, y compris quand seules
+  // les catégories manquent. Sans cache, la liste s'affichait sans ses filtres
+  // (un confort) plutôt que pas du tout. Mise en cache, cette liste incomplète
+  // serait servie à tous pendant 10 min, et remplacerait la version complète
+  // si la panne tombait sur une régénération ; un 503 n'est jamais gardé, et
+  // Vercel continue de servir la version précédente. `erreur` reste dans les
+  // données pour la page, toujours vide.
   const lectureLois = await lireJson<Law[]>(reponseLois);
-  if (!lectureLois.ok) {
-    // Au rendu serveur (premier affichage, et tout ce que lit un robot), un 503
-    // ($lib/panne). En navigation dans le navigateur (requête de données), la
-    // liste garde son message et sa reprise.
-    if (!isDataRequest) leverIndisponible('/laws', lectureLois.cause);
-    return { laws: [] as LoiDeListe[], categories, hasMore: false, page, lang, category, erreur: 'laws.errorLoad' };
-  }
+  const lectureCategories = await lireJson<Category[]>(reponseCategories);
+  if (!lectureLois.ok) leverIndisponible('/laws', lectureLois.cause);
+  if (!lectureCategories.ok) leverIndisponible('/laws', lectureCategories.cause);
 
   // Seuls les champs que la liste affiche : l'API renvoie chaque texte EN
   // ENTIER, avec une douzaine de champs dont la page ne lit aucun.
@@ -97,7 +109,7 @@ export const load: PageServerLoad = async ({ fetch, url, isDataRequest }) => {
 
   return {
     laws: hasMore ? donnees.slice(0, TAILLE_PAGE_LOIS) : donnees,
-    categories,
+    categories: lectureCategories.valeur,
     hasMore,
     page,
     lang,

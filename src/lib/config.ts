@@ -46,9 +46,25 @@ export const API_URL = `${API_BASE_URL}/api/v1`;
 export const WS_URL = `${WS_BASE_URL}/api/v1`;
 
 /**
- * Delai accorde a l'API pour repondre a un `load`, au serveur comme dans le
- * navigateur. Au-dela, la page sert son erreur (503 au rendu serveur) au lieu
- * d'attendre une API figee : sans borne, une navigation restait suspendue
- * aussi longtemps que l'API, et le rendu serveur jusqu'a 5 min.
+ * Delai accorde a l'API pour repondre a un `load`. Au-dela, la page sert son
+ * 503 au lieu d'attendre une API figee : sans borne, le rendu serveur restait
+ * suspendu jusqu'a 5 min.
+ *
+ * 8 s, et non plus 25 s. Les 25 s absorbaient un demarrage a froid de Railway
+ * a CHAQUE affichage. Les pages publiques sont maintenant mises en cache par
+ * Vercel (ISR, `config.isr` de leurs +page.server.ts) et leurs `load` ne
+ * tournent plus que sur le serveur : l'API n'est appelee qu'a la premiere
+ * generation d'une adresse et aux regenerations, faites en arriere-plan
+ * pendant que l'ancienne version reste servie. Un delai long n'y gagne rien :
+ * - a la premiere generation, un visiteur attend le delai ENTIER avant son
+ *   503 (et son lien « Reessayer ») ;
+ * - a une regeneration, Vercel garde la version en cache et reessaie 30 s
+ *   apres un echec, quel que soit le delai.
+ * L'API ne dort pas (essai Railway : /health stable a 0,4 s) et l'appel le
+ * plus lent des pages, la liste des lois d'une categorie, prend environ 2 s :
+ * 8 s laissent une marge de 4. Rester sous 10 s, la duree maximale d'une
+ * fonction Vercel Hobby sans Fluid compute, garde aussi NOTRE 503 : au-dela,
+ * Vercel coupe la fonction et sert sa propre erreur (504), sans lien de
+ * reprise.
  */
-export const DELAI_API_MS = 25_000;
+export const DELAI_API_MS = 8_000;

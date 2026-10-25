@@ -20,9 +20,59 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/*
+ * Material Icons, en sous-ensemble : les icônes que le site affiche, et elles
+ * seules (src/lib/polices/material-icons.txt), 3 Ko au lieu des 125 Ko de la
+ * police complète du paquet material-icons (2 122 icônes), qui était
+ * préchargée sur chaque page et disputait la bande passante à cette feuille
+ * de style sur une 4G lente. Fichier traité par Vite : nom haché, servi
+ * immuable, et jamais incrusté dans la feuille (vite.config.ts) pour rester
+ * préchargeable (src/hooks.server.ts).
+ *
+ * font-display: block, et non swap. Une police d'icônes s'écrit par
+ * ligatures : en attendant la police, swap afficherait les noms en toutes
+ * lettres (« calendar_today », « arrow_forward ») dans la police de repli,
+ * bien plus larges que l'icône, puis tout se redessinerait à son arrivée :
+ * boutons élargis, lignes qui sautent. block les garde invisibles le temps
+ * qu'elle arrive, très court pour 3 Ko préchargés.
+ */
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./lib/polices/material-icons.woff2') format('woff2');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Classe des icônes, reprise du fichier filled.css du paquet. Dans la couche
+ * `components`, donc AVANT les utilitaires : `hidden`, `text-xl` ou
+ * `leading-6` posés sur une icône doivent l'emporter sur son `display` et sa
+ * taille par défaut, comme lorsque filled.css était importé avant app.css.
+ */
+@layer components {
+  .material-icons {
+    font-family: 'Material Icons';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'liga';
+  }
+}
 
 /*
  * Fond et schema de couleurs au niveau du document : sans eux, le rebond du

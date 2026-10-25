@@ -1,32 +1,30 @@
 // @vitest-environment node
 import { isHttpError } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DELAI_API_MS } from '$lib/config';
 
 /**
- * Les `load` des pages publiques face à une API en panne : 503 au rendu
- * serveur, avec sa cause au journal ; message et reprise dans le navigateur.
+ * Les `load` des pages publiques face à une API en panne : 503, avec sa cause
+ * au journal, au rendu serveur comme en navigation dans le navigateur.
+ *
+ * Ces pages sont mises en cache par Vercel (ISR), leurs `__data.json`
+ * compris : une page en 200 portant « Impossible de charger » y serait gardée
+ * et servie à tous pendant toute l'expiration, à la place de la bonne version.
+ * Un 503 n'est jamais gardé, et Vercel continue de servir la version
+ * précédente. Le message et le bouton de reprise propres à chaque page ont
+ * donc laissé la place à la page d'erreur du site (503, lien « Réessayer »),
+ * en navigation aussi : src/hooks.server.ts fait passer le statut de l'erreur
+ * dans la réponse HTTP des requêtes de données (voir hooks.server.test.ts).
  *
  * Seul un test unitaire peut le vérifier : en e2e, `page.route` n'intercepte
  * que les appels du navigateur, alors que ceux des `load` serveur partent du
  * serveur Node, même pendant une navigation.
  */
 
-// `browser` lu à chaque usage : la transformation de Vite fait de l'import un
-// accès à la propriété du module, et le getter suit la variable.
-let navigateur = false;
-vi.mock('$app/environment', () => ({
-  get browser() {
-    return navigateur;
-  },
-  building: false,
-  dev: false,
-  version: 'test',
-}));
-
-import { load as chargerAccueil } from '../routes/(main)/+page';
+import { load as chargerAccueil } from '../routes/(main)/+page.server';
 import { load as chargerCategorie } from '../routes/categories/[id]/+page.server';
 import { load as chargerListe } from '../routes/laws/+page.server';
-import { load as chargerFiche } from '../routes/laws/[id]/+page';
+import { load as chargerFiche } from '../routes/laws/[id]/+page.server';
 
 type Appel = (entree: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -40,36 +38,32 @@ const PANNES: [string, Appel][] = [
 interface Page {
   nom: string;
   chemin: string;
-  erreur: string;
   charger: (fetch: Appel, navigation: boolean) => Promise<unknown>;
 }
 
-// `navigation` : true pour une navigation dans le navigateur (`browser` pour un
-// load universel, `isDataRequest` pour un load serveur), false au rendu serveur.
+// `navigation` : true pour une requête de données (`__data.json`, navigation
+// dans le navigateur), false au rendu serveur d'une page.
 const PAGES: Page[] = [
   {
     nom: 'accueil',
     chemin: '/',
-    erreur: 'categories.errorLoad',
-    charger: async (fetch) => chargerAccueil({ fetch } as never),
+    charger: async (fetch, navigation) => chargerAccueil({ fetch, isDataRequest: navigation } as never),
   },
   {
     nom: 'fiche',
     chemin: '/laws/12',
-    erreur: 'laws.errorLoad',
-    charger: async (fetch) => chargerFiche({ fetch, params: { id: '12' } } as never),
+    charger: async (fetch, navigation) =>
+      chargerFiche({ fetch, params: { id: '12' }, isDataRequest: navigation } as never),
   },
   {
     nom: 'liste',
     chemin: '/laws',
-    erreur: 'laws.errorLoad',
     charger: async (fetch, navigation) =>
       chargerListe({ fetch, url: new URL('http://site/laws'), isDataRequest: navigation } as never),
   },
   {
     nom: 'catégorie',
     chemin: '/categories/3',
-    erreur: 'categories.errorLoad',
     charger: async (fetch, navigation) =>
       chargerCategorie({
         fetch,
@@ -80,56 +74,69 @@ const PAGES: Page[] = [
   },
 ];
 
+const MODES: [string, boolean][] = [
+  ['au rendu serveur', false],
+  ['en navigation (requête de données)', true],
+];
+
 function journal() {
   return vi.spyOn(console, 'error').mockImplementation(() => {});
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
-  navigateur = false;
 });
 
 describe.each(PAGES)('$nom', (page) => {
-  it.each(PANNES)('%s : 503 au rendu serveur, cause au journal', async (_panne, appel) => {
-    navigateur = false;
-    const espion = journal();
-    await expect(page.charger(vi.fn(appel), false)).rejects.toSatisfy((e) => isHttpError(e, 503));
-    expect(espion).toHaveBeenCalledOnce();
-    expect(String(espion.mock.calls[0][0])).toMatch(`[503] ${page.chemin} : API indisponible (`);
+  describe.each(MODES)('%s', (_mode, navigation) => {
+    it.each(PANNES)('%s : 503, cause au journal', async (_panne, appel) => {
+      const espion = journal();
+      await expect(page.charger(vi.fn(appel), navigation)).rejects.toSatisfy((e) => isHttpError(e, 503));
+      expect(espion).toHaveBeenCalledOnce();
+      expect(String(espion.mock.calls[0][0])).toMatch(`[503] ${page.chemin} : API indisponible (`);
+    });
   });
 
-  it.each(PANNES)('%s : message et reprise dans le navigateur', async (_panne, appel) => {
-    navigateur = true;
-    const espion = journal();
-    expect(await page.charger(vi.fn(appel), true)).toMatchObject({ erreur: page.erreur });
-    expect(espion).not.toHaveBeenCalled();
-  });
-
-  it('borne chaque appel à l’API par un délai', async () => {
-    navigateur = true;
+  it('borne chaque appel à l’API par le délai de $lib/config', async () => {
+    journal();
+    const minuterie = vi.spyOn(AbortSignal, 'timeout');
     const fetch = vi.fn<Appel>(async () => new Response('boum', { status: 500 }));
-    await page.charger(fetch, true);
+    await page.charger(fetch, true).catch(() => undefined);
     expect(fetch).toHaveBeenCalled();
     for (const [, init] of fetch.mock.calls) {
       expect(init?.signal).toBeInstanceOf(AbortSignal);
     }
+    expect(minuterie).toHaveBeenCalledWith(DELAI_API_MS);
   });
 });
 
+/** Une catégorie telle que la rend `GET /categories` (CategoryResponse). */
+const categorie = (id: number, name = `Catégorie ${id}`) => ({
+  id,
+  name,
+  description: null,
+  icon: '⚖️',
+  created_at: '2026-10-15T00:30:00',
+  law_count: 16,
+});
+
 describe('ce qui n’est pas une panne', () => {
-  it.each([false, true])('une fiche absente reste une 404 (navigateur : %s)', async (dansLeNavigateur) => {
-    navigateur = dansLeNavigateur;
+  it.each([false, true])('une fiche absente reste une 404 (requête de données : %s)', async (navigation) => {
     const espion = journal();
     const fetch = vi.fn<Appel>(async () => new Response('{}', { status: 404 }));
-    await expect(chargerFiche({ fetch, params: { id: '12' } } as never)).rejects.toSatisfy((e) =>
-      isHttpError(e, 404),
-    );
+    await expect(
+      chargerFiche({ fetch, params: { id: '12' }, isDataRequest: navigation } as never),
+    ).rejects.toSatisfy((e) => isHttpError(e, 404));
     expect(espion).not.toHaveBeenCalled();
   });
 
-  it('une catégorie absente reste une 404', async () => {
-    const fetch = vi.fn<Appel>(async (entree) =>
-      String(entree).includes('/categories/') ? new Response('{}', { status: 404 }) : Response.json([]),
+  it.each([
+    ['sa liste de documents répond', async () => Response.json([])],
+    ['sa liste de documents est en panne', async () => new Response('boum', { status: 500 })],
+  ])('une catégorie absente de /categories reste une 404 (%s)', async (_cas, lois: Appel) => {
+    const espion = journal();
+    const fetch = vi.fn<Appel>(async (entree, init) =>
+      String(entree).includes('/laws/') ? lois(entree, init) : Response.json([categorie(1), categorie(2)]),
     );
     await expect(
       chargerCategorie({
@@ -139,6 +146,7 @@ describe('ce qui n’est pas une panne', () => {
         isDataRequest: false,
       } as never),
     ).rejects.toSatisfy((e) => isHttpError(e, 404));
+    expect(espion).not.toHaveBeenCalled();
   });
 
   it.each(['012', '1e3', 'abc', '99999999999'])('l’identifiant %s donne 404 sans appeler l’API', async (id) => {
@@ -172,7 +180,39 @@ describe('ce qui n’est pas une panne', () => {
   });
 });
 
-describe('ce que les listes envoient au navigateur', () => {
+describe('jamais de page amputée (elle serait mise en cache)', () => {
+  it.each(MODES)('/laws : les catégories seules en panne donnent 503 (%s)', async (_mode, navigation) => {
+    const espion = journal();
+    const fetch = vi.fn<Appel>(async (entree) =>
+      String(entree).includes('/laws/') ? Response.json([]) : new Response('boum', { status: 502 }),
+    );
+    await expect(
+      chargerListe({ fetch, url: new URL('http://site/laws'), isDataRequest: navigation } as never),
+    ).rejects.toSatisfy((e) => isHttpError(e, 503));
+    expect(String(espion.mock.calls[0][0])).toMatch('[503] /laws : API indisponible (HTTP 502)');
+  });
+
+  it.each(MODES)('/categories/<id> : la catégorie sans ses documents donne 503 (%s)', async (_mode, navigation) => {
+    // Sans cache, la navigation gardait l'en-tête et signalait la liste seule.
+    // Mise en cache, cette page sans documents serait servie à tous.
+    journal();
+    const fetch = vi.fn<Appel>(async (entree) =>
+      String(entree).includes('/laws/')
+        ? new Response('boum', { status: 500 })
+        : Response.json([categorie(3, 'Droit pénal')]),
+    );
+    await expect(
+      chargerCategorie({
+        fetch,
+        params: { id: '3' },
+        url: new URL('http://site/categories/3'),
+        isDataRequest: navigation,
+      } as never),
+    ).rejects.toSatisfy((e) => isHttpError(e, 503));
+  });
+});
+
+describe('ce que les pages envoient au navigateur', () => {
   const texte = 'Article premier. '.repeat(500);
   const loi = (id: number) => ({
     id,
@@ -209,9 +249,7 @@ describe('ce que les listes envoient au navigateur', () => {
 
   it('/categories/<id> : un extrait au lieu du texte entier', async () => {
     const fetch = vi.fn<Appel>(async (entree) =>
-      String(entree).includes('/categories/')
-        ? Response.json({ id: 3, name: 'Droit pénal' })
-        : Response.json([loi(1)]),
+      String(entree).includes('/laws/') ? Response.json([loi(1)]) : Response.json([categorie(3, 'Droit pénal')]),
     );
     const donnees = (await chargerCategorie({
       fetch,
@@ -223,19 +261,41 @@ describe('ce que les listes envoient au navigateur', () => {
     expect(donnees.documents[0].content.length).toBeLessThanOrEqual(301);
   });
 
-  it('/categories/<id> dans le navigateur : la catégorie reste si seule sa liste manque', async () => {
+  it('/categories/<id> : l’en-tête vient de la liste /categories, jamais de /categories/{id}', async () => {
+    // Le détail fait charger par l'ORM toutes les lois de la catégorie et
+    // leurs articles (1,9 à 7,4 s) pour les mêmes champs que la liste.
     const fetch = vi.fn<Appel>(async (entree) =>
-      String(entree).includes('/categories/')
-        ? Response.json({ id: 3, name: 'Droit pénal' })
-        : new Response('boum', { status: 500 }),
+      String(entree).includes('/laws/')
+        ? Response.json([])
+        : Response.json([categorie(2), categorie(3, 'Droit pénal'), categorie(4)]),
     );
-    expect(
-      await chargerCategorie({
-        fetch,
-        params: { id: '3' },
-        url: new URL('http://site/categories/3'),
-        isDataRequest: true,
-      } as never),
-    ).toMatchObject({ categorie: { name: 'Droit pénal' }, documents: [], erreur: 'categories.errorLoad' });
+    const donnees = (await chargerCategorie({
+      fetch,
+      params: { id: '3' },
+      url: new URL('http://site/categories/3?lang=fr'),
+      isDataRequest: false,
+    } as never)) as { categorie: object; lang: string };
+    const appels = fetch.mock.calls.map(([entree]) => new URL(String(entree)));
+    expect(appels.map((u) => u.pathname)).not.toContainEqual(expect.stringMatching(/\/categories\/\d/));
+    const liste = appels.find((u) => u.pathname.endsWith('/categories'));
+    // Complète : une catégorie absente de la liste répond 404.
+    expect(liste?.searchParams.get('limit')).toBe('1000');
+    expect(donnees.categorie).toEqual(categorie(3, 'Droit pénal'));
+    expect(donnees.lang).toBe('fr');
+  });
+
+  it('/laws/<id> : le sommaire réduit au numéro et à la page du PDF', async () => {
+    const article = (n: number) => ({ id: n, number: String(n), title: 'Titre', section: 'Livre I', page_number: n, kind: 'article' });
+    const fetch = vi.fn<Appel>(async () => Response.json({ ...loi(12), articles: [article(1), article(2)] }));
+    const donnees = (await chargerFiche({ fetch, params: { id: '12' }, isDataRequest: false } as never)) as {
+      law: { content: string; articles: object[] };
+      erreur: string;
+    };
+    expect(donnees.law.articles).toEqual([
+      { number: '1', page_number: 1 },
+      { number: '2', page_number: 2 },
+    ]);
+    expect(donnees.law.content).toBe(texte);
+    expect(donnees.erreur).toBe('');
   });
 });

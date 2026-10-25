@@ -943,10 +943,10 @@ const PARCOURS: Parcours[] = [
     chemin: '/',
     capture: 'accueil',
     ouvrir: async (page) => {
+      // API éteinte, l'accueil répond 503 comme les autres pages publiques :
+      // mis en cache par Vercel (ISR), il ne doit jamais être servi sans sa
+      // grille de catégories. ouvrirAuServeur passe alors le test.
       await ouvrirAuServeur(page, '/');
-      // L'accueil ne répond jamais 503 (démarrage à froid de l'API) : sans
-      // catégories, il affiche sa reprise à la place de la grille.
-      exiger((await page.getByTestId('home-retry').count()) === 0, '/ : catégories indisponibles');
     },
   },
   {

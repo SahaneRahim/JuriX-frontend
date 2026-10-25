@@ -1,0 +1,48 @@
+# Ligatures du sous-ensemble de Material Icons (material-icons.woff2, à côté) :
+# les icônes que le site affiche, et elles seules. Une par ligne, triées.
+# material-icons.test.ts échoue si une icône affichée manque ici, ou si une
+# icône d'ici n'est plus affichée. Après modification, régénérer la police :
+# scripts/sous-ensemble-icones.py (mode d'emploi en tête du script).
+account_balance
+admin_panel_settings
+arrow_back
+arrow_downward
+arrow_forward
+article
+assignment
+auto_awesome
+balance
+business_center
+calendar_today
+check
+chevron_left
+chevron_right
+close
+cloud_off
+dark_mode
+delete_outline
+description
+error_outline
+expand_less
+expand_more
+fit_screen
+folder_open
+forum
+gavel
+help_outline
+light_mode
+link
+menu
+person
+picture_as_pdf
+public
+school
+search
+search_off
+send
+smart_toy
+tag
+toc
+tune
+zoom_in
+zoom_out
