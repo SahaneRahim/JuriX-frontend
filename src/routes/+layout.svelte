@@ -15,6 +15,7 @@
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
   import ChoixPersona from "$lib/components/ChoixPersona.svelte";
+  import CommandPalette from "$lib/components/CommandPalette.svelte";
   import { synchroniserPersonaAuDemarrage } from "$lib/persona-compte";
   import { language } from "$lib/stores/language";
   import {
@@ -116,3 +117,5 @@
 {#if dialogue}
   <ChoixPersona mode={dialogue} />
 {/if}
+
+<CommandPalette />

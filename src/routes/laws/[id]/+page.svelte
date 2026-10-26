@@ -75,6 +75,8 @@
       show_text: "Revenir au texte",
       link_copied: "Lien copié !",
       link_copy_failed: "Copie impossible. Copiez l'adresse depuis la barre du navigateur.",
+      copy_citation: "Copier la citation",
+      citation_copied: "Citation copiée !",
       article_prefix: "Article", // For "Article 1"
       raw_fallback: "Affichage brut (structure non détectée) :",
     },
@@ -104,7 +106,7 @@
       ai_implications: "Implications",
       ai_impl_desc: "What this concretely means for you.",
       ai_explain: "Explain this article",
-      ai_loading: "Generating explanation\u2026",
+      ai_loading: "Generating explanation…",
       ai_regenerate: "Regenerate",
       ai_error_not_found: "This article could not be found in the document.",
       ai_disclaimer:
@@ -113,6 +115,8 @@
       show_text: "Back to text",
       link_copied: "Link copied!",
       link_copy_failed: "Copy failed. Copy the address from the browser bar.",
+      copy_citation: "Copy citation",
+      citation_copied: "Citation copied!",
       article_prefix: "Article",
       raw_fallback: "Raw display (structure not detected):",
     },
@@ -312,6 +316,33 @@
     try {
       await navigator.clipboard.writeText(window.location.href);
       alert(t.link_copied);
+    } catch {
+      alert(t.link_copy_failed);
+    }
+  }
+
+  let citationCopiee = false;
+  let minuterieCitation: ReturnType<typeof setTimeout>;
+
+  async function copierCitationArticle() {
+    if (!currentArticle || !law) return;
+    const texte = currentArticle.content.trim();
+    const titreLoi = law.title || "Texte de loi";
+    const refLoi = law.reference ? ` (${law.reference})` : "";
+    const url = typeof window !== "undefined" ? window.location.href : `https://jurix.cm/laws/${law.id}`;
+    
+    // Format officiel de citation juridique
+    const citation = `« ${texte} »\n\n— Article ${currentArticle.number}, ${titreLoi}${refLoi}.\nSource : JuriX (${url})`;
+    
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(citation);
+        citationCopiee = true;
+        clearTimeout(minuterieCitation);
+        minuterieCitation = setTimeout(() => {
+          citationCopiee = false;
+        }, 3000);
+      }
     } catch {
       alert(t.link_copy_failed);
     }
@@ -1168,11 +1199,24 @@
                       {currentArticle.number}
                     </h2>
                   </div>
-                  <span
-                    class="shrink-0 whitespace-nowrap px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-bold uppercase tracking-wide"
-                  >
-                    {t.in_force}
-                  </span>
+                  <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      on:click={copierCitationArticle}
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                      title={t.copy_citation}
+                      aria-label={t.copy_citation}
+                    >
+                      <span class="material-icons text-base text-blue-600 dark:text-blue-400">
+                        {citationCopiee ? "check" : "link"}
+                      </span>
+                      <span>{citationCopiee ? t.citation_copied : t.copy_citation}</span>
+                    </button>
+                    <span
+                      class="shrink-0 whitespace-nowrap px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-bold uppercase tracking-wide"
+                    >
+                      {t.in_force}
+                    </span>
+                  </div>
                 </div>
 
                 {#if currentArticle.title && currentArticle.title !== `Article ${currentArticle.number}` && currentArticle.title !== `Texte de l'article ${currentArticle.number}`}

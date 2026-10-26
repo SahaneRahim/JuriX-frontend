@@ -37,6 +37,7 @@ export interface NavLink {
 export const NAV_LINKS: readonly NavLink[] = [
   { href: '/', key: 'nav.home', isActive: (p) => p === '/' },
   { href: '/laws', key: 'nav.documents', isActive: (p) => p.startsWith('/laws') },
+  { href: '/blog', key: 'nav.blog', isActive: (p) => p.startsWith('/blog') },
   { href: '/search', key: 'nav.search', isActive: (p) => p.startsWith('/search') },
   { href: '/compare', key: 'nav.compare', isActive: (p) => p.startsWith('/compare') },
   { href: '/about', key: 'nav.about', isActive: (p) => p === '/about' },

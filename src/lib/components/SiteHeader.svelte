@@ -18,6 +18,7 @@
   import { authStore } from "$lib/stores/auth";
   import { language, switchLanguage, tr } from "$lib/stores/language";
   import { themeStore } from "$lib/stores/theme";
+  import { openCommandPalette } from "$lib/stores/commandPalette";
   import {
     PERSONA_ICONE,
     PERSONA_SLUG,
@@ -138,6 +139,18 @@
 
   <!-- Actions (bureau) -->
   <div class="hidden lg:flex items-center justify-end gap-2 xl:gap-3 flex-1">
+    <button
+      on:click={openCommandPalette}
+      type="button"
+      class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-gray-100 hover:bg-gray-200/70 dark:bg-white/5 dark:hover:bg-white/10 transition-colors border border-gray-200/50 dark:border-white/10"
+      title="Recherche et actions rapides (Ctrl+K)"
+      aria-label="Recherche et actions rapides (Ctrl+K)"
+    >
+      <span class="material-icons text-base" aria-hidden="true">search</span>
+      <span class="hidden 2xl:inline">Recherche</span>
+      <kbd class="px-1.5 py-0.5 text-[10px] font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-slate-400">⌘K</kbd>
+    </button>
+
     <div class="hidden xl:block h-4 w-px bg-white/10 mx-2"></div>
 
     <div
@@ -257,7 +270,15 @@
 
   <!-- Bascule mobile. 44 px de côté ; la marge négative aligne l'icône sur le
        bord du contenu sans réduire la zone d'appui. -->
-  <div class="flex lg:hidden flex-1 justify-end">
+  <div class="flex lg:hidden flex-1 justify-end items-center gap-1">
+    <button
+      on:click={openCommandPalette}
+      type="button"
+      aria-label="Recherche et actions rapides"
+      class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+    >
+      <span class="material-icons" aria-hidden="true">search</span>
+    </button>
     <button
       on:click={() => (mobileOpen = !mobileOpen)}
       data-testid="nav-mobile-toggle"
