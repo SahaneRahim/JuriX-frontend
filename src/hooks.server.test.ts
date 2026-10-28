@@ -195,3 +195,42 @@ describe('handle : requêtes de données en erreur', () => {
     expect(await traiter(flux)).toBe(flux);
   });
 });
+
+describe('handle : noindex des pages privées', () => {
+  const HTML = '<html><head><title>t</title></head><body></body></html>';
+
+  /** La page telle que la rend SvelteKit, passée par `transformPageChunk` s'il y en a un. */
+  async function servir(chemin: string) {
+    const url = new URL(chemin, 'https://jurix.example');
+    const reponse = await handle({
+      event: { url, isDataRequest: false } as never,
+      resolve: async (_event, options) => {
+        const html = (await options?.transformPageChunk?.({ html: HTML, done: true })) ?? HTML;
+        return new Response(html, { headers: { 'content-type': 'text/html' } });
+      },
+    });
+    return { robots: reponse.headers.get('x-robots-tag'), html: await reponse.text() };
+  }
+
+  it('coquille de /admin : la balise et les polices ajoutées au HTML, plus l’en-tête', async () => {
+    const { robots, html } = await servir('/admin/users');
+    expect(robots).toBe('noindex, follow');
+    expect(html.match(/name="robots"/g)).toHaveLength(1);
+    expect(html).toMatch(/<link rel="preload" as="font"[^>]+inter-latin-wght-normal/);
+  });
+
+  it('/chat, rendu au serveur : l’en-tête seul, MetaSeo et SvelteKit posent le reste', async () => {
+    // Traité en coquille, il recevait la balise robots et chaque police en double.
+    const { robots, html } = await servir('/chat');
+    expect(robots).toBe('noindex, follow');
+    expect(html).toBe(HTML);
+  });
+
+  it('une page publique ne reçoit rien', async () => {
+    for (const chemin of ['/', '/laws', '/chatbot']) {
+      const { robots, html } = await servir(chemin);
+      expect(robots, chemin).toBeNull();
+      expect(html, chemin).toBe(HTML);
+    }
+  });
+});

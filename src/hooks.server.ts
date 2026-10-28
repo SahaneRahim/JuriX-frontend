@@ -13,10 +13,19 @@ import icones from '$lib/polices/material-icons.woff2?url';
  * directive noindex est donc ajoutee ici, dans l'en-tete ET dans le HTML,
  * pour les robots qui n'executent pas le JavaScript.
  */
-const RENDUES_DANS_LE_NAVIGATEUR = ['/admin', '/chat'];
+const RENDUES_DANS_LE_NAVIGATEUR = ['/admin'];
 
-function rendueDansLeNavigateur(chemin: string): boolean {
-  return RENDUES_DANS_LE_NAVIGATEUR.some((prefixe) => chemin === prefixe || chemin.startsWith(`${prefixe}/`));
+/**
+ * Pages en noindex rendues au serveur : MetaSeo (indexable={false}) pose deja
+ * la balise, et SvelteKit les prechargements de polices. Seul l'en-tete est
+ * ajoute, pour les robots qui ne lisent pas le HTML. /chat y est passe avec
+ * son rendu serveur (b45d165) : traite encore en coquille, il recevait la
+ * balise robots et chaque prechargement de police en double.
+ */
+const NON_INDEXEES_RENDUES_AU_SERVEUR = ['/chat'];
+
+function sousArbre(chemin: string, prefixes: string[]): boolean {
+  return prefixes.some((prefixe) => chemin === prefixe || chemin.startsWith(`${prefixe}/`));
 }
 
 /**
@@ -41,11 +50,12 @@ const PRECHARGEMENT_DES_COQUILLES = [inter, icones]
   .join('');
 
 export const handle: Handle = async ({ event, resolve }) => {
-  const privee = rendueDansLeNavigateur(event.url.pathname);
+  const coquille = sousArbre(event.url.pathname, RENDUES_DANS_LE_NAVIGATEUR);
+  const privee = coquille || sousArbre(event.url.pathname, NON_INDEXEES_RENDUES_AU_SERVEUR);
   const reponse = await resolve(event, {
     preload: ({ type, path }) =>
       type === 'js' || type === 'css' || (type === 'font' && POLICES_A_PRECHARGER.test(path)),
-    ...(privee
+    ...(coquille
       ? {
           transformPageChunk: ({ html }: { html: string }) =>
             html.replace(

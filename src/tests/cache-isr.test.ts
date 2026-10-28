@@ -4,6 +4,7 @@ import * as accueil from '../routes/(main)/+page.server';
 import * as categorie from '../routes/categories/[id]/+page.server';
 import * as liste from '../routes/laws/+page.server';
 import * as fiche from '../routes/laws/[id]/+page.server';
+import * as chat from '../routes/(main)/chat/+page';
 
 /**
  * Pages publiques mises en cache par Vercel (ISR, `config.isr` de
@@ -176,6 +177,32 @@ describe.each(ROUTES)('$chemin', (route) => {
     expect(signature, `${route.source} : signature du load`).not.toBeNull();
     const recus = (signature?.[1] ?? '').split(',').map((nom) => nom.trim()).filter(Boolean);
     expect(recus.filter((nom) => !['fetch', 'params', 'url'].includes(nom))).toEqual([]);
+  });
+});
+
+describe('/chat : la coquille en cache', () => {
+  // Sans `load` : la page ne fait que se rendre, en version invitée, et ne lit
+  // le visiteur (jeton, profil, `?q=`) que dans le navigateur.
+  it('est mise en cache sans expiration ni clé', () => {
+    expect(chat.config).toEqual({ isr: { expiration: false } });
+    expect(chat.ssr).toBe(true);
+  });
+
+  it('n’a aucun `load`, ni universel ni serveur', () => {
+    expect('load' in chat).toBe(false);
+    expect(SOURCES['/src/routes/(main)/chat/+page.server.ts']).toBeUndefined();
+  });
+
+  it('ne lit que `?q=`, appliqué dans le navigateur', () => {
+    // Hors de la clé, `?q=` n'atteint pas la fonction : la page le lit au
+    // montage (question pré-remplie). Tout autre paramètre lu devrait, lui,
+    // être examiné comme ceux des pages ci-dessus.
+    const source = SOURCES['/src/routes/(main)/chat/+page.svelte'];
+    const lus = [...source.matchAll(/searchParams\s*\.\s*(?:get|getAll|has)\(\s*(["'`])([^"'`]+)\1/g)].map(
+      (m) => m[2],
+    );
+    expect(lus).toEqual(['q']);
+    expect(SOURCES['/src/routes/(main)/+layout.svelte']).not.toMatch(/searchParams\s*\.\s*(?:get|getAll|has)\(/);
   });
 });
 
