@@ -39,6 +39,15 @@ interface Route {
   params: Record<string, string>;
   /** Les fichiers dont le rendu dépend de l'URL : la page et ses gabarits. */
   composants: string[];
+  /**
+   * Paramètres que les composants lisent, laissés HORS de la clé à dessein.
+   * Vercel ne les transmet pas à la fonction : le rendu serveur, donc la
+   * version en cache, est toujours celui SANS eux, le même pour toutes les
+   * variantes ; le navigateur les applique ensuite (`$page.url` y est
+   * l'adresse réelle). Le `load` ne doit pas les lire : ses données en
+   * dépendraient, et celles d'une variante seraient servies aux autres.
+   */
+  appliquesDansLeNavigateur?: string[];
   source: string;
 }
 
@@ -64,10 +73,14 @@ const ROUTES: Route[] = [
   {
     chemin: '/laws/[id]',
     module: fiche as never,
-    attendu: { expiration: 3600, allowQuery: ['article'] },
+    // `article` hors de la clé : les mêmes données pour tous les articles d'un
+    // texte, et une génération (1,3 Mo lus à l'API pour le code pénal) par
+    // couple (texte, article) quand il en faisait partie.
+    attendu: { expiration: 3600 },
     adresse: 'http://site/laws/12?article=5&utm_source=x&lang=en',
     params: { id: '12' },
     composants: ['/src/routes/laws/[id]/+page.svelte', '/src/routes/+layout.svelte'],
+    appliquesDansLeNavigateur: ['article'],
     source: '/src/routes/laws/[id]/+page.server.ts',
   },
   {
@@ -141,6 +154,7 @@ describe.each(ROUTES)('$chemin', (route) => {
     // gestionnaires de clic qui recopient toute la requête vers une nouvelle
     // adresse (`new URLSearchParams($page.url.searchParams)`) ne changent pas
     // le rendu ; ils ne sont pas visés.
+    const permis = [...cle, ...(route.appliquesDansLeNavigateur ?? [])];
     for (const fichier of route.composants) {
       const source = SOURCES[fichier];
       expect(source, fichier).toBeDefined();
@@ -148,7 +162,7 @@ describe.each(ROUTES)('$chemin', (route) => {
         (m) => m[2],
       );
       expect(
-        lus.filter((nom) => !cle.includes(nom)),
+        lus.filter((nom) => !permis.includes(nom)),
         fichier,
       ).toEqual([]);
     }
