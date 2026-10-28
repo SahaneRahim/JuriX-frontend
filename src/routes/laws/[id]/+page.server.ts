@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import { API_URL, DELAI_API_MS } from '$lib/config';
 import { identifiantDepuis } from '$lib/identifiant';
-import { leverIndisponible } from '$lib/panne';
+import { absenceConfirmee, leverIndisponible } from '$lib/panne';
 import type { Law } from '$lib/types';
 import type { PageServerLoad } from './$types';
 
@@ -11,15 +11,29 @@ import type { PageServerLoad } from './$types';
  * change qu'à une réingestion, et sa fiche attendait jusqu'ici l'API à chaque
  * visite (2,2 à 2,5 s avant le premier octet, mesurés depuis le Cameroun).
  *
- * `article` dans la clé du cache, et lui seul : la page le lit
- * (`?article=`, posé par les citations du chat et les articles trouvés par la
- * recherche) et le rend dès le serveur, ouverte sur cet article et sur sa page
- * du PDF. Hors de la clé, toutes les variantes partageraient la version
- * générée la première, ouverte sur un autre article. Les autres paramètres
- * (`utm_*`…) n'atteignent pas la fonction.
+ * AUCUN paramètre dans la clé du cache, pas même `?article=` (posé par les
+ * articles trouvés par la recherche et par les citations du chat). Le `load`
+ * ne le lit pas : tous les articles d'un texte ont les mêmes données. Dans la
+ * clé, chaque couple (texte, article) coûtait pourtant sa propre génération,
+ * page et `__data.json` compris (adapter-vercel leur donne la même clé) : un
+ * appel à /laws/{id} (1,3 Mo pour le code pénal) et une écriture ISR pour un
+ * corps identique. Le chemin principal vers une fiche tombait donc presque
+ * toujours sur une génération : 1,0 à 1,1 s après TLS, contre 0,2 s pour la
+ * version en cache (mesuré le 28/10).
+ *
+ * Hors de la clé, Vercel ne transmet pas le paramètre à la fonction : la
+ * version en cache est toujours la fiche ouverte sur son premier article, la
+ * même pour toutes les variantes, jamais celle d'un autre article. C'est le
+ * navigateur qui applique `?article=` (+page.svelte le lit dans `$page.url`,
+ * l'adresse réelle, et `afterNavigate` y fait défiler) : aussitôt en
+ * navigation dans le site, qui ne demande que le `__data.json` ; à
+ * l'hydratation pour un lien ouvert dans un nouvel onglet ou partagé, dont le
+ * HTML montre d'abord le premier article. La canonique ne porte de toute
+ * façon aucun paramètre ($lib/seo). Les autres paramètres (`utm_*`…)
+ * n'atteignent pas non plus la fonction.
  */
 export const config: Config = {
-  isr: { expiration: 3600, allowQuery: ['article'] },
+  isr: { expiration: 3600 },
 };
 
 /**
@@ -56,7 +70,11 @@ export const load: PageServerLoad = async ({ fetch, params }) => {
     return leverIndisponible(`/laws/${id}`, e);
   }
 
-  if (reponse.status === 404) {
+  // 404 seulement si l'API elle-même dit le document absent : un 404 est mis
+  // en cache une heure, et celui de Railway (domaine du service retiré, le
+  // 21/10) aurait fait disparaître chaque fiche régénérée. Tout autre 404 est
+  // une panne : 503, que Vercel ne garde pas (voir $lib/panne).
+  if (await absenceConfirmee(reponse)) {
     throw error(404, 'Document introuvable');
   }
   if (!reponse.ok) {

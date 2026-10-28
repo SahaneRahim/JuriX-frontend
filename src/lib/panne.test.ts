@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { isHttpError } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { decrirePanne, leverIndisponible, lireJson } from './panne';
+import { absenceConfirmee, decrirePanne, leverIndisponible, lireJson } from './panne';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -59,5 +59,34 @@ describe('leverIndisponible', () => {
     }
     expect(isHttpError(levee, 503)).toBe(true);
     expect(journal).toHaveBeenCalledWith('[503] /laws/12 : API indisponible (HTTP 500)');
+  });
+});
+
+describe('absenceConfirmee', () => {
+  it('reconnaît le 404 de l’API : du JSON avec son `detail`', async () => {
+    const api = Response.json({ detail: 'Law with ID 12 not found' }, { status: 404 });
+    expect(await absenceConfirmee(api)).toBe(true);
+  });
+
+  it('refuse tout autre 404, que l’ISR garderait', async () => {
+    const railway = Response.json(
+      { status: 'error', code: 404, message: 'Application not found' },
+      { status: 404, headers: { 'x-railway-fallback': 'true' } },
+    );
+    expect(await absenceConfirmee(railway)).toBe(false);
+    const html = new Response('<h1>404</h1>', { status: 404, headers: { 'content-type': 'text/html' } });
+    expect(await absenceConfirmee(html)).toBe(false);
+    const tronque = new Response('{"detail":', { status: 404, headers: { 'content-type': 'application/json' } });
+    expect(await absenceConfirmee(tronque)).toBe(false);
+    expect(await absenceConfirmee(Response.json(null, { status: 404 }))).toBe(false);
+    expect(await absenceConfirmee(Response.json({ detail: 404 }, { status: 404 }))).toBe(false);
+    expect(await absenceConfirmee(Response.json({ detail: 'Not Found' }, { status: 404 }))).toBe(false);
+  });
+
+  it('ne lit pas le corps d’une réponse qui n’est pas un 404', async () => {
+    const correcte = Response.json({ detail: 'x' });
+    expect(await absenceConfirmee(correcte)).toBe(false);
+    expect(correcte.bodyUsed).toBe(false);
+    expect(await absenceConfirmee(Response.json({ detail: 'Erreur' }, { status: 500 }))).toBe(false);
   });
 });

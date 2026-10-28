@@ -40,18 +40,8 @@
     </script>
     %sveltekit.head%
   </head>
-  <!--
-    preload-code="viewport" : le code d'une page (JS et CSS de sa route) est
-    chargé dès que l'un de ses liens est à l'écran, après l'hydratation ; le
-    toucher n'attend plus que ses données (__data.json, en cache chez Vercel)
-    au lieu d'enchaîner code puis données. Coût borné : une fois par route et
-    non par lien (les 20 fiches d'une liste partagent le même code), des
-    fichiers immuables mis en cache un an, et rien du tout quand le
-    navigateur est en mode économie de données (SvelteKit coupe alors tout
-    préchargement). Les données, elles, restent préchargées au survol (au
-    toucher sur téléphone), comme avant.
-  -->
-  <body data-sveltekit-preload-data="hover" data-sveltekit-preload-code="hover">
+  <!-- Préchargement des pages au survol : raisons dans svelte.config.js. -->
+  <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

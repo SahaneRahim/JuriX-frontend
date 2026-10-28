@@ -28,6 +28,35 @@ export async function lireJson<T>(appel: PromiseSettledResult<Response>): Promis
 }
 
 /**
+ * Vrai si ce 404 est celui de NOTRE API (FastAPI) pour une ressource absente :
+ * du JSON qui porte son `detail` (« Law with ID 12 not found »).
+ *
+ * Un autre 404 ne prouve pas l'absence, il signale une panne. Or un 404 se
+ * garde en cache (ISR) : traduit en page « introuvable », il remplacerait la
+ * fiche, pour tous les visiteurs et pour les moteurs, pendant toute
+ * l'expiration. Trois cas sont donc des pannes :
+ * - le 404 de Railway lui-même (« Application not found »), dès que le
+ *   domaine du service n'est plus exposé, comme le 21/10 : il porte
+ *   `x-railway-fallback`, quel que soit son corps ;
+ * - un corps qui n'est pas le JSON de FastAPI (proxy, page HTML, corps vide) ;
+ * - « Not Found », le 404 générique de Starlette : c'est la ROUTE qui
+ *   manque (préfixe changé, autre application sur le domaine), ce qui ne dit
+ *   rien du document.
+ *
+ * Lit le corps d'un 404, et seulement d'un 404.
+ */
+export async function absenceConfirmee(reponse: Response): Promise<boolean> {
+  if (reponse.status !== 404 || reponse.headers.has('x-railway-fallback')) return false;
+  if (!reponse.headers.get('content-type')?.includes('application/json')) return false;
+  try {
+    const detail = ((await reponse.json()) as { detail?: unknown } | null)?.detail;
+    return typeof detail === 'string' && detail !== 'Not Found';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Lève le 503 du rendu serveur, après en avoir écrit la cause.
  *
  * Le journal n'est pas une option : un 503 est une HttpError, que SvelteKit ne

@@ -10,7 +10,7 @@
   import CategoryIcon from "$lib/components/CategoryIcon.svelte";
   import Icone from "$lib/components/Icone.svelte";
 
-  /** Rempli par `+page.ts`. */
+  /** Rempli par `+page.server.ts`. */
   export let data;
 
   let searchQuery = "";

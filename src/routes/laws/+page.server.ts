@@ -67,6 +67,14 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
     // limit + 1 : une ligne de plus que la page suffit à savoir s'il existe une
     // suite, sans second appel de comptage. L'API ne renvoie pas de total.
     limit: String(TAILLE_PAGE_LOIS + 1),
+    // Aucun texte : la liste n'en affiche pas une ligne, et l'API renvoyait
+    // chaque document EN ENTIER, lu, transmis et analysé à chaque génération
+    // de la page. Son poids dépend des 21 lignes reçues, dans un ordre que
+    // l'API ne fixe pas : 36 Ko de texte pour la première page en ligne
+    // (28/10) ; sur le corpus local, 160 Ko par page en médiane, jusqu'à 5 Mo.
+    // 0 : la base ne lit même pas la colonne. Une API qui ignorerait ce
+    // paramètre rendrait le texte entier, comme avant : rien ne casse.
+    content_max_chars: '0',
   });
   if (lang !== 'all') params.set('language', lang);
   if (category !== 'all') params.set('category_id', category);

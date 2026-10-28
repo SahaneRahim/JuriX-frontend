@@ -15,11 +15,11 @@
   import { blocsDeReponse } from "$lib/texte";
   import { LONGUEUR_MAX_NUMERO, normaliserNumeroArticle } from "$lib/article";
 
-  /** Rempli par `+page.ts`. Un identifiant inexistant n'arrive plus ici : 404. */
+  /** Rempli par `+page.server.ts`. Un identifiant inexistant n'arrive plus ici : 404. */
   export let data;
 
   // `lawId` a disparu avec le chargement client : l'identifiant est lu par
-  // `+page.ts`, qui seul en a besoin. Le garder ici en aurait fait une seconde
+  // `+page.server.ts`, qui seul en a besoin. Le garder ici en aurait fait une seconde
   // source de verite pour la meme valeur.
 
   // Article demande par l'URL, pose par les citations du chat et les articles

@@ -224,8 +224,9 @@
 
   /**
    * Écran d'au moins 1 024 px (`lg`), où les conversations sont une colonne et
-   * non un tiroir. Lu dès l'initialisation : la page n'est rendue que dans le
-   * navigateur (`ssr = false`), le premier affichage est donc déjà le bon.
+   * non un tiroir. Lu dès l'initialisation dans le navigateur, donc juste à
+   * l'hydratation. Faux au serveur, sans conséquence : il rend la version
+   * invitée, sans panneau des conversations (voir +page.ts).
    */
   const REQUETE_ECRAN_LARGE = "(min-width: 1024px)";
   let ecranLarge =
