@@ -38,21 +38,7 @@
     </script>
     %sveltekit.head%
   </head>
-  <!--
-    Données ET code d'une page préchargés au survol (au toucher sur
-    téléphone) : SvelteKit demande alors le code de la route en même temps
-    que son __data.json (en cache chez Vercel), sans les enchaîner. Un
-    data-sveltekit-preload-code="hover" n'y ajoutait donc rien.
-
-    Pas de preload-code="viewport" : il téléchargerait ET exécuterait, juste
-    après l'hydratation, le code de chaque route dont un lien est à l'écran
-    (environ huit depuis l'en-tête, 40 à 60 Ko compressés), sur des
-    téléphones modestes et des forfaits au mégaoctet, pour ne gagner que le
-    téléchargement de ce code, déjà parallèle à celui des données, et
-    seulement à la première visite de chaque route. S'il le faut un jour, le
-    poser sur les seules listes de documents (vers /laws/[id], la route la
-    plus lourde), pas ici.
-  -->
+  <!-- Préchargement des pages au survol : raisons dans svelte.config.js. -->
   <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>
   </body>
