@@ -36,9 +36,10 @@ const DEBUT_DU_TEXTE = 2000;
  *
  * Chargement SERVEUR : l'API renvoyait le texte intégral de chacun des 50
  * documents (820 Ko pour le droit pénal ; leur début seulement depuis
- * `DEBUT_DU_TEXTE`), que la page ne montre que sur deux lignes. Un `load` universel l'incrustait dans le HTML (1,6 Mo) et le rendait
- * en entier sous un line-clamp (2 s de calcul de mise en page mesurées) ; seul
- * un extrait part maintenant vers le navigateur.
+ * `DEBUT_DU_TEXTE`), que la page ne montre que sur deux lignes. Un `load`
+ * universel l'incrustait dans le HTML (1,6 Mo) et le rendait en entier sous un
+ * line-clamp (2 s de calcul de mise en page mesurées) ; seul un extrait part
+ * maintenant vers le navigateur.
  *
  * DEUX DÉFAUTS CORRIGÉS ICI, l'un de performance, l'autre de vérité.
  *
