@@ -123,7 +123,10 @@ const categorie = (id: number, name = `Catégorie ${id}`) => ({
 describe('ce qui n’est pas une panne', () => {
   it.each([false, true])('une fiche absente reste une 404 (requête de données : %s)', async (navigation) => {
     const espion = journal();
-    const fetch = vi.fn<Appel>(async () => new Response('{}', { status: 404 }));
+    // Le 404 tel que le rend l'API (app/api/routes/laws.py, get_law).
+    const fetch = vi.fn<Appel>(async () =>
+      Response.json({ detail: 'Law with ID 12 not found' }, { status: 404 }),
+    );
     await expect(
       chargerFiche({ fetch, params: { id: '12' }, isDataRequest: navigation } as never),
     ).rejects.toSatisfy((e) => isHttpError(e, 404));
@@ -177,6 +180,47 @@ describe('ce qui n’est pas une panne', () => {
     expect(appelLois.searchParams.has('category_id')).toBe(false);
     expect(Number(appelLois.searchParams.get('skip'))).toBeLessThanOrEqual(2_147_483_647);
     expect(appelLois.searchParams.get('skip')).toMatch(/^\d+$/);
+  });
+});
+
+describe('un 404 qui ne vient pas de l’API est une panne (il serait mis en cache)', () => {
+  // Vercel garde les 404 (ISR) : une fiche « introuvable » à cause d'un
+  // intermédiaire remplacerait le texte une heure durant, pour tous.
+  const QUATRE_CENT_QUATRE: [string, () => Response][] = [
+    [
+      'Railway sans domaine exposé (« Application not found »)',
+      () =>
+        Response.json(
+          { status: 'error', code: 404, message: 'Application not found', request_id: 'r' },
+          { status: 404, headers: { 'x-railway-fallback': 'true' } },
+        ),
+    ],
+    [
+      'x-railway-fallback, même avec un `detail`',
+      () =>
+        Response.json(
+          { detail: 'Law with ID 12 not found' },
+          { status: 404, headers: { 'x-railway-fallback': 'true' } },
+        ),
+    ],
+    [
+      'une page HTML (un proxy)',
+      () => new Response('<h1>Not Found</h1>', { status: 404, headers: { 'content-type': 'text/html' } }),
+    ],
+    ['un corps vide', () => new Response(null, { status: 404 })],
+    ['du JSON sans `detail`', () => Response.json({}, { status: 404 })],
+    ['la route inconnue de Starlette (« Not Found »)', () => Response.json({ detail: 'Not Found' }, { status: 404 })],
+  ];
+
+  describe.each(MODES)('%s', (_mode, navigation) => {
+    it.each(QUATRE_CENT_QUATRE)('%s : 503, cause au journal', async (_cas, reponse) => {
+      const espion = journal();
+      const fetch = vi.fn<Appel>(async () => reponse());
+      await expect(
+        chargerFiche({ fetch, params: { id: '12' }, isDataRequest: navigation } as never),
+      ).rejects.toSatisfy((e) => isHttpError(e, 503));
+      expect(espion).toHaveBeenCalledWith('[503] /laws/12 : API indisponible (HTTP 404)');
+    });
   });
 });
 

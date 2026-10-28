@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import { API_URL, DELAI_API_MS } from '$lib/config';
 import { identifiantDepuis } from '$lib/identifiant';
-import { leverIndisponible } from '$lib/panne';
+import { absenceConfirmee, leverIndisponible } from '$lib/panne';
 import type { Law } from '$lib/types';
 import type { PageServerLoad } from './$types';
 
@@ -56,7 +56,11 @@ export const load: PageServerLoad = async ({ fetch, params }) => {
     return leverIndisponible(`/laws/${id}`, e);
   }
 
-  if (reponse.status === 404) {
+  // 404 seulement si l'API elle-même dit le document absent : un 404 est mis
+  // en cache une heure, et celui de Railway (domaine du service retiré, le
+  // 21/10) aurait fait disparaître chaque fiche régénérée. Tout autre 404 est
+  // une panne : 503, que Vercel ne garde pas (voir $lib/panne).
+  if (await absenceConfirmee(reponse)) {
     throw error(404, 'Document introuvable');
   }
   if (!reponse.ok) {
