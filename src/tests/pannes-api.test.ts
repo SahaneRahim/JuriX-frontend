@@ -319,8 +319,9 @@ describe('ce que les pages envoient au navigateur', () => {
       isDataRequest: false,
     } as never);
     const appelLois = new URL(String(fetch.mock.calls.find(([e]) => String(e).includes('/laws/'))?.[0]));
-    // 1 500 caractères : le plus court début qui donne, sur tout le corpus
-    // publié, le même extrait de 300 caractères que le texte entier.
+    // Au moins 1 500 caractères : sur tout le corpus publié (vérifié le 28/10),
+    // ce début donne le même extrait de 300 caractères que le texte entier ;
+    // 1 000 en changeaient encore un.
     expect(Number(appelLois.searchParams.get('content_max_chars'))).toBeGreaterThanOrEqual(1500);
   });
 
