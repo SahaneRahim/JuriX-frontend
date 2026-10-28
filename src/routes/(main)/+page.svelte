@@ -7,7 +7,7 @@
   import { descriptionCategorie, nomCategorie } from "$lib/categories";
   import type { Category } from "$lib/types";
 
-  /** Rempli par `+page.ts`. */
+  /** Rempli par `+page.server.ts`. */
   export let data;
 
   let searchQuery = "";
