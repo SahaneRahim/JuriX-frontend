@@ -67,6 +67,12 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
     // limit + 1 : une ligne de plus que la page suffit à savoir s'il existe une
     // suite, sans second appel de comptage. L'API ne renvoie pas de total.
     limit: String(TAILLE_PAGE_LOIS + 1),
+    // Aucun texte : la liste n'en affiche pas une ligne, et l'API renvoyait
+    // chaque document EN ENTIER (87 Ko de texte pour 21 lignes), lu, transmis
+    // et analysé à chaque génération de la page. 0 : la base ne lit même pas
+    // la colonne. Une API qui ignorerait ce paramètre rendrait le texte
+    // entier, comme avant : rien ne casse.
+    content_max_chars: '0',
   });
   if (lang !== 'all') params.set('language', lang);
   if (category !== 'all') params.set('category_id', category);

@@ -48,6 +48,20 @@ export const config: Config = {
  * une catégorie absente de la liste répond 404, la liste doit donc être
  * complète (100 par défaut, pour 14 catégories aujourd'hui).
  */
+/**
+ * Longueur du début de texte demandée à l'API (`content_max_chars`) : la page
+ * n'en montre qu'un extrait de 300 caractères (`descriptionDepuis`), et l'API
+ * renvoyait chaque texte EN ENTIER, à chaque génération : 800 Ko pour les 16
+ * documents du droit pénal, jusqu'à 3,6 Mo pour les 50 premiers d'une autre
+ * catégorie. Le début suffit, mais nettoyé (marqueurs de page, tableaux,
+ * markdown, blancs de l'OCR), il raccourcit : sur les 2 275 textes publiés du
+ * corpus (vérifié le 28/10), 1 000 caractères changeaient encore un extrait,
+ * 1 500 n'en changent plus aucun. 2 000 gardent une marge pour un préambule
+ * plus bruité : 30 à 90 Ko de texte au lieu de 0,6 à 3,6 Mo. Une API qui
+ * ignorerait ce paramètre rendrait le texte entier, comme avant.
+ */
+const DEBUT_DU_TEXTE = 2000;
+
 export const load: PageServerLoad = async ({ fetch, params, url }) => {
   // Contrôle avant tout appel : `/categories/abc` n'a aucune raison de
   // consommer une requête pour apprendre qu'il n'existe pas.
@@ -59,7 +73,11 @@ export const load: PageServerLoad = async ({ fetch, params, url }) => {
   const brut = url.searchParams.get('lang');
   const lang: FiltreLangue = brut === 'fr' || brut === 'en' ? brut : 'all';
 
-  const cible = new URLSearchParams({ category_id: String(id), limit: '50' });
+  const cible = new URLSearchParams({
+    category_id: String(id),
+    limit: '50',
+    content_max_chars: String(DEBUT_DU_TEXTE),
+  });
   if (lang !== 'all') cible.set('language', lang);
 
   // `allSettled` et non `all` : une panne réseau sur l'une des deux ne doit pas

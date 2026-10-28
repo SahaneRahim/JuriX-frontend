@@ -286,6 +286,9 @@ describe('ce que les pages envoient au navigateur', () => {
     } as never)) as { laws: object[]; hasMore: boolean };
     expect(donnees.hasMore).toBe(true);
     expect(donnees.laws).toHaveLength(20);
+    // Et l'API ne renvoie aucun texte, que la liste n'affiche pas.
+    const appelLois = new URL(String(fetch.mock.calls.find(([e]) => String(e).includes('/laws/'))?.[0]));
+    expect(appelLois.searchParams.get('content_max_chars')).toBe('0');
     expect(Object.keys(donnees.laws[0]).sort()).toEqual(
       ['article_count', 'id', 'publication_date', 'reference', 'title', 'type'].sort(),
     );
@@ -303,6 +306,22 @@ describe('ce que les pages envoient au navigateur', () => {
     } as never)) as { documents: { content: string }[] };
     expect(Object.keys(donnees.documents[0]).sort()).toEqual(['content', 'id', 'publication_date', 'title']);
     expect(donnees.documents[0].content.length).toBeLessThanOrEqual(301);
+  });
+
+  it('/categories/<id> : seulement le début de chaque texte, assez long pour le même extrait', async () => {
+    const fetch = vi.fn<Appel>(async (entree) =>
+      String(entree).includes('/laws/') ? Response.json([loi(1)]) : Response.json([categorie(3, 'Droit pénal')]),
+    );
+    await chargerCategorie({
+      fetch,
+      params: { id: '3' },
+      url: new URL('http://site/categories/3'),
+      isDataRequest: false,
+    } as never);
+    const appelLois = new URL(String(fetch.mock.calls.find(([e]) => String(e).includes('/laws/'))?.[0]));
+    // 1 500 caractères : le plus court début qui donne, sur tout le corpus
+    // publié, le même extrait de 300 caractères que le texte entier.
+    expect(Number(appelLois.searchParams.get('content_max_chars'))).toBeGreaterThanOrEqual(1500);
   });
 
   it('/categories/<id> : l’en-tête vient de la liste /categories, jamais de /categories/{id}', async () => {
