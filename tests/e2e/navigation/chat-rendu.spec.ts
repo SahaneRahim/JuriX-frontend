@@ -12,10 +12,15 @@
  * alors pas s'afficher du tout — c'est ce qui fait disparaître l'article du
  * Code Minier affiché sous « comment vas-tu ? ».
  *
- * Les appels sont interceptés : aucun backend requis, aucun quota dépensé.
+ * Les appels du chat sont interceptés : aucun quota dépensé. Une exception :
+ * la fiche qu'ouvre une source est rendue par le SERVEUR, que `page.route` ne
+ * voit pas ; ce test-là ouvre une loi réelle de l'API locale, et il est sauté
+ * sans elle (échoué avec E2E_EXIGER_BACKEND=1).
  */
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+
+import { API, exiger, lireListe } from '../doublures';
 
 /**
  * Le chat lit la réponse EN FLUX (`/rag/ask/stream`, événements SSE) : le
@@ -43,6 +48,95 @@ async function poser(page: Page, question: string) {
   const champ = page.getByRole('textbox').first();
   await champ.fill(question);
   await champ.press('Enter');
+}
+
+/** Un article tel que la fiche le découpe : son numéro et ses lignes de texte. */
+interface ArticleLu {
+  numero: string;
+  lignes: string[];
+}
+
+/**
+ * Les articles d'un texte, découpés comme le fait la fiche
+ * (`parseContent`, src/routes/laws/[id]/+page.svelte) : une ligne « Article
+ * N » ouvre un article, une ligne LIVRE, TITRE ou CHAPITRE le ferme, et
+ * chaque autre ligne non vide devient un paragraphe de l'article en cours.
+ */
+function articlesDe(contenu: string): ArticleLu[] {
+  const articles: ArticleLu[] = [];
+  let courant: ArticleLu | null = null;
+  for (const brute of contenu.replace(/<<PAGE:?\s*\d+>>/gi, '').replace(/\r\n/g, '\n').split('\n')) {
+    const ligne = brute.trim();
+    if (!ligne) continue;
+    if (/^(LIVRE|TITRE|CHAPITRE)\s+[IVX0-9]+/i.test(ligne)) {
+      courant = null;
+      continue;
+    }
+    const numero = ligne.match(/^\**\s*Article\s*(\d+)/i)?.[1];
+    if (numero) {
+      courant = { numero, lignes: [] };
+      articles.push(courant);
+    } else {
+      courant?.lignes.push(ligne);
+    }
+  }
+  return articles;
+}
+
+interface LoiAOuvrir {
+  id: number;
+  /** Le second article : celui que demande la source. */
+  cible: { numero: string; extrait: string };
+  /** Un paragraphe du premier article, qui ne doit PAS s'afficher. */
+  premier: string;
+  /** Un paragraphe du troisième, qu'affiche « Suivant ». */
+  suivant: string;
+}
+
+/**
+ * Une loi réelle dont les trois premiers articles se distinguent à coup sûr :
+ * le second a un numéro unique (`?article=` ouvre sa première occurrence),
+ * et chacun a un paragraphe d'au moins 20 caractères qui n'apparaît pas dans
+ * l'article voisin. Lue dans l'API : un jeu figé pourrit à la réingestion du
+ * corpus. Beaucoup de textes courts (décrets d'un ou deux articles, lignes
+ * de signature) ne conviennent pas : 3 sur les 60 premiers, 17 sur 200,
+ * parcourus en 1,5 s au plus (mesuré le 2026-10-28). `null` sans API ou sans
+ * loi qui convienne.
+ */
+async function loiAOuvrir(request: APIRequestContext): Promise<LoiAOuvrir | null> {
+  const lois = await lireListe<{ id: number; article_count?: number | null }>(request, '/laws/?limit=200');
+  const candidates = lois
+    .filter((loi) => (loi.article_count ?? 0) >= 3)
+    .sort((a, b) => (a.article_count ?? 0) - (b.article_count ?? 0));
+  for (const { id } of candidates) {
+    const reponse = await request.get(`${API}/api/v1/laws/${id}`, { failOnStatusCode: false }).catch(() => null);
+    if (!reponse?.ok()) continue;
+    const loi = (await reponse.json().catch(() => null)) as { content?: string | null } | null;
+    const articles = articlesDe(loi?.content ?? '');
+    if (articles.length < 3) continue;
+    const [premier, cible, suivant] = articles;
+    // Le premier paragraphe d'au moins 20 caractères (une ligne de date ou
+    // de signature ne distingue rien), coupé à 80 : assez pour reconnaître
+    // l'article, et un message d'échec qui reste lisible.
+    const extrait = (a: ArticleLu) =>
+      (a.lignes.find((l) => l.replace(/\s+/g, ' ').trim().length >= 20) ?? '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80)
+        .trim();
+    const texte = (a: ArticleLu) => a.lignes.join(' ').replace(/\s+/g, ' ');
+    if (articles.filter((a) => a.numero === cible.numero).length !== 1) continue;
+    if ([premier, cible, suivant].some((a) => extrait(a).length < 20)) continue;
+    if (texte(cible).includes(extrait(premier)) || texte(suivant).includes(extrait(cible))) continue;
+    if (texte(cible).includes(extrait(suivant))) continue;
+    return {
+      id,
+      cible: { numero: cible.numero, extrait: extrait(cible) },
+      premier: extrait(premier),
+      suivant: extrait(suivant),
+    };
+  }
+  return null;
 }
 
 test.describe('Rendu des réponses du chat', () => {
@@ -117,33 +211,24 @@ test.describe('Rendu des réponses du chat', () => {
     await expect(journal.locator('a[href*="/laws/42"]')).toBeVisible();
   });
 
-  test('une source dit quel article de quel texte, et ouvre CET article', async ({ page }) => {
-    // Le texte ouvert par le lien : l'article 33 n'est pas le premier.
-    await page.route('**/api/v1/laws/42', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 42, reference: 'PRC-9001', type: 'loi', language: 'fr', category_id: null,
-          status: 'published', publication_date: null, articles: [], article_count: 3,
-          detected_language: null, language_confidence: null, suggested_categories: null,
-          category_confidence: null, file_id: null, original_filename: null,
-          title: 'Loi N°2023/014 du 19 décembre 2023 portant Code Minier',
-          content: [
-            'ARTICLE 1.- Objet', 'La présente loi régit les activités minières.',
-            'ARTICLE 2.- Définitions', 'Au sens de la présente loi, on entend par mine…',
-            'ARTICLE 33.- Durée du permis', 'Le permis de recherche est accordé pour trois ans.',
-            'ARTICLE 34.- Renouvellement', 'Le permis est renouvelable deux fois.',
-          ].join('\n\n'),
-        }),
-      }),
-    );
+  test('une source dit quel article de quel texte, et ouvre CET article', async ({ page, request }) => {
+    // La fiche se charge sur le SERVEUR depuis b45d165 (laws/[id]/+page.server.ts,
+    // puis son __data.json en navigation) : la loi 42 simulée par `page.route`
+    // n'était jamais lue, et la vraie loi 42 de la base s'ouvrait, sur son
+    // article 1. Le test n'attrapait donc plus rien. Le texte ouvert est
+    // maintenant une loi RÉELLE, et la source vise son DEUXIÈME article : le
+    // premier ne doit pas s'afficher.
+    const loi = await loiAOuvrir(request);
+    exiger(loi, 'aucune loi de la base locale à trois articles distincts (API éteinte ?)');
+
+    // La réponse du chat reste simulée : le nom affiché vient de l'intitulé
+    // de la source, pas de la loi ouverte.
     await repondre(page, {
-      answer: 'Selon l’article 33 du Code Minier, le permis est accordé pour trois ans.',
+      answer: `Selon l’article ${loi.cible.numero} du Code Minier, le permis est accordé pour trois ans.`,
       sources: [{
-        law_id: 42, law_reference: 'PRC-9001',
+        law_id: loi.id, law_reference: 'PRC-9001',
         law_title: 'Loi N°2023/014 du 19 décembre 2023 portant Code Minier',
-        article_number: '33', article_id: 900,
+        article_number: loi.cible.numero, article_id: 900,
         excerpt: 'Le permis de recherche est accordé pour trois ans.', relevance_score: 0.91,
       }],
       intent: 'juridique',
@@ -153,18 +238,19 @@ test.describe('Rendu des réponses du chat', () => {
 
     // Le nom du texte, jamais sa cote interne.
     const source = page.getByTestId('chat-source');
-    await expect(source).toContainText('Article 33 — Code Minier');
+    await expect(source).toContainText(`Article ${loi.cible.numero} — Code Minier`);
     await expect(source).not.toContainText('PRC-9001');
 
     await source.click();
 
-    await expect(page).toHaveURL(/\/laws\/42\?article=33$/);
-    await expect(page.locator('article.article')).toContainText('trois ans');
-    await expect(page.locator('article.article')).not.toContainText('activités minières');
+    await expect(page).toHaveURL(new RegExp(`/laws/${loi.id}\\?article=${loi.cible.numero}$`));
+    const article = page.locator('article.article');
+    await expect(article).toContainText(loi.cible.extrait);
+    await expect(article).not.toContainText(loi.premier);
 
-    // « Suivant » avance : le lien ne ramène pas le lecteur à l'article 33.
+    // « Suivant » avance : le lien ne ramène pas le lecteur à l'article demandé.
     await page.locator('.article-navigation button').last().click();
-    await expect(page.locator('article.article')).toContainText('renouvelable');
+    await expect(article).toContainText(loi.suivant);
   });
 
   test('une panne en cours de flux s’affiche en erreur, sans fausse réponse', async ({ page }) => {

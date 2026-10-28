@@ -8,9 +8,9 @@
  *
  *  - aucun `aria-live` dans tout le projet : après une recherche, rien n'était
  *    annoncé — ni le départ de la requête, ni le nombre de résultats ;
- *  - les 36 `<span class="material-icons">` faisaient lire leur ligature à voix
+ *  - les 36 icônes de l'ancienne police faisaient lire leur ligature à voix
  *    haute (« send », « menu », « balance ») au milieu d'une interface
- *    française ;
+ *    française ; leurs remplaçantes SVG doivent rester muettes de même ;
  *  - `/chat` et `/login` n'avaient aucun titre, de h1 à h6 ;
  *  - `<html lang="fr">` était figé alors que l'interface bascule FR/EN ;
  *  - aucun lien d'évitement : atteindre le contenu au clavier demandait de
@@ -102,13 +102,15 @@ test.describe('Cible du lien d’évitement', () => {
 
 test.describe('Icônes décoratives', () => {
   for (const chemin of ['/', '/search?q=loi', '/laws']) {
-    test(`${chemin} : aucune ligature lue à voix haute`, async ({ page }) => {
+    test(`${chemin} : aucune icône décorative annoncée`, async ({ page }) => {
       await ouvrir(page, chemin);
 
-      // Une ligature Material Icons est du TEXTE : sans aria-hidden, un lecteur
-      // d'écran annonce « search », « menu », « balance » au fil de la page.
+      // Une icône (src/lib/components/Icone.svelte) est décorative sauf si
+      // elle porte seule une information : elle est alors une image nommée
+      // (role="img" et <title>). Une icône sans l'un ni l'autre serait lue
+      // « image » ou « groupe » au fil de la page, sans rien dire.
       const exposees = await page
-        .locator('.material-icons:not([aria-hidden="true"])')
+        .locator('svg.icone:not([aria-hidden="true"]):not([role="img"])')
         .count();
       expect(exposees, `${exposees} icône(s) encore annoncée(s)`).toBe(0);
     });

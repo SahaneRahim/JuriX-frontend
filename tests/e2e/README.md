@@ -40,6 +40,8 @@ npx playwright show-report
 tests/e2e/
 ├── README.md                          # Ce fichier
 ├── hydratation.ts                     # Helpers : cliquer/saisir apres hydratation
+├── doublures.ts                       # Doublures de l'API, sessions simulees, jeux de donnees
+├── pages-du-site.ts                   # Les 21 pages ouvertes par monochrome et redimensionnement
 └── navigation/
     ├── accessibilite.spec.ts          # axe sur les pages publiques
     ├── avant-hydratation.spec.ts      # les pages avant leur JavaScript
@@ -51,8 +53,11 @@ tests/e2e/
     ├── inscription.spec.ts            # inscription et connexion
     ├── link-integrity.spec.ts         # aucun lien mort, rendu serveur
     ├── mot-de-passe-oublie.spec.ts    # recuperation de compte
+    ├── monochrome.spec.ts             # aucune teinte sauf le rouge, anglais sans francais (projet monochrome)
+    ├── mot-de-passe-visible.spec.ts   # bouton « Afficher le mot de passe », acces a la reinitialisation
     ├── panne-api.spec.ts              # API injoignable : 503 au rendu serveur
     ├── persona.spec.ts                # question du profil, chat selon le profil
+    ├── redimensionnement.spec.ts      # 1920 a 320 px sans recharger, ecrans courts, 44 px (projet redimensionnement)
     └── responsif.spec.ts              # six tailles d'ecran (projet responsif)
 ```
 
@@ -75,8 +80,8 @@ l'API de production.
 `navigation/responsif.spec.ts` ouvre les pages du site (accueil, chat, `/laws`,
 une loi, une catégorie, recherche, comparaison, à propos, connexion,
 inscription, administration) sur six tailles : 360×740, 390×844, 740×360
-(téléphone en paysage), 768×1024, 1024×768 (bascule de l'en-tête, pile sur
-`lg`) et 1440×900. Les trois premières sont émulées en téléphone : balise
+(téléphone en paysage), 768×1024, 1024×768 (pile sur `lg` ; l'en-tête, lui,
+bascule à `xl`) et 1440×900. Les trois premières sont émulées en téléphone : balise
 viewport prise en compte, écran tactile, agent Android. Sur trois téléphones
 courts (320×568, 360×584, 375×553), elle vérifie en plus que le bouton
 flottant de l'assistant ne couvre pas le bouton « Rechercher » de l'accueil.
@@ -104,6 +109,29 @@ appels : ils lisent la vraie API, et sont sautés quand elle est éteinte, sauf
 avec `E2E_EXIGER_BACKEND=1`. Le clavier virtuel, la barre d'adresse qui se
 replie et le zoom au doigt n'existent pas en émulation : ils se vérifient sur un
 vrai téléphone.
+
+### Noir et blanc, et redimensionnement : deux projets de plus
+
+`navigation/monochrome.spec.ts` (projet `monochrome`) relève, sur 21 pages en
+390×844 et 1440×900, en clair et en sombre, chaque couleur peinte (texte, fond,
+dégradé, bordures, contour, soulignement, SVG, ombres, pseudo-éléments) et
+échoue sur toute teinte saturée hors du rouge ; les rouges sont imprimés
+(`[rouge] …`) pour relecture. Le même relevé porte sur ce qui ne s'ouvre qu'à
+la demande : menus, palette (Ctrl+K), choix du profil, tiroirs, filtres,
+sommaire et explication d'une loi, fenêtres de l'administration, messages
+d'erreur. Il vérifie aussi l'accueil et une loi en anglais (clé
+`jurix-language`). Avec `CAPTURES_DIR=<dossier>`, il dépose une capture
+pleine page par page et par taille (`<page>__<l>x<h>__<thème>.png`), et
+celles des états ouverts dans `etats/`.
+
+`navigation/redimensionnement.spec.ts` (projet `redimensionnement`) ouvre
+chaque page en 1440×900 puis la redimensionne sans la recharger, de 1920 à
+320 px et retour, et fait de même pour l'en-tête d'un administrateur connecté
+et le chat d'un compte connecté ; il vérifie aussi les écrans courts, les tiroirs et fenêtres
+ouverts pendant un changement de taille, et les cibles de 44 px au doigt.
+
+Les deux partagent les doublures de `doublures.ts` (aussi lues par
+`responsif.spec.ts`) et la liste des pages de `pages-du-site.ts`.
 
 ### Stockage de départ : un profil déjà choisi
 

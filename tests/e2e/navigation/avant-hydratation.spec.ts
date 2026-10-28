@@ -31,16 +31,18 @@ test.describe('Icône du thème', () => {
   // Les deux icônes sont rendues, et la classe `dark` que pose app.html avant
   // le premier affichage choisit la bonne : un {#if} sur le store dessinait la
   // lune au serveur, puis la remplaçait à l'hydratation.
+  // Les icônes sont des SVG (src/lib/components/Icone.svelte), repérés par
+  // leur `data-icone` : le soleil propose le thème clair, la lune le sombre.
   for (const { theme, visible, cachee } of [
-    { theme: 'dark', visible: 'light_mode', cachee: 'dark_mode' },
-    { theme: 'light', visible: 'dark_mode', cachee: 'light_mode' },
+    { theme: 'dark', visible: 'sun', cachee: 'moon' },
+    { theme: 'light', visible: 'moon', cachee: 'sun' },
   ]) {
     test(`thème ${theme} : ${visible} affichée, ${cachee} masquée`, async ({ page }) => {
       await page.addInitScript((valeur) => localStorage.setItem('jurix-theme', valeur), theme);
       await page.goto('/about');
       const bascule = page.getByTestId('theme-toggle');
-      await expect(bascule.getByText(visible, { exact: true })).toBeVisible();
-      await expect(bascule.getByText(cachee, { exact: true })).toBeHidden();
+      await expect(bascule.locator(`[data-icone="${visible}"]`)).toBeVisible();
+      await expect(bascule.locator(`[data-icone="${cachee}"]`)).toBeHidden();
     });
   }
 });
