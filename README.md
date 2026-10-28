@@ -171,6 +171,7 @@ src/lib/
   suggestions.ts     questions suggérées par le chat, par profil et par langue
   persona-compte.ts  le profil et le compte (GET et PATCH /auth/me)
   chat-session.ts    conversation en cours, et son profil
+  icones.ts          les icônes du site (SVG Lucide), dessinées par components/Icone
   stores/            language (i18n), auth, theme, persona
   actions/           piegerFocus : le focus clavier des fenêtres modales
   components/        SearchBar, SearchResultCard, StatusBadge, ImagePdfViewer,
@@ -197,6 +198,20 @@ tests/e2e/        playwright : navigation, accessibilité, backend indisponible,
 L'internationalisation passe par `$lib/stores/language` : `$tr("cle")` dans le
 balisage, `t("cle")` dans le script. Les deux blocs de langue doivent porter
 exactement les mêmes clés — un test le vérifie et échoue sinon.
+
+L'interface est en noir et blanc (échelle zinc de Tailwind), en clair comme en
+sombre ; le rouge est réservé aux erreurs et aux actions qui suppriment. Toute
+icône passe par `<Icone nom="…" />` (`$lib/components/Icone.svelte`), des SVG
+Lucide gardés dans `$lib/icones.ts` : ni police d'icônes, ni SVG copié à la
+main, ni émoji. Un test relit les noms employés dans `src` et échoue sur un nom
+absent du registre comme sur une entrée que plus rien n'affiche.
+
+Les champs suivent une seule recette : en sombre, fond `zinc-950` (un cran sous
+la carte qui les porte) et bordure `zinc-500` (3:1 au moins contre la carte et
+la page). `src/app.css` neutralise le bleu que le navigateur pose sur un champ
+qu'il remplit lui-même. Tout champ de mot de passe passe par
+`$lib/components/ChampMotDePasse.svelte` (bouton « Afficher le mot de passe »),
+jamais par un `<input type="password">` écrit à la main.
 
 Les appels vers une route protégée passent par `apiFetch`, qui pose le jeton et
 traite le 401 en un seul endroit. `apiFetch` **ne lève pas** sur une réponse
