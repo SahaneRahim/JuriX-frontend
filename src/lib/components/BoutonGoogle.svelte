@@ -124,10 +124,12 @@
 
 {#if GOOGLE_CLIENT_ID}
   <div bind:this={enveloppe} class="flex w-full flex-col items-center gap-3" class:hidden={!disponible}>
+    <!-- Le séparateur est au site, en zinc comme le reste ; le bouton, dessiné
+         par Google dans son iframe, garde la charte de Google. -->
     <div class="flex w-full items-center gap-3" aria-hidden="true">
-      <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></span>
-      <span class="text-xs text-slate-500">{$tr("auth.orGoogle")}</span>
-      <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></span>
+      <span class="h-px flex-1 bg-zinc-200 dark:bg-zinc-800"></span>
+      <span class="text-xs text-zinc-500 dark:text-zinc-400">{$tr("auth.orGoogle")}</span>
+      <span class="h-px flex-1 bg-zinc-200 dark:bg-zinc-800"></span>
     </div>
     {#key largeurRendue}
       <div

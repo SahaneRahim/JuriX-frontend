@@ -168,7 +168,11 @@ export type LoiDeListe = Pick<Law, 'id' | 'title' | 'reference' | 'publication_d
  * prendre pour le document entier.
  */
 export type LawResume = Pick<Law, 'id' | 'title' | 'publication_date'> & {
-  /** Extrait de 300 caractères, sans les marqueurs `<<PAGE:n>>`. */
+  /**
+   * Extrait de 300 caractères, sans les marqueurs `<<PAGE:n>>`. Il sert au
+   * filtre de la page, plus à l'affichage : le début brut de l'OCR (« 1 0 DEC
+   * 2018 DECRETN° … ») faisait paraître la liste cassée.
+   */
   content: string;
 };
 

@@ -3,17 +3,20 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { piegerFocus } from '$lib/actions/pieger-focus';
+  import Icone from '$lib/components/Icone.svelte';
   import { authStore } from '$lib/stores/auth';
   import { language, switchLanguage, tr } from '$lib/stores/language';
+  import { themeStore } from '$lib/stores/theme';
 
   /**
-   * Sous lg, la barre latérale est un tiroir que le layout ouvre depuis sa
+   * Sous xl, la barre latérale est un tiroir que le layout ouvre depuis sa
    * barre du haut : fixe et toujours affichée, elle ne laissait que 104 px de
    * contenu sur un téléphone de 360 px, et rien ne permettait de la replier.
-   * À partir de lg, c'est la colonne fixe d'origine et ces deux props restent
-   * sans effet.
+   * À partir de xl, c'est la colonne fixe d'origine et ces deux props restent
+   * sans effet. (xl et non lg : en colonne à 1 024 px, elle ne laissait
+   * qu'environ 704 px au contenu ; voir src/routes/admin/+layout.svelte.)
    *
-   * `enTiroir` (sous lg, d'après le layout) sert à sortir le tiroir FERMÉ de
+   * `enTiroir` (sous xl, d'après le layout) sert à sortir le tiroir FERMÉ de
    * la tabulation et des lecteurs d'écran : poussé hors de l'écran, il restait
    * sinon parcouru au clavier, lien après lien, sans rien montrer.
    */
@@ -26,6 +29,17 @@
     dispatch('fermer');
   }
 
+  /**
+   * Couleurs des entrées de la barre. La page courante est inversée, comme
+   * tout élément actif du site. Le survol ne vise que les autres entrées :
+   * posé sur toutes, il repassait l'entrée courante en clair sous le pointeur,
+   * et elle ne se distinguait plus des autres.
+   */
+  const ENTREE =
+    'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white';
+  const ENTREE_COURANTE = 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950';
+  const classeEntree = (courante: boolean) => (courante ? ENTREE_COURANTE : ENTREE);
+
   // "Déconnexion" était un simple <a href="/"> : il ramenait à l'accueil sans
   // rien déconnecter, le jeton restait dans localStorage.
   function handleLogout() {
@@ -34,7 +48,7 @@
   }
 
   /**
-   * Le focus n'est piégé que tiroir OUVERT : à partir de lg, la barre est une
+   * Le focus n'est piégé que tiroir OUVERT : à partir de xl, la barre est une
    * colonne ordinaire, que la tabulation doit pouvoir quitter.
    *
    * La pose attend le rendu suivant : `inert` tombe dans la même mise à jour,
@@ -73,27 +87,35 @@
   data-testid="admin-sidebar"
   inert={enTiroir && !ouvert}
   use:piegeSiOuvert={ouvert}
-  class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[85vw] flex-col border-r border-slate-200 bg-white pl-[env(safe-area-inset-left)] transition-transform duration-200 ease-out motion-reduce:transition-none lg:max-w-none lg:translate-x-0 lg:pl-0 {ouvert
-    ? 'translate-x-0 shadow-xl'
+  class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[85vw] flex-col border-r border-zinc-200 bg-white pl-[env(safe-area-inset-left)] transition-transform duration-200 ease-out motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 xl:max-w-none xl:translate-x-0 xl:pl-0 {ouvert
+    ? 'translate-x-0 shadow-xl dark:shadow-none'
     : '-translate-x-full'}"
 >
   <div
-    class="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-slate-200 pl-6 pr-2 court:h-12 lg:justify-center lg:px-6"
+    class="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-zinc-200 pl-6 pr-2 court:h-12 dark:border-zinc-800"
   >
-    <a href="/admin" on:click={fermer} class="flex items-center gap-2 font-bold text-slate-900">
-      <span class="text-2xl">⚖️</span>
-      <span class="text-lg">JuriX Admin</span>
+    <!-- La balance dans sa tuile noire (blanche en sombre), comme le logo de
+         l'en-tête du site : l'émoji changeait de dessin et de couleurs d'un
+         système à l'autre. Calée à gauche à toute largeur, à 24 px du bord
+         comme les icônes du menu (px-3 de la liste, p-3 de l'entrée) :
+         centrée en colonne, elle ne s'alignait sur rien de ce qu'il y a
+         dessous. -->
+    <a href="/admin" on:click={fermer} class="flex min-h-11 items-center gap-2.5 rounded-xl font-bold text-zinc-950 dark:text-white">
+      <span
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950 dark:shadow-none"
+      >
+        <Icone nom="scale" class="text-lg" />
+      </span>
+      <span class="text-lg tracking-tight">JuriX Admin</span>
     </a>
     <button
       type="button"
       on:click={fermer}
       data-testid="admin-menu-close"
       aria-label={$tr("common.close")}
-      class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+      class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white xl:hidden"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-6 w-6" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-      </svg>
+      <Icone nom="x" class="h-6 w-6" />
     </button>
   </div>
 
@@ -107,11 +129,9 @@
           href="/admin"
           on:click={fermer}
           aria-current={$page.url.pathname === '/admin' ? "page" : undefined}
-          class="flex items-center rounded-lg p-3 text-base font-medium transition-colors hover:bg-blue-50 hover:text-blue-600 court:py-2.5 {$page.url.pathname === '/admin' ? 'bg-blue-50 text-blue-600' : 'text-slate-700'}"
+          class="flex items-center rounded-xl p-3 text-sm font-medium transition-colors court:py-2.5 {classeEntree($page.url.pathname === '/admin')}"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-          </svg>
+          <Icone nom="layout-dashboard" class="mr-3 h-5 w-5" />
           {$tr("admin.dashboard")}
         </a>
       </li>
@@ -120,12 +140,21 @@
           href="/admin/documents"
           on:click={fermer}
           aria-current={$page.url.pathname.startsWith('/admin/documents') ? "page" : undefined}
-          class="flex items-center rounded-lg p-3 text-base font-medium transition-colors hover:bg-blue-50 hover:text-blue-600 court:py-2.5 {$page.url.pathname.startsWith('/admin/documents') ? 'bg-blue-50 text-blue-600' : 'text-slate-700'}"
+          class="flex items-center rounded-xl p-3 text-sm font-medium transition-colors court:py-2.5 {classeEntree($page.url.pathname.startsWith('/admin/documents'))}"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
+          <Icone nom="file-text" class="mr-3 h-5 w-5" />
           {$tr("admin.documents")}
+        </a>
+      </li>
+      <li>
+        <a
+          href="/admin/blog"
+          on:click={fermer}
+          aria-current={$page.url.pathname.startsWith('/admin/blog') ? "page" : undefined}
+          class="flex items-center rounded-xl p-3 text-sm font-medium transition-colors court:py-2.5 {classeEntree($page.url.pathname.startsWith('/admin/blog'))}"
+        >
+          <Icone nom="newspaper" class="mr-3 h-5 w-5" />
+          {$tr("admin.blog")}
         </a>
       </li>
       <li>
@@ -133,11 +162,9 @@
           href="/admin/users"
           on:click={fermer}
           aria-current={$page.url.pathname.startsWith('/admin/users') ? "page" : undefined}
-          class="flex items-center rounded-lg p-3 text-base font-medium transition-colors hover:bg-blue-50 hover:text-blue-600 court:py-2.5 {$page.url.pathname.startsWith('/admin/users') ? 'bg-blue-50 text-blue-600' : 'text-slate-700'}"
+          class="flex items-center rounded-xl p-3 text-sm font-medium transition-colors court:py-2.5 {classeEntree($page.url.pathname.startsWith('/admin/users'))}"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
-             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-          </svg>
+          <Icone nom="users-round" class="mr-3 h-5 w-5" />
           {$tr("admin.users")}
         </a>
       </li>
@@ -146,48 +173,63 @@
 
   <!-- Hors de la zone qui défile, donc toujours visible ; la zone sûre garde
        la langue au-dessus de la barre d'accueil de l'iPhone. -->
-  <div class="shrink-0 border-t border-slate-200 px-3 pt-4 pb-zone-sure court:pt-2">
+  <div class="shrink-0 border-t border-zinc-200 px-3 pt-4 pb-zone-sure court:pt-2 dark:border-zinc-800">
       <!-- L'administration n'avait AUCUNE sortie vers le site public : le logo
            pointe /admin, et la seule issue était la déconnexion. -->
       <a
         href="/"
         data-testid="admin-back-to-site"
-        class="mb-1 flex w-full items-center rounded-lg p-3 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors court:py-2.5">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" />
-        </svg>
+        class="mb-1 flex w-full items-center rounded-xl p-3 text-sm font-medium transition-colors court:py-2.5 {ENTREE}">
+        <Icone nom="house" class="mr-3 h-5 w-5" />
         {$tr("admin.backToSite")}
       </a>
       <button
         type="button"
         on:click={handleLogout}
         data-testid="admin-logout"
-        class="flex w-full items-center rounded-lg p-3 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors court:py-2.5">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 mr-3">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-        </svg>
+        class="flex w-full items-center rounded-xl p-3 text-sm font-medium transition-colors court:py-2.5 {ENTREE}">
+        <Icone nom="log-out" class="mr-3 h-5 w-5" />
         {$tr("admin.logout")}
       </button>
 
-      <!-- L'administration n'avait aucun moyen de changer de langue : la
-           langue choisie sur le site public s'y appliquait sans qu'on puisse
-           la modifier. Boutons de 44 px au doigt, compactés à partir de lg,
-           où la barre n'est plus un tiroir tactile. -->
-      <div class="mb-4 mt-3 flex items-center gap-2 px-3 court:mb-2 court:mt-1">
+      <!-- L'administration n'avait aucun moyen de changer de langue (celle du
+           site public s'y appliquait sans qu'on puisse la modifier), ni de
+           thème. Mêmes boutons que la rangée des réglages du menu mobile du
+           site (SiteHeader) : 44 px, rounded-xl, langue active inversée comme
+           l'entrée courante du menu, thème calé à droite. La pastille de
+           12 px en rounded-lg faisait une troisième variante du choix de
+           langue, et ne gardait pas ses 44 px en colonne, où une tablette en
+           paysage ou un portable tactile s'en servent au doigt. Sans retrait
+           propre, la langue active s'aligne sur le fond des entrées du menu. -->
+      <div class="mb-4 mt-3 flex items-center gap-2 court:mb-2 court:mt-1">
         <button
           type="button"
           on:click={() => switchLanguage('fr')}
           data-testid="lang-fr-admin"
           aria-label="{$tr('a11y.switchTo')} français"
-          class="inline-flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-xs font-bold lg:h-auto lg:min-w-0 lg:py-1 {$language.current === 'fr' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-800'}">FR</button
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {classeEntree($language.current === 'fr')}">FR</button
         >
         <button
           type="button"
           on:click={() => switchLanguage('en')}
           data-testid="lang-en-admin"
           aria-label="{$tr('a11y.switchTo')} English"
-          class="inline-flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-xs font-bold lg:h-auto lg:min-w-0 lg:py-1 {$language.current === 'en' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-800'}">EN</button
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {classeEntree($language.current === 'en')}">EN</button
         >
+        <!-- Les deux icônes, alternées en CSS par la classe `dark` de <html>,
+             comme dans l'en-tête du site : l'icône suit le thème réellement
+             affiché, même pour un thème « auto » déjà enregistré, que la
+             valeur du store ne dit pas. -->
+        <button
+          type="button"
+          on:click={themeStore.toggle}
+          data-testid="admin-theme-toggle"
+          aria-label={$tr('a11y.toggleTheme')}
+          class="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-xl transition-colors {ENTREE}"
+        >
+          <Icone nom="moon" class="text-xl dark:hidden" />
+          <Icone nom="sun" class="hidden text-xl dark:inline-block" />
+        </button>
       </div>
   </div>
 </aside>

@@ -45,10 +45,11 @@ function applyTheme(theme: 'light' | 'dark') {
     root.classList.add(theme);
     root.setAttribute('data-theme', theme);
     // Barre du navigateur mobile accordee au fond de la page (app.html pose la
-    // valeur initiale avant le premier affichage).
+    // valeur initiale avant le premier affichage) : background-dark et
+    // background-light de tailwind.config.js, memes valeurs qu'app.html.
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#0a1628' : '#f8f9fa');
+      ?.setAttribute('content', theme === 'dark' ? '#09090B' : '#FAFAFA');
   }
 }
 

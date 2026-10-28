@@ -16,18 +16,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Blue-600 et non Blue-500. #3B82F6 donnait 3,68:1 — sous le seuil AA de
-        // 4,5 — DANS LES DEUX SENS : en texte sur fond blanc, et en texte blanc
-        // sur bouton bleu. Un seul jeton corrigeait les deux (5,17:1).
-        primary: "#2563EB",
-        "background-light": "#f8f9fa", // Light gray from reference
-        "background-dark": "#0a1628", // Matches reference background
-        "card-light": "#fafafa", // Slightly off-white for cards
-        "card-dark": "#1a2942", // Slightly lighter for cards (matches gradient end from reference)
-        "text-light": "#1a1a1a", // Dark gray/black from reference
-        "text-dark": "#F1F5F9",
-        "secondary-text-light": "#6b7280", // Gray-500 from reference
-        "secondary-text-dark": "#94A3B8",
+        // Site en noir et blanc, sur l'échelle ZINC de Tailwind et elle seule :
+        // pas de slate, gray, neutral ni stone, aucune teinte. Seule exception,
+        // le rouge des erreurs et des actions destructrices. Recettes de classes
+        // et règles de contraste : guide de la conversion (data/ui-mono/guide.md
+        // dans le dépôt du backend).
+        //
+        // `primary` vaut zinc-900 et non plus le bleu d'avant : il SE CONFOND
+        // avec les fonds sombres (1,1:1 sur background-dark). Jamais seul en
+        // texte ou en anneau : toujours avec sa variante `dark:` (blanc).
+        primary: "#18181B", // zinc-900
+        "background-light": "#FAFAFA", // zinc-50 : fond des pages, theme-color (app.html)
+        "background-dark": "#09090B", // zinc-950 : fond des pages en sombre
+        "card-light": "#FFFFFF", // cartes, panneaux, fenêtres
+        "card-dark": "#121215", // entre zinc-950 et zinc-900 : la carte se détache du fond
+        "text-light": "#09090B", // zinc-950 : 19:1 sur le fond clair
+        "text-dark": "#F4F4F5", // zinc-100 : 18:1 sur le fond sombre
+        // Texte secondaire. zinc-500 : 4,8:1 sur blanc, 4,6:1 sur le fond clair,
+        // mais 4,4:1 seulement sur zinc-100, sous le seuil AA : sur une surface
+        // zinc-100 ou plus foncée, prendre zinc-600.
+        "secondary-text-light": "#71717A", // zinc-500
+        // zinc-400 : 7,8:1 sur le fond sombre. zinc-500 n'y fait que 4,1:1.
+        "secondary-text-dark": "#A1A1AA", // zinc-400
       },
       fontFamily: {
         // « Inter Variable » : la police auto-hebergee (@fontsource-variable/inter).
@@ -37,6 +47,12 @@ export default {
         sans: ["Inter Variable", ...defaultTheme.fontFamily.sans],
         display: ["Inter Variable", "Inter", "sans-serif"],
         body: ["Inter Variable", "Inter", "sans-serif"],
+        // « Geist Mono Variable » : la chasse fixe auto-hebergee
+        // (@fontsource-variable/geist-mono, src/app.css). Sans elle, font-mono
+        // (et code, kbd, pre, que le preflight met en `mono`) prenait celle du
+        // systeme, qui change d'un poste a l'autre. Les polices de Tailwind
+        // restent en repli, pour un caractere hors du latin (⌘ des touches).
+        mono: ["Geist Mono Variable", ...defaultTheme.fontFamily.mono],
       },
       boxShadow: {
         'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
@@ -45,7 +61,12 @@ export default {
     },
   },
   plugins: [
-    forms,
+    // Styles des champs posés sur les ÉLÉMENTS seulement (stratégie `base`),
+    // repris en noir et blanc dans src/app.css. Les classes `form-checkbox`,
+    // `form-input`… (stratégie `class`) pesaient plus lourd que ces reprises :
+    // leur bleu revenait, et en mode sombre une case cochée blanche gardait sa
+    // coche blanche, invisible. Sans elles, ces classes ne font plus rien.
+    forms({ strategy: 'base' }),
     typography,
     // Variante `court:` : ecran court, telephone en paysage (environ 360 px de
     // haut). Elle reduit les marges verticales la ou chaque ligne compte, sans

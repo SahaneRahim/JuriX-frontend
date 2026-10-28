@@ -26,6 +26,9 @@
 
 import { get, writable } from 'svelte/store';
 import { effacerSessionChat, lirePersonaSessionChat, lireSessionChat } from '$lib/chat-session';
+// Import de TYPE seulement, effacé à la compilation : le module reste une
+// feuille à l'exécution.
+import type { NomIcone } from '$lib/icones';
 
 /** Les profils proposés, dans l'ordre d'affichage. Accent en échappement : NFC garanti. */
 export const PERSONAS = ['citoyen', 'étudiant', 'avocat', 'entrepreneur'] as const;
@@ -42,13 +45,23 @@ export const PERSONA_SLUG: Record<Persona, string> = {
   entrepreneur: 'entrepreneur',
 };
 
-/** Icônes Material Icons ; `general` pour le profil général. */
-export const PERSONA_ICONE: Record<Persona | 'general', string> = {
-  citoyen: 'person',
-  'étudiant': 'school',
+/**
+ * Icône Lucide de chaque profil, pour `<Icone nom={PERSONA_ICONE[…]} />` ;
+ * `general` pour le profil général. Typée `NomIcone` : un nom absent du
+ * registre (src/lib/icones.ts) est une erreur de svelte-check, et non une
+ * icône vide découverte à l'écran.
+ *
+ * Mêmes sujets que les icônes d'avant la refonte (personne, toque, maillet,
+ * mallette, globe), pour que chaque profil reste reconnaissable ;
+ * `user-round` et non `user` : les personnes sont de la famille « -round »
+ * sur tout le site.
+ */
+export const PERSONA_ICONE: Record<Persona | 'general', NomIcone> = {
+  citoyen: 'user-round',
+  'étudiant': 'graduation-cap',
   avocat: 'gavel',
-  entrepreneur: 'business_center',
-  general: 'public',
+  entrepreneur: 'briefcase-business',
+  general: 'globe',
 };
 
 /** Un persona connu, en NFC ; `null` pour tout le reste (`general` compris). */

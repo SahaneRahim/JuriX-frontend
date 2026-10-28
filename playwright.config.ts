@@ -59,9 +59,13 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      // Les tailles d'ecran ont leur propre projet, ci-dessous : la suite
+      // Les tailles d'ecran ont leurs propres projets, ci-dessous : la suite
       // habituelle reste celle d'avant, au viewport de bureau.
-      testIgnore: 'navigation/responsif.spec.ts',
+      testIgnore: [
+        'navigation/responsif.spec.ts',
+        'navigation/monochrome.spec.ts',
+        'navigation/redimensionnement.spec.ts',
+      ],
     },
     {
       // Le site sur six tailles d'ecran, du telephone de 360 px au bureau, et
@@ -72,6 +76,27 @@ export default defineConfig({
       //   npx playwright test --project=responsif
       name: 'responsif',
       testMatch: 'navigation/responsif.spec.ts',
+      use: chromeSansTaille,
+    },
+    {
+      // Le noir et blanc : aucune teinte peinte, sauf le rouge des erreurs, sur
+      // 21 pages en 390x844 et 1440x900, clair et sombre, et sur ce qui ne
+      // s'ouvre qu'a la demande (menus, palette, fenetres, tiroirs, erreurs) ;
+      // l'interface anglaise sans reste de francais. Avec CAPTURES_DIR, une
+      // capture par page et par taille (tests/e2e/navigation/monochrome.spec.ts).
+      //   CAPTURES_DIR=… npx playwright test --project=monochrome
+      name: 'monochrome',
+      testMatch: 'navigation/monochrome.spec.ts',
+      use: chromeSansTaille,
+    },
+    {
+      // Le redimensionnement en direct, de 1920 a 320 px sans recharger, les
+      // ecrans courts, les tiroirs et fenetres qui traversent un changement de
+      // taille, et les cibles de 44 px au doigt
+      // (tests/e2e/navigation/redimensionnement.spec.ts).
+      //   npx playwright test --project=redimensionnement
+      name: 'redimensionnement',
+      testMatch: 'navigation/redimensionnement.spec.ts',
       use: chromeSansTaille,
     },
   ],

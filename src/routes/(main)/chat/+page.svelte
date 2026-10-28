@@ -30,12 +30,13 @@
   import { prefersReducedMotion } from "svelte/motion";
   import { fade } from "svelte/transition";
   import { formatHeure } from "$lib/format";
-  import { blocsDeReponse, type Bloc } from "$lib/texte";
+  import { blocsDeReponse, morceauxDuTexte, type Bloc } from "$lib/texte";
   import { lireEvenements } from "$lib/flux";
   // `traductions` et non `tr` : la page rend des <tr> (tableaux des réponses),
   // et un identifiant du même nom fait signaler chaque balise par Svelte.
   import { language, switchLanguage, tr as traductions } from "$lib/stores/language";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import Icone from "$lib/components/Icone.svelte";
 
 // Chat message types
   interface ChatMessage {
@@ -165,6 +166,33 @@
     }
     return blocs;
   }
+
+  /**
+   * Nom du cadre qui fait défiler un tableau de côté (voir le gabarit) : ses
+   * intitulés de colonnes, ou, sans ligne d'en-tête, sa première ligne, qui en
+   * tient lieu quand le modèle oublie le délimiteur `|---|`. Tiré de la
+   * réponse elle-même, il est dans sa langue sans clé de traduction, et chaque
+   * tableau se distingue des autres dans la liste des repères d'un lecteur
+   * d'écran, là où un nom générique (« Tableau ») les confondrait tous.
+   * Chaîne vide : rien pour le nommer.
+   */
+  function nomDuTableau(bloc: Bloc): string {
+    const ligne = bloc.entetes?.length ? bloc.entetes : (bloc.lignes?.[0] ?? []);
+    return ligne
+      .map((cellule) => cellule.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  /**
+   * Lien d'une réponse (adresse repérée par `morceauxDuTexte`), au style des
+   * liens du site (guide § 4.3) : souligné discret, qui fonce au survol. Il
+   * s'ouvre dans un nouvel onglet : de retour sur /chat, la page ne réaffiche
+   * pas la conversation, et suivre un lien dans le même onglet la faisait
+   * disparaître de l'écran.
+   */
+  const CLASSE_LIEN =
+    "text-zinc-950 underline decoration-zinc-300 underline-offset-4 transition-colors hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-white";
 
   /**
    * Sources dépliées, par message. Sous sm, la liste est repliée par défaut :
@@ -704,10 +732,7 @@
             {
               id: idReponse,
               type: "assistant",
-              content:
-                $language.current === "fr"
-                  ? "Je n'ai pas pu traiter votre demande."
-                  : "I couldn't process your request.",
+              content: t("chat.emptyAnswer"),
               timestamp: getCurrentTime(),
             },
           ];
@@ -858,9 +883,14 @@
   sort AVANT les variantes de largeur dans la feuille de style, et un `sm:`
   sur la même propriété l'emporterait sur un téléphone en paysage (plus de
   640 px de large).
+
+  Écran court : 8 px au-dessus et au-dessous de la carte, le pas des marges
+  courtes du site (`court:!pt-2` du layout) et de la liste (`court:py-2`). À
+  4 px, contre 16 px sur les côtés, la carte touchait presque le haut et le
+  bas de l'écran.
 -->
 <div
-  class="flex min-h-0 w-full flex-1 flex-col sm:mx-auto sm:max-w-3xl sm:pt-3 sm:pb-4 sm:court:py-1 lg:pt-0 lg:pb-6 {$authStore.isAuthenticated
+  class="flex min-h-0 w-full flex-1 flex-col sm:mx-auto sm:max-w-3xl sm:pt-3 sm:pb-4 sm:court:py-2 lg:pt-0 lg:pb-6 {$authStore.isAuthenticated
     ? 'lg:max-w-6xl lg:flex-row lg:gap-6'
     : ''}"
 >
@@ -876,7 +906,7 @@
       <!-- Fond du tiroir : un appui à côté le referme. -->
       <div
         role="presentation"
-        class="fixed inset-0 z-[54] bg-slate-900/60 lg:hidden"
+        class="fixed inset-0 z-[54] bg-zinc-950/40 backdrop-blur-sm lg:hidden"
         on:click={() => (panneauOuvert = false)}
         transition:fade={{ duration: duree(150) }}
       ></div>
@@ -891,6 +921,11 @@
       Fermé sous lg, il est `invisible` et non seulement poussé hors de
       l'écran : sinon la tabulation entrait dans ses boutons cachés. z-[55] :
       au-dessus de l'en-tête (z-50), sous la boîte des profils (z-[60]).
+
+      En tiroir, un trait à droite : en sombre, sans ombre, seul le voile du
+      fond le séparait de la conversation, d'un gris presque identique. En
+      colonne, la même carte que la conversation (bordure, ombre légère, rien
+      en sombre), pour que les deux se lisent comme une paire.
     -->
     <aside
       bind:this={panneau}
@@ -900,21 +935,21 @@
       role={tiroirOuvert ? "dialog" : undefined}
       aria-modal={tiroirOuvert ? "true" : undefined}
       use:piegeSiTiroir={tiroirOuvert}
-      class="fixed inset-y-0 left-0 z-[55] flex h-app w-[85vw] max-w-xs flex-col bg-white pt-zone-sure pb-zone-sure pl-[env(safe-area-inset-left)] shadow-xl transition-[transform,visibility] duration-200 ease-out motion-reduce:transition-none dark:bg-slate-900 {panneauOuvert
+      class="fixed inset-y-0 left-0 z-[55] flex h-app w-[85vw] max-w-xs flex-col border-r border-zinc-200 bg-white pt-zone-sure pb-zone-sure pl-[env(safe-area-inset-left)] shadow-xl transition-[transform,visibility] duration-200 ease-out motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none {panneauOuvert
         ? 'visible translate-x-0'
-        : 'invisible -translate-x-full'} lg:visible lg:static lg:z-auto lg:h-auto lg:w-72 lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:rounded-2xl lg:border lg:border-gray-100 lg:p-0 lg:shadow-none lg:transition-none lg:dark:border-slate-700/50 lg:dark:bg-slate-800/50"
+        : 'invisible -translate-x-full'} lg:visible lg:static lg:z-auto lg:h-auto lg:w-72 lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:rounded-2xl lg:border lg:p-0 lg:shadow-sm lg:transition-none lg:dark:shadow-none"
     >
       <div class="flex items-center justify-between gap-2 px-4 pt-3 lg:pt-4">
-        <h2 id="titre-conversations" class="text-sm font-bold text-slate-900 dark:text-white">
+        <h2 id="titre-conversations" class="text-sm font-bold text-zinc-950 dark:text-white">
           {t("chat.conversations")}
         </h2>
         <button
           type="button"
           aria-label={t("common.close")}
           on:click={() => (panneauOuvert = false)}
-          class="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white lg:hidden"
+          class="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white lg:hidden"
         >
-          <span class="material-icons" aria-hidden="true">close</span>
+          <Icone nom="x" class="text-2xl" />
         </button>
       </div>
 
@@ -922,7 +957,7 @@
         <button
           on:click={() => nouvelleConversation()}
           data-testid="chat-new"
-          class="min-h-11 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 lg:min-h-0"
+          class="min-h-11 w-full rounded-xl bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 lg:min-h-0"
         >
           {t("chat.newConversation")}
         </button>
@@ -938,27 +973,32 @@
           <p
             role="status"
             aria-live="polite"
-            class="mt-2 text-xs text-slate-500 dark:text-slate-400"
+            class="mt-2 text-xs text-zinc-500 dark:text-zinc-400"
           >
             {t("common.loading")}
           </p>
         {:else if conversationsErreur}
+          <!-- L'alerte d'erreur du site, en format serré pour la colonne :
+               l'icône dit « erreur » sans compter sur le seul rouge. -->
           <div
             role="alert"
             data-testid="conversations-error"
-            class="mt-2 rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-300"
+            class="mt-2 flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
           >
-            <p>{conversationsErreur}</p>
-            <button
-              on:click={chargerConversations}
-              data-testid="conversations-retry"
-              class="-mx-2 inline-flex min-h-11 items-center px-2 font-medium underline hover:no-underline lg:mx-0 lg:mt-1 lg:min-h-0 lg:px-0"
-            >
-              {t("common.retry")}
-            </button>
+            <Icone nom="circle-alert" class="mt-px text-sm" />
+            <div class="min-w-0">
+              <p>{conversationsErreur}</p>
+              <button
+                on:click={chargerConversations}
+                data-testid="conversations-retry"
+                class="-mx-2 inline-flex min-h-11 items-center px-2 font-medium underline hover:no-underline lg:mx-0 lg:mt-1 lg:min-h-0 lg:px-0"
+              >
+                {t("common.retry")}
+              </button>
+            </div>
           </div>
         {:else if conversations.length === 0}
-          <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             {t("chat.conversationsEmpty")}
           </p>
         {:else}
@@ -969,23 +1009,26 @@
                   on:click={() => ouvrirConversation(conversation)}
                   data-testid="conversation-item"
                   aria-current={conversation.session_id === sessionId ? "true" : undefined}
-                  class="min-h-11 min-w-0 flex-1 truncate rounded-lg px-2 py-2.5 text-left text-sm transition-colors lg:min-h-0 lg:py-1.5 lg:text-xs {conversation.session_id ===
+                  class="min-h-11 min-w-0 flex-1 truncate rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors lg:min-h-0 lg:py-1.5 lg:text-xs {conversation.session_id ===
                   sessionId
-                    ? 'bg-blue-50 dark:bg-slate-700 font-semibold text-blue-700 dark:text-blue-300'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'}"
+                    ? 'bg-zinc-950 font-medium text-white dark:bg-white dark:text-zinc-950'
+                    : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}"
                 >
                   {conversation.title || t("chat.untitledConversation")}
                 </button>
                 <!-- 44 px sous lg : collé au titre et effaçant sans
-                     confirmation, il se touchait par erreur du pouce. -->
+                     confirmation, il se touchait par erreur du pouce.
+                     zinc-500 au repos et non plus clair : l'icône est seule à
+                     dire ce que fait le bouton, il lui faut 3:1 sur le blanc.
+                     Le rouge n'arrive qu'au survol : c'est une suppression. -->
                 <button
                   on:click={() => supprimerConversation(conversation)}
                   data-testid="conversation-delete"
                   aria-label="{t('chat.deleteConversation')} : {conversation.title ||
                     t('chat.untitledConversation')}"
-                  class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:text-red-600 lg:h-auto lg:w-auto lg:px-1.5 lg:py-1"
+                  class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-950/40 dark:hover:text-red-400 lg:h-auto lg:w-auto lg:px-1.5 lg:py-1"
                 >
-                  <span class="material-icons text-lg lg:text-sm" aria-hidden="true">delete_outline</span>
+                  <Icone nom="trash" class="text-lg lg:text-sm" />
                 </button>
               </li>
             {/each}
@@ -995,10 +1038,13 @@
     </aside>
   {/if}
 
-  <!-- `sm:dark:` : les variantes `dark:` sortent avant celles de largeur, un
-       `sm:border-gray-100` seul l'emporterait aussi en mode sombre. -->
+  <!-- Bordure et ombre du mode sombre sous la variante de largeur, empilée
+       devant celle du thème : les variantes de thème sortent avant celles de
+       largeur, un `sm:border-zinc-200` seul l'emporterait aussi en mode
+       sombre. (Ce commentaire n'écrit pas l'empilement en toutes lettres :
+       Tailwind lit aussi les commentaires, et en tirait des règles mortes.) -->
   <div
-    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-800/50 sm:rounded-2xl sm:border sm:border-gray-100 sm:shadow-xl sm:dark:border-slate-700/50 sm:dark:shadow-none"
+    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl sm:border sm:border-zinc-200 sm:shadow-sm sm:dark:border-zinc-800 sm:dark:shadow-none"
   >
     <!--
       Barre du haut. Sous lg, elle remplace l'en-tête du site (non rendu sur
@@ -1009,7 +1055,7 @@
       élément).
     -->
     <div
-      class="shrink-0 border-b border-gray-100 bg-gray-50 pt-zone-sure dark:border-slate-700 dark:bg-slate-800 lg:pt-0"
+      class="shrink-0 border-b border-zinc-200 bg-zinc-50/70 pt-zone-sure dark:border-zinc-800 dark:bg-zinc-900/60 lg:pt-0"
     >
       <div
         class="flex min-h-14 items-center gap-1 px-1 py-1 sm:gap-2 sm:px-2 lg:min-h-0 lg:px-6 lg:py-4 court:min-h-0 court:py-0"
@@ -1017,18 +1063,23 @@
         <a
           href="/"
           aria-label={t("chat.backHome")}
-          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-700/60 lg:hidden"
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white lg:hidden"
         >
-          <span class="material-icons" aria-hidden="true">arrow_back</span>
+          <Icone nom="arrow-left" class="text-2xl" />
         </a>
 
-        <span class="hidden h-2 w-2 shrink-0 rounded-full bg-emerald-500 motion-safe:animate-pulse lg:block"></span>
+        <!-- Le titre de la barre, le même à toutes les largeurs, en surtitre
+             (guide § 4.2) comme « Corpus juridique officiel » sur l'accueil :
+             ici à partir de lg, avec la pastille d'état ; sous lg, première
+             ligne du bouton de profil, plus bas. La barre disait « IA
+             Juridique Camerounaise V2.0 » en capitales noires sur grand écran
+             et « Assistant JuriX » en gras en dessous : deux noms et deux
+             styles pour un même panneau. -->
+        <span class="hidden h-2 w-2 shrink-0 rounded-full bg-zinc-950 dark:bg-white motion-safe:animate-pulse lg:block"></span>
         <span
-          class="hidden text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 lg:inline"
+          class="hidden font-mono text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 lg:inline"
         >
-          {$language.current === "fr"
-            ? "IA Juridique Camerounaise V2.0"
-            : "Cameroonian Legal AI V2.0"}
+          {t("chat.barTitle")}
         </span>
 
         <!-- Le profil auquel le chat répond : celui de la conversation en cours,
@@ -1036,35 +1087,42 @@
              barre et le profil sur deux lignes (le tout en 44 px de haut) ; à
              partir de lg, il redevient le lien « Changer ». -->
         <div
-          class="flex min-w-0 flex-1 items-center gap-2 text-xs text-slate-600 dark:text-slate-300 lg:ml-auto lg:flex-none"
+          class="flex min-w-0 flex-1 items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300 lg:ml-auto lg:flex-none"
           data-testid="chat-persona"
           data-persona={personaAffiche ?? "general"}
         >
-          <span
-            class="material-icons hidden text-base text-blue-600 dark:text-blue-400 lg:inline-block"
-            aria-hidden="true">{PERSONA_ICONE[personaAffiche ?? "general"]}</span
-          >
+          <Icone
+            nom={PERSONA_ICONE[personaAffiche ?? "general"]}
+            class="hidden text-base text-zinc-950 dark:text-white lg:inline-block"
+          />
           <span class="hidden lg:inline">{t("persona.chatLabel")} : <strong>{nomDuProfil}</strong></span>
+          <!-- À partir de lg, « Changer » prend l'allure des liens du site :
+               souligné discret, qui fonce au survol. -->
           <button
             type="button"
             data-testid="chat-persona-change"
             aria-haspopup="dialog"
             on:click={() => ouvrirChoixPersona(personaAffiche)}
-            class="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-lg px-2 text-left hover:bg-gray-100 dark:hover:bg-slate-700/60 lg:min-h-0 lg:flex-none lg:rounded-md lg:py-0.5 lg:font-semibold lg:text-blue-700 lg:underline lg:hover:bg-transparent lg:hover:no-underline lg:dark:text-blue-300 lg:dark:hover:bg-transparent"
+            class="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-xl px-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 lg:min-h-0 lg:flex-none lg:rounded-md lg:py-0.5 lg:font-semibold lg:text-zinc-950 lg:underline lg:decoration-zinc-300 lg:underline-offset-4 lg:hover:bg-transparent lg:hover:decoration-zinc-950 lg:dark:text-white lg:dark:decoration-zinc-600 lg:dark:hover:bg-transparent lg:dark:hover:decoration-white"
           >
+            <!-- Le titre de la barre, en surtitre comme à partir de lg. Les
+                 deux lignes en zinc-600 et non zinc-500 : au survol, le bouton
+                 passe sur zinc-100, où zinc-500 n'atteint plus 4,5:1 (guide
+                 § 3, règle 1). Le nom du profil en gras, comme à partir de
+                 lg : le titre en surtitre, rien d'autre n'accrochait l'œil. -->
             <span
-              class="block max-w-full truncate text-sm font-semibold leading-5 text-slate-900 dark:text-white lg:hidden"
+              class="block max-w-full truncate font-mono text-xs font-semibold uppercase leading-4 tracking-widest text-zinc-600 dark:text-zinc-400 lg:hidden"
               >{t("chat.barTitle")}</span
             >
             <span
-              class="flex max-w-full items-center gap-1 leading-4 text-slate-500 dark:text-slate-400 lg:hidden"
+              class="flex max-w-full items-center gap-1 leading-4 text-zinc-600 dark:text-zinc-400 lg:hidden"
             >
-              <span
-                class="material-icons shrink-0 text-sm text-blue-600 dark:text-blue-400"
-                aria-hidden="true">{PERSONA_ICONE[personaAffiche ?? "general"]}</span
-              >
-              <span class="min-w-0 truncate">{t("persona.chatLabel")} : {nomDuProfil}</span>
-              <span class="material-icons shrink-0 text-sm" aria-hidden="true">expand_more</span>
+              <Icone
+                nom={PERSONA_ICONE[personaAffiche ?? "general"]}
+                class="shrink-0 text-sm text-zinc-950 dark:text-white"
+              />
+              <span class="min-w-0 truncate">{t("persona.chatLabel")} : <strong>{nomDuProfil}</strong></span>
+              <Icone nom="chevron-down" class="shrink-0 text-sm" />
               <span class="sr-only">— {t("persona.change")}</span>
             </span>
             <span class="hidden lg:inline">{t("persona.change")}</span>
@@ -1082,9 +1140,9 @@
               menuOuvert = false;
               panneauOuvert = !panneauOuvert;
             }}
-            class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-700/60 lg:hidden"
+            class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white lg:hidden"
           >
-            <span class="material-icons" aria-hidden="true">forum</span>
+            <Icone nom="messages-square" class="text-2xl" />
           </button>
         {/if}
 
@@ -1096,9 +1154,9 @@
           aria-controls="chat-menu"
           aria-label={t("a11y.menu")}
           on:click={() => (menuOuvert = !menuOuvert)}
-          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-700/60 lg:hidden"
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white lg:hidden"
         >
-          <span class="material-icons" aria-hidden="true">{menuOuvert ? "close" : "menu"}</span>
+          <Icone nom={menuOuvert ? "x" : "menu"} class="text-2xl" />
         </button>
       </div>
 
@@ -1109,50 +1167,50 @@
           id="chat-menu"
           data-testid="chat-menu"
           aria-label={t("a11y.menu")}
-          class="border-t border-gray-100 px-2 py-2 dark:border-slate-700 lg:hidden"
+          class="border-t border-zinc-200 px-2 py-2 dark:border-zinc-800 lg:hidden"
         >
           <ul class="grid grid-cols-2 gap-1">
             {#each NAV_LINKS as lien (lien.href)}
               <li>
                 <a
                   href={lien.href}
-                  class="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-700/60"
+                  class="flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
                   >{t(lien.key)}</a
                 >
               </li>
             {/each}
           </ul>
-          <div class="mt-2 flex items-center gap-1 border-t border-gray-100 pt-2 dark:border-slate-700">
+          <div class="mt-2 flex items-center gap-1 border-t border-zinc-200 pt-2 dark:border-zinc-800">
             <button
               type="button"
               aria-label="{t('a11y.switchTo')} français"
               aria-pressed={$language.current === "fr"}
               on:click={() => switchLanguage("fr")}
-              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-bold {$language.current ===
+              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-bold transition-colors {$language.current ===
               'fr'
-                ? 'bg-blue-50 text-blue-700 dark:bg-white/10 dark:text-blue-300'
-                : 'text-slate-600 dark:text-slate-300'}">FR</button
+                ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950'
+                : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">FR</button
             >
             <button
               type="button"
               aria-label="{t('a11y.switchTo')} English"
               aria-pressed={$language.current === "en"}
               on:click={() => switchLanguage("en")}
-              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-bold {$language.current ===
+              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-bold transition-colors {$language.current ===
               'en'
-                ? 'bg-blue-50 text-blue-700 dark:bg-white/10 dark:text-blue-300'
-                : 'text-slate-600 dark:text-slate-300'}">EN</button
+                ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950'
+                : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">EN</button
             >
             <button
               type="button"
               aria-label={t("a11y.toggleTheme")}
               on:click={themeStore.toggle}
-              class="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-700/60"
+              class="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
             >
               <!-- Les deux icônes, alternées par la classe `dark`, comme dans
                    l'en-tête. -->
-              <span class="material-icons dark:hidden" aria-hidden="true">dark_mode</span>
-              <span class="material-icons hidden dark:inline-block" aria-hidden="true">light_mode</span>
+              <Icone nom="moon" class="text-2xl dark:hidden" />
+              <Icone nom="sun" class="hidden text-2xl dark:inline-block" />
             </button>
           </div>
         </nav>
@@ -1173,6 +1231,11 @@
       500 px quelle que soit la taille de l'écran : plus haut que l'écran d'un
       téléphone en paysage, et la saisie tombait sous la ligne de flottaison.
       `overscroll-contain` : arrivé en haut, le geste ne recharge pas la page.
+
+      Marges latérales : 16 px sur téléphone, la gouttière du reste du site,
+      puis 24 px à partir de sm ; la saisie, en dessous, prend les mêmes. La
+      liste (12 px) et la saisie (8 px) ne s'alignaient pas : le cadre de
+      saisie débordait des bulles de chaque côté.
     -->
     <div class="relative flex min-h-0 flex-1 flex-col">
       <div
@@ -1181,34 +1244,44 @@
         aria-live="polite"
         aria-label={t("chat.header")}
         on:scroll={mesurerColle}
-        class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-4 sm:space-y-6 sm:p-6 court:py-2 sm:court:py-2"
+        class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:space-y-6 sm:p-6 court:py-2 sm:court:py-2"
       >
         {#each messagesAffiches as message (message.id)}
           <div
             data-message-id={message.id}
             class="flex gap-2 sm:gap-4 {message.type === 'user' ? 'flex-row-reverse' : ''}"
           >
-            <!-- Avatar. Celui de l'utilisateur disparaît sous sm : la bulle
-                 alignée à droite suffit à dire qui parle, et ces 40 px
-                 manquaient au texte. -->
-            <div class="shrink-0 {message.type === 'user' ? 'hidden sm:block' : ''}">
+            <!-- Avatar. Sous sm, ceux de l'utilisateur ET de l'assistant
+                 disparaissent : la bulle noire à droite et la bulle bordée à
+                 gauche suffisent à dire qui parle, et ces 40 px (32 + 8
+                 d'écart) manquaient au texte. Seul celui du bot restait : les
+                 réponses, les textes les plus longs, perdaient 40 px de ligne
+                 (285 px de texte à 390 px de large), et les deux
+                 interlocuteurs n'avaient pas la même mise en page. Celui d'une
+                 erreur reste : son icône est le seul pictogramme qui la
+                 signale (guide § 4.10), et le message est court.
+                 L'utilisateur est inversé, comme sa bulle ; l'assistant est
+                 clair, comme la sienne. Le rouge reste à
+                 l'erreur seule, en red-600 : sur red-500, le blanc ne fait que
+                 3,8:1. -->
+            <div class="shrink-0 {message.type === 'error' ? '' : 'hidden sm:block'}">
               {#if message.type === "error"}
                 <div
-                  class="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 shadow-lg shadow-red-500/30 sm:h-10 sm:w-10"
+                  class="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white sm:h-10 sm:w-10"
                 >
-                  <span class="material-icons text-base text-white sm:text-lg" aria-hidden="true">cloud_off</span>
+                  <Icone nom="cloud-off" class="text-base sm:text-lg" />
                 </div>
               {:else if message.type === "assistant"}
                 <div
-                  class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/30 sm:h-10 sm:w-10"
+                  class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 sm:h-10 sm:w-10"
                 >
-                  <span class="material-icons text-base text-white sm:text-lg" aria-hidden="true">smart_toy</span>
+                  <Icone nom="bot" class="text-base sm:text-lg" />
                 </div>
               {:else}
                 <div
-                  class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 shadow-lg shadow-blue-500/30 sm:h-10 sm:w-10"
+                  class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 sm:h-10 sm:w-10"
                 >
-                  <span class="material-icons text-base text-white sm:text-lg" aria-hidden="true">person</span>
+                  <Icone nom="user-round" class="text-base sm:text-lg" />
                 </div>
               {/if}
             </div>
@@ -1222,7 +1295,7 @@
                 <div
                   role="alert"
                   data-testid="chat-error"
-                  class="coupe-mots inline-block max-w-[85%] rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-left dark:border-red-900/40 dark:bg-red-900/20 sm:max-w-md sm:px-5 sm:py-3"
+                  class="coupe-mots inline-block max-w-[85%] rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-left dark:border-red-900/60 dark:bg-red-950/40 sm:max-w-md sm:px-5 sm:py-3"
                 >
                   <p class="text-red-700 dark:text-red-300">{message.content}</p>
                   <button
@@ -1234,19 +1307,36 @@
                 </div>
               {:else if message.type === "user"}
                 <!-- `whitespace-pre-wrap` : la saisie accepte les retours à la
-                     ligne (Maj+Entrée), qui sont gardés. -->
+                     ligne (Maj+Entrée), qui sont gardés.
+                     Bulle inversée dans les deux thèmes, comme tout élément
+                     « à soi » du site : blanche en sombre. L'heure suit :
+                     zinc-400 sur zinc-950 (7,8:1), zinc-600 sur blanc (7,7:1).
+                     `rounded-tr-sm` et non `-xs`, qui n'existe pas dans
+                     Tailwind 3 : le coin de la bulle restait arrondi. -->
                 <div
-                  class="coupe-mots inline-block max-w-[85%] rounded-2xl rounded-tr-none bg-gray-100 px-4 py-2.5 text-left dark:bg-slate-700 sm:max-w-md sm:px-5 sm:py-3"
+                  class="coupe-mots inline-block max-w-[85%] rounded-2xl rounded-tr-sm bg-zinc-950 px-4 py-2.5 text-left text-white shadow-sm dark:bg-white dark:text-zinc-950 dark:shadow-none sm:max-w-md sm:px-5 sm:py-3"
                 >
-                  <p class="whitespace-pre-wrap text-slate-800 dark:text-white">{message.content}</p>
+                  <p class="whitespace-pre-wrap">{message.content}</p>
                   {#if message.timestamp}
-                    <span class="mt-1 block text-xs text-slate-500 dark:text-slate-300 sm:mt-2"
+                    <span class="mt-1 block font-mono text-xs text-zinc-400 dark:text-zinc-600 sm:mt-2"
                       >{message.timestamp}</span
                     >
                   {/if}
                 </div>
               {:else}
-                <div class="space-y-3">
+                <!--
+                  Bulle de l'assistant (guide § 4.15), pendant de la bulle
+                  noire de l'utilisateur : blanche et bordée, le coin du haut
+                  resserré côté avatar comme le sien. La réponse était posée à
+                  plat sur la carte. Les sources y entrent, sous un trait : elles
+                  font partie de la réponse. Les suggestions restent dehors : ce
+                  sont des questions à poser, pas du texte de l'assistant.
+                  Pleine largeur et non ajustée au texte : pendant le flux, elle
+                  aurait changé de largeur à chaque morceau.
+                -->
+                <div
+                  class="space-y-3 rounded-2xl rounded-tl-sm border border-zinc-200 bg-white px-4 py-2.5 text-left text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 sm:px-5 sm:py-3"
+                >
                   <!--
                     Rendu en NOEUDS Svelte, donc echappe par construction. Le
                     prompt systeme du backend demande du markdown ; `{message.content}`
@@ -1258,13 +1348,20 @@
 
                     `coupe-mots` : une cote (« N°2018/9387/CAB/PM ») ou une URL
                     ne pousse plus la conversation hors de l'écran.
+
+                    Les adresses http(s) deviennent des liens, eux aussi en
+                    nœuds (`morceauxDuTexte`) : Svelte échappe l'adresse, et
+                    seuls http et https passent. Elles restaient du texte brut,
+                    long et qu'on ne pouvait pas suivre. Ni dans les titres ni
+                    dans le code, qui se lisent tels quels. Les morceaux
+                    s'écrivent bout à bout, sans blanc entre les balises : une
+                    espace glissée entre un lien et le point qui le suit se
+                    verrait.
                   -->
-                  <div
-                    class="coupe-mots space-y-3 text-left leading-relaxed text-slate-700 dark:text-slate-200"
-                  >
+                  <div class="coupe-mots space-y-3 leading-relaxed">
                     {#each blocsDe(message) as bloc, i (i)}
                       {#if bloc.type === "titre"}
-                        <h5 class="font-bold text-slate-900 dark:text-white pt-1">
+                        <h5 class="pt-1 font-bold text-zinc-950 dark:text-white">
                           {bloc.texte}
                         </h5>
                       {:else if bloc.type === "puce" && bloc.numero !== undefined}
@@ -1272,25 +1369,55 @@
                              d'ecran, et non un `content:` CSS. -->
                         <p class="pl-7 relative">
                           <span
-                            class="absolute left-0 w-6 text-right font-semibold text-blue-600 dark:text-blue-400"
+                            class="absolute left-0 w-6 text-right font-semibold text-zinc-950 dark:text-zinc-100"
                             >{bloc.numero}.</span
                           >
-                          {bloc.texte}
+                          {#each morceauxDuTexte(bloc.texte) as morceau, m (m)}{#if morceau.lien}<a
+                                href={morceau.lien}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class={CLASSE_LIEN}>{morceau.texte}</a
+                              >{:else}{morceau.texte}{/if}{/each}
                         </p>
                       {:else if bloc.type === "puce"}
+                        <!-- La puce seule en gras, comme le numéro d'une liste
+                             numérotée : la phrase garde le poids du texte. En
+                             gras, une réponse faite de listes l'était presque
+                             entière. -->
                         <p
-                          class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:text-blue-600 dark:before:text-blue-400"
+                          class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:font-bold before:text-zinc-950 dark:before:text-zinc-100"
                         >
-                          {bloc.texte}
+                          {#each morceauxDuTexte(bloc.texte) as morceau, m (m)}{#if morceau.lien}<a
+                                href={morceau.lien}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class={CLASSE_LIEN}>{morceau.texte}</a
+                              >{:else}{morceau.texte}{/if}{/each}
                         </p>
                       {:else if bloc.type === "tableau"}
+                        {@const nom = nomDuTableau(bloc)}
                         <!-- Un tableau large défile de côté DANS son cadre, au
                              lieu d'élargir la conversation. Ses mots ne se
                              coupent pas n'importe où (`overflow-wrap` normal) :
                              des colonnes réduites à une lettre seraient
                              illisibles. Cellules en nœuds de texte, comme le
-                             reste. -->
-                        <div class="overflow-x-auto overscroll-x-contain [overflow-wrap:normal]">
+                             reste.
+                             Le cadre prend le focus (`tabindex`, axe
+                             scrollable-region-focusable) : sans rien de
+                             focalisable dedans, ses colonnes cachées restaient
+                             hors d'atteinte du clavier, dont les flèches le
+                             font maintenant défiler. Région nommée par ses
+                             intitulés (`nomDuTableau`), comme le cadre de
+                             ImagePdfViewer ; sans nom, ni rôle ni aria-label :
+                             une région anonyme ne dit rien. Le contour du focus
+                             est celui d'app.css. -->
+                        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                        <div
+                          class="overflow-x-auto overscroll-x-contain [overflow-wrap:normal]"
+                          tabindex="0"
+                          role={nom ? "region" : undefined}
+                          aria-label={nom || undefined}
+                        >
                           <table class="min-w-full border-collapse text-sm">
                             {#if bloc.entetes && bloc.entetes.length > 0}
                               <thead>
@@ -1298,7 +1425,7 @@
                                   {#each bloc.entetes as entete, c (c)}
                                     <th
                                       scope="col"
-                                      class="whitespace-pre-line border-b border-slate-200 px-2 py-1.5 text-left font-semibold text-slate-900 dark:border-slate-600 dark:text-white"
+                                      class="whitespace-pre-line border-b border-zinc-200 bg-zinc-100 px-2 py-1.5 text-left font-semibold text-zinc-950 dark:border-zinc-800 dark:bg-zinc-800 dark:text-white"
                                       >{entete}</th
                                     >
                                   {/each}
@@ -1307,9 +1434,16 @@
                             {/if}
                             <tbody>
                               {#each bloc.lignes ?? [] as rangee, r (r)}
-                                <tr class="border-b border-slate-100 last:border-0 dark:border-slate-700">
+                                <tr class="border-b border-zinc-200 last:border-0 dark:border-zinc-800">
                                   {#each rangee as cellule, c (c)}
-                                    <td class="whitespace-pre-line px-2 py-1.5 align-top">{cellule}</td>
+                                    <td class="whitespace-pre-line px-2 py-1.5 align-top"
+                                      >{#each morceauxDuTexte(cellule) as morceau, m (m)}{#if morceau.lien}<a
+                                            href={morceau.lien}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class={CLASSE_LIEN}>{morceau.texte}</a
+                                          >{:else}{morceau.texte}{/if}{/each}</td
+                                    >
                                   {/each}
                                 </tr>
                               {/each}
@@ -1321,23 +1455,30 @@
                              un modèle de courrier dans un bloc de code ne doit
                              pas se lire en faisant défiler l'écran de côté. -->
                         <pre
-                          class="overflow-x-auto whitespace-pre-wrap rounded-lg bg-slate-100 px-3 py-2 font-mono text-sm leading-relaxed text-slate-800 dark:bg-slate-900/60 dark:text-slate-100"><code>{bloc.texte}</code></pre>
+                          class="overflow-x-auto whitespace-pre-wrap rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-sm leading-relaxed text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-100"><code>{bloc.texte}</code></pre>
                       {:else}
-                        <p>{bloc.texte}</p>
+                        <p>
+                          {#each morceauxDuTexte(bloc.texte) as morceau, m (m)}{#if morceau.lien}<a
+                                href={morceau.lien}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class={CLASSE_LIEN}>{morceau.texte}</a
+                              >{:else}{morceau.texte}{/if}{/each}
+                        </p>
                       {/if}
                     {/each}
                   </div>
 
                   {#if message.sources && message.sources.length > 0}
                     <div
-                      class="text-left border-t border-slate-100 dark:border-slate-700 pt-3"
+                      class="border-t border-zinc-200 pt-3 text-left dark:border-zinc-800"
                     >
                       <!-- À partir de sm, le titre « Sources », seul dans son
                            élément (les tests le cherchent au mot près). Sous
                            sm, à sa place, le bouton qui déplie la liste et dit
                            combien elle compte de sources. -->
-                      <p class="mb-2 hidden text-xs font-medium text-slate-500 dark:text-slate-400 sm:block">
-                        {$language.current === "fr" ? "Sources" : "Sources"}
+                      <p class="mb-2 hidden text-xs font-medium text-zinc-500 dark:text-zinc-400 sm:block">
+                        {t("chat.sources")}
                       </p>
                       <button
                         type="button"
@@ -1345,11 +1486,12 @@
                         aria-expanded={Boolean(sourcesDepliees[message.id])}
                         aria-controls="sources-{message.id}"
                         on:click={() => basculerSources(message.id)}
-                        class="-ml-2 -mt-3 inline-flex min-h-11 items-center gap-1 px-2 text-xs font-semibold text-blue-700 dark:text-blue-300 sm:hidden"
+                        class="-ml-2 -mt-3 inline-flex min-h-11 items-center gap-1 px-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100 sm:hidden"
                       >
-                        <span class="material-icons text-base" aria-hidden="true"
-                          >{sourcesDepliees[message.id] ? "expand_less" : "expand_more"}</span
-                        >
+                        <Icone
+                          nom={sourcesDepliees[message.id] ? "chevron-up" : "chevron-down"}
+                          class="text-base"
+                        />
                         {sourcesDepliees[message.id] ? t("chat.hideSources") : t("chat.showSources")}
                         ({message.sources.length})
                       </button>
@@ -1370,17 +1512,17 @@
                                 ? `/laws/${source.law_id}?article=${encodeURIComponent(source.article_number)}`
                                 : `/laws/${source.law_id}`}
                               data-testid="chat-source"
-                              class="block min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                              class="block min-w-0 rounded-xl border border-zinc-200 px-3 py-2 transition-colors hover:border-zinc-950 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:border-zinc-400 dark:hover:bg-zinc-800/60"
                             >
-                              <span class="coupe-mots block text-sm font-medium text-slate-800 dark:text-white line-clamp-2">
+                              <span class="coupe-mots block text-sm font-medium text-zinc-950 dark:text-white line-clamp-2">
                                 {libelleDeSource(source)}
                               </span>
                               {#if source.law_title && source.law_title !== nomCourtDuTexte(source.law_title, source.law_reference)}
-                                <span class="block truncate text-xs text-slate-500 dark:text-slate-400" title={source.law_title}>
+                                <span class="block truncate text-xs text-zinc-500 dark:text-zinc-400" title={source.law_title}>
                                   {source.law_title}
                                 </span>
                               {/if}
-                              <span class="coupe-mots mt-1 block text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                              <span class="coupe-mots mt-1 block text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">
                                 {source.excerpt}
                               </span>
                             </a>
@@ -1389,66 +1531,75 @@
                       </ul>
                     </div>
                   {/if}
-
-                  {#if message.details}
-                    <ul class="space-y-2 ml-4 text-left">
-                      {#each message.details as detail, i (i)}
-                        <li class="text-slate-600 dark:text-slate-300">
-                          • <strong class="text-slate-800 dark:text-white"
-                            >{detail.title}</strong
-                          >, {detail.description}
-                        </li>
-                      {/each}
-                    </ul>
-                  {/if}
-
-                  {#if message.suggestions}
-                    <!-- Empilées sur toute la largeur sous sm : en pastilles
-                         rondes, une suggestion de 80 caractères tenait sur
-                         quatre lignes serrées contre les bords arrondis. -->
-                    <div
-                      class="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center"
-                      data-testid="chat-suggestions"
-                    >
-                      <span class="text-sm text-slate-500 dark:text-slate-400">{t("chat.suggestionsLabel")}</span>
-                      {#each message.suggestions as suggestion (suggestion)}
-                        <button
-                          on:click={() => handleSuggestionClick(suggestion)}
-                          data-testid="chat-suggestion"
-                          disabled={envoiEnCours}
-                          class="min-h-11 w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-left text-sm font-medium leading-snug text-blue-600 transition-colors hover:border-blue-500 hover:bg-blue-500 hover:text-white active:border-blue-500 active:bg-blue-500 active:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-400 sm:min-h-0 sm:w-auto sm:rounded-full sm:px-4 sm:py-1.5 sm:text-center"
-                        >
-                          {suggestion}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
                 </div>
+
+                {#if message.details}
+                  <ul class="mt-3 ml-4 space-y-2 text-left">
+                    {#each message.details as detail, i (i)}
+                      <li class="text-zinc-600 dark:text-zinc-300">
+                        • <strong class="text-zinc-900 dark:text-white"
+                          >{detail.title}</strong
+                        >, {detail.description}
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+
+                {#if message.suggestions}
+                  <!-- Empilées sur toute la largeur sous sm : en pastilles
+                       rondes, une suggestion de 80 caractères tenait sur
+                       quatre lignes serrées contre les bords arrondis.
+                       `active:` répète le survol : sur un écran tactile, le
+                       survol n'existe pas (hoverOnlyWhenSupported), et un
+                       fond inversé sans son texte inversé laissait du
+                       zinc-800 sur du noir pendant l'appui. -->
+                  <div
+                    class="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+                    data-testid="chat-suggestions"
+                  >
+                    <span class="text-sm text-zinc-500 dark:text-zinc-400">{t("chat.suggestionsLabel")}</span>
+                    {#each message.suggestions as suggestion (suggestion)}
+                      <button
+                        on:click={() => handleSuggestionClick(suggestion)}
+                        data-testid="chat-suggestion"
+                        disabled={envoiEnCours}
+                        class="min-h-11 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3.5 py-2 text-left text-xs sm:text-sm font-medium leading-snug text-zinc-800 transition-colors hover:border-zinc-950 hover:bg-zinc-950 hover:text-white active:border-zinc-950 active:bg-zinc-950 active:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700/60 dark:bg-zinc-800/80 dark:text-zinc-200 dark:hover:border-white dark:hover:bg-white dark:hover:text-zinc-950 dark:active:border-white dark:active:bg-white dark:active:text-zinc-950 sm:min-h-0 sm:w-auto sm:rounded-full sm:px-4 sm:py-1.5 sm:text-center"
+                      >
+                        {suggestion}
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
               {/if}
             </div>
           </div>
         {/each}
 
         {#if isTyping}
+          <!-- Même avatar (masqué sous sm, comme celui des réponses) et même
+               bulle que les réponses : la bulle d'attente est remplacée par
+               celle de la réponse, au même endroit. Points
+               en zinc-500 (4,8:1 sur le blanc), zinc-400 en sombre : ils sont
+               la seule trace de l'attente, il leur faut 3:1 sur leur bulle. -->
           <div class="flex gap-2 sm:gap-4">
             <div
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 sm:h-10 sm:w-10"
+              class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 sm:flex sm:h-10 sm:w-10"
             >
-              <span class="material-icons text-base text-white sm:text-lg" aria-hidden="true">smart_toy</span>
+              <Icone nom="bot" class="text-base sm:text-lg" />
             </div>
             <div
-              class="flex items-center gap-1 px-4 py-3 bg-gray-100 dark:bg-slate-700 rounded-2xl"
+              class="flex items-center gap-1 rounded-2xl rounded-tl-sm border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
             >
               <span
-                class="w-2 h-2 bg-slate-400 rounded-full motion-safe:animate-bounce"
+                class="w-2 h-2 bg-zinc-500 dark:bg-zinc-400 rounded-full motion-safe:animate-bounce"
                 style="animation-delay: 0ms"
               ></span>
               <span
-                class="w-2 h-2 bg-slate-400 rounded-full motion-safe:animate-bounce"
+                class="w-2 h-2 bg-zinc-500 dark:bg-zinc-400 rounded-full motion-safe:animate-bounce"
                 style="animation-delay: 150ms"
               ></span>
               <span
-                class="w-2 h-2 bg-slate-400 rounded-full motion-safe:animate-bounce"
+                class="w-2 h-2 bg-zinc-500 dark:bg-zinc-400 rounded-full motion-safe:animate-bounce"
                 style="animation-delay: 300ms"
               ></span>
             </div>
@@ -1456,33 +1607,60 @@
         {/if}
       </div>
 
-      <!-- Le lecteur est remonté : un appui le ramène au dernier message. -->
+      <!--
+        Le lecteur est remonté : un appui le ramène au dernier message.
+
+        Centré au-dessus de la zone de saisie, là où se pose le regard qui
+        cherche la suite de la conversation. Il était en bas à gauche, dans
+        la colonne des avatars (pour ne couvrir aucun texte) : rond, de la
+        taille d'un avatar, empilé sous celui de l'assistant en paysage, on
+        le prenait pour un second avatar. Le texte qu'il couvre un instant
+        défile dessous ; à droite, il se posait sur la fin des lignes.
+
+        Inversé et élevé, à la recette du bouton flottant du site (ChatFab,
+        guide § 4.16 : ombre gardée en sombre) : blanc bordé de zinc-300 sur
+        la bulle blanche de l'assistant (zinc-800 sur zinc-900 en sombre), il
+        s'y fondait, et l'on croyait voir une flèche collée sur les mots
+        qu'il masquait, pas un bouton posé au-dessus du texte.
+      -->
       {#if !colle}
         <button
           type="button"
           data-testid="chat-scroll-latest"
           aria-label={t("chat.scrollToLatest")}
+          title={t("chat.scrollToLatest")}
           on:click={allerAuDernier}
           transition:fade={{ duration: duree(150) }}
-          class="absolute bottom-3 right-3 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-lg ring-1 ring-black/5 hover:bg-gray-50 dark:bg-slate-700 dark:text-white dark:ring-white/10 dark:hover:bg-slate-600"
+          class="absolute bottom-3 left-1/2 z-10 inline-flex h-11 w-11 -translate-x-1/2 items-center justify-center rounded-full border border-zinc-800 bg-zinc-950 text-white shadow-2xl shadow-zinc-950/30 transition-colors hover:bg-black dark:border-zinc-200 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
         >
-          <span class="material-icons" aria-hidden="true">arrow_downward</span>
+          <Icone nom="arrow-down" class="text-2xl" />
         </button>
       {/if}
     </div>
 
     <!-- Input Area. `pb-zone-sure` : au-dessus de la barre d'accueil de
-         l'iPhone, et non dessous. -->
+         l'iPhone, et non dessous. Marges latérales de la liste au-dessus
+         (16 px, puis 24 px à partir de sm) : le cadre de saisie s'aligne sur
+         les avatars et les bulles.
+         Écran court : 8 px au-dessus et au-dessous du cadre, comme la liste
+         et la carte. À 6 px (contre 24 sur les côtés), le champ semblait
+         collé au filet du dessus et au bord bas de la carte ; 2 px de plus de
+         chaque côté, pas davantage : `court:` vaut aussi pour un téléphone
+         dont le clavier est ouvert, où chaque ligne de la conversation
+         compte. -->
     <div
-      class="shrink-0 border-t border-gray-100 bg-gray-50 pb-zone-sure dark:border-slate-700 dark:bg-slate-800/50"
+      class="shrink-0 border-t border-zinc-200 bg-zinc-50/70 pb-zone-sure dark:border-zinc-800 dark:bg-zinc-900/60"
     >
       <div
-        class="px-2 pt-2 sm:px-4 sm:pt-4 {$authStore.isAuthenticated
+        class="px-4 pt-2 sm:px-6 sm:pt-4 {$authStore.isAuthenticated
           ? 'pb-2 sm:pb-4'
-          : 'sm:pb-3'} court:py-1.5 sm:court:py-1.5"
+          : 'sm:pb-3'} court:py-2 sm:court:py-2"
       >
+        <!-- Cadre du champ, à la recette des champs (guide § 4.5) : en sombre,
+             fond zinc-950 et bordure zinc-500. En zinc-900 bordé de zinc-700,
+             il ressemblait aux suggestions de question posées au-dessus. -->
         <div
-          class="flex items-end gap-2 rounded-xl border-2 border-gray-200 bg-white py-1 pl-3 pr-1 transition-colors focus-within:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:focus-within:border-blue-500 sm:gap-3 sm:pl-4"
+          class="flex items-end gap-2 rounded-xl border border-zinc-300 bg-white py-1 pl-3 pr-1 transition-colors focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 sm:gap-3 sm:pl-4"
         >
           <!--
             Une zone de texte et non un champ d'une ligne : une question
@@ -1500,7 +1678,7 @@
             aria-label={t("a11y.chatInput")}
             on:keydown={handleChatKeydown}
             placeholder={t("chat.placeholder")}
-            class="block max-h-40 w-full min-w-0 flex-1 resize-none overflow-y-auto border-none bg-transparent px-0 py-2.5 text-base leading-6 text-slate-800 placeholder-slate-400 [field-sizing:content] focus:ring-0 dark:text-white"
+            class="block max-h-40 w-full min-w-0 flex-1 resize-none overflow-y-auto border-none bg-transparent px-0 py-2.5 text-base leading-6 text-zinc-950 placeholder-zinc-400 [field-sizing:content] focus:ring-0 dark:text-zinc-100 dark:placeholder-zinc-500"
           ></textarea>
           <!-- Le trombone est retiré : aucun endpoint n'accepte de pièce jointe
                conversationnelle (/upload et /batch-upload sont réservés à l'admin
@@ -1513,9 +1691,9 @@
             on:mousedown={(event) => event.preventDefault()}
             disabled={!chatInput.trim() || envoiEnCours}
             aria-label={t("chat.send")}
-            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white transition-all hover:scale-105 hover:bg-blue-600 disabled:bg-gray-300 disabled:hover:scale-100 motion-reduce:transform-none dark:disabled:bg-slate-600"
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 hover:bg-black text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 transition-all hover:scale-105 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 disabled:hover:scale-100 motion-reduce:transform-none shadow-sm dark:shadow-none"
           >
-            <span class="material-icons" aria-hidden="true">send</span>
+            <Icone nom="send-horizontal" class="text-xl" />
           </button>
         </div>
 
@@ -1524,11 +1702,11 @@
                pleinement utilisable sans compte, le compte n'ajoute que la memoire.
                Masquée sur écran court (paysage, clavier ouvert sur Android) :
                chaque ligne y manque à la conversation. -->
-          <p class="text-center text-xs text-slate-500 dark:text-slate-400 sm:mt-2 court:hidden">
+          <p class="text-center text-xs text-zinc-500 dark:text-zinc-400 sm:mt-2 court:hidden">
             <a
               href="/signup"
               data-testid="chat-signup-link"
-              class="inline-flex min-h-11 items-center font-medium text-blue-600 hover:underline dark:text-blue-400 sm:min-h-0"
+              class="inline-flex min-h-11 items-center font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 transition-colors hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-white sm:min-h-0"
               >{t("chat.signInToKeep")}</a
             >
           </p>

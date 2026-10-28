@@ -10,6 +10,8 @@
   import { createEventDispatcher } from "svelte";
   import { piegerFocus } from "$lib/actions/pieger-focus";
   import { apiFetch } from "$lib/api";
+  import ChampMotDePasse from "$lib/components/ChampMotDePasse.svelte";
+  import Icone from "$lib/components/Icone.svelte";
   import { authStore } from "$lib/stores/auth";
   import { tr } from "$lib/stores/language";
   import type { User } from '$lib/types';
@@ -19,6 +21,18 @@
   export let user: User | null = null;
 
   const dispatch = createEventDispatcher();
+
+  // Une seule recette pour les champs et leurs libellés, celle de tout le site
+  // (noir et blanc, mode sombre compris) : recopiée champ par champ, elle
+  // finissait par diverger. Une seule taille aussi, dans les quatre fenêtres
+  // de l'administration et les pages de compte : 44 px de haut au moins
+  // (38 px ici auparavant), `px-3 py-2`, libellé 4 px au-dessus. 16 px de
+  // texte sauf à partir de sm sous un pointeur fin (règle de
+  // login/+page.svelte) : sous 16 px, iOS zoome au focus et ne dézoome pas,
+  // téléphone en paysage compris.
+  const CHAMP =
+    "min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-base text-zinc-950 placeholder-zinc-400 outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm";
+  const LIBELLE = "mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200";
 
   let email = "";
   let username = "";
@@ -161,81 +175,82 @@
     d'adresse, clavier Android) sans dépendre de l'unité dvh.
   -->
   <div
-    class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 backdrop-blur-sm sm:items-center sm:p-4"
+    class="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/40 backdrop-blur-sm sm:items-center sm:p-4"
     role="presentation"
     data-testid="user-modal"
     on:click={onBackdropClick}
     use:bloquerDefilement
   >
     <div
-      class="flex max-h-[calc(100%-1rem)] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl sm:max-h-[90%] sm:rounded-2xl"
+      class="flex max-h-[calc(100%-1rem)] w-full max-w-lg flex-col rounded-t-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:max-h-[90%] sm:rounded-2xl"
       use:piegerFocus
       role="dialog"
       aria-modal="true"
       aria-labelledby="user-modal-title"
     >
-      <div class="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
-        <h2 id="user-modal-title" class="min-w-0 text-xl font-bold text-slate-900">
+      <!-- En-tête séparé du corps par un trait, aux marges de « Modifier le
+           document » et de « Modifier l'article » : les quatre fenêtres de
+           l'administration ont la même construction (trait sous l'en-tête et
+           au-dessus du pied). Celle-ci n'avait que le second. -->
+      <div class="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800 sm:px-6 sm:py-4">
+        <!-- Titre des fenêtres de l'administration : 20 puis 24 px, comme
+             « Modifier le document » et « Modifier l'article ». -->
+        <h2 id="user-modal-title" class="min-w-0 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl">
           {enCreation ? $tr("admin.user.new") : $tr("admin.user.edit")}
         </h2>
-        <!-- 44 px : la croix seule faisait une cible d'environ 16 × 24 px. -->
+        <!-- 44 px : la croix seule faisait une cible d'environ 16 × 24 px. La
+             croix est l'icône `x` des autres fenêtres, et non plus le
+             caractère « × », dont le dessin dépendait de la police. -->
         <button
           type="button"
           on:click={close}
           data-testid="user-modal-close"
           aria-label={$tr("common.close")}
-          class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-700">&times;</button
+          class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+          ><Icone nom="x" class="h-6 w-6" /></button
         >
       </div>
 
       <form on:submit|preventDefault={save} class="flex min-h-0 flex-1 flex-col">
         <!-- overscroll-contain : arrivé au bout, le défilement ne passe pas à
              la page derrière. -->
-        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
+        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-6">
           <div>
-            <label for="u-email" class="mb-1 block text-sm font-medium text-slate-700"
-              >{$tr("admin.user.email")}</label
-            >
+            <label for="u-email" class={LIBELLE}>{$tr("admin.user.email")}</label>
             <input
               id="u-email"
               type="email"
               bind:value={email}
               required
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              class={CHAMP}
             />
           </div>
 
           <div>
-            <label for="u-username" class="mb-1 block text-sm font-medium text-slate-700"
-              >{$tr("admin.user.username")}</label
-            >
+            <label for="u-username" class={LIBELLE}>{$tr("admin.user.username")}</label>
             <input
               id="u-username"
               bind:value={username}
               required
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              class={CHAMP}
             />
-            <p class="mt-1 text-xs text-slate-500">
+            <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               {$tr("admin.user.usernameHint")}
             </p>
           </div>
 
           <div>
-            <label for="u-fullname" class="mb-1 block text-sm font-medium text-slate-700"
-              >{$tr("admin.user.fullName")}</label
-            >
+            <label for="u-fullname" class={LIBELLE}>{$tr("admin.user.fullName")}</label>
             <input
               id="u-fullname"
               bind:value={fullName}
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              class={CHAMP}
             />
           </div>
 
           <div class="flex items-end gap-4">
             <div class="min-w-0 flex-1">
-              <label for="u-role" class="mb-1 block text-sm font-medium text-slate-700"
-                >{$tr("admin.user.role")}</label
-              >
+              <label for="u-role" class={LIBELLE}>{$tr("admin.user.role")}</label>
               <select
                 id="u-role"
                 bind:value={role}
@@ -243,7 +258,7 @@
                 title={peutChangerRole
                   ? undefined
                   : $tr("admin.user.roleHint")}
-                class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                class="{CHAMP} pr-10 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-500 dark:disabled:bg-zinc-800/50 dark:disabled:text-zinc-400"
               >
                 <option value="user">{$tr("admin.role.user")}</option>
                 <option value="admin">{$tr("admin.role.admin")}</option>
@@ -253,26 +268,29 @@
 
             <!-- Toute l'étiquette est la cible : 44 px de haut, case de 20 px. -->
             <div class="shrink-0">
-              <label class="flex min-h-11 items-center gap-2 text-sm font-medium text-slate-700">
-                <input type="checkbox" bind:checked={isActive} class="h-5 w-5 rounded" />
+              <label class="flex min-h-11 items-center gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                <input
+                  type="checkbox"
+                  bind:checked={isActive}
+                  class="h-5 w-5 rounded text-zinc-900 focus:ring-zinc-950 dark:text-white dark:focus:ring-white"
+                />
                 {$tr("admin.user.active")}
               </label>
             </div>
           </div>
 
           <div>
-            <label for="u-password" class="mb-1 block text-sm font-medium text-slate-700"
+            <label for="u-password" class={LIBELLE}
               >{$tr("admin.user.password")} {enCreation ? "" : $tr("admin.user.passwordKeep")}</label
             >
-            <input
+            <ChampMotDePasse
               id="u-password"
-              type="password"
               bind:value={password}
               autocomplete="new-password"
               required={enCreation}
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              class={CHAMP}
             />
-            <p class="mt-1 text-xs text-slate-500">
+            <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               {$tr("admin.user.passwordHint")}
             </p>
           </div>
@@ -282,26 +300,32 @@
              (zone sûre). L'erreur y vit aussi : en fin de corps défilant, elle
              restait hors de vue sous les champs quand l'enregistrement
              échouait. -->
-        <div class="shrink-0 border-t border-slate-100 pb-zone-sure">
+        <div class="shrink-0 border-t border-zinc-200 pb-zone-sure dark:border-zinc-800">
           {#if error}
-            <p role="alert" class="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:mx-6">
-              {error}
+            <p
+              role="alert"
+              class="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300 sm:mx-6"
+            >
+              <Icone nom="circle-alert" class="mt-0.5 text-base" />{error}
             </p>
           {/if}
 
-          <div class="flex justify-end gap-3 px-4 py-3 sm:px-6 sm:pb-6 sm:pt-4">
+          <!-- Boutons du pied à la base du guide (§ 4.4 : 14 px, semi-gras,
+               `px-5`), comme dans les trois autres fenêtres de
+               l'administration, et aux mêmes marges (12 puis 16 px). -->
+          <div class="flex justify-end gap-3 px-4 py-3 sm:px-6 sm:py-4">
             <button
               type="button"
               on:click={close}
               data-testid="user-modal-cancel"
-              class="inline-flex h-11 flex-1 items-center justify-center rounded-lg px-4 font-medium text-slate-600 hover:bg-slate-100 sm:flex-none"
+              class="inline-flex h-11 flex-1 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:flex-none"
               >{$tr("common.cancel")}</button
             >
             <button
               type="submit"
               disabled={saving}
               data-testid="user-modal-save"
-              class="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-blue-600 px-5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:flex-none"
+              class="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 sm:flex-none"
               >{saving ? $tr("common.saving") : $tr("common.save")}</button
             >
           </div>

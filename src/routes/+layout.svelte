@@ -24,13 +24,12 @@
     personaStore,
     questionAPoser,
   } from "$lib/stores/persona";
-  // Polices servies par le site lui-meme, et non par fonts.googleapis.com :
-  // leurs feuilles de style bloquaient l'affichage (1,1 s pour Material Icons
-  // et 0,2 s pour Inter, mesure Lighthouse mobile), sur deux origines tierces.
-  // Les deux sont declarees dans app.css : Inter (font-display: optional) et
-  // Material Icons, en sous-ensemble des seules icones affichees (3 Ko au lieu
-  // des 125 Ko de material-icons/iconfont/filled.css, importe ici jusque-la) ;
-  // les deux sont prechargees par src/hooks.server.ts.
+  // Police servie par le site lui-meme, et non par fonts.googleapis.com : sa
+  // feuille de style bloquait l'affichage (0,2 s pour Inter, mesure Lighthouse
+  // mobile), sur deux origines tierces. Inter est declaree dans app.css
+  // (font-display: optional) et prechargee par src/hooks.server.ts. Les icones
+  // ne sont pas une police mais des SVG Lucide (src/lib/icones.ts), inscrits
+  // dans la page : rien a telecharger, rien d'invisible en attendant.
   import "../app.css";
 
   /**

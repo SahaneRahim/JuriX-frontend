@@ -81,7 +81,14 @@ export function formatDateCourte(
   });
 }
 
-/** Date et heure, pour le suivi d'un traitement en cours. */
+/**
+ * Date et heure, pour le suivi d'un traitement en cours : « 21 oct. 2026,
+ * 09:30 ». La date a la forme de `formatDateCourte`, celle des autres écrans
+ * de l'administration ; l'heure, sans les secondes. `toLocaleString` sans
+ * options rendait « 21/10/2026 09:30:00 », un cinquième format pour la même
+ * information. Heure LOCALE (pas de `timeZone`) : celle du lecteur qui suit
+ * l'import.
+ */
 export function formatDateHeure(
   valeur: string | null | undefined,
   lang: Language,
@@ -89,7 +96,13 @@ export function formatDateHeure(
   if (!valeur) return DATE_ABSENTE;
   const d = lireDate(valeur);
   if (Number.isNaN(d.getTime())) return DATE_ABSENTE;
-  return d.toLocaleString(locale(lang));
+  return d.toLocaleString(locale(lang), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /** Heure seule, pour l'horodatage des messages du chat. */

@@ -12,20 +12,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>Erreur %sveltekit.status% — JuriX</title>
+    <!--
+      Couleurs du site (noir et blanc, échelle zinc de tailwind.config.js),
+      écrites en clair : cette page ne charge aucune feuille de style. Mode
+      sombre selon le système, faute du script de thème.
+    -->
     <style>
       :root {
         color-scheme: light dark;
-        --fond: #f8f9fa;
-        --texte: #1a1a1a;
-        --discret: #6b7280;
-        --accent: #2563eb;
+        --fond: #fafafa; /* background-light */
+        --texte: #09090b; /* zinc-950 */
+        --discret: #52525b; /* zinc-600, 7,4:1 sur le fond */
+        --accent: #09090b;
+        --trait: #d4d4d8; /* zinc-300, soulignement au repos */
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --fond: #0a1628;
-          --texte: #f1f5f9;
-          --discret: #94a3b8;
-          --accent: #60a5fa;
+          --fond: #09090b; /* background-dark */
+          --texte: #f4f4f5; /* zinc-100 */
+          --discret: #a1a1aa; /* zinc-400, 7,8:1 sur le fond */
+          --accent: #ffffff;
+          --trait: #52525b; /* zinc-600 */
         }
       }
       body {
@@ -47,11 +54,14 @@
       .statut {
         font-size: 4rem;
         font-weight: 800;
+        letter-spacing: -0.025em;
+        font-variant-numeric: tabular-nums;
         color: var(--accent);
         margin: 0 0 1rem;
       }
       h1 {
         font-size: 1.5rem;
+        letter-spacing: -0.025em;
         margin: 0 0 0.75rem;
       }
       p {
@@ -62,6 +72,17 @@
       a {
         color: var(--accent);
         font-weight: 600;
+        text-decoration: underline;
+        text-decoration-color: var(--trait);
+        text-underline-offset: 4px;
+      }
+      a:hover {
+        text-decoration-color: var(--accent);
+      }
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 4px;
+        border-radius: 2px;
       }
     </style>
   </head>

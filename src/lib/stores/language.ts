@@ -69,7 +69,12 @@ export const translations = {
     'signup.title': 'Créer un compte',
     'signup.subtitle': 'Conservez vos conversations d\'une visite à l\'autre.',
     'signup.name': 'Nom complet',
-    'signup.namePlaceholder': 'Rahim Sahane',
+    // Exemples des champs de compte : un nom et une adresse de convention,
+    // les mêmes d'une langue à l'autre. Le nom était celui du propriétaire,
+    // et l'adresse de la connexion (« admin@jurix.cm », en dur) évoquait un
+    // compte d'administration plausible.
+    'signup.namePlaceholder': 'Jean Dupont',
+    'auth.emailPlaceholder': 'vous@exemple.cm',
     'signup.email': 'Adresse email',
     'signup.password': 'Mot de passe',
     'signup.passwordHint': '8 caractères minimum, avec une majuscule, une minuscule et un chiffre.',
@@ -94,7 +99,13 @@ export const translations = {
     'forgot.errorGeneric': 'Envoi impossible. Réessayez dans un instant.',
     'forgot.backToLogin': 'Retour à la connexion',
     'lien.usedTitle': 'Lien déjà utilisé',
-    'lien.usedDetail': 'Ce lien ne sert qu\'une fois. S\'il vous en faut un nouveau, redemandez-en un.',
+    // Saut de ligne entre les deux phrases : la page les affiche une par ligne
+    // (`whitespace-pre-line`), et non coupées au hasard de l'équilibrage.
+    // Espace insécable (U+00A0) avant le dernier mot, en français comme en
+    // anglais : en 390 px, « un. » restait seul sur sa ligne, sous une ligne
+    // pleine. La page équilibre chaque phrase (`text-balance`) ; l'espace
+    // insécable tient aussi là où l'équilibrage n'existe pas.
+    'lien.usedDetail': 'Ce lien ne sert qu\'une fois.\nS\'il vous en faut un nouveau, redemandez-en\u00a0un.',
     'reset.title': 'Nouveau mot de passe',
     'reset.subtitle': 'Choisissez un mot de passe pour votre compte.',
     'reset.password': 'Nouveau mot de passe',
@@ -112,12 +123,29 @@ export const translations = {
     'verify.errorToken': 'Ce lien n\'est plus valide. Il a peut-être déjà servi.',
     'verify.errorGeneric': 'Vérification impossible. Réessayez dans un instant.',
     'verify.goHome': 'Aller à l\'accueil',
+    // `/verify-email` sans jeton : le lien a servi, ce qui est le cas NORMAL
+    // après une confirmation réussie. Le texte de `/reset-password` (« S'il
+    // vous en faut un nouveau, redemandez-en un ») y promettait une action
+    // que la page n'offre pas, et se lisait comme un échec.
+    'verify.usedDetail': 'Ce lien a déjà servi : votre adresse est sans doute déjà confirmée. Vous pouvez vous connecter.',
+    'login.subtitle': 'Retrouvez vos conversations enregistrées.',
     'login.forgotPassword': 'Mot de passe oublié ?',
     'login.noAccount': 'Pas encore de compte ?',
     'auth.orGoogle': 'ou',
     'auth.googleButton': 'Continuer avec Google',
     'auth.googleError': 'Connexion Google refusée.',
     'auth.googleUnavailable': 'La connexion Google est momentanément indisponible.',
+    // ---- Champ de mot de passe (ChampMotDePasse.svelte) et récupération ----
+    // Le libellé dit l'action du bouton ; son état passe par aria-pressed.
+    'auth.showPassword': 'Afficher le mot de passe',
+    'auth.hidePassword': 'Masquer le mot de passe',
+    // Sous l'erreur « Identifiants invalides » : un mot de passe oublié en
+    // est la cause la plus courante, la sortie s'affiche là où l'on regarde.
+    'login.resetHint': 'Vous avez oublié votre mot de passe ?',
+    'login.resetLink': 'Recevoir un lien pour le changer',
+    // Refus de FORME (champ vide, adresse mal écrite) : il ne dit rien de
+    // l'existence d'un compte, contrairement à une réponse sur le fond.
+    'forgot.errorInvalid': 'Saisissez une adresse email valide.',
     'nav.signup': 'Créer un compte',
     'chat.conversations': 'Mes conversations',
     'chat.newConversation': 'Nouvelle conversation',
@@ -166,24 +194,36 @@ export const translations = {
     'common.save': 'Enregistrer',
     'common.saving': 'Enregistrement…',
     'admin.users': 'Utilisateurs',
-    'admin.usersDesc': 'Comptes autorisés à accéder à l\'administration.',
+    // Sans point final, comme les sous-titres des quatre autres pages de
+    // l'administration.
+    'admin.usersDesc': 'Comptes autorisés à accéder à l\'administration',
     'admin.backToSite': 'Retour au site',
     'admin.logout': 'Déconnexion',
     'admin.administration': 'Administration',
     'admin.checkingSession': 'Vérification de la session…',
-    'admin.sinceLastMonth': 'depuis le mois dernier',
+    // Sous le nombre de documents du tableau de bord (StatsCard) : `recent_laws`
+    // compte les textes créés dans les 30 derniers jours
+    // (app/api/routes/analytics.py), et non « depuis le mois dernier ».
+    'admin.inLast30Days': 'en 30 jours',
     'admin.requests': 'requêtes',
+    // Modes de recherche (app/schemas/search.py), sous les barres du
+    // graphique du tableau de bord (`libelleMode`) : la valeur brute de
+    // l'API, en anglais, s'affichait sur la page française.
+    'admin.searchMode.hybrid': 'Hybride',
+    'admin.searchMode.text': 'Plein texte',
+    'admin.searchMode.semantic': 'Sémantique',
     'admin.role.user': 'Utilisateur',
     'admin.role.admin': 'Administrateur',
-    'admin.role.superadmin': 'Superadmin',
+    'admin.role.superadmin': 'Super-administrateur',
     'admin.user.new': 'Nouveau compte',
     'admin.user.edit': 'Modifier le compte',
-    'admin.user.email': 'Email',
+    // « Adresse email », comme la connexion et l'inscription.
+    'admin.user.email': 'Adresse email',
     'admin.user.username': 'Nom d\'utilisateur',
     'admin.user.usernameHint': 'Converti en minuscules à l\'enregistrement.',
     'admin.user.fullName': 'Nom complet',
     'admin.user.role': 'Rôle',
-    'admin.user.roleHint': 'Seul un superadmin peut changer un rôle',
+    'admin.user.roleHint': 'Seul un super-administrateur peut changer un rôle',
     'admin.user.active': 'Compte actif',
     'admin.user.password': 'Mot de passe',
     'admin.user.passwordKeep': '(laisser vide pour ne pas changer)',
@@ -196,8 +236,10 @@ export const translations = {
     'admin.user.errPwdLower': 'Le mot de passe doit contenir une minuscule.',
     'admin.user.errPwdDigit': 'Le mot de passe doit contenir un chiffre.',
     'admin.user.errSave': 'Enregistrement impossible ({status}).',
-    'admin.users.searchPlaceholder': 'Rechercher par email, identifiant ou nom…',
-    'admin.users.allRoles': 'Tous les rôles',
+    'admin.users.searchPlaceholder': 'Rechercher par adresse email, identifiant ou nom…',
+    // Sans article, comme « Toutes catégories », « Toutes langues » et « Tous
+    // statuts » des autres filtres.
+    'admin.users.allRoles': 'Tous rôles',
     'admin.users.activePlural': 'Actifs',
     'admin.users.inactivePlural': 'Inactifs',
     'admin.users.activeOne': 'Actif',
@@ -209,11 +251,15 @@ export const translations = {
     'admin.users.lastLogin': 'Dernière connexion',
     'admin.users.confirmDelete': 'Supprimer définitivement le compte {email} ?',
     'admin.users.deleteError': 'Suppression impossible ({status}).',
-    'admin.doc.editTitle': 'Éditer le document',
+    'admin.doc.editTitle': 'Modifier le document',
     'admin.doc.title': 'Titre',
     'admin.doc.titlePlaceholder': 'Titre du document',
     'admin.doc.category': 'Catégorie',
-    'admin.doc.noCategory': '-- Aucune catégorie --',
+    // Sans tirets ASCII, dans les deux fenêtres qui choisissent la catégorie
+    // d'un texte (EditModal, UploadModal) : c'est une vraie valeur (aucune
+    // catégorie), et non une invite. La fenêtre d'ajout affichait en noir
+    // « -- Sélectionner une catégorie -- », lu comme une valeur choisie.
+    'admin.doc.noCategory': 'Aucune catégorie',
     'admin.doc.content': 'Contenu',
     'admin.doc.contentPlaceholder': 'Contenu du document…',
     'admin.doc.chars': 'caractères',
@@ -221,14 +267,24 @@ export const translations = {
     'admin.doc.unknownError': 'Erreur inconnue',
     'admin.upload.title': 'Ajouter des documents',
     'admin.upload.titlePlaceholder': 'Ex : La Constitution du Cameroun',
-    'admin.upload.optional': '(optionnel)',
+    // Mention d'un champ facultatif, posée après son libellé en gris et sans
+    // gras, dans la fenêtre d'ajout comme dans le générateur d'articles : le
+    // générateur l'écrivait dans son libellé, en gras.
+    'admin.optional': '(optionnel)',
     'admin.upload.refPlaceholder': 'Ex : LOI-2024-001 ou Décret N°2024/PM/123',
     'admin.upload.refHint': 'Numéro officiel du document juridique',
     'admin.upload.category': 'Catégorie du document',
-    'admin.upload.selectCategory': '-- Sélectionner une catégorie --',
     'admin.upload.loadingCategories': 'Chargement des catégories…',
-    'admin.upload.clickToSelect': 'Cliquez pour sélectionner des fichiers',
-    'admin.upload.formats': 'PDF ou DOCX (1 Go max)',
+    // Zone de dépôt de la fenêtre d'ajout, écrite comme celle de l'import en
+    // lot (« Touchez pour choisir… », « … max par fichier ») : seule la
+    // consigne à la souris diffère, la fenêtre ne recevant pas de fichiers
+    // glissés. 250 Mo : la limite du téléversement unitaire
+    // (FileUploadService, max_size_mb=250, app/api/routes/upload.py) ; le
+    // « 1 Go » affiché était celui de l'import en lot (MAX_UPLOAD_SIZE).
+    'admin.upload.clickToSelect': 'Cliquez pour choisir des fichiers',
+    // Consigne au doigt (pointeur grossier), la précédente à la souris.
+    'admin.upload.tapToSelect': 'Touchez pour choisir des fichiers',
+    'admin.upload.formats': 'PDF ou DOCX (250 Mo max par fichier)',
     'admin.upload.statusUploading': 'Envoi…',
     'admin.upload.statusProcessing': 'Traitement…',
     'admin.upload.statusDone': 'Terminé',
@@ -236,16 +292,16 @@ export const translations = {
     'admin.upload.statusPending': 'En attente',
     'admin.upload.processing': 'Traitement en cours…',
     'admin.upload.start': 'Lancer le traitement',
-    'admin.upload.logUploading': '📤 Envoi de {name}…',
-    'admin.upload.logProcessing': '⚙️ Traitement de {name} (ID : {id})…',
-    'admin.upload.logDone': '✅ {name} envoyé au pipeline.',
-    'admin.upload.logError': '❌ Erreur sur {name} : {err}',
+    'admin.upload.logUploading': 'Envoi de {name}…',
+    'admin.upload.logProcessing': 'Traitement de {name} (ID : {id})…',
+    'admin.upload.logDone': '{name} envoyé au pipeline.',
+    'admin.upload.logError': 'Erreur sur {name} : {err}',
     'admin.upload.errUpload': 'Erreur d\'envoi',
     'admin.upload.errIngest': 'Erreur d\'ingestion ({status}) : {text}',
     'batch.uploadFailed': 'Envoi impossible : {err}',
     // Hero section
     'hero.badge': 'IA Juridique Camerounaise',
-    // Titre et mot en dégradé, rendus sur deux lignes : deux clés, et non un
+    // Titre et mot mis en retrait, rendus sur deux lignes : deux clés, et non un
     // `.replace("IA", "")` qui ne trouvait rien dans le titre anglais.
     'hero.title': 'Votre Assistant Juridique',
     'hero.titleHighlight': 'IA',
@@ -269,6 +325,11 @@ export const translations = {
     'chat.errorInvalid': 'La question n\'a pas pu être envoyée telle quelle. Reformulez-la.',
     'chat.errorPersona': 'Votre profil n\'a pas été reconnu. Choisissez-le de nouveau depuis l\'en-tête.',
     'chat.suggestionsLabel': 'Suggestions :',
+    // Chat : libellé d'état sous le titre, titre des sources, réponse vide du
+    // serveur. Ces textes étaient écrits en dur, en ternaire français/anglais.
+    'chat.statusLabel': 'IA Juridique Camerounaise V2.0',
+    'chat.sources': 'Sources',
+    'chat.emptyAnswer': 'Je n\'ai pas pu traiter votre demande.',
     'persona.chatLabel': 'Profil',
     'persona.general': 'Profil général',
     'persona.citoyen.nom': 'Citoyen',
@@ -297,9 +358,21 @@ export const translations = {
     'batch.errorUnknown': "Le serveur a signalé une erreur pendant l'import.",
 
     // Categories
-    'categories.title': 'Explorer par Catégorie',
+    // Titres en casse de phrase, à la française : une majuscule au premier
+    // mot et aux noms propres seulement (« Explorer par Catégorie », « Notre
+    // Mission » suivaient l'usage anglais, à côté de titres déjà en casse de
+    // phrase comme « Autres analyses récentes »).
+    'categories.title': 'Explorer par catégorie',
     'categories.subtitle': 'Explorez les textes de loi par grandes catégories',
     'categories.documentsShort': 'doc.',
+    // Accueil (src/routes/(main)/+page.svelte). Deux formes du compteur des
+    // cartes, choisies par Intl.PluralRules selon la langue : le français met
+    // le singulier à 0 et à 1 (« 0 texte »), l'anglais le pluriel à 0
+    // (« 0 texts ») ; un simple test `> 1` se trompait en anglais.
+    'categories.eyebrow': 'Corpus juridique officiel',
+    'categories.textCount.one': 'texte',
+    'categories.textCount.other': 'textes',
+    'categories.browseTexts': 'Consulter les textes',
 
     // Category names (French)
 
@@ -310,7 +383,10 @@ export const translations = {
     'common.retry': 'Réessayer',
 
     // Search results
-    'search.resultsFor': 'Résultats pour',
+    // Titre de /search : la requête entre les guillemets de la langue
+    // (« » et espaces fines insécables en français), et non entre des
+    // guillemets droits.
+    'search.resultsForQuery': 'Résultats pour «\u202F{q}\u202F»',
     'search.searchLaw': 'Rechercher une loi, un décret, un article...',
 
     // Pagination
@@ -327,13 +403,16 @@ export const translations = {
     'search.thisYear': 'Cette année',
     'search.last5Years': '5 dernières années',
     'search.category': 'Catégorie',
-    'search.sortBy': 'Trier par:',
+    // Espace fine insécable avant les deux-points (typographie française).
+    'search.sortBy': 'Trier par\u202F:',
     'search.relevance': 'Pertinence',
     'search.recentDate': 'Date récente',
     'search.oldestDate': 'Date ancienne',
     'search.aboutResults': 'Environ',
     'search.resultsFound': 'résultats trouvés',
-    'search.seconds': 'secondes',
+    // Unité de la durée (« 0,31 s ») : le symbole, comme le nombre mis en forme
+    // dans la langue (search/+page.svelte, `dureeAffichee`).
+    'search.seconds': 's',
     'search.readFull': 'Lire le texte complet',
     'search.copyLink': 'Copier le lien',
     'search.allTexts': 'Tous les textes',
@@ -345,6 +424,13 @@ export const translations = {
     'badge.constitution': 'Constitution',
     'badge.ordinance': 'Ordonnance',
     'badge.text': 'Texte',
+    // Types moins courants ($lib/type-de-texte) : /laws affichait la valeur
+    // brute de l'API (« arrêté »), et la recherche les rangeait sous « Texte ».
+    'badge.arrete': 'Arrêté',
+    'badge.circular': 'Circulaire',
+    'badge.instruction': 'Instruction',
+    'badge.decision': 'Décision',
+    'badge.uniformAct': 'Acte uniforme',
     'search.errorSearch': 'Erreur lors de la recherche. Veuillez réessayer.',
     'search.errorServer': 'Impossible de contacter le serveur.',
 
@@ -362,6 +448,9 @@ export const translations = {
     'laws.previous': 'Précédent',
     'laws.next': 'Suivant',
     'laws.page': 'Page',
+    // Fiche d'une loi : section du sommaire qui précède le premier LIVRE,
+    // TITRE ou CHAPITRE du document (le texte n'en donne aucun titre).
+    'laws.preamble': 'Préambule / Général',
     'nav.documents': 'Documents',
     'a11y.skipToContent': 'Aller au contenu',
     'a11y.searchField': 'Rechercher',
@@ -418,7 +507,7 @@ export const translations = {
     // depuis l'ouverture des comptes publics, et l'en-tête y renvoie.
 
     // Footer
-    'footer.rights': '© 2025 JuriX. Tous droits réservés. L\'accès au droit pour tous.',
+    'footer.rights': '© {annee} JuriX. Tous droits réservés. L\'accès au droit pour tous.',
 
     // Page titles
     'title.home': 'Accueil',
@@ -436,6 +525,9 @@ export const translations = {
     // Categories page
     'categories.backHome': 'Retour à l\'accueil',
     'categories.searchPlaceholder': 'Rechercher une loi, un décret, un article...',
+    // Sous sm : le texte complet (317 px) était coupé en plein mot dans un
+    // champ de 274 px à 390 px de large, 204 px à 320. Celui-ci en fait 167.
+    'categories.searchPlaceholderShort': 'Rechercher un texte…',
     'categories.langLabel': 'Langue',
     'categories.all': 'Tout',
     'categories.retry': 'Réessayer',
@@ -445,30 +537,39 @@ export const translations = {
     'categories.noPreview': 'Aucun aperçu disponible',
     'categories.errorLoad': 'Impossible de charger les documents. Vérifiez que le serveur backend est démarré.',
     'search.bodyMatches': 'Mentions dans le texte',
+    // Intitulé du premier groupe, affiché quand les deux groupes existent.
+    'search.titleMatches': 'Correspondances dans le titre',
 
     // Admin
-    'admin.dashboard': 'Tableau de Bord',
+    // Casse de phrase, comme « Conversations par profil » ou « Import en lot » :
+    // les majuscules à l'anglaise (« Tableau de Bord ») tranchaient.
+    'admin.dashboard': 'Tableau de bord',
     'admin.dashboardDesc': 'Aperçu des performances de JuriX',
     'admin.lastUpdate': 'Dernière mise à jour',
     'admin.statsError': 'Impossible de charger les statistiques. Le serveur est peut-être injoignable.',
     'admin.docsError': 'Impossible de charger les documents. Le serveur est peut-être injoignable.',
     'admin.refresh': 'Actualiser',
-    'admin.totalDocs': 'Documents Total',
-    'admin.totalSearches': 'Recherches Total',
-    'admin.activeUsers': 'Utilisateurs Actifs',
-    'admin.responseTime': 'Temps de Réponse',
-    'admin.searchActivity': 'Activité de Recherche',
+    // Titres des chiffres clés, courts : « Documents au total » et « Recherches
+    // au total » passaient sur deux lignes dans les cartes étroites
+    // (téléphone, quatre colonnes de 222 px), et « au total » contredisait la
+    // ligne du dessous (« Les 7 derniers jours ») pour les recherches.
+    'admin.totalDocs': 'Documents',
+    'admin.totalSearches': 'Recherches',
+    'admin.activeUsers': 'Utilisateurs actifs',
+    'admin.responseTime': 'Temps de réponse',
+    'admin.searchActivity': 'Activité de recherche',
     'admin.noActivityData': 'Aucune donnée d\'activité',
-    'admin.latestDocs': 'Derniers Documents',
+    'admin.latestDocs': 'Derniers documents',
     'admin.noRecentDocs': 'Aucun document récent',
     'admin.viewAll': 'Voir tout',
     'admin.personasTitle': 'Conversations par profil',
     'admin.personasNote': '« Profil général » : les visiteurs qui n\'ont pas répondu à la question du profil, et ceux qui l\'ont choisi.',
     'admin.personasEmpty': 'Aucune conversation sur la période',
     'admin.personasUnavailable': 'Répartition par profil indisponible',
-    'admin.docManagement': 'Gestion des Documents',
+    'admin.docManagement': 'Gestion des documents',
     'admin.docManagementDesc': 'Ajoutez, modifiez ou supprimez des textes de loi',
-    'admin.newDoc': 'Nouveau Document',
+    // Le libellé de la fenêtre qu'il ouvre (`admin.upload.title`).
+    'admin.newDoc': 'Ajouter des documents',
     'admin.searchDoc': 'Rechercher un document...',
     'admin.allCategories': 'Toutes catégories',
     'admin.allLanguages': 'Toutes langues',
@@ -478,7 +579,7 @@ export const translations = {
     'admin.dateAdded': 'Date d\'ajout',
     'admin.status': 'Statut',
     'admin.actions': 'Actions',
-    'admin.edit': 'Éditer',
+    'admin.edit': 'Modifier',
     'admin.delete': 'Supprimer',
     'admin.loading': 'Chargement...',
     'admin.noDocFound': 'Aucun document trouvé.',
@@ -492,7 +593,7 @@ export const translations = {
     'admin.lastPage': 'Dernière page',
     'admin.draft': 'Brouillon',
     'admin.published': 'Publié',
-    'admin.processing': 'Traitement...',
+    'admin.processing': 'En traitement',
     'admin.pending': 'En attente',
     'admin.refused': 'Refusé',
     'admin.archived': 'Archivé',
@@ -501,22 +602,67 @@ export const translations = {
     'admin.deleteError': 'Erreur lors de la suppression',
     'admin.networkError': 'Erreur réseau lors de la suppression du document',
     'admin.batchUpload': 'Import en lot',
-    'admin.batchUploadDesc': 'Uploadez plusieurs PDFs et suivez leur traitement en temps réel',
+    'admin.batchUploadDesc': 'Importez plusieurs PDF et suivez leur traitement en temps réel',
     'admin.selectFiles': 'Sélectionner les fichiers',
     'admin.dragDrop': 'Glissez-déposez vos fichiers PDF ici, ou',
     'admin.browse': 'parcourez',
     'admin.tapToChoose': 'Touchez pour choisir des fichiers PDF',
     'admin.removeFile': 'Retirer {name}',
-    'admin.fileLimit': 'Limite: 1GB par fichier',
+    // Comme la fenêtre d'ajout (« PDF ou DOCX (1 Go max) ») : « Limite: 1GB »
+    // n'avait ni l'espace avant les deux-points, ni l'unité française.
+    'admin.fileLimit': 'PDF (1 Go max par fichier)',
     'admin.selectedFiles': 'Fichiers sélectionnés',
-    'admin.uploading': 'Upload en cours...',
-    'admin.uploadFiles': 'Uploader',
+    'admin.uploading': 'Envoi en cours…',
+    'admin.uploadFiles': 'Envoyer',
     'admin.files': 'fichier(s)',
     'admin.documents': 'Documents',
-    'admin.all': 'Tous',
+    'admin.blog': 'Blog & Actualités IA',
+    // Administration du blog (src/routes/admin/blog/+page.svelte). La page
+    // remplace `{n}`, `{status}` et `{title}`.
+    'admin.blog.subtitle': 'Générez et publiez des décryptages d\'actualité juridique par l\'IA',
+    'admin.blog.generate': 'Générer un article IA',
+    'admin.blog.closeGenerator': 'Fermer le générateur',
+    'admin.blog.generatorTitle': 'Générateur d\'article automatique',
+    'admin.blog.generatorHint': 'Décrivez le sujet ou la question d\'actualité, l\'IA rédige tout l\'article',
+    'admin.blog.topicLabel': 'Sujet ou question d\'actualité *',
+    'admin.blog.topicPlaceholder': 'Ex : Un propriétaire a-t-il le droit de couper l\'eau d\'un locataire au Cameroun ?',
+    // « (optionnel) » vient d'`admin.optional`, posé en gris après le libellé.
+    'admin.blog.extraContextLabel': 'Contexte supplémentaire',
+    'admin.blog.extraContextPlaceholder': 'Ex : Un fait divers récent à Douala, un locataire a trouvé son compteur débranché après 3 mois d\'impayés...',
+    'admin.blog.generating': 'Génération en cours (15-30s)...',
+    'admin.blog.generateFull': 'Générer l\'article complet',
+    'admin.blog.previewTitle': 'Article généré — Prévisualisation',
+    'admin.blog.slug': 'Slug :',
+    'admin.blog.contextHeading': 'Le contexte :',
+    'admin.blog.summaryHeading': 'Analyse juridique vulgarisée :',
+    'admin.blog.keyPointsHeading': 'Points clés :',
+    'admin.blog.citationsHeading': 'Citations de lois ({n}) :',
+    'admin.blog.impactHeading': 'Impact citoyen :',
+    'admin.blog.publishNow': 'Publier maintenant',
+    // Tous les articles, brouillons compris : « Articles publiés (2) » comptait
+    // aussi le brouillon affiché dans la liste.
+    'admin.blog.listTitle': 'Articles ({n})',
+    'admin.blog.empty': 'Aucun article. Cliquez sur « Générer un article IA » pour commencer.',
+    'admin.blog.view': 'Voir sur le site',
+    // Libellé visible du lien, court pour tenir dans un tiers de rangée au
+    // téléphone ; `admin.blog.view` reste son nom accessible.
+    'admin.blog.viewShort': 'Voir',
+    'admin.blog.edit': 'Modifier',
+    'admin.blog.editTitle': 'Modifier l\'article',
+    'admin.blog.tagsField': 'Mots-clés (séparés par des virgules)',
+    'admin.blog.contextField': 'Contexte',
+    'admin.blog.summaryField': 'Analyse juridique (résumé)',
+    'admin.blog.keyPointsField': 'Points clés (un par ligne)',
+    'admin.blog.impactField': 'Impact citoyen',
+    'admin.blog.suggestedQuestionField': 'Question suggérée (chat)',
+    'admin.blog.publishedField': 'Article publié',
+    'admin.blog.httpError': 'Erreur HTTP {status}',
+    'admin.blog.confirmDelete': 'Supprimer « {title} » ?',
+    // Le filtre de l'import en lot reprend celui des documents : « Tous
+    // statuts » (`admin.allStatuses`) et les libellés au singulier des badges
+    // (`admin.published`, `admin.refused`). « Tous » seul ne disait pas ce
+    // qu'il filtrait, et « Publiés », « Refusés » y étaient au pluriel.
     'admin.inProcess': 'En traitement',
-    'admin.publishedPlural': 'Publiés',
-    'admin.refusedPlural': 'Refusés',
     'admin.title': 'Titre',
     'admin.reference': 'Référence',
     'admin.progress': 'Progression',
@@ -525,22 +671,128 @@ export const translations = {
     // About
     'about.title': 'À propos de',
     'about.subtitle': 'La référence juridique numérique du Cameroun.',
-    'about.mission.title': 'Notre Mission',
+    'about.mission.title': 'Notre mission',
     'about.mission.p1': 'JuriX est une plateforme innovante dédiée à la centralisation de l\'ensemble des textes de lois du Cameroun. Notre objectif premier est de démocratiser l\'accès au droit en rendant les textes juridiques accessibles à tous : citoyens, professionnels du droit, étudiants et entreprises.',
     'about.mission.p2': 'Au-delà d\'une simple bibliothèque numérique, JuriX intègre l\'intelligence artificielle de pointe pour révolutionner la compréhension du droit. Grâce à notre assistant juridique IA, les textes complexes deviennent clairs et intelligibles pour tout le monde.',
     'about.centralization.title': 'Centralisation',
     'about.centralization.desc': 'Tous les codes, lois et règlements en un seul endroit.',
-    'about.ai.title': 'Intelligence Artificielle',
+    'about.ai.title': 'Intelligence artificielle',
     'about.ai.desc': 'Explications claires et assistance juridique instantanée.',
     'about.creator': 'Conçu et réalisé par',
     'about.contact.title': 'Contact',
     'about.contact.email': 'Email',
+
+    // Palette de commande (CommandPalette.svelte), ouverte depuis l'en-tête
+    // (SiteHeader.svelte) ou par Ctrl+K. `{q}` est la saisie de l'utilisateur,
+    // insérée par le composant.
+    'palette.label': 'Palette de commande',
+    'palette.open': 'Recherche et actions rapides',
+    'palette.openWithShortcut': 'Recherche et actions rapides (Ctrl+K)',
+    'palette.placeholder': 'Rechercher une loi, un sujet, ou poser une question…',
+    'palette.clear': 'Effacer',
+    'palette.escKey': 'Échap',
+    'palette.sectionResults': 'Résultats & Actions',
+    'palette.sectionShortcuts': 'Raccourcis & Navigation',
+    'palette.noResults': 'Aucun résultat pour « {q} »',
+    'palette.noResultsHint': 'Essayez avec d\'autres mots-clés ou posez directement votre question dans le chat.',
+    'palette.navigate': 'Naviguer',
+    'palette.select': 'Ouvrir',
+    'palette.footer': 'Palette universelle JuriX',
+    'palette.askAi.title': 'Poser une question à l\'Assistant IA',
+    'palette.askAi.subtitle': 'Réponses sourcées par notre IA sur l\'ensemble du droit',
+    'palette.blog.title': 'L\'actualité décryptée (blog)',
+    'palette.blog.subtitle': 'Analyses hebdomadaires des sujets chauds par l\'IA',
+    'palette.laws.title': 'Explorer tous les textes de lois',
+    'palette.laws.subtitle': 'Codes, lois, décrets et arrêtés classés par catégories',
+    'palette.compare.title': 'Comparer deux régimes juridiques',
+    'palette.compare.subtitle': 'Tableau comparatif dynamique article par article',
+    'palette.searchAll.title': 'Rechercher « {q} » dans toutes les lois',
+    'palette.searchAll.subtitle': 'Lancer la recherche plein texte et sémantique',
+    'palette.askAiQuery.title': 'Demander à l\'IA : « {q} »',
+    'palette.askAiQuery.subtitle': 'Obtenir une réponse personnalisée et vulgarisée',
+    'palette.blogPost': 'Article de blog',
+    'palette.lawFallback': 'Texte de loi officiel',
+    'palette.badge.assistant': 'Assistant',
+    'palette.badge.blog': 'Blog',
+    'palette.badge.laws': 'Lois',
+    'palette.badge.tool': 'Outil',
+    'palette.badge.search': 'Recherche',
+    'palette.badge.news': 'Actualité',
+    'palette.badge.law': 'Loi',
+
+    // Blog d'actualité (src/routes/blog). Les rubriques et le contenu des
+    // articles viennent de l'API, en français : seule l'interface est traduite.
+    'blog.metaTitle': 'Actualités juridiques et décryptages IA — Blog',
+    'blog.metaDescription': 'Chaque semaine, l\'actualité juridique et économique décryptée en langage clair par l\'intelligence artificielle avec citations des textes de lois.',
+    'blog.kicker': 'L\'actualité décryptée par l\'IA',
+    'blog.title': 'Le droit face à l\'actualité',
+    'blog.subtitle': 'Chaque semaine, un sujet chaud de l\'actualité passé au crible des textes de lois en vigueur au Cameroun. Des explications claires, sans jargon inutile, avec les sources officielles.',
+    'blog.all': 'Tous',
+    'blog.featured': 'Article à la une',
+    // Badge de l'article à la une : une clé, et non plus un texte français
+    // écrit par le chargeur (`badge` de $lib/data/blog), qui restait en
+    // français dans l'interface anglaise.
+    'blog.badge.ai': 'Décryptage IA',
+    'blog.badge.weekly': 'Décryptage de la semaine',
+    'blog.badge.labour': 'Droit du travail',
+    'blog.badge.cybercrime': 'Cybercriminalité',
+    'blog.reading': 'de lecture',
+    'blog.recently': 'Récemment',
+    'blog.readFull': 'Lire le décryptage complet',
+    'blog.others': 'Autres décryptages',
+    'blog.othersTitle': 'Autres analyses récentes',
+    'blog.read': 'Consulter',
+    'blog.ctaTitle': 'Vous avez une question sur une actualité ou un litige ?',
+    'blog.ctaText': 'Notre assistant juridique intelligent analyse plus de 2 200 lois et 43 000 articles en temps réel pour vous donner une réponse sourcée et vulgarisée.',
+    'blog.ctaButton': 'Interroger l\'Assistant IA',
+    'blog.metaSuffix': 'Décryptage juridique',
+    'blog.breadcrumb': 'Fil d\'Ariane',
+    'blog.shareMessage': 'Décryptage juridique par l\'IA :',
+    'blog.writtenWith': 'Rédigé avec l\'assistance de',
+    'blog.aiName': 'JuriX IA',
+    'blog.shareWhatsApp': 'Partager sur WhatsApp',
+    'blog.shareLinkedIn': 'Partager sur LinkedIn',
+    'blog.shareX': 'Partager sur X (Twitter)',
+    'blog.copyLink': 'Copier le lien',
+    'blog.copied': 'Copié !',
+    'blog.contextTitle': '1. L\'actualité en 2 minutes (le contexte)',
+    'blog.lawTitle': '2. Ce que dit la loi — l\'analyse de l\'IA',
+    'blog.explanationTitle': 'Explication juridique simplifiée',
+    'blog.keyPoints': 'Les règles essentielles à retenir',
+    'blog.citationsTitle': 'Textes de loi officiels applicables',
+    'blog.article': 'Article',
+    'blog.legalExcerpt': 'Extrait légal',
+    'blog.readLaw': 'Consulter le texte complet de la loi',
+    'blog.impactTitle': 'Ce que cela change concrètement pour vous',
+    'blog.assistanceBadge': 'Assistance juridique sur mesure',
+    'blog.similarTitle': 'Vous traversez une situation similaire ?',
+    'blog.similarText': 'Ne restez pas dans le doute. Posez directement votre question à notre assistant IA, qui analysera les spécificités de votre cas à la lumière des textes officiels.',
+    'blog.askAssistant': 'Poser cette question à l\'Assistant',
+    'blog.allPosts': 'Tous les décryptages',
+    // Rubriques du blog ($lib/data/blog, `nomRubrique`) : l'API les donne en
+    // français et en texte libre ; une rubrique composée (« Immobilier &
+    // Logement ») se traduit partie par partie. Clé : le nom sans accents,
+    // en minuscules, mots joints par des tirets.
+    'blog.rubrique.immobilier': 'Immobilier',
+    'blog.rubrique.logement': 'Logement',
+    'blog.rubrique.travail': 'Travail',
+    'blog.rubrique.emploi': 'Emploi',
+    'blog.rubrique.economie': 'Économie',
+    'blog.rubrique.fiscalite': 'Fiscalité',
+    'blog.rubrique.droit-penal': 'Droit pénal',
+    'blog.rubrique.famille': 'Famille',
+    'blog.rubrique.numerique': 'Numérique',
+    'blog.rubrique.affaires': 'Affaires',
+    'blog.rubrique.consommation': 'Consommation',
+    'blog.rubrique.sante': 'Santé',
+    'blog.rubrique.actualite-juridique': 'Actualité juridique',
   },
   en: {
     'signup.title': 'Create an account',
     'signup.subtitle': 'Keep your conversations from one visit to the next.',
     'signup.name': 'Full name',
-    'signup.namePlaceholder': 'Jane Doe',
+    'signup.namePlaceholder': 'John Doe',
+    'auth.emailPlaceholder': 'you@example.com',
     'signup.email': 'Email address',
     'signup.password': 'Password',
     'signup.passwordHint': 'At least 8 characters, with an uppercase letter, a lowercase letter and a digit.',
@@ -562,7 +814,7 @@ export const translations = {
     'forgot.errorGeneric': 'Could not send the link. Try again in a moment.',
     'forgot.backToLogin': 'Back to sign-in',
     'lien.usedTitle': 'Link already used',
-    'lien.usedDetail': 'This link works only once. If you need a new one, just ask for it again.',
+    'lien.usedDetail': 'This link works only once.\nIf you need a new one, just ask for it\u00a0again.',
     'reset.title': 'New password',
     'reset.subtitle': 'Choose a password for your account.',
     'reset.password': 'New password',
@@ -580,12 +832,20 @@ export const translations = {
     'verify.errorToken': 'This link is no longer valid. It may already have been used.',
     'verify.errorGeneric': 'Could not verify. Try again in a moment.',
     'verify.goHome': 'Go to the home page',
+    'verify.usedDetail': 'This link has already been used: your address is most likely confirmed already. You can sign in.',
+    'login.subtitle': 'Pick up your saved conversations.',
     'login.forgotPassword': 'Forgotten password?',
     'login.noAccount': 'No account yet?',
     'auth.orGoogle': 'or',
     'auth.googleButton': 'Continue with Google',
     'auth.googleError': 'Google sign-in refused.',
     'auth.googleUnavailable': 'Google sign-in is momentarily unavailable.',
+    // ---- Password field (ChampMotDePasse.svelte) and account recovery ----
+    'auth.showPassword': 'Show password',
+    'auth.hidePassword': 'Hide password',
+    'login.resetHint': 'Forgotten your password?',
+    'login.resetLink': 'Get a link to change it',
+    'forgot.errorInvalid': 'Enter a valid email address.',
     'nav.signup': 'Sign up',
     'chat.conversations': 'My conversations',
     'chat.newConversation': 'New conversation',
@@ -632,19 +892,22 @@ export const translations = {
     'common.save': 'Save',
     'common.saving': 'Saving…',
     'admin.users': 'Users',
-    'admin.usersDesc': 'Accounts allowed to access the administration.',
+    'admin.usersDesc': 'Accounts allowed to access the administration',
     'admin.backToSite': 'Back to site',
     'admin.logout': 'Sign out',
     'admin.administration': 'Administration',
     'admin.checkingSession': 'Checking session…',
-    'admin.sinceLastMonth': 'since last month',
+    'admin.inLast30Days': 'in 30 days',
     'admin.requests': 'requests',
+    'admin.searchMode.hybrid': 'Hybrid',
+    'admin.searchMode.text': 'Full text',
+    'admin.searchMode.semantic': 'Semantic',
     'admin.role.user': 'User',
     'admin.role.admin': 'Administrator',
     'admin.role.superadmin': 'Superadmin',
     'admin.user.new': 'New account',
     'admin.user.edit': 'Edit account',
-    'admin.user.email': 'Email',
+    'admin.user.email': 'Email address',
     'admin.user.username': 'Username',
     'admin.user.usernameHint': 'Converted to lowercase when saved.',
     'admin.user.fullName': 'Full name',
@@ -679,7 +942,7 @@ export const translations = {
     'admin.doc.title': 'Title',
     'admin.doc.titlePlaceholder': 'Document title',
     'admin.doc.category': 'Category',
-    'admin.doc.noCategory': '-- No category --',
+    'admin.doc.noCategory': 'No category',
     'admin.doc.content': 'Content',
     'admin.doc.contentPlaceholder': 'Document content…',
     'admin.doc.chars': 'characters',
@@ -687,14 +950,14 @@ export const translations = {
     'admin.doc.unknownError': 'Unknown error',
     'admin.upload.title': 'Add documents',
     'admin.upload.titlePlaceholder': 'e.g. The Constitution of Cameroon',
-    'admin.upload.optional': '(optional)',
+    'admin.optional': '(optional)',
     'admin.upload.refPlaceholder': 'e.g. LOI-2024-001 or Decree No. 2024/PM/123',
     'admin.upload.refHint': 'Official number of the legal document',
     'admin.upload.category': 'Document category',
-    'admin.upload.selectCategory': '-- Select a category --',
     'admin.upload.loadingCategories': 'Loading categories…',
-    'admin.upload.clickToSelect': 'Click to select files',
-    'admin.upload.formats': 'PDF or DOCX (max 1 GB)',
+    'admin.upload.clickToSelect': 'Click to choose files',
+    'admin.upload.tapToSelect': 'Tap to choose files',
+    'admin.upload.formats': 'PDF or DOCX (max 250 MB per file)',
     'admin.upload.statusUploading': 'Uploading…',
     'admin.upload.statusProcessing': 'Processing…',
     'admin.upload.statusDone': 'Done',
@@ -702,17 +965,20 @@ export const translations = {
     'admin.upload.statusPending': 'Pending',
     'admin.upload.processing': 'Processing…',
     'admin.upload.start': 'Start processing',
-    'admin.upload.logUploading': '📤 Uploading {name}…',
-    'admin.upload.logProcessing': '⚙️ Processing {name} (ID: {id})…',
-    'admin.upload.logDone': '✅ {name} sent to the pipeline.',
-    'admin.upload.logError': '❌ Error on {name}: {err}',
+    'admin.upload.logUploading': 'Uploading {name}…',
+    'admin.upload.logProcessing': 'Processing {name} (ID: {id})…',
+    'admin.upload.logDone': '{name} sent to the pipeline.',
+    'admin.upload.logError': 'Error on {name}: {err}',
     'admin.upload.errUpload': 'Upload error',
     'admin.upload.errIngest': 'Ingestion error ({status}): {text}',
     'batch.uploadFailed': 'Upload failed: {err}',
     // Hero section
     'hero.badge': 'Cameroonian Legal AI',
-    'hero.title': 'Your Legal Assistant',
-    'hero.titleHighlight': 'AI',
+    // Le titre se lit d'un trait, le mot en gris À LA FIN (layout du groupe
+    // (main)) : « Your Legal Assistant / AI » donnait un ordre que l'anglais
+    // n'emploie pas. « Your Legal / AI Assistant » : « legal AI assistant ».
+    'hero.title': 'Your Legal',
+    'hero.titleHighlight': 'AI Assistant',
     'hero.subtitle': 'Search, consult and understand Cameroonian laws with the help of artificial intelligence',
 
     // Mode switcher
@@ -733,6 +999,10 @@ export const translations = {
     'chat.errorInvalid': 'The question could not be sent as is. Please rephrase it.',
     'chat.errorPersona': 'Your profile was not recognised. Please choose it again from the header.',
     'chat.suggestionsLabel': 'Suggestions:',
+    // Chat: status label, sources title, empty server answer.
+    'chat.statusLabel': 'Cameroonian Legal AI V2.0',
+    'chat.sources': 'Sources',
+    'chat.emptyAnswer': 'I couldn\'t process your request.',
     'persona.chatLabel': 'Profile',
     'persona.general': 'General profile',
     'persona.citoyen.nom': 'Citizen',
@@ -764,6 +1034,11 @@ export const translations = {
     'categories.title': 'Browse by Category',
     'categories.subtitle': 'Explore legal texts by major categories',
     'categories.documentsShort': 'doc.',
+    // Home page (src/routes/(main)/+page.svelte): plural forms picked by Intl.PluralRules.
+    'categories.eyebrow': 'Official Legal Corpus',
+    'categories.textCount.one': 'text',
+    'categories.textCount.other': 'texts',
+    'categories.browseTexts': 'Browse texts',
 
     // Category names (English)
 
@@ -774,7 +1049,7 @@ export const translations = {
     'common.retry': 'Retry',
 
     // Search results
-    'search.resultsFor': 'Results for',
+    'search.resultsForQuery': 'Results for “{q}”',
     'search.searchLaw': 'Search for a law, decree, article...',
 
     // Pagination
@@ -797,7 +1072,7 @@ export const translations = {
     'search.oldestDate': 'Oldest first',
     'search.aboutResults': 'About',
     'search.resultsFound': 'results found',
-    'search.seconds': 'seconds',
+    'search.seconds': 's',
 
     'search.readFull': 'Read full text',
     'search.copyLink': 'Copy link',
@@ -810,6 +1085,11 @@ export const translations = {
     'badge.constitution': 'Constitution',
     'badge.ordinance': 'Ordinance',
     'badge.text': 'Text',
+    'badge.arrete': 'Order',
+    'badge.circular': 'Circular',
+    'badge.instruction': 'Instruction',
+    'badge.decision': 'Decision',
+    'badge.uniformAct': 'Uniform Act',
     'search.errorSearch': 'Search error. Please try again.',
     'search.errorServer': 'Unable to contact the server.',
 
@@ -827,6 +1107,7 @@ export const translations = {
     'laws.previous': 'Previous',
     'laws.next': 'Next',
     'laws.page': 'Page',
+    'laws.preamble': 'Preamble / General',
     'nav.documents': 'Documents',
     'a11y.skipToContent': 'Skip to content',
     'a11y.searchField': 'Search',
@@ -881,7 +1162,7 @@ export const translations = {
     'error.retry': 'Try again',
 
     // Footer
-    'footer.rights': '© 2025 JuriX. All rights reserved. Access to law for everyone.',
+    'footer.rights': '© {annee} JuriX. All rights reserved. Access to law for everyone.',
 
     // Page titles
     'title.home': 'Home',
@@ -899,6 +1180,7 @@ export const translations = {
     // Categories page
     'categories.backHome': 'Back to Home',
     'categories.searchPlaceholder': 'Search for a law, decree, article...',
+    'categories.searchPlaceholderShort': 'Search for a text…',
     'categories.langLabel': 'Language',
     'categories.all': 'All',
     'categories.retry': 'Retry',
@@ -908,6 +1190,7 @@ export const translations = {
     'categories.noPreview': 'No preview available',
     'categories.errorLoad': 'Unable to load documents. Check that the backend server is running.',
     'search.bodyMatches': 'Mentioned in the text',
+    'search.titleMatches': 'Matches in the title',
 
     // Admin
     'admin.dashboard': 'Dashboard',
@@ -916,8 +1199,8 @@ export const translations = {
     'admin.statsError': 'Could not load statistics. The server may be unreachable.',
     'admin.docsError': 'Could not load documents. The server may be unreachable.',
     'admin.refresh': 'Refresh',
-    'admin.totalDocs': 'Total Documents',
-    'admin.totalSearches': 'Total Searches',
+    'admin.totalDocs': 'Documents',
+    'admin.totalSearches': 'Searches',
     'admin.activeUsers': 'Active Users',
     'admin.responseTime': 'Response Time',
     'admin.searchActivity': 'Search Activity',
@@ -931,7 +1214,7 @@ export const translations = {
     'admin.personasUnavailable': 'Profile breakdown unavailable',
     'admin.docManagement': 'Document Management',
     'admin.docManagementDesc': 'Add, edit, or delete legal texts',
-    'admin.newDoc': 'New Document',
+    'admin.newDoc': 'Add documents',
     'admin.searchDoc': 'Search a document...',
     'admin.allCategories': 'All categories',
     'admin.allLanguages': 'All languages',
@@ -955,7 +1238,7 @@ export const translations = {
     'admin.lastPage': 'Last page',
     'admin.draft': 'Draft',
     'admin.published': 'Published',
-    'admin.processing': 'Processing...',
+    'admin.processing': 'Processing',
     'admin.pending': 'Pending',
     'admin.refused': 'Refused',
     'admin.archived': 'Archived',
@@ -970,16 +1253,49 @@ export const translations = {
     'admin.browse': 'browse',
     'admin.tapToChoose': 'Tap to choose PDF files',
     'admin.removeFile': 'Remove {name}',
-    'admin.fileLimit': 'Limit: 1GB per file',
+    'admin.fileLimit': 'PDF (max 1 GB per file)',
     'admin.selectedFiles': 'Selected files',
-    'admin.uploading': 'Uploading...',
+    'admin.uploading': 'Uploading…',
     'admin.uploadFiles': 'Upload',
     'admin.files': 'file(s)',
     'admin.documents': 'Documents',
-    'admin.all': 'All',
+    'admin.blog': 'Blog & AI News',
+    // Blog administration (src/routes/admin/blog/+page.svelte).
+    'admin.blog.subtitle': 'Generate and publish AI-written explainers of legal news',
+    'admin.blog.generate': 'Generate an AI article',
+    'admin.blog.closeGenerator': 'Close the generator',
+    'admin.blog.generatorTitle': 'Automatic article generator',
+    'admin.blog.generatorHint': 'Describe the topic or news question; the AI writes the whole article',
+    'admin.blog.topicLabel': 'Topic or news question *',
+    'admin.blog.topicPlaceholder': 'E.g.: Can a landlord cut off a tenant\'s water in Cameroon?',
+    'admin.blog.extraContextLabel': 'Additional context',
+    'admin.blog.extraContextPlaceholder': 'E.g.: A recent incident in Douala: a tenant found their meter disconnected after 3 months of unpaid rent...',
+    'admin.blog.generating': 'Generating (15-30s)...',
+    'admin.blog.generateFull': 'Generate the full article',
+    'admin.blog.previewTitle': 'Generated article — Preview',
+    'admin.blog.slug': 'Slug:',
+    'admin.blog.contextHeading': 'Context:',
+    'admin.blog.summaryHeading': 'Plain-language legal analysis:',
+    'admin.blog.keyPointsHeading': 'Key points:',
+    'admin.blog.citationsHeading': 'Legal citations ({n}):',
+    'admin.blog.impactHeading': 'Impact on citizens:',
+    'admin.blog.publishNow': 'Publish now',
+    'admin.blog.listTitle': 'Posts ({n})',
+    'admin.blog.empty': 'No posts yet. Click “Generate an AI article” to get started.',
+    'admin.blog.view': 'View on the site',
+    'admin.blog.viewShort': 'View',
+    'admin.blog.edit': 'Edit',
+    'admin.blog.editTitle': 'Edit the post',
+    'admin.blog.tagsField': 'Tags (comma-separated)',
+    'admin.blog.contextField': 'Context',
+    'admin.blog.summaryField': 'Legal analysis (summary)',
+    'admin.blog.keyPointsField': 'Key points (one per line)',
+    'admin.blog.impactField': 'Impact on citizens',
+    'admin.blog.suggestedQuestionField': 'Suggested question (chat)',
+    'admin.blog.publishedField': 'Published',
+    'admin.blog.httpError': 'HTTP error {status}',
+    'admin.blog.confirmDelete': 'Delete “{title}”?',
     'admin.inProcess': 'Processing',
-    'admin.publishedPlural': 'Published',
-    'admin.refusedPlural': 'Refused',
     'admin.title': 'Title',
     'admin.reference': 'Reference',
     'admin.progress': 'Progress',
@@ -998,6 +1314,101 @@ export const translations = {
     'about.creator': 'Designed and built by',
     'about.contact.title': 'Contact',
     'about.contact.email': 'Email',
+
+    // Command palette (CommandPalette.svelte, opened from SiteHeader.svelte or Ctrl+K).
+    'palette.label': 'Command palette',
+    'palette.open': 'Search and quick actions',
+    'palette.openWithShortcut': 'Search and quick actions (Ctrl+K)',
+    'palette.placeholder': 'Search for a law or a topic, or ask a question…',
+    'palette.clear': 'Clear',
+    'palette.escKey': 'Esc',
+    'palette.sectionResults': 'Results & Actions',
+    'palette.sectionShortcuts': 'Shortcuts & Navigation',
+    'palette.noResults': 'No results for “{q}”',
+    'palette.noResultsHint': 'Try other keywords, or ask your question directly in the chat.',
+    'palette.navigate': 'Navigate',
+    'palette.select': 'Open',
+    'palette.footer': 'JuriX universal palette',
+    'palette.askAi.title': 'Ask the AI Assistant a question',
+    'palette.askAi.subtitle': 'Sourced answers from our AI across the whole of the law',
+    'palette.blog.title': 'News Decoded (Blog)',
+    'palette.blog.subtitle': 'Weekly AI analyses of the hot topics',
+    'palette.laws.title': 'Explore all legal texts',
+    'palette.laws.subtitle': 'Codes, laws, decrees and orders, sorted by category',
+    'palette.compare.title': 'Compare two legal regimes',
+    'palette.compare.subtitle': 'Dynamic article-by-article comparison table',
+    'palette.searchAll.title': 'Search “{q}” in all laws',
+    'palette.searchAll.subtitle': 'Run the full-text and semantic search',
+    'palette.askAiQuery.title': 'Ask the AI: “{q}”',
+    'palette.askAiQuery.subtitle': 'Get a tailored answer in plain language',
+    'palette.blogPost': 'Blog post',
+    'palette.lawFallback': 'Official legal text',
+    'palette.badge.assistant': 'Assistant',
+    'palette.badge.blog': 'Blog',
+    'palette.badge.laws': 'Laws',
+    'palette.badge.tool': 'Tool',
+    'palette.badge.search': 'Search',
+    'palette.badge.news': 'News',
+    'palette.badge.law': 'Law',
+
+    // News blog (src/routes/blog): interface only, post content comes from the API.
+    'blog.metaTitle': 'Legal News & AI Analyses — Blog',
+    'blog.metaDescription': 'Every week, legal and economic news explained in plain language by artificial intelligence, with citations from the legal texts.',
+    'blog.kicker': 'The News, Decoded by AI',
+    'blog.title': 'The Law Behind the Headlines',
+    'blog.subtitle': 'Every week, a hot news topic examined against the laws in force in Cameroon. Clear explanations, no needless jargon, with the official sources.',
+    'blog.all': 'All',
+    'blog.featured': 'Featured article',
+    'blog.badge.ai': 'AI analysis',
+    'blog.badge.weekly': 'Analysis of the week',
+    'blog.badge.labour': 'Labour law',
+    'blog.badge.cybercrime': 'Cybercrime',
+    'blog.reading': 'read',
+    'blog.recently': 'Recently',
+    'blog.readFull': 'Read the full analysis',
+    'blog.others': 'Other analyses',
+    'blog.othersTitle': 'Other recent analyses',
+    'blog.read': 'Read',
+    'blog.ctaTitle': 'Have a question about a news story or a dispute?',
+    'blog.ctaText': 'Our intelligent legal assistant analyses more than 2,200 laws and 43,000 articles in real time to give you a sourced, plain-language answer.',
+    'blog.ctaButton': 'Ask the AI Assistant',
+    'blog.metaSuffix': 'Legal Analysis',
+    'blog.breadcrumb': 'Breadcrumb',
+    'blog.shareMessage': 'Legal analysis by AI:',
+    'blog.writtenWith': 'Written with the help of',
+    'blog.aiName': 'JuriX AI',
+    'blog.shareWhatsApp': 'Share on WhatsApp',
+    'blog.shareLinkedIn': 'Share on LinkedIn',
+    'blog.shareX': 'Share on X (Twitter)',
+    'blog.copyLink': 'Copy link',
+    'blog.copied': 'Copied!',
+    'blog.contextTitle': '1. The news in 2 minutes (Context)',
+    'blog.lawTitle': '2. What the law says — The AI\'s analysis',
+    'blog.explanationTitle': 'Simplified legal explanation',
+    'blog.keyPoints': 'Key rules to remember',
+    'blog.citationsTitle': 'Applicable official legal texts',
+    'blog.article': 'Article',
+    'blog.legalExcerpt': 'Legal excerpt',
+    'blog.readLaw': 'Read the full text of the law',
+    'blog.impactTitle': 'What this actually changes for you',
+    'blog.assistanceBadge': 'Tailored legal assistance',
+    'blog.similarTitle': 'Going through a similar situation?',
+    'blog.similarText': 'Don\'t stay in doubt. Ask our AI assistant your question directly: it will analyse the specifics of your case in light of the official texts.',
+    'blog.askAssistant': 'Ask the Assistant this question',
+    'blog.allPosts': 'All analyses',
+    'blog.rubrique.immobilier': 'Real Estate',
+    'blog.rubrique.logement': 'Housing',
+    'blog.rubrique.travail': 'Labour',
+    'blog.rubrique.emploi': 'Employment',
+    'blog.rubrique.economie': 'Economy',
+    'blog.rubrique.fiscalite': 'Taxation',
+    'blog.rubrique.droit-penal': 'Criminal Law',
+    'blog.rubrique.famille': 'Family',
+    'blog.rubrique.numerique': 'Digital',
+    'blog.rubrique.affaires': 'Business',
+    'blog.rubrique.consommation': 'Consumer Affairs',
+    'blog.rubrique.sante': 'Health',
+    'blog.rubrique.actualite-juridique': 'Legal News',
   }
 };
 

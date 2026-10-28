@@ -1,13 +1,26 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  /**
+   * Palette de commande : Ctrl+K (Cmd+K sur Mac) ou la loupe de l'en-tête.
+   * Vide, elle propose les grandes pages ; à la saisie, la recherche, une
+   * question à l'assistant, puis les articles du blog et les lois qui
+   * correspondent.
+   *
+   * Ses libellés passent par `$tr` : écrits en dur en français, ils restaient
+   * français dans l'interface anglaise. Les titres venus des données (lois de
+   * l'API, articles du blog) s'affichent tels quels.
+   */
+  import { tick } from "svelte";
   import { goto } from "$app/navigation";
   import { fade, scale } from "svelte/transition";
   import { API_URL } from "$lib/api";
+  import Icone from "$lib/components/Icone.svelte";
+  import type { NomIcone } from "$lib/icones";
   import {
     commandPaletteOpen,
     closeCommandPalette,
   } from "$lib/stores/commandPalette";
-  import { BLOG_POSTS } from "$lib/data/blog";
+  import { language, tr } from "$lib/stores/language";
+  import { BLOG_POSTS, nomRubrique } from "$lib/data/blog";
 
   let query = "";
   let inputElement: HTMLInputElement;
@@ -19,55 +32,69 @@
     id?: number;
     title: string;
     subtitle?: string;
-    icon: string;
+    /** Nom Lucide : un nom absent de src/lib/icones.ts est une erreur de typage. */
+    icon: NomIcone;
     badge?: string;
     action: () => void;
   }
 
   let suggestions: SuggestionItem[] = [];
 
-  const defaultActions: SuggestionItem[] = [
-    {
-      title: "Poser une question à l'Assistant IA",
-      subtitle: "Réponses sourcées par notre IA sur l'ensemble du droit",
-      icon: "smart_toy",
-      badge: "Assistant",
-      action: () => {
-        close();
-        goto("/chat");
+  /** Le libellé traduit, son `{q}` remplacé par la saisie. */
+  function avecSaisie(libelle: string, saisie: string): string {
+    // Une fonction, et non la saisie elle-même : dans une chaîne de
+    // remplacement, un `$&` ou un `$1` tapé par l'utilisateur serait
+    // interprété par `replace`.
+    return libelle.replace("{q}", () => saisie);
+  }
+
+  // Réactif : les raccourcis suivent la langue de l'interface.
+  $: defaultActions = actionsParDefaut($tr);
+
+  function actionsParDefaut(t: (cle: string) => string): SuggestionItem[] {
+    return [
+      {
+        title: t("palette.askAi.title"),
+        subtitle: t("palette.askAi.subtitle"),
+        icon: "bot",
+        badge: t("palette.badge.assistant"),
+        action: () => {
+          close();
+          goto("/chat");
+        },
       },
-    },
-    {
-      title: "L'Actualité Décryptée (Blog)",
-      subtitle: "Analyses hebdomadaires des sujets chauds par l'IA",
-      icon: "article",
-      badge: "Blog",
-      action: () => {
-        close();
-        goto("/blog");
+      {
+        title: t("palette.blog.title"),
+        subtitle: t("palette.blog.subtitle"),
+        icon: "newspaper",
+        badge: t("palette.badge.blog"),
+        action: () => {
+          close();
+          goto("/blog");
+        },
       },
-    },
-    {
-      title: "Explorer tous les textes de lois",
-      subtitle: "Codes, lois, décrets et arrêtés classés par catégories",
-      icon: "description",
-      badge: "Lois",
-      action: () => {
-        close();
-        goto("/laws");
+      {
+        title: t("palette.laws.title"),
+        subtitle: t("palette.laws.subtitle"),
+        icon: "file-text",
+        badge: t("palette.badge.laws"),
+        action: () => {
+          close();
+          goto("/laws");
+        },
       },
-    },
-    {
-      title: "Comparer deux régimes juridiques",
-      subtitle: "Tableau comparatif dynamique article par article",
-      icon: "balance",
-      badge: "Outil",
-      action: () => {
-        close();
-        goto("/compare");
+      {
+        title: t("palette.compare.title"),
+        subtitle: t("palette.compare.subtitle"),
+        icon: "scale",
+        badge: t("palette.badge.tool"),
+        action: () => {
+          close();
+          goto("/compare");
+        },
       },
-    },
-  ];
+    ];
+  }
 
   function close() {
     closeCommandPalette();
@@ -89,10 +116,10 @@
 
     // 1. Action directe de recherche globale
     resultats.push({
-      title: `Rechercher « ${q} » dans toutes les lois`,
-      subtitle: "Lancer la recherche plein texte et sémantique",
+      title: avecSaisie($tr("palette.searchAll.title"), q),
+      subtitle: $tr("palette.searchAll.subtitle"),
       icon: "search",
-      badge: "Recherche",
+      badge: $tr("palette.badge.search"),
       action: () => {
         close();
         goto(`/search?q=${encodeURIComponent(q)}`);
@@ -101,10 +128,10 @@
 
     // 2. Action directe de question IA
     resultats.push({
-      title: `Demander à l'IA : « ${q} »`,
-      subtitle: "Obtenir une réponse personnalisée et vulgarisée",
-      icon: "smart_toy",
-      badge: "Assistant",
+      title: avecSaisie($tr("palette.askAiQuery.title"), q),
+      subtitle: $tr("palette.askAiQuery.subtitle"),
+      icon: "bot",
+      badge: $tr("palette.badge.assistant"),
       action: () => {
         close();
         goto(`/chat?q=${encodeURIComponent(q)}`);
@@ -122,9 +149,10 @@
     for (const b of blogMatches.slice(0, 2)) {
       resultats.push({
         title: b.title,
-        subtitle: `Article de blog • ${b.category}`,
-        icon: "article",
-        badge: "Actualité",
+        // Rubrique traduite, comme sur /blog : la valeur est en français.
+        subtitle: `${$tr("palette.blogPost")} • ${nomRubrique(b.category, $language.current)}`,
+        icon: "newspaper",
+        badge: $tr("palette.badge.news"),
         action: () => {
           close();
           goto(`/blog/${b.slug}`);
@@ -144,9 +172,9 @@
           resultats.push({
             id: item.id,
             title: item.title,
-            subtitle: item.reference || "Texte de loi officiel",
-            icon: "description",
-            badge: "Loi",
+            subtitle: item.reference || $tr("palette.lawFallback"),
+            icon: "file-text",
+            badge: $tr("palette.badge.law"),
             action: () => {
               close();
               goto(`/laws/${item.id}`);
@@ -224,90 +252,96 @@
     class="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 sm:px-6"
     role="dialog"
     aria-modal="true"
-    aria-label="Palette de commande"
+    aria-label={$tr("palette.label")}
   >
     <!-- Arrière-plan flouté avec fermeture au clic -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+      class="fixed inset-0 bg-zinc-950/40 backdrop-blur-sm transition-opacity"
       on:click={close}
       transition:fade={{ duration: 150 }}
     ></div>
 
     <!-- Boîte de dialogue flottante -->
     <div
-      class="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[80vh] z-10"
+      class="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl dark:shadow-none border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col max-h-[80vh] z-10"
       transition:scale={{ duration: 150, start: 0.95 }}
     >
       <!-- Barre de saisie -->
-      <div class="flex items-center px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 gap-3">
+      <div class="flex items-center px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800 gap-3">
         {#if loading}
-          <svg class="w-6 h-6 animate-spin text-blue-600 shrink-0" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+          <Icone nom="loader-circle" class="w-6 h-6 text-zinc-950 dark:text-white motion-safe:animate-spin" />
         {:else}
-          <span class="material-icons text-slate-400 text-2xl shrink-0" aria-hidden="true">search</span>
+          <Icone nom="search" class="text-2xl text-zinc-400 dark:text-zinc-500" />
         {/if}
+        <!-- Champ sans cadre (guide § 4.5) : toute la fenêtre tient lieu de
+             champ, et le curseur, toujours là, montre où l'on écrit. Avec la
+             base des champs (bordure zinc-500, noire au focus, anneau d'1 px,
+             angles droits), un rectangle se dessinait en permanence dans la
+             fenêtre arrondie, puisque le focus ne quitte jamais ce champ.
+             `px-0` : le texte s'aligne sur l'écart qui suit la loupe. -->
         <input
           bind:this={inputElement}
           type="text"
           value={query}
           on:input={onInput}
-          placeholder="Rechercher une loi, un sujet, ou poser une question…"
-          class="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-base focus:outline-none"
+          placeholder={$tr("palette.placeholder")}
+          class="w-full border-none bg-transparent px-0 text-zinc-950 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 text-base focus:outline-none focus:ring-0"
         />
         {#if query}
           <button
+            type="button"
             on:click={() => {
               query = "";
               suggestions = [];
               inputElement.focus();
             }}
-            class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1.5 py-0.5 rounded"
+            class="text-xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white px-1.5 py-0.5 rounded-lg transition-colors"
           >
-            Effacer
+            {$tr("palette.clear")}
           </button>
         {/if}
+        <!-- Touches : texte en zinc-600, le zinc-500 n'atteignant que 4,4:1
+             sur le fond zinc-100 de la touche. -->
         <kbd
-          class="hidden sm:inline-block px-2 py-0.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm"
+          class="hidden sm:inline-block px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md font-mono"
         >
-          Échap
+          {$tr("palette.escKey")}
         </kbd>
       </div>
 
       <!-- Liste des résultats / actions -->
-      <div class="overflow-y-auto p-2 divide-y divide-slate-100 dark:divide-slate-800/60 max-h-96">
+      <div class="overflow-y-auto p-2 divide-y divide-zinc-100 dark:divide-zinc-800/60 max-h-96">
         {#if displayedItems.length > 0}
           <div class="py-1">
-            <div class="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {query.trim() ? "Résultats & Actions" : "Raccourcis & Navigation"}
+            <div class="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
+              {query.trim() ? $tr("palette.sectionResults") : $tr("palette.sectionShortcuts")}
             </div>
             {#each displayedItems as item, idx}
+              <!-- Sous-titre en zinc-600 : sur la ligne choisie (zinc-100), le
+                   zinc-500 tombait à 4,4:1. -->
               <button
                 type="button"
                 on:click={item.action}
                 on:mouseenter={() => (selectedIndex = idx)}
                 class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-colors {selectedIndex === idx
-                  ? 'bg-blue-50 dark:bg-blue-600/10 text-blue-900 dark:text-blue-100'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}"
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-white'
+                  : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/60'}"
               >
                 <div class="flex items-center gap-3 min-w-0 pr-2">
-                  <span
-                    class="material-icons text-xl shrink-0 {selectedIndex === idx
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-slate-400 dark:text-slate-500'}"
-                    aria-hidden="true"
-                  >
-                    {item.icon}
-                  </span>
+                  <Icone
+                    nom={item.icon}
+                    class="text-xl {selectedIndex === idx
+                      ? 'text-zinc-950 dark:text-white'
+                      : 'text-zinc-400 dark:text-zinc-500'}"
+                  />
                   <div class="min-w-0">
                     <p class="text-sm font-semibold truncate leading-tight">
                       {item.title}
                     </p>
                     {#if item.subtitle}
-                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      <p class="text-xs text-zinc-600 dark:text-zinc-400 truncate mt-0.5">
                         {item.subtitle}
                       </p>
                     {/if}
@@ -316,9 +350,9 @@
 
                 {#if item.badge}
                   <span
-                    class="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border {selectedIndex === idx
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'}"
+                    class="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-mono {selectedIndex === idx
+                      ? 'bg-zinc-950 text-white border-zinc-950 dark:bg-white dark:text-zinc-950 dark:border-white'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'}"
                   >
                     {item.badge}
                   </span>
@@ -328,12 +362,12 @@
           </div>
         {:else}
           <div class="p-8 text-center space-y-2">
-            <span class="material-icons text-slate-400 text-4xl">search_off</span>
-            <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">
-              Aucun résultat pour « {query} »
+            <Icone nom="search-x" class="text-4xl text-zinc-400 dark:text-zinc-500" />
+            <p class="text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+              {avecSaisie($tr("palette.noResults"), query)}
             </p>
-            <p class="text-xs text-slate-400">
-              Essayez avec d'autres mots-clés ou posez directement votre question dans le chat.
+            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              {$tr("palette.noResultsHint")}
             </p>
           </div>
         {/if}
@@ -341,21 +375,21 @@
 
       <!-- Pied de la boîte de commande -->
       <div
-        class="px-4 py-2 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400"
+        class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400"
       >
         <div class="flex items-center gap-3">
           <span class="inline-flex items-center gap-1">
-            <kbd class="px-1 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px]">↑</kbd>
-            <kbd class="px-1 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px]">↓</kbd>
-            <span>Naviguer</span>
+            <kbd class="px-1 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded font-mono text-[10px] text-zinc-600 dark:text-zinc-400">↑</kbd>
+            <kbd class="px-1 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded font-mono text-[10px] text-zinc-600 dark:text-zinc-400">↓</kbd>
+            <span>{$tr("palette.navigate")}</span>
           </span>
           <span class="inline-flex items-center gap-1">
-            <kbd class="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px]">↵</kbd>
-            <span>Ouvrir</span>
+            <kbd class="px-1.5 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded font-mono text-[10px] text-zinc-600 dark:text-zinc-400">↵</kbd>
+            <span>{$tr("palette.select")}</span>
           </span>
         </div>
-        <span class="text-[11px] font-medium text-slate-500">
-          Palette universelle JuriX
+        <span class="text-[11px] font-medium">
+          {$tr("palette.footer")}
         </span>
       </div>
     </div>

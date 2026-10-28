@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icone from "$lib/components/Icone.svelte";
   import { tr } from "$lib/stores/language";
   import { onDestroy, onMount, tick } from "svelte";
 
@@ -306,20 +307,18 @@
   Plus de hauteur minimale de 500 px (plus haute qu'un telephone en paysage), ni
   de marge de 1rem dans la carte deja marginee : la page gagne la largeur. Les
   couleurs ont leur pendant sombre ; la visionneuse restait blanche en mode
-  sombre.
+  sombre. Son fond y est zinc-950, un cran sous la carte (zinc-900) qui
+  l'entoure : les pages, blanches, s'y détachent comme sur une table de lecture.
 -->
 <div
-  class="pdf-viewer flex w-full flex-col items-center gap-2 bg-slate-50 p-2 sm:gap-3 sm:p-4 dark:bg-slate-900"
+  class="pdf-viewer flex w-full flex-col items-center gap-2 bg-zinc-50 p-2 sm:gap-3 sm:p-4 dark:bg-zinc-950"
 >
   {#if loading}
     <div
-      class="loading-container flex min-h-64 w-full flex-col items-center justify-center gap-3 text-center text-sm text-slate-600 dark:text-slate-300"
+      class="loading-container flex min-h-64 w-full flex-col items-center justify-center gap-3 text-center text-sm text-zinc-600 dark:text-zinc-300"
       role="status"
     >
-      <div
-        class="h-12 w-12 rounded-full border-4 border-slate-200 border-t-blue-600 motion-safe:animate-spin dark:border-slate-700 dark:border-t-blue-400"
-        aria-hidden="true"
-      ></div>
+      <Icone nom="loader-circle" class="h-12 w-12 text-zinc-950 motion-safe:animate-spin dark:text-white" />
       <p>{$tr("pdf.loading")}</p>
     </div>
   {:else if error}
@@ -328,7 +327,7 @@
       role="alert"
     >
       <p class="error-message coupe-mots font-semibold text-red-600 dark:text-red-400">{error}</p>
-      <p class="error-hint text-sm text-slate-500 dark:text-slate-400">{$tr("pdf.errorHint")}</p>
+      <p class="error-hint text-sm text-zinc-500 dark:text-zinc-400">{$tr("pdf.errorHint")}</p>
     </div>
   {:else}
     <!--
@@ -337,24 +336,33 @@
       accroche en debut de ligne une fois le groupe renvoye dessous. Boutons de
       44 px sous `sm` ; Precedent / Suivant n'y sont plus que des fleches,
       nommees par aria-label.
+
+      Page precedente / suivante au dessin de la pagination du site (/search,
+      /laws, barre des articles) : carres bordes a chevron, fond zinc-100 au
+      survol. C'etaient des boutons pleins noirs (« ← Précédent »), la
+      recette du bouton principal, et une cinquieme pagination sur la meme
+      page. Fleches a toutes les tailles, le champ « Page n sur N » entre
+      elles disant ou l'on est ; leur nom reste dans aria-label.
     -->
     <div
-      class="controls flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-lg bg-white p-2 text-sm text-slate-700 shadow-sm sm:w-auto sm:px-4 dark:bg-slate-800 dark:text-slate-200"
+      class="controls flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-xl border border-zinc-200 bg-white p-2 text-sm text-zinc-700 sm:w-auto sm:px-4 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
     >
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="inline-flex h-11 min-w-11 items-center justify-center rounded-md bg-blue-600 px-2 font-medium text-white transition-colors enabled:hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:h-9 sm:px-4 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:border-zinc-800 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={onPrevPage}
           disabled={pageNum <= 1 || pageLoading}
           aria-label={$tr("pdf.previousPage")}
         >
-          <span class="material-icons sm:hidden" aria-hidden="true">chevron_left</span>
-          <span class="hidden sm:inline">{$tr("pdf.previous")}</span>
+          <Icone nom="chevron-left" class="text-2xl" />
         </button>
         <span class="page-info flex items-center gap-1.5 whitespace-nowrap">
           {$tr("pdf.page")}
-          <!-- 16 px sous `sm` : en dessous, iOS zoome sur la page au focus. -->
+          <!-- 16 px sous `sm` : en dessous, iOS zoome sur la page au focus.
+               Bordure zinc-300 (zinc-500 en sombre, la recette des champs) et
+               fond un cran sous la barre en sombre : ce petit champ se perdait
+               sinon dans la barre, de la même couleur que lui. -->
           <input
             type="number"
             inputmode="numeric"
@@ -364,19 +372,18 @@
             value={pageNum}
             on:change={(e) => goToPage((e.currentTarget as HTMLInputElement).value)}
             disabled={pageLoading}
-            class="h-11 w-14 rounded-md border-slate-300 bg-white px-1 text-center text-base text-slate-900 sm:h-9 sm:w-16 sm:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            class="h-11 w-14 rounded-lg border-zinc-300 bg-white px-1 text-center text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 sm:h-9 sm:w-16 sm:text-sm dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
           />
           {$tr("pdf.of")} {totalPages}
         </span>
         <button
           type="button"
-          class="inline-flex h-11 min-w-11 items-center justify-center rounded-md bg-blue-600 px-2 font-medium text-white transition-colors enabled:hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:h-9 sm:px-4 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:border-zinc-800 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={onNextPage}
           disabled={pageNum >= totalPages || pageLoading}
           aria-label={$tr("pdf.nextPage")}
         >
-          <span class="material-icons sm:hidden" aria-hidden="true">chevron_right</span>
-          <span class="hidden sm:inline">{$tr("pdf.next")}</span>
+          <Icone nom="chevron-right" class="text-2xl" />
         </button>
       </div>
 
@@ -385,37 +392,39 @@
       <div class="zoom-controls flex items-center gap-1">
         <button
           type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-700 transition-colors enabled:hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9 dark:bg-slate-700 dark:text-slate-100 dark:enabled:hover:bg-slate-600"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={zoomOut}
           disabled={zoom <= NIVEAUX_ZOOM[0]}
           aria-label={$tr("pdf.zoomOut")}
           title={$tr("pdf.zoomOut")}
         >
-          <span class="material-icons" aria-hidden="true">zoom_out</span>
+          <Icone nom="zoom-out" class="text-2xl" />
         </button>
         <span
-          class="zoom-level min-w-[3.25rem] text-center tabular-nums text-slate-600 dark:text-slate-300"
+          class="zoom-level min-w-[3.25rem] text-center tabular-nums text-zinc-600 dark:text-zinc-300"
           aria-live="polite">{Math.round(zoom * 100)}%</span
         >
         <button
           type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-700 transition-colors enabled:hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9 dark:bg-slate-700 dark:text-slate-100 dark:enabled:hover:bg-slate-600"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={zoomIn}
           disabled={zoom >= NIVEAUX_ZOOM[NIVEAUX_ZOOM.length - 1]}
           aria-label={$tr("pdf.zoomIn")}
           title={$tr("pdf.zoomIn")}
         >
-          <span class="material-icons" aria-hidden="true">zoom_in</span>
+          <Icone nom="zoom-in" class="text-2xl" />
         </button>
+        <!-- `fullscreen` : des coins et un cadre, comme l'icône d'origine ;
+             `scan` n'a que les coins. -->
         <button
           type="button"
-          class="ml-1 inline-flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-700 transition-colors enabled:hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9 dark:bg-slate-700 dark:text-slate-100 dark:enabled:hover:bg-slate-600"
+          class="ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={ajusterALaLargeur}
           disabled={zoom === NIVEAUX_ZOOM[0]}
           aria-label={$tr("pdf.fitWidth")}
           title={$tr("pdf.fitWidth")}
         >
-          <span class="material-icons" aria-hidden="true">fit_screen</span>
+          <Icone nom="fullscreen" class="text-2xl" />
         </button>
       </div>
     </div>
@@ -430,7 +439,7 @@
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div
         bind:this={cadre}
-        class="canvas-container w-full overflow-auto overscroll-contain touch-manipulation rounded bg-white shadow-md dark:bg-slate-800 {currentImageUrl
+        class="canvas-container w-full overflow-auto overscroll-contain touch-manipulation rounded border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 {currentImageUrl
           ? ''
           : 'min-h-64'}"
         tabindex="0"
@@ -456,14 +465,12 @@
           class="page-loading pointer-events-none absolute inset-0 flex items-center justify-center"
           aria-hidden="true"
         >
-          <div
-            class="h-6 w-6 rounded-full border-[3px] border-slate-200 border-t-blue-600 motion-safe:animate-spin dark:border-slate-600 dark:border-t-blue-400"
-          ></div>
+          <Icone nom="loader-circle" class="h-6 w-6 text-zinc-950 motion-safe:animate-spin dark:text-white" />
         </div>
       {/if}
     </div>
 
-    <div class="keyboard-hint text-xs text-slate-500 sm:text-sm dark:text-slate-400">
+    <div class="keyboard-hint text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
       {$tr("pdf.keyboardHint")}
     </div>
   {/if}

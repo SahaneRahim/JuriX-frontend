@@ -2,10 +2,6 @@ import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { API_BASE_URL, DELAI_API_MS } from '$lib/config';
 import inter from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url';
-// Le sous-ensemble des icônes affichées (src/app.css), et non plus la police
-// complète du paquet material-icons : le même fichier que celui de la feuille
-// de style, donc le même nom haché, téléchargé une seule fois.
-import icones from '$lib/polices/material-icons.woff2?url';
 
 /**
  * Pages rendues dans le navigateur seulement (ssr = false) : le serveur n'en
@@ -20,25 +16,20 @@ function rendueDansLeNavigateur(chemin: string): boolean {
 }
 
 /**
- * Polices prechargees : celles du premier affichage, le latin d'Inter et
- * Material Icons. Sans prechargement, le navigateur ne les decouvre qu'apres la
- * feuille de style. Mesure (Lighthouse mobile) : sans le prechargement de
- * Material Icons, dont les pictogrammes restent invisibles jusqu'a son arrivee
- * (font-display: block), le premier affichage reculait de pres d'une seconde.
- * Material Icons n'est plus que le sous-ensemble des icones affichees (3 Ko,
- * src/lib/polices) : son nom de fichier commence toujours par
- * « material-icons », d'ou la meme expression.
+ * Police prechargee : celle du premier affichage, le latin d'Inter. Sans
+ * prechargement, le navigateur ne la decouvre qu'apres la feuille de style, et
+ * Inter (font-display: optional) manquerait le premier affichage. Les icones
+ * n'ont plus de police : ce sont des SVG inscrits dans la page
+ * (src/lib/components/Icone.svelte), presents des le HTML.
  *
  * Les coquilles des pages rendues dans le navigateur ne recoivent rien de
  * SvelteKit (il ne collecte les polices que des pages rendues au serveur) : le
- * prechargement y est ajoute a la main. Sans lui, Inter (font-display:
- * optional) arrivait trop tard sur un premier /chat et manquait pour toute la
- * visite, la navigation gardant le meme document.
+ * prechargement y est ajoute a la main. Sans lui, Inter arrivait trop tard sur
+ * un premier /chat et manquait pour toute la visite, la navigation gardant le
+ * meme document.
  */
-const POLICES_A_PRECHARGER = /\/(inter-latin-wght-normal|material-icons)[^/]*\.woff2$/;
-const PRECHARGEMENT_DES_COQUILLES = [inter, icones]
-  .map((href) => `<link rel="preload" as="font" type="font/woff2" crossorigin href="${href}" />`)
-  .join('');
+const POLICES_A_PRECHARGER = /\/inter-latin-wght-normal[^/]*\.woff2$/;
+const PRECHARGEMENT_DES_COQUILLES = `<link rel="preload" as="font" type="font/woff2" crossorigin href="${inter}" />`;
 
 export const handle: Handle = async ({ event, resolve }) => {
   const privee = rendueDansLeNavigateur(event.url.pathname);

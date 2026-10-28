@@ -2,11 +2,14 @@
   import { onDestroy, onMount, tick } from "svelte";
   import { API_URL } from '$lib/api';
   import { piegerFocus } from "$lib/actions/pieger-focus";
+  import Icone from "$lib/components/Icone.svelte";
   import ImagePdfViewer from "$lib/components/ImagePdfViewer.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { afterNavigate, invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
-  import { language, switchLanguage, tr } from "$lib/stores/language";
+  import { language, tr } from "$lib/stores/language";
+  import { classesBadgeDeType, typeDeTexte } from "$lib/type-de-texte";
+  import { nomCategorie } from "$lib/categories";
   import { formatDate } from "$lib/format";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
   import { blocsDeReponse } from "$lib/texte";
@@ -36,33 +39,47 @@
   // Language: use shared store
   $: currentLanguage = $language.current;
 
+  // La ponctuation vit DANS les chaînes (« Contenu clé : », « Key content: ») :
+  // écrite dans le gabarit, l'espace française avant le deux-points restait
+  // dans l'interface anglaise (« Last updated : », « Key Content : »).
+  // `\u00a0` : espace insécable, le deux-points ne passe jamais seul à la
+  // ligne.
   const translations = {
     fr: {
-      explorer: "Explorer",
+      // Repli du fil d'Ariane, quand l'API ne joint pas la catégorie : le
+      // libellé n'affiche plus son identifiant (« Catégorie 6 »).
       category: "Catégorie",
       loading: "Chargement...",
-      return: "Retour à l'accueil",
+      // Le retour du fil d'Ariane ramène à la page d'où l'on vient (recherche,
+      // liste, catégorie), pas à l'accueil : « Retour à l'accueil » y mentait.
+      back: "Retour",
+      // Le lien du message d'erreur, lui, mène bien à l'accueil.
+      return_home: "Retour à l'accueil",
       toc: "Table des matières",
       // Libellé court du bouton qui ouvre le sommaire sous `lg` : il partage
       // la barre Précédent / Suivant d'un écran de 320 px.
       toc_open: "Sommaire",
       filter: "Filtrer les articles...",
       no_result: "Aucun résultat",
-      law_decree: "Loi / Décret",
-      updated: "Dernière mise à jour",
-      articles: "Articles",
+      // « Mis à jour le 14 octobre 2026 » et non « Dernière mise à jour : … » :
+      // plus court de 70 px, la ligne « 24 articles • … » tient sur un
+      // téléphone de 360 px au lieu de passer sur deux.
+      updated: "Mis à jour le",
+      // En minuscules, comme la liste des documents (« 4 articles »).
+      article_one: "article",
+      articles: "articles",
       share: "Partager",
       download: "Télécharger PDF",
     no_source_file: "Le fichier d'origine n'est pas disponible pour ce document",
       previous: "Précédent",
       next: "Suivant",
       in_force: "En vigueur",
-      ai_title: "Explication Simplifiée (IA)",
+      ai_title: "Explication simplifiée (IA)",
       ai_desc:
         "Demandez à l'assistant d'expliquer cet article en langage courant, à partir de son texte et de son document d'origine. Vous obtiendrez :",
-      ai_key_content: "Contenu clé",
+      ai_key_content: "Contenu clé\u00a0:",
       ai_key_desc: "Le résumé des points importants de l'article.",
-      ai_implications: "Implications",
+      ai_implications: "Implications\u00a0:",
       ai_impl_desc: "Ce que cela signifie concrètement pour vous.",
       ai_explain: "Expliquer l'article",
       ai_loading: "Explication en cours\u2026",
@@ -81,29 +98,29 @@
       raw_fallback: "Affichage brut (structure non détectée) :",
     },
     en: {
-      explorer: "Explorer",
       category: "Category",
       loading: "Loading...",
-      return: "Back to Home",
+      back: "Back",
+      return_home: "Back to home",
       toc: "Table of Contents",
       toc_open: "Contents",
       filter: "Filter articles...",
       no_result: "No result",
-      law_decree: "Law / Decree",
-      updated: "Last updated",
-      articles: "Articles",
+      updated: "Updated",
+      article_one: "article",
+      articles: "articles",
       share: "Share",
       download: "Download PDF",
     no_source_file: "The original file is not available for this document",
       previous: "Previous",
       next: "Next",
-      in_force: "In Force",
-      ai_title: "Simplified Explanation (AI)",
+      in_force: "In force",
+      ai_title: "Simplified explanation (AI)",
       ai_desc:
         "Ask the assistant to explain this article in plain language, from its text and its parent document. You will get:",
-      ai_key_content: "Key Content",
+      ai_key_content: "Key content:",
       ai_key_desc: "Summary of the article's important points.",
-      ai_implications: "Implications",
+      ai_implications: "Implications:",
       ai_impl_desc: "What this concretely means for you.",
       ai_explain: "Explain this article",
       ai_loading: "Generating explanation…",
@@ -121,10 +138,6 @@
       raw_fallback: "Raw display (structure not detected):",
     },
   };
-
-  function setLanguage(lang: "fr" | "en") {
-    switchLanguage(lang);
-  }
 
   /**
    * Structure de la table des matieres.
@@ -191,9 +204,13 @@
     tableOfContents = [];
     flatArticles = [];
 
+    // Section des articles qui précèdent le premier LIVRE, TITRE ou CHAPITRE :
+    // le document ne lui donne aucun titre. Titre vide, et libellé traduit à
+    // l'affichage (`laws.preamble`) : écrit ici en dur, « Préambule /
+    // Général » restait en français dans l'interface anglaise.
     let currentSection: SectionTDM = {
       type: "section",
-      title: "Préambule / Général",
+      title: "",
       articles: [],
     };
     tableOfContents.push(currentSection);
@@ -231,8 +248,12 @@
         const match = line.match(articleRegex);
         const num = match ? match[1] : "?";
 
+        // Le numéro, son ordinal et la ponctuation qui le suit, emphase
+        // comprise des deux côtés (« **ARTICLE 1er.**- Le… »). L'OCR lit
+        // aussi « 1er » en « 1ºr » ou « 1° » : non retirés, ces débris
+        // ouvraient le texte de l'article (« ºr.- Le présent décret… »).
         let titleText = line.replace(
-          /^\**\s*Article\s*\d+\s*(?:er|ère|ème)?\s*[:.-]*\**\s*/i,
+          /^\**\s*Article\s*\d+\s*(?:er|ère|ème|[º°]\s*r?)?\s*[:.\-–—]*\s*\**\s*[:.\-–—]*\s*/i,
           "",
         );
         if (!titleText) titleText = `Texte de l'article ${num}`;
@@ -306,6 +327,116 @@
   }
 
   /**
+   * Le « titre » d'un article est-il en réalité son texte ?
+   *
+   * `parseContent` prend pour titre ce qui suit « Article N » sur la même
+   * ligne. Dans les décrets, c'est presque toujours la première phrase de
+   * l'article, souvent tout l'article (« Article 1er.- Le présent décret
+   * fixe… »). Rendue en intertitre (20 px, demi-gras, sur toute la largeur),
+   * elle se lisait comme un sous-titre, et aucun paragraphe ne suivait. Un
+   * vrai intitulé (« Imputabilité ») est court et suivi du texte ; ici,
+   * l'article n'a pas d'autre texte, ou la ligne est longue, ou elle annonce
+   * une liste (« … on entend par : »).
+   */
+  function titreEstLeTexte(article: ArticleTDM): boolean {
+    const titre = article.title.trim();
+    if (!titre || titre === `Texte de l'article ${article.number}`) return false;
+    return !article.content.trim() || titre.length > 100 || /[:;]$/.test(titre);
+  }
+
+  /**
+   * Le texte de l'article, sa première ligne comprise quand c'en est une.
+   * Le même pour l'affichage, la citation copiée et l'extrait envoyé avec
+   * « Expliquer l'article » : la citation de l'article 1 ci-dessus copiait
+   * « » vide, son texte étant tout entier dans le titre.
+   */
+  function texteDeLArticle(article: ArticleTDM): string {
+    return titreEstLeTexte(article) ? `${article.title.trim()}\n${article.content}` : article.content;
+  }
+
+  /**
+   * « CHAPITRE III DE LA PARTICIPATION… » : le numéro, court, et l'intitulé.
+   *
+   * Le titre entier, en capitales à chasse fixe très espacées, s'étalait sur
+   * cinq lignes dans la colonne du sommaire, illisible. Le numéro garde le
+   * style du surtitre ; l'intitulé passe en texte courant, coupé à deux
+   * lignes dans le sommaire. Un titre qui ne commence pas par un numéro
+   * reconnu reste entier, en intitulé.
+   */
+  function decouperSection(titre: string, langue: string = "fr"): { numero: string; intitule: string } {
+    const morceaux = /^((LIVRE|TITRE|CHAPITRE)\s+([IVX0-9]+)(?:\s*(?:er|ère|ème))?)(?![\p{L}\d])\s*[-–—:.]*\s*(.*)$/iu.exec(
+      titre.trim(),
+    );
+    if (!morceaux) return { numero: "", intitule: titre.trim() };
+    // Dans l'interface anglaise, le mot du numéro suit la langue (CHAPITRE III
+    // → CHAPTER III, sans le « er » de « 1er ») : il voisinait avec
+    // « PREAMBLE / GENERAL », traduit, dans la même liste. L'intitulé est le
+    // texte du document, en français seulement : il reste tel quel.
+    const numero =
+      langue === "en" ? `${MOT_DE_SECTION_EN[morceaux[2].toLowerCase()]} ${morceaux[3]}` : morceaux[1];
+    return { numero, intitule: morceaux[4] };
+  }
+
+  const MOT_DE_SECTION_EN: Record<string, string> = { livre: "BOOK", titre: "TITLE", chapitre: "CHAPTER" };
+
+  /**
+   * Élément d'une ligne de méta (cote • date, articles • mise à jour).
+   *
+   * Le « • » est dessiné AVANT chaque élément, centré dans l'écart de 16 px
+   * qui le sépare du précédent, et la ligne est décalée de cet écart vers la
+   * gauche (`-ml-4`) dans un cadre qui coupe ce qui dépasse
+   * (`overflow-hidden`) : en début de ligne, le point tombe hors du cadre.
+   * Écrit en <span> à part, il restait seul en bout de ligne sur téléphone
+   * (« 28 articles • », la date dessous).
+   */
+  const ELEMENT_SEPARE =
+    "relative ml-4 before:absolute before:-left-4 before:w-4 before:text-center before:text-zinc-400 before:content-['•'] dark:before:text-zinc-600";
+
+  /**
+   * Taille du titre du document, selon sa longueur.
+   *
+   * Un intitulé de décret dépasse souvent 200 caractères : à 36 px, il
+   * prenait 8 lignes à 1 024 px à côté du sommaire, 9 sur téléphone, et à
+   * 740×360 il était à lui seul plus haut que l'écran ; le texte de l'article
+   * commençait sous la ligne de flottaison. Un titre court (« Code pénal »)
+   * garde la recette des titres de page (guide, § 4.2) ; plus il est long,
+   * plus il descend, jusqu'à 20 px sur téléphone et 24 px au-delà (8 lignes
+   * de 30 px à 1 024 px pour /laws/1740 auparavant, 6 de 24 px désormais ;
+   * 6 de 30 px à 740×360, 4 de 20 px). Sur écran court (`court:`, téléphone
+   * en paysage), la taille du téléphone en portrait : la hauteur y manque
+   * plus que la largeur.
+   */
+  function tailleDuTitre(titre: string): string {
+    if (titre.length <= 40) return "text-3xl sm:text-4xl court:text-3xl";
+    if (titre.length <= 100) return "text-2xl sm:text-3xl court:text-2xl";
+    return "text-xl sm:text-2xl court:text-xl";
+  }
+
+  /**
+   * Retour du fil d'Ariane : la page d'où l'on vient quand c'en est une du
+   * site (recherche, liste, catégorie, avec ses filtres et sa position),
+   * sinon la liste des documents, cible du lien.
+   *
+   * L'ancien bouton appelait `history.back()` sans condition, sous le libellé
+   * « Retour à l'accueil » : venu de /search ou de /laws, il n'allait pas à
+   * l'accueil ; arrivé depuis un moteur de recherche, il quittait le site.
+   * `pagePrecedenteDuSite` est posé par `afterNavigate` (plus bas), qui
+   * connaît la page de départ d'une navigation dans le site ; nulle au
+   * premier chargement.
+   */
+  let pagePrecedenteDuSite = false;
+
+  function revenir(event: MouseEvent) {
+    // Ouverture dans un nouvel onglet (clic du milieu, Ctrl, Cmd, Maj) : le
+    // lien garde son comportement.
+    if (!pagePrecedenteDuSite || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    history.back();
+  }
+
+  /**
    * Copie le lien de la page.
    *
    * L'ancienne version n'attendait pas la promesse et n'attrapait rien : en
@@ -326,7 +457,7 @@
 
   async function copierCitationArticle() {
     if (!currentArticle || !law) return;
-    const texte = currentArticle.content.trim();
+    const texte = texteDeLArticle(currentArticle).trim();
     const titreLoi = law.title || "Texte de loi";
     const refLoi = law.reference ? ` (${law.reference})` : "";
     const url = typeof window !== "undefined" ? window.location.href : `https://jurix.cm/laws/${law.id}`;
@@ -514,7 +645,9 @@
    * une position — retour arrière, ou rechargement qui la restaure : la
    * remplacer ferait perdre au lecteur l'endroit où il en était.
    */
-  afterNavigate(({ type }) => {
+  afterNavigate(({ from, type }) => {
+    // Voir `revenir` : une page du site précède celle-ci.
+    pagePrecedenteDuSite = from !== null;
     tocOuvert = false;
     if (type === "popstate" || window.scrollY > 0 || !requestedArticle) return;
     const voulu = normaliserNumeroArticle(requestedArticle);
@@ -582,8 +715,10 @@
           // base n'a pas de ligne pour ce numéro — la page en reconnaît 193 là
           // où la base en compte 230 pour le même document. Le serveur vérifie
           // que cet extrait provient bien du document avant de s'en servir, et
-          // l'ignore dès qu'il trouve la vraie ligne.
-          excerpt: currentArticle.content.slice(0, 12000),
+          // l'ignore dès qu'il trouve la vraie ligne. Première ligne comprise
+          // quand elle porte le texte (`texteDeLArticle`) : l'extrait était
+          // vide pour un article tenant sur sa ligne « Article N ».
+          excerpt: texteDeLArticle(currentArticle).slice(0, 12000),
         }),
       });
 
@@ -666,9 +801,36 @@
   $: compteur =
     flatArticles.length > 0 ? `${currentArticleIndex + 1} / ${flatArticles.length}` : "0 / 0";
 
+  /**
+   * UN seul nombre d'articles sur la page : celui que le lecteur parcourt.
+   *
+   * L'en-tête affichait `law.article_count`, compté en base (28 pour
+   * /laws/1740), quand le sommaire et le compteur « 1 / 24 » comptent les
+   * articles reconstruits depuis le texte : deux chiffres contradictoires sur
+   * le même écran. Le compteur ne peut aller que jusqu'aux articles affichés,
+   * l'en-tête dit donc le même nombre. Le compte de la base ne sert plus
+   * qu'au texte brut, quand aucun article n'a été reconnu.
+   */
+  $: nombreDArticles = flatArticles.length > 0 ? flatArticles.length : (law?.article_count ?? 0);
+
+  /**
+   * Nom du domaine dans le fil d'Ariane, dans la langue de l'interface : il
+   * affichait l'identifiant (« Catégorie 6 », 6 étant le droit
+   * administratif). `GET /laws/{id}` joint la catégorie (`law.category`) ;
+   * sans elle, le mot « Catégorie » seul, plutôt qu'un numéro.
+   */
+  $: nomDeLaCategorie = nomCategorie(law?.category?.name, currentLanguage) || t.category;
+
+  // Libellé et icône du type (loi, décret, arrêté…), la table commune à
+  // /laws, /search et la page d'une catégorie.
+  $: typeDuTexte = typeDeTexte(law?.type, law?.title);
+
+  $: classeTitre = tailleDuTitre(law?.title ?? "");
+
   $: verrouillerDefilement(tocOuvert);
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
+  import ChatFab from "$lib/components/ChatFab.svelte";
 </script>
 
 <!--
@@ -694,7 +856,7 @@
 <!-- `min-h-app` (app.css) et non `min-h-screen min-h-dvh` : Tailwind écrit
      `.min-h-dvh` AVANT `.min-h-screen`, et la paire valait toujours 100vh. -->
 <div
-  class="page text-slate-900 dark:text-gray-100 bg-[#F8F9FA] dark:bg-slate-900 min-h-app font-sans"
+  class="page text-zinc-950 dark:text-zinc-100 bg-background-light dark:bg-background-dark min-h-app font-sans"
 >
   <!-- Breadcrumb & Top Nav -->
   <!--
@@ -712,94 +874,65 @@
     qui l'emporteraient.
   -->
   <div
-    class="breadcrumb bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 py-1 sm:py-4 sm:court:py-1.5 px-0 sticky top-0 z-40 shadow-sm"
+    class="breadcrumb bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-1 sm:py-4 sm:court:py-1.5 px-0 sticky top-0 z-40 shadow-sm dark:shadow-none"
   >
     <div
-      class="container mx-auto px-3 sm:px-4 max-w-[1400px] flex items-center justify-between gap-3"
+      class="mx-auto w-full max-w-[96rem] px-4 sm:px-6 lg:px-12 flex items-center justify-between gap-3"
     >
       <!-- Left: Breadcrumb -->
-      <!-- Sur une seule ligne : seul le titre se tronque (`min-w-0`), les
-           autres morceaux gardent leur largeur. -->
+      <!-- Sur une seule ligne : le titre se tronque (`min-w-0`), le nom de la
+           catégorie aussi, à largeur bornée ; les autres morceaux gardent la
+           leur. -->
       <div
-        class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+        class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"
       >
         <!-- 44 px sous `sm`, où il n'est plus qu'une flèche : son nom passe
-             par aria-label, le libellé visible étant masqué. -->
-        <button
-          class="-ml-3 inline-flex h-11 w-11 shrink-0 items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors sm:ml-0 sm:mr-2 sm:h-auto sm:w-auto"
-          on:click={() => window.history.back()}
-          aria-label={t.return}
+             par aria-label, le libellé visible étant masqué. Un lien vers la
+             liste des documents, que `revenir` change en retour arrière
+             quand on vient d'une page du site : il marche aussi sans
+             JavaScript et pour qui arrive d'un moteur de recherche. -->
+        <a
+          href="/laws"
+          class="-ml-3.5 inline-flex h-11 w-11 shrink-0 items-center justify-center gap-1 text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white transition-colors sm:ml-0 sm:mr-2 sm:h-auto sm:w-auto"
+          on:click={revenir}
+          aria-label={t.back}
         >
-          <svg
-            class="w-4 h-4 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-            ><path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            /></svg
-          >
-          <span class="hidden sm:inline whitespace-nowrap">{t.return}</span>
-        </button>
-        <span class="hidden sm:inline text-gray-300 dark:text-slate-600" aria-hidden="true">|</span>
-        <a href="/" class="hidden sm:inline shrink-0 whitespace-nowrap hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-          >{t.explorer}</a
+          <Icone nom="arrow-left" class="w-4 h-4 shrink-0" />
+          <span class="hidden sm:inline whitespace-nowrap">{t.back}</span>
+        </a>
+        <span class="hidden sm:inline text-zinc-300 dark:text-zinc-700" aria-hidden="true">|</span>
+        <!-- « Documents », la liste du corpus (/laws), entrée active de
+             l'en-tête sur cette page. L'ancien « Explorer » menait à
+             l'accueil et restait en français dans l'interface anglaise. -->
+        <a href="/laws" class="hidden sm:inline shrink-0 whitespace-nowrap hover:text-zinc-950 dark:hover:text-white transition-colors"
+          >{$tr("nav.documents")}</a
         >
-        <svg class="hidden sm:block w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
-          ><path
-            d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
-          /></svg
-        >
+        <Icone nom="chevron-right" class="hidden sm:block w-4 h-4 shrink-0" />
         {#if law?.category_id}
           <!-- Pointait vers "/" : le libellé annonçait une catégorie et le lien
-               ramenait à l'accueil. La route /categories/[id] existe. -->
+               ramenait à l'accueil. La route /categories/[id] existe.
+               Largeur bornée (le nom entier en infobulle) : « Droit des
+               personnes, de la famille et état civil » ne laissait plus de
+               place au titre du document à 640 px. -->
           <a
             href="/categories/{law.category_id}"
-            class="hidden sm:inline shrink-0 whitespace-nowrap hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t.category} {law.category_id}</a
+            title={nomDeLaCategorie}
+            class="hidden sm:block shrink-0 max-w-[9rem] lg:max-w-[16rem] truncate hover:text-zinc-950 dark:hover:text-white transition-colors">{nomDeLaCategorie}</a
           >
-          <svg class="hidden sm:block w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
-            ><path
-              d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
-            /></svg
-          >
+          <Icone nom="chevron-right" class="hidden sm:block w-4 h-4 shrink-0" />
         {/if}
         <span
-          class="min-w-0 truncate font-medium text-gray-900 dark:text-white sm:max-w-[400px]"
+          class="min-w-0 truncate font-medium text-zinc-950 dark:text-white sm:max-w-[400px]"
           >{law?.title || t.loading}</span
         >
       </div>
 
-      <!-- Right: Language Switcher -->
-      <!-- Masquée sous `sm` : doublon de la bascule du menu de l'en-tête, elle
-           prenait la place du titre. -->
-      <div class="hidden sm:flex items-center gap-3">
-        <div class="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-          <button
-            class="px-2 py-1 text-xs font-bold rounded shadow-sm transition-all {currentLanguage ===
-            'fr'
-              ? 'bg-white dark:bg-slate-700 text-blue-600'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'}"
-            on:click={() => setLanguage("fr")}
-            aria-pressed={currentLanguage === "fr"}
-          >
-            FR
-          </button>
-          <button
-            class="px-2 py-1 text-xs font-bold rounded shadow-sm transition-all {currentLanguage ===
-            'en'
-              ? 'bg-white dark:bg-slate-700 text-blue-600'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'}"
-            on:click={() => setLanguage("en")}
-            aria-pressed={currentLanguage === "en"}
-          >
-            EN
-          </button>
-        </div>
-      </div>
+      <!-- Plus de bascule FR / EN ici. Elle doublait celle de l'en-tête
+           (texte « FR | EN » à 1 440 px) avec un autre dessin, et, posée sur
+           la barre du texte, elle laissait croire à une version anglaise du
+           décret : « EN » actif au-dessus d'un texte en français. Elle ne
+           change que la langue de l'interface, ce que font l'en-tête et son
+           menu. -->
     </div>
   </div>
 
@@ -811,7 +944,7 @@
          n'atteint jamais ce balisage — le test d'intégrité contrôle désormais le
          statut. Ce bloc ne couvre plus que la panne : backend éteint ou 5xx. -->
     <div class="text-center py-20" data-testid="law-error" role="alert">
-      <h2 class="text-2xl font-bold text-gray-700 dark:text-gray-300">
+      <h2 class="text-2xl font-bold text-zinc-700 dark:text-zinc-300">
         {error}
       </h2>
       <div class="mt-6 flex flex-wrap items-center justify-center gap-3 px-4">
@@ -819,11 +952,11 @@
           type="button"
           on:click={() => invalidateAll()}
           data-testid="law-retry"
-          class="min-h-11 sm:min-h-0 px-5 py-2 rounded-lg border border-slate-300 dark:border-slate-600 font-medium hover:border-primary hover:text-primary transition-colors"
+          class="min-h-11 lg:[@media(pointer:fine)]:min-h-0 px-5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-medium hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white transition-colors"
         >
           {$tr("common.retry")}
         </button>
-        <a href="/" class="text-blue-600 hover:underline">{t.return}</a>
+        <a href="/" class="font-medium text-zinc-950 dark:text-white underline decoration-zinc-300 dark:decoration-zinc-600 underline-offset-4 hover:decoration-zinc-950 dark:hover:decoration-white">{t.return_home}</a>
       </div>
     </div>
   <!--
@@ -836,8 +969,12 @@
   -->
   {:else if law}
     <!-- Main Content -->
+    <!-- Marges de l'en-tête (16, 24 puis 48 px) et non celles d'un
+         `container` de 1 400 px : en 1 440, fil d'Ariane et colonnes
+         s'alignaient sur 37 et 1 404 px, ni sur le logo (48) ni sur le bord
+         droit de « Créer un compte » (1 392). -->
     <div class="main-content py-4 sm:py-8">
-      <div class="container mx-auto px-3 sm:px-4 max-w-[1400px]">
+      <div class="mx-auto w-full max-w-[96rem] px-4 sm:px-6 lg:px-12">
         <!-- `minmax(0, 1fr)` et non `1fr` (qui vaut minmax(auto, 1fr)) : un
              mot insécable, une cote ou une URL élargissait la colonne de
              lecture au-delà de l'écran entre 1 024 et 1 280 px. -->
@@ -846,7 +983,7 @@
             <!-- Fond du panneau du sommaire. Au-dessus du fil d'Ariane (z-40),
                  sous la boîte du profil (z-[60]). -->
             <div
-              class="fond-sommaire fixed inset-0 z-[55] bg-slate-900/50 lg:hidden"
+              class="fond-sommaire fixed inset-0 z-[55] bg-zinc-950/40 backdrop-blur-sm lg:hidden"
               role="presentation"
               on:click={surLeFond}
             ></div>
@@ -862,9 +999,9 @@
           <div
             id="sommaire"
             data-testid="law-toc"
-            class="sidebar sommaire flex-col bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 {tocOuvert
-              ? 'fixed inset-x-0 bottom-0 z-[56] flex rounded-t-2xl border-t shadow-2xl pb-zone-sure px-zone-sure'
-              : 'hidden'} lg:sticky lg:inset-auto lg:top-24 lg:z-auto lg:flex lg:h-fit lg:rounded-xl lg:border lg:p-0 lg:shadow-sm"
+            class="sidebar sommaire flex-col bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 dark:shadow-none {tocOuvert
+              ? 'fixed inset-x-0 bottom-0 z-[56] flex rounded-t-2xl border-t shadow-xl pb-zone-sure px-zone-sure'
+              : 'hidden'} lg:sticky lg:inset-auto lg:top-24 lg:z-auto lg:flex lg:h-fit lg:rounded-2xl lg:border lg:p-0 lg:shadow-sm"
             class:ouvert={tocOuvert}
             role={tocOuvert ? "dialog" : undefined}
             aria-modal={tocOuvert ? "true" : undefined}
@@ -874,56 +1011,89 @@
             <div
               class="sidebar-header flex shrink-0 items-center justify-between gap-3 px-4 pt-2 lg:mb-4 lg:px-6 lg:pt-6"
             >
-              <h2 id="sommaire-titre" class="text-lg font-bold text-gray-900 dark:text-white">
+              <h2 id="sommaire-titre" class="text-lg font-bold text-zinc-950 dark:text-white">
                 {t.toc}
               </h2>
               <button
                 type="button"
-                class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white lg:hidden"
+                class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors lg:hidden"
                 on:click={fermerSommaire}
                 aria-label={$tr("common.close")}
                 data-testid="law-toc-close"
               >
-                <span class="material-icons" aria-hidden="true">close</span>
+                <Icone nom="x" class="text-2xl" />
               </button>
             </div>
 
+            <!-- Le cadre dessine le champ et son focus (bordure et anneau,
+                 comme les champs du site) ; le champ lui-même reste
+                 transparent, sans anneau propre qui doublerait celui-ci. En
+                 sombre, la recette des champs : fond zinc-950, bordure
+                 zinc-500 (zinc-800 se perdait dans le panneau zinc-900).
+                 Hauteur et loupe des autres champs du site : 44 px à
+                 partir de `lg` (`min-h-11`, et `py-2.5` sur le champ), 46
+                 en dessous où le texte passe à 16 px ; loupe de 20 px et
+                 texte à 49 px du bord, comme la barre de recherche et le
+                 champ d'une catégorie. Le cadre (`py-2`) s'ajoutait à la
+                 marge propre du champ que pose @tailwindcss/forms : 54 px,
+                 plus haut que tous les champs de la page dans une colonne
+                 de 230 px, autour d'une loupe de 16 px. -->
             <div
-              class="search-box mx-4 mb-3 mt-1 flex shrink-0 items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 lg:mx-6 lg:mb-6 lg:mt-0"
+              class="search-box mx-4 mb-3 mt-1 flex min-h-11 shrink-0 items-center bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-500 rounded-xl pl-4 focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 lg:mx-6 lg:mb-6 lg:mt-0"
             >
-              <svg
-                class="w-4 h-4 shrink-0 text-gray-500 mr-2"
-                viewBox="0 0 16 16"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"
-                />
-              </svg>
+              <Icone nom="search" class="h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400" />
               <!-- 16 px sous `lg`, là où il vit dans le panneau tactile : en
-                   dessous, iOS zoome sur la page au focus et ne dézoome pas. -->
+                   dessous, iOS zoome sur la page au focus et ne dézoome pas.
+                   `self-stretch` : le champ occupe toute la hauteur du
+                   cadre, un appui au-dessus ou au-dessous du texte le
+                   touche encore. -->
               <input
                 type="text"
-                class="bg-transparent border-none outline-none w-full min-w-0 text-base lg:text-sm text-gray-900 dark:text-white placeholder-gray-400"
+                class="self-stretch bg-transparent border-none outline-none focus:ring-0 w-full min-w-0 py-2.5 pl-3 pr-4 text-base lg:text-sm text-zinc-950 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
                 placeholder={t.filter}
                 bind:value={searchQuery}
           aria-label={t.filter}
               />
             </div>
 
+            <!-- Fondu en bas de la liste (`after:`, collé au bas de la zone
+                 qui défile) : la liste s'arrêtait net au bord de la carte,
+                 un titre de chapitre à 5 px du bord, sans rien qui dise
+                 qu'il en reste. Blanc vers transparent (zinc-900 en
+                 sombre), la couleur du panneau : un repère de défilement,
+                 pas un décor. En fin de liste, il ne couvre que du vide. -->
             <nav
-              class="toc min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-6 lg:px-6 lg:pb-6"
+              class="toc min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-6 lg:px-6 lg:pb-6 after:pointer-events-none after:sticky after:bottom-0 after:z-[2] after:block after:h-8 after:bg-gradient-to-t after:from-white after:content-[''] dark:after:from-zinc-900"
               aria-labelledby="sommaire-titre"
             >
               {#each filteredTOC as section}
                 <div class="toc-section">
                   <!-- Collé en haut de la liste qui défile : on sait toujours
-                       dans quel titre ou chapitre on se trouve. -->
+                       dans quel titre ou chapitre on se trouve. Le numéro
+                       (« CHAPITRE III ») en surtitre, l'intitulé en texte
+                       courant sur deux lignes au plus, entier en infobulle
+                       (voir `decouperSection`). -->
                   <div
-                    class="sticky top-0 z-[1] bg-white dark:bg-slate-800 py-1 mb-2 lg:mb-3 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest coupe-mots"
+                    class="sticky top-0 z-[1] bg-white dark:bg-zinc-900 py-1 mb-2 lg:mb-3"
+                    title={section.title || undefined}
                   >
-                    {section.title}
+                    {#if section.title}
+                      {@const morceaux = decouperSection(section.title, currentLanguage)}
+                      {#if morceaux.numero}
+                        <p class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                          {morceaux.numero}
+                        </p>
+                      {/if}
+                      {#if morceaux.intitule}
+                        <p class="mt-0.5 text-xs leading-snug text-zinc-600 dark:text-zinc-400 line-clamp-2 coupe-mots">
+                          {morceaux.intitule}
+                        </p>
+                      {/if}
+                    {:else}
+                      <p class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                        {$tr("laws.preamble")}
+                      </p>
+                    {/if}
                   </div>
                   <div class="articles-list flex flex-col gap-1">
                     {#each section.articles as article}
@@ -935,10 +1105,10 @@
                            que par la couleur. Il sert aussi de point d'entrée
                            du focus à l'ouverture du panneau. -->
                       <button
-                        class="text-left px-3 py-3 lg:py-2 rounded-md text-base lg:text-sm transition-all duration-200
+                        class="text-left px-3 py-3 lg:py-2 rounded-xl text-base lg:text-sm transition-all duration-200
                                  {isActive
-                          ? 'bg-blue-50 text-blue-600 font-medium dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'}"
+                          ? 'bg-zinc-950 text-white font-medium dark:bg-white dark:text-zinc-950'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white'}"
                         aria-current={isActive ? "true" : undefined}
                         on:click={() => {
                           // Find index in flat list
@@ -957,7 +1127,7 @@
               {/each}
 
               {#if filteredTOC.length === 0}
-                <div class="text-sm text-gray-500 dark:text-gray-400 italic">{t.no_result}</div>
+                <div class="text-sm text-zinc-500 dark:text-zinc-400 italic">{t.no_result}</div>
               {/if}
             </nav>
           </div>
@@ -967,42 +1137,63 @@
                contenu le plus large. -->
           <main
             id="contenu"
-            class="content min-w-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 sm:p-6 md:p-10 shadow-sm relative"
+            data-hors-du-bouton
+            class="content min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-6 md:p-10 shadow-sm dark:shadow-none relative"
           >
             <!-- Document Header -->
             <div
-              class="document-header border-b border-gray-100 dark:border-slate-700 pb-6 mb-6 sm:pb-8 sm:mb-8"
+              class="document-header border-b border-zinc-200 dark:border-zinc-800 pb-6 mb-6 sm:pb-8 sm:mb-8"
             >
               <!-- Passe à la ligne : sur téléphone, la cote et la date
                    écrasaient le badge sur deux lignes. Les cotes du type
-                   « N°2018/9387/CAB/PM » n'ont aucune coupure possible. -->
+                   « N°2018/9387/CAB/PM » n'ont aucune coupure possible.
+                   Cote et date séparées par « • », comme dans les listes
+                   (un tiret ici seulement) ; sans cote, la date seule : le
+                   repli « Loi No 12 » était du français en dur, et faux pour
+                   un décret.
+                   Cote et date à la recette « Méta » du guide (§ 4.2) :
+                   chasse fixe, 12 px, comme sur /laws, /search et /compare.
+                   En sans-serif de 14 px ici, la même cote changeait de
+                   dessin entre la recherche et le texte qu'elle ouvre. -->
               <div class="document-meta flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
-                <span
-                  class="inline-block shrink-0 whitespace-nowrap px-3 py-1 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 rounded-md text-xs font-bold uppercase tracking-wide"
-                >
-                  {t.law_decree}
+                <!-- Le type du texte, traduit et avec son icône, comme sur
+                     /laws et /search ($lib/type-de-texte). C'était « LOI /
+                     DÉCRET » en capitales mono, un libellé FIXE qui annonçait
+                     aussi un arrêté ou une ordonnance comme « Loi / Décret ». -->
+                <span class={classesBadgeDeType(typeDuTexte)}>
+                  <Icone nom={typeDuTexte.icone} class="text-sm" />
+                  {$tr(typeDuTexte.cle)}
                 </span>
-                <span class="min-w-0 coupe-mots text-sm text-gray-500"
-                  >{law.reference || "Loi No " + law.id} - {formatDate(law.publication_date, currentLanguage)}</span
-                >
+                <div class="min-w-0 overflow-hidden">
+                  <div class="-ml-4 flex flex-wrap items-center font-mono tabular-nums text-xs text-zinc-500 dark:text-zinc-400">
+                    {#if law.reference}
+                      <span class="{ELEMENT_SEPARE} min-w-0 coupe-mots">{law.reference}</span>
+                    {/if}
+                    <span class={ELEMENT_SEPARE}>{formatDate(law.publication_date, currentLanguage)}</span>
+                  </div>
+                </div>
               </div>
+              <!-- Taille selon la longueur du titre (`tailleDuTitre`). -->
               <h1
-                class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight coupe-mots"
+                class="{classeTitre} font-bold text-zinc-950 dark:text-white mb-4 leading-tight coupe-mots tracking-tight"
               >
                 {law.title}
               </h1>
-              <div
-                class="document-info flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-6"
-              >
-                <!-- `law.article_count` vient de la base ; `flatArticles` est
-                     reconstruit par expression régulière sur le contenu et en
-                     trouve 193 là où la base en compte 230 pour le même
-                     document. Deux chiffres pour une seule vérité : on garde
-                     celui qui compte les lignes réellement stockées. -->
-                <span>{law.article_count ?? flatArticles.length} {t.articles}</span>
-                <span class="text-gray-300">•</span>
-                <!-- Etait code en dur a "2024". -->
-                <span>{t.updated} : {formatDate(law.updated_at || law.created_at, currentLanguage)}</span>
+              <div class="document-info mb-6 overflow-hidden font-mono tabular-nums text-xs text-zinc-500 dark:text-zinc-400">
+                <!-- Le nombre d'articles est celui du sommaire et du
+                     compteur « 1 / 24 » (`nombreDArticles`). Même recette
+                     « Méta » que la ligne de la cote : un nombre et une
+                     date, que le reste du site écrit en chasse fixe (la
+                     ligne « 24 octobre 2026 • 4 min de lecture » du blog). -->
+                <div class="-ml-4 flex flex-wrap items-center gap-y-1">
+                  <span class={ELEMENT_SEPARE}
+                    >{nombreDArticles} {nombreDArticles === 1 ? t.article_one : t.articles}</span
+                  >
+                  <!-- Etait code en dur a "2024". -->
+                  <span class={ELEMENT_SEPARE}
+                    >{t.updated} {formatDate(law.updated_at || law.created_at, currentLanguage)}</span
+                  >
+                </div>
               </div>
               <!--
                 Rangée qui passe à la ligne, chaque bouton s'étirant sur la
@@ -1012,27 +1203,18 @@
                 glissait de côté. Pas de grille à deux colonnes : « Document
                 original » ne tient pas dans une demi-largeur de téléphone, il
                 y aurait coupé son libellé sur deux lignes.
+
+                L'action principale, « Télécharger PDF », passe EN TÊTE, sur
+                toute la largeur au téléphone (`basis-full`) ; « Partager » et
+                « Document original » se partagent la ligne suivante. Placée
+                entre les deux, elle était réduite à une demi-largeur, et
+                « Document original », seul et pleine largeur sur la seconde
+                ligne, passait pour l'action principale.
+                44 px de haut, sauf à partir de lg sous un pointeur fin (la
+                règle de /search et de /compare) : réduits à 38 px dès sm, ils
+                l'étaient aussi sur un téléphone en paysage et une tablette.
               -->
               <div class="document-actions flex flex-wrap gap-2 sm:gap-3">
-                <button
-                  class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm font-medium transition-colors"
-                  on:click={copierLeLien}
-                >
-                  <svg
-                    class="w-5 h-5 shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    aria-hidden="true"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                    /></svg
-                  >
-                  {t.share}
-                </button>
                 <!-- Telechargement du document D'ORIGINE, servi par l'API.
                      Ce bouton appelait window.print(), qui imprime la page
                      telle qu'affichee : comme la page ne monte qu'UN article a
@@ -1046,47 +1228,50 @@
                        nom brut du fichier aspire
                        ("10691_decret-n-2026-164-du-..."). -->
                   <a
-                    class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm shadow-blue-600/20 transition-colors"
+                    class="inline-flex min-h-11 basis-full items-center justify-center gap-2 whitespace-nowrap px-3 py-2 lg:[@media(pointer:fine)]:min-h-0 sm:basis-auto sm:flex-none sm:px-4 bg-zinc-950 text-white rounded-xl hover:bg-black dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 text-sm font-medium shadow-sm dark:shadow-none transition-colors"
                     href={`${API_URL}/laws/${law.id}/download`}
                     download
                   >
-                    <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"
-                      ><path
-                        fill-rule="evenodd"
-                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                      /></svg
-                    >
+                    <Icone nom="download" class="w-5 h-5 shrink-0" />
                     {t.download}
                   </a>
+                {:else}
+                  <!-- Loi creee sans televersement : l'endpoint repondrait 404.
+                       Bouton desactive et explique, plutot que masque sans
+                       raison visible. Meme dessin que le lien de
+                       telechargement, estompe comme tout bouton desactive du
+                       site : c'est la meme action, indisponible. -->
+                  <button
+                    class="inline-flex min-h-11 basis-full items-center justify-center gap-2 whitespace-nowrap px-3 py-2 lg:[@media(pointer:fine)]:min-h-0 sm:basis-auto sm:flex-none sm:px-4 bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
+                    title={t.no_source_file}
+                  >
+                    <Icone nom="download" class="w-5 h-5 shrink-0" />
+                    {t.download}
+                  </button>
+                {/if}
+                <button
+                  class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 lg:[@media(pointer:fine)]:min-h-0 sm:flex-none sm:px-4 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-xl text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white text-sm font-medium transition-colors"
+                  on:click={copierLeLien}
+                >
+                  <Icone nom="share-2" class="w-5 h-5 shrink-0" />
+                  {t.share}
+                </button>
+                {#if law.file_id}
                   <!-- ImagePdfViewer et PdfViewer étaient complets et testés,
                        mais importés NULLE PART : le document d'origine n'était
                        consultable qu'en le téléchargeant. -->
                   <button
                     on:click={() => (afficherDocument = !afficherDocument)}
                     data-testid="law-toggle-document"
-                    class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 rounded-lg text-sm font-medium border transition-colors {afficherDocument
-                      ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300'
-                      : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}"
+                    class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 lg:[@media(pointer:fine)]:min-h-0 sm:flex-none sm:px-4 rounded-xl text-sm font-medium border transition-colors {afficherDocument
+                      ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 border-zinc-950 dark:border-white'
+                      : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white'}"
                   >
-                    <span class="material-icons text-lg" aria-hidden="true">picture_as_pdf</span>
+                    <!-- `file-image` : la visionneuse montre les pages d'origine
+                         en images ; `file-down` aurait dit « télécharger ». -->
+                    <Icone nom="file-image" class="text-lg" />
                     {afficherDocument ? t.show_text : t.show_document}
-                  </button>
-                {:else}
-                  <!-- Loi creee sans televersement : l'endpoint repondrait 404.
-                       Bouton desactive et explique, plutot que masque sans
-                       raison visible. -->
-                  <button
-                    class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap px-3 py-2 sm:min-h-0 sm:flex-none sm:px-4 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed"
-                    disabled
-                    title={t.no_source_file}
-                  >
-                    <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"
-                      ><path
-                        fill-rule="evenodd"
-                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                      /></svg
-                    >
-                    {t.download}
                   </button>
                 {/if}
               </div>
@@ -1097,7 +1282,7 @@
                    carte) : 32 px de plus pour la page, là où chaque pixel de
                    largeur grossit le texte du PDF. -->
               <div
-                class="-mx-4 mt-6 mb-6 overflow-hidden border-y border-slate-200 dark:border-slate-700 sm:mx-0 sm:rounded-xl sm:border"
+                class="-mx-4 mt-6 mb-6 overflow-hidden border-y border-zinc-200 dark:border-zinc-800 sm:mx-0 sm:rounded-xl sm:border"
                 data-testid="law-document-viewer"
               >
                 <!-- Recréée pour chaque document : SvelteKit réutilise la page
@@ -1125,28 +1310,34 @@
               Cible du défilement à chaque changement d'article : `scroll-mt-*`
               suit la hauteur du fil d'Ariane collant (53 px sous `sm`, 65 px
               au-dessus, 45 px en paysage), plus un peu d'air.
+
+              Survol en `enabled:` : au premier ou au dernier article, le
+              bouton désactivé ne doit pas réagir comme s'il menait ailleurs.
+
+              Boutons au dessin de la pagination du site (/search, /laws) :
+              carrés arrondis de 44 px à toutes les tailles (40 à partir de sm
+              auparavant, sur les écrans tactiles aussi), bord zinc-200
+              (zinc-700 en sombre : zinc-800 se perdait dans la barre),
+              fond zinc-100 au survol. Ils faisaient 34 px, en rounded-lg et
+              bord zinc-300 : une quatrième pagination, différente des trois
+              autres.
             -->
             <div
               bind:this={debutArticle}
-              class="article-navigation flex justify-between items-center gap-2 bg-gray-50 dark:bg-slate-900/50 rounded-lg p-2 sm:p-4 mb-6 sm:mb-10 border border-gray-100 dark:border-slate-700 scroll-mt-16 sm:scroll-mt-20 sm:court:scroll-mt-14 lg:scroll-mt-24"
+              class="article-navigation flex justify-between items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-2 sm:p-4 mb-6 sm:mb-10 border border-zinc-200 dark:border-zinc-700/60 scroll-mt-16 sm:scroll-mt-20 sm:court:scroll-mt-14 lg:scroll-mt-24"
             >
               <button
-                class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 on:click={navigateToPrevious}
                 disabled={!flatArticles.length || currentArticleIndex === 0}
                 aria-label={t.previous}
               >
-                <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
-                  ><path
-                    fill-rule="evenodd"
-                    d="M9.78 12.78a.75.75 0 01-1.06 0L4.47 8.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 1.06L6.06 8l3.72 3.72a.75.75 0 010 1.06z"
-                  /></svg
-                >
+                <Icone nom="chevron-left" class="w-4 h-4 shrink-0" />
                 <span class="hidden sm:inline">{t.previous}</span>
               </button>
               <button
                 type="button"
-                class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-md px-3 text-gray-700 dark:text-gray-200 hover:bg-white hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-blue-400 disabled:opacity-50 transition-colors lg:hidden"
+                class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-3 text-zinc-700 dark:text-zinc-200 enabled:hover:bg-white enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors lg:hidden"
                 on:click={ouvrirSommaire}
                 disabled={!flatArticles.length}
                 aria-haspopup="dialog"
@@ -1154,46 +1345,65 @@
                 aria-controls="sommaire"
                 data-testid="law-toc-toggle"
               >
-                <span class="material-icons text-xl" aria-hidden="true">toc</span>
+                <Icone nom="table-of-contents" class="text-xl" />
                 <span class="flex min-w-0 flex-col items-start leading-tight">
                   <span class="text-sm font-semibold">{t.toc_open}</span>
-                  <span class="text-xs text-gray-500 dark:text-gray-400">{compteur}</span>
+                  <span class="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{compteur}</span>
                 </span>
               </button>
-              <div class="hidden lg:block text-sm font-medium text-gray-500">
+              <div class="hidden lg:block text-sm font-medium tabular-nums text-zinc-500 dark:text-zinc-400 font-mono">
                 {compteur}
               </div>
               <button
-                class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 on:click={navigateToNext}
                 disabled={!flatArticles.length ||
                   currentArticleIndex === flatArticles.length - 1}
                 aria-label={t.next}
               >
                 <span class="hidden sm:inline">{t.next}</span>
-                <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
-                  ><path
-                    fill-rule="evenodd"
-                    d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
-                  /></svg
-                >
+                <Icone nom="chevron-right" class="w-4 h-4 shrink-0" />
               </button>
             </div>
 
             <!-- Article Content -->
             {#if currentArticle}
               <article class="article">
+                <!-- Titre, puis boutons dessous sur téléphone : côte à côte
+                     dès 390 px, « Copier la citation » et « En vigueur »
+                     (environ 250 px) ne laissaient qu'une soixantaine de
+                     pixels au titre, « Article 1 » passait sur deux lignes et
+                     le nom de la section se coupait en plein mot. Côte à
+                     côte à partir de sm, comme avant. -->
                 <div
-                  class="article-header flex justify-between items-start gap-3 mb-6"
+                  class="article-header flex flex-col gap-3 mb-6 sm:flex-row sm:justify-between sm:items-start"
                 >
+                  <!-- Le chapitre de l'article : numéro en surtitre,
+                       intitulé en texte courant (`decouperSection`), comme
+                       dans le sommaire. -->
                   <div class="min-w-0">
-                    <p
-                      class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 coupe-mots"
-                    >
-                      {currentArticle.sectionTitle || ""}
-                    </p>
+                    {#if currentArticle.sectionTitle}
+                      {@const morceaux = decouperSection(currentArticle.sectionTitle, currentLanguage)}
+                      {#if morceaux.numero}
+                        <p class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-1">
+                          {morceaux.numero}
+                        </p>
+                      {/if}
+                      {#if morceaux.intitule}
+                        <p
+                          class="text-xs leading-snug text-zinc-600 dark:text-zinc-400 mb-1 line-clamp-2 coupe-mots"
+                          title={currentArticle.sectionTitle}
+                        >
+                          {morceaux.intitule}
+                        </p>
+                      {/if}
+                    {:else}
+                      <p class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-1">
+                        {$tr("laws.preamble")}
+                      </p>
+                    {/if}
                     <h2
-                      class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white"
+                      class="text-2xl sm:text-3xl font-bold text-zinc-950 dark:text-white tracking-tight"
                     >
                       {t.article_prefix}
                       {currentArticle.number}
@@ -1202,26 +1412,32 @@
                   <div class="flex flex-wrap items-center gap-2 shrink-0">
                     <button
                       on:click={copierCitationArticle}
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                      class="inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white rounded-xl text-xs font-semibold transition-colors shadow-sm dark:shadow-none lg:[@media(pointer:fine)]:min-h-0"
                       title={t.copy_citation}
                       aria-label={t.copy_citation}
                     >
-                      <span class="material-icons text-base text-blue-600 dark:text-blue-400">
-                        {citationCopiee ? "check" : "link"}
-                      </span>
+                      <Icone nom={citationCopiee ? "check" : "link"} class="text-base text-zinc-950 dark:text-white" />
                       <span>{citationCopiee ? t.citation_copied : t.copy_citation}</span>
                     </button>
+                    <!-- Statut actif du guide (§ 4.9) : badge inversé et
+                         icône `check`, le sens passant par le libellé et
+                         l'icône. Il était gris, en capitales mono, sans
+                         icône, comme un simple surtitre. -->
                     <span
-                      class="shrink-0 whitespace-nowrap px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-bold uppercase tracking-wide"
+                      class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium bg-zinc-950 text-white border-zinc-950 dark:bg-white dark:text-zinc-950 dark:border-white"
                     >
+                      <Icone nom="check" class="text-sm" />
                       {t.in_force}
                     </span>
                   </div>
                 </div>
 
-                {#if currentArticle.title && currentArticle.title !== `Article ${currentArticle.number}` && currentArticle.title !== `Texte de l'article ${currentArticle.number}`}
+                <!-- L'intertitre ne sert qu'à un vrai intitulé ; une ligne
+                     qui porte le texte de l'article passe en premier
+                     paragraphe, avec la recette du corps (`titreEstLeTexte`). -->
+                {#if currentArticle.title && !titreEstLeTexte(currentArticle) && currentArticle.title !== `Article ${currentArticle.number}` && currentArticle.title !== `Texte de l'article ${currentArticle.number}`}
                   <h3
-                    class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200 mb-6 sm:mb-8 coupe-mots"
+                    class="text-lg sm:text-xl font-semibold text-zinc-800 dark:text-zinc-200 mb-6 sm:mb-8 coupe-mots"
                   >
                     {currentArticle.title}
                   </h3>
@@ -1229,11 +1445,13 @@
 
                 <!-- 16 px sur téléphone (18 au-dessus), et coupure des cotes,
                      URL et références sans espace, qui débordaient de la
-                     colonne. -->
+                     colonne. Mesure de lecture de 36em (650 px en 18 px,
+                     environ 67 à 77 caractères) : en 1 440, la ligne prenait
+                     toute la carte, 935 px et 100 à 110 caractères. -->
                 <div
-                  class="article-content space-y-4 sm:space-y-6 text-base sm:text-lg leading-relaxed text-gray-700 dark:text-gray-300 coupe-mots"
+                  class="article-content max-w-[36em] space-y-4 sm:space-y-6 text-base sm:text-lg leading-relaxed text-zinc-700 dark:text-zinc-300 coupe-mots"
                 >
-                  {#each currentArticle.content.split("\n") as paragraph}
+                  {#each texteDeLArticle(currentArticle).split("\n") as paragraph}
                     {#if paragraph.trim()}
                       <p>{paragraph}</p>
                     {/if}
@@ -1246,38 +1464,23 @@
                      une vingtaine de caractères par ligne pour l'explication,
                      la fonction phare de la page. -->
                 <div
-                  class="ai-explanation mt-8 sm:mt-12 flex flex-col sm:flex-row gap-3 sm:gap-6 p-4 sm:p-6 bg-blue-50 dark:bg-slate-900/80 border border-blue-100 dark:border-slate-700 rounded-xl relative overflow-hidden"
+                  class="ai-explanation mt-8 sm:mt-12 flex flex-col sm:flex-row gap-3 sm:gap-6 p-4 sm:p-6 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/60 rounded-xl relative overflow-hidden"
                 >
-                  <!-- Decorative bg -->
+                  <!-- `sparkles` et non l'ancien engrenage : l'icône dit « IA »,
+                       pas « réglages ». -->
                   <div
-                    class="absolute -right-10 -top-10 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl"
-                  ></div>
-
-                  <div
-                    class="ai-icon w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20"
+                    class="ai-icon w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 rounded-xl flex items-center justify-center"
                   >
-                    <svg
-                      class="w-5 h-5 sm:w-6 sm:h-6"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M12 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM9.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"
-                      />
-                      <path
-                        d="M13.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1-1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"
-                      />
-                    </svg>
+                    <Icone nom="sparkles" class="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
                   <div class="ai-content flex-1 min-w-0 z-10 coupe-mots">
                     <h4
-                      class="ai-title font-bold text-gray-900 dark:text-white mb-2"
+                      class="ai-title font-bold text-zinc-950 dark:text-white mb-2"
                     >
                       {t.ai_title}
                     </h4>
                     <p
-                      class="ai-description text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed"
+                      class="ai-description text-sm text-zinc-600 dark:text-zinc-400 mb-4 leading-relaxed"
                     >
                       {t.ai_desc}
                     </p>
@@ -1286,19 +1489,19 @@
                         role="status"
                         aria-live="polite"
                         data-testid="law-explain-loading"
-                        class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300"
+                        class="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400"
                       >
                         <span class="flex items-center gap-1" aria-hidden="true">
                           <span
-                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full motion-safe:animate-bounce"
+                            class="w-2 h-2 bg-zinc-950 dark:bg-white rounded-full motion-safe:animate-bounce"
                             style="animation-delay: 0ms"
                           ></span>
                           <span
-                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full motion-safe:animate-bounce"
+                            class="w-2 h-2 bg-zinc-950 dark:bg-white rounded-full motion-safe:animate-bounce"
                             style="animation-delay: 150ms"
                           ></span>
                           <span
-                            class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full motion-safe:animate-bounce"
+                            class="w-2 h-2 bg-zinc-950 dark:bg-white rounded-full motion-safe:animate-bounce"
                             style="animation-delay: 300ms"
                           ></span>
                         </span>
@@ -1308,22 +1511,25 @@
                       <div
                         role="alert"
                         data-testid="law-explain-error"
-                        class="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 text-sm text-red-700 dark:text-red-300"
+                        class="flex gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-sm text-red-700 dark:text-red-300"
                       >
-                        <p>{explicationErreur}</p>
-                        <button
-                          on:click={expliquerArticle}
-                          data-testid="law-explain-retry"
-                          class="mt-2 inline-flex min-h-11 items-center sm:min-h-0 underline font-medium hover:no-underline"
-                        >
-                          {$tr("common.retry")}
-                        </button>
+                        <Icone nom="circle-alert" class="mt-0.5 text-base" />
+                        <div class="min-w-0">
+                          <p>{explicationErreur}</p>
+                          <button
+                            on:click={expliquerArticle}
+                            data-testid="law-explain-retry"
+                            class="mt-2 inline-flex min-h-11 items-center lg:[@media(pointer:fine)]:min-h-0 underline font-medium hover:no-underline"
+                          >
+                            {$tr("common.retry")}
+                          </button>
+                        </div>
                       </div>
                     {:else if explication}
                       <div
                         data-testid="law-explain-answer"
                         aria-live="polite"
-                        class="space-y-3 text-base leading-relaxed text-gray-700 dark:text-gray-300"
+                        class="space-y-3 text-base leading-relaxed text-zinc-800 dark:text-zinc-200"
                       >
                         <!--
                           Rendu en NOEUDS Svelte, donc echappe. Le prompt
@@ -1333,11 +1539,15 @@
                         -->
                         {#each blocsDeReponse(explication) as bloc}
                           {#if bloc.type === "titre"}
-                            <h5 class="font-bold text-gray-900 dark:text-white pt-1">
+                            <h5 class="font-bold text-zinc-950 dark:text-white pt-1">
                               {bloc.texte}
                             </h5>
                           {:else if bloc.type === "puce"}
-                            <p class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:text-blue-600 dark:before:text-blue-400">
+                            <!-- Puce en gras, et elle seule (`before:font-bold`) :
+                                 sans le bleu d'avant, elle se perdait dans le
+                                 texte ; un paragraphe entier en demi-gras se
+                                 serait lu comme un intertitre. -->
+                            <p class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:font-bold before:text-zinc-950 dark:before:text-white">
                               {bloc.texte}
                             </p>
                           {:else}
@@ -1346,7 +1556,7 @@
                         {/each}
                       </div>
                       <p
-                        class="mt-4 text-xs italic text-gray-500 dark:text-gray-400"
+                        class="mt-4 text-xs italic text-zinc-500 dark:text-zinc-400"
                         data-testid="law-explain-disclaimer"
                       >
                         {t.ai_disclaimer}
@@ -1354,27 +1564,29 @@
                       <button
                         on:click={expliquerArticle}
                         data-testid="law-explain-regenerate"
-                        class="mt-4 w-full sm:w-auto min-h-11 sm:min-h-0 px-4 py-2 border border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400 hover:bg-blue-100 dark:hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors"
+                        class="mt-4 w-full sm:w-auto min-h-11 lg:[@media(pointer:fine)]:min-h-0 px-4 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white rounded-xl text-sm font-medium transition-colors"
                       >
                         {t.ai_regenerate}
                       </button>
                     {:else}
                       <ol
-                        class="ai-list list-decimal pl-5 space-y-2 text-sm text-gray-600 dark:text-gray-400 marker:text-blue-600 marker:font-bold"
+                        class="ai-list list-decimal pl-5 space-y-2 text-sm text-zinc-600 dark:text-zinc-400 marker:text-zinc-950 dark:marker:text-zinc-200 marker:font-bold"
                       >
+                        <!-- Deux-points dans la chaîne traduite (voir
+                             `translations`). -->
                         <li>
-                          <strong>{t.ai_key_content} :</strong>
+                          <strong>{t.ai_key_content}</strong>
                           {t.ai_key_desc}
                         </li>
                         <li>
-                          <strong>{t.ai_implications} :</strong>
+                          <strong>{t.ai_implications}</strong>
                           {t.ai_impl_desc}
                         </li>
                       </ol>
                       <button
                         on:click={expliquerArticle}
                         data-testid="law-explain"
-                        class="ai-question-btn mt-6 w-full sm:w-auto min-h-11 sm:min-h-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        class="ai-question-btn mt-6 w-full sm:w-auto min-h-11 lg:[@media(pointer:fine)]:min-h-0 px-4 py-2 bg-zinc-950 hover:bg-black dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 rounded-xl text-sm font-medium transition-colors shadow-sm dark:shadow-none"
                       >
                         {t.ai_explain}
                       </button>
@@ -1390,63 +1602,53 @@
                 qui visent la barre du haut la trouvent seule.
               -->
               <div
-                class="article-navigation-bas mt-8 sm:mt-10 flex justify-between items-center gap-2 bg-gray-50 dark:bg-slate-900/50 rounded-lg p-2 sm:p-4 border border-gray-100 dark:border-slate-700"
+                class="article-navigation-bas mt-8 sm:mt-10 flex justify-between items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-2 sm:p-4 border border-zinc-200 dark:border-zinc-700/60"
               >
                 <button
-                  class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                  class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   on:click={navigateToPrevious}
                   disabled={currentArticleIndex === 0}
                   aria-label={t.previous}
                 >
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
-                    ><path
-                      fill-rule="evenodd"
-                      d="M9.78 12.78a.75.75 0 01-1.06 0L4.47 8.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 1.06L6.06 8l3.72 3.72a.75.75 0 010 1.06z"
-                    /></svg
-                  >
+                  <Icone nom="chevron-left" class="w-4 h-4 shrink-0" />
                   <span class="hidden sm:inline">{t.previous}</span>
                 </button>
                 <button
                   type="button"
-                  class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-md px-3 text-gray-700 dark:text-gray-200 hover:bg-white hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-blue-400 transition-colors lg:hidden"
+                  class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-3 text-zinc-700 dark:text-zinc-200 enabled:hover:bg-white enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white transition-colors lg:hidden"
                   on:click={ouvrirSommaire}
                   aria-haspopup="dialog"
                   aria-expanded={tocOuvert}
                   aria-controls="sommaire"
                   data-testid="law-toc-toggle-bas"
                 >
-                  <span class="material-icons text-xl" aria-hidden="true">toc</span>
+                  <Icone nom="table-of-contents" class="text-xl" />
                   <span class="flex min-w-0 flex-col items-start leading-tight">
                     <span class="text-sm font-semibold">{t.toc_open}</span>
-                    <span class="text-xs text-gray-500 dark:text-gray-400">{compteur}</span>
+                    <span class="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{compteur}</span>
                   </span>
                 </button>
-                <div class="hidden lg:block text-sm font-medium text-gray-500">
+                <div class="hidden lg:block text-sm font-medium tabular-nums text-zinc-500 dark:text-zinc-400 font-mono">
                   {compteur}
                 </div>
                 <button
-                  class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 sm:h-auto sm:min-w-0 sm:py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-600 transition-colors"
+                  class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   on:click={navigateToNext}
                   disabled={currentArticleIndex === flatArticles.length - 1}
                   aria-label={t.next}
                 >
                   <span class="hidden sm:inline">{t.next}</span>
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
-                    ><path
-                      fill-rule="evenodd"
-                      d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"
-                    /></svg
-                  >
+                  <Icone nom="chevron-right" class="w-4 h-4 shrink-0" />
                 </button>
               </div>
             {:else if flatArticles.length === 0 && law.content}
               <!-- Fallback if parsing failed but content exists -->
-              <div class="prose dark:prose-invert max-w-none">
+              <div class="prose prose-zinc dark:prose-invert max-w-none">
                 <p>{t.raw_fallback}</p>
                 <pre class="whitespace-pre-wrap font-sans coupe-mots">{law.content}</pre>
               </div>
             {:else}
-              <div class="py-20 text-center text-gray-500">{t.loading}</div>
+              <div class="py-20 text-center text-zinc-500 dark:text-zinc-400">{t.loading}</div>
             {/if}
           </main>
         </div>
@@ -1455,7 +1657,12 @@
   {/if}
 </div>
 
-<SiteFooter />
+<!-- Le bouton de l'assistant, comme sur la recherche et l'accueil : il
+     manquait ici, et l'accès au chat changeait d'une page à l'autre de la
+     section. Il se retire quand le texte passe dessous (`eviter`), et le
+     pied de page lui réserve sa place en fin de défilement. -->
+<ChatFab eviter="[data-hors-du-bouton]" />
+<SiteFooter reserverBouton />
 
 <style>
   /*

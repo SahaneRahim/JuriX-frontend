@@ -18,7 +18,9 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { API_URL } from "$lib/api";
+  import Icone from "$lib/components/Icone.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { tr } from "$lib/stores/language";
   import "../../../app.css";
@@ -105,23 +107,39 @@
 </svelte:head>
 
 <!-- Même coquille que login/+page.svelte : colonne de la hauteur de l'écran
-     visible, carte ancrée en haut sous sm, liens texte de 44 px. -->
+     visible, cibles de 44 px à toutes les tailles, tuile douce à l'icône de
+     la tâche, règles d'écran court, pied du site. Carte centrée sous sm,
+     comme sur verify-email/+page.svelte : aucun des trois états n'a de
+     champ, donc aucun clavier à prévoir, et ancrée en haut la carte courte
+     laissait une bande vide jusqu'au pied. -->
 <div class="flex min-h-app flex-col">
 <SiteHeader />
 
 <main id="contenu" class="flex flex-1 flex-col">
+  <!-- À partir de sm, la carte est ancrée à 12 % de la hauteur de l'écran
+       (`sm:pt-[12vh]`), la même ancre que les autres pages de compte :
+       centrée selon sa propre hauteur, la tuile et le titre sautaient d'une
+       page sœur à l'autre. De lg à xl, autant sous elle (`lg:pb-[12vh]`) : le
+       pied empilé sous un écran bas la faisait paraître posée sur lui ; 40 px
+       ailleurs (voir login/+page.svelte). Le dernier lien garde sa cible de
+       44 px (`py-3`), son paragraphe rend la marge qu'elle ajoutait sous lui
+       (`-mb-3`) : la carte paraissait lestée vers le bas. -->
   <div
-    class="flex flex-1 items-start justify-center bg-slate-50 px-4 py-6 font-sans dark:bg-slate-900 sm:items-center sm:py-10"
+    class="flex flex-1 items-center justify-center bg-background-light px-4 py-6 font-sans dark:bg-background-dark sm:items-start sm:pb-10 sm:pt-[12vh] lg:pb-[12vh] xl:pb-10 court:items-start court:py-3"
   >
     <div
-      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8"
+      class="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:p-8 court:p-4"
     >
       <!-- Un seul titre de niveau 1, commun aux trois états : il décrit la page
            et non son issue, pour garder le même repère du début à la fin. -->
       <h1
-        class="mb-6 flex items-center justify-center gap-2 text-xl font-bold text-slate-900 dark:text-white"
+        class="mb-6 flex items-center justify-center gap-2 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl"
       >
-        <span class="text-3xl" aria-hidden="true">&#9878;</span>
+        <span
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-100 text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-200 court:hidden"
+        >
+          <Icone nom="mail-check" class="text-lg" />
+        </span>
         {$tr("verify.title")}
       </h1>
 
@@ -129,22 +147,29 @@
         <p
           role="status"
           data-testid="verify-pending"
-          class="text-sm text-slate-600 dark:text-slate-300"
+          class="text-sm text-zinc-600 dark:text-zinc-300"
         >
           {$tr("verify.pending")}
         </p>
       {:else if etat === "reussi"}
+        <!-- Messages alignés à gauche dans la carte centrée : sur deux lignes,
+             un texte centré se détachait de l'icône posée à sa gauche. En
+             sombre, les couleurs d'un bloc DANS une carte (guide § 4.1) :
+             celles de l'alerte posée sur la page (zinc-900, filet zinc-800)
+             sont celles de la carte, et l'encadré s'y fondait (voir
+             forgot-password/+page.svelte). -->
         <p
           role="status"
           data-testid="verify-success"
-          class="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300"
+          class="flex gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-left text-sm text-zinc-700 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-300"
         >
-          {$tr("verify.success")}
+          <Icone nom="circle-check" class="mt-0.5 text-base text-zinc-950 dark:text-white" />
+          <span>{$tr("verify.success")}</span>
         </p>
         <a
           href="/"
           data-testid="verify-to-home"
-          class="mt-6 inline-block w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 sm:py-2"
+          class="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200"
         >
           {$tr("verify.goHome")}
         </a>
@@ -152,9 +177,10 @@
         <p
           role="alert"
           data-testid="verify-error"
-          class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
+          class="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-left text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
         >
-          {error}
+          <Icone nom="circle-alert" class="mt-0.5 text-base" />
+          <span>{error}</span>
         </p>
         <!-- Un écran d'échec sans lien serait un cul-de-sac : la confirmation a
              échoué, mais le compte existe peut-être déjà et le site reste
@@ -162,15 +188,15 @@
         <a
           href="/login"
           data-testid="verify-to-login"
-          class="mt-6 inline-block w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 sm:py-2"
+          class="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200"
         >
           {$tr("login.submit")}
         </a>
-        <p class="mt-1 text-sm sm:mt-4 sm:text-xs">
+        <p class="-mb-3 mt-3 text-sm">
           <a
             href="/"
             data-testid="verify-to-home"
-            class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
+            class="inline-block py-3 font-semibold text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-white"
           >
             {$tr("verify.goHome")}
           </a>
@@ -179,4 +205,6 @@
     </div>
   </div>
 </main>
+
+<SiteFooter />
 </div>

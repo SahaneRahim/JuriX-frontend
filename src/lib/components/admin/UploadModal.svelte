@@ -3,6 +3,8 @@
   import { apiFetch } from '$lib/api';
     import { createEventDispatcher, onMount } from "svelte";
     import { fade, scale } from "svelte/transition";
+  import Icone from '$lib/components/Icone.svelte';
+  import type { NomIcone } from '$lib/icones';
   import { tr, language } from '$lib/stores/language';
   import { nomCategorie } from '$lib/categories';
   import type { IngestPayload } from '$lib/types';
@@ -10,6 +12,20 @@
     export let show = false;
 
     const dispatch = createEventDispatcher();
+
+    // Une seule recette pour les champs et leurs libellés, celle de tout le
+    // site (noir et blanc, mode sombre compris) et de UserFormModal : recopiée
+    // champ par champ, elle finissait par diverger. Une seule taille aussi,
+    // dans les quatre fenêtres de l'administration et les pages de compte :
+    // 44 px de haut au moins (38 px ici auparavant), `py-2`, libellé 4 px
+    // au-dessus. 16 px de texte sauf à partir de sm sous un pointeur fin
+    // (règle de login/+page.svelte) : en dessous, iOS zoome au focus,
+    // téléphone en paysage compris. Le retrait horizontal reste à chaque
+    // champ : une liste garde la place de son chevron à droite.
+    const CHAMP =
+        "min-h-11 w-full rounded-xl border border-zinc-200 bg-white py-2 text-base text-zinc-950 placeholder-zinc-400 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm";
+    const LIBELLE = "mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200";
+
 let files: FileList | null = null;
     let uploading = false;
     let uploadStatus: {
@@ -20,7 +36,22 @@ let files: FileList | null = null;
             | "done"
             | "error";
     } = {};
-    let logs: string[] = [];
+
+    /**
+     * Journal du traitement : une ligne par étape et par fichier. Son type
+     * choisit l'icône posée devant le texte, celle du site (Lucide), à la
+     * place des émojis qui ouvraient les libellés (admin.upload.log*) et dont
+     * le dessin et la couleur changeaient d'un système à l'autre ; l'échec se
+     * lit aussi à sa couleur, le rouge des erreurs.
+     */
+    type TypeJournal = "envoi" | "traitement" | "fait" | "erreur";
+    const ICONE_JOURNAL: Record<TypeJournal, NomIcone> = {
+        envoi: "upload",
+        traitement: "loader-circle",
+        fait: "circle-check",
+        erreur: "circle-x",
+    };
+    let logs: Array<{ type: TypeJournal; texte: string }> = [];
 
     // Document metadata
     let documentTitle = "";
@@ -76,7 +107,7 @@ let files: FileList | null = null;
 
             try {
                 uploadStatus[fileName] = "uploading";
-                logs = [...logs, $tr("admin.upload.logUploading").replace("{name}", fileName)];
+                logs = [...logs, { type: "envoi", texte: $tr("admin.upload.logUploading").replace("{name}", fileName) }];
 
                 // 1. Upload File
                 const formData = new FormData();
@@ -94,7 +125,10 @@ let files: FileList | null = null;
                 uploadStatus[fileName] = "processing";
                 logs = [
                     ...logs,
-                    $tr("admin.upload.logProcessing").replace("{name}", fileName).replace("{id}", String(fileId)),
+                    {
+                        type: "traitement",
+                        texte: $tr("admin.upload.logProcessing").replace("{name}", fileName).replace("{id}", String(fileId)),
+                    },
                 ];
 
                 // Get title and reference from filename (without extension)
@@ -139,12 +173,15 @@ let files: FileList | null = null;
                 uploadStatus[fileName] = "done";
                 logs = [
                     ...logs,
-                    $tr("admin.upload.logDone").replace("{name}", fileName),
+                    { type: "fait", texte: $tr("admin.upload.logDone").replace("{name}", fileName) },
                 ];
             } catch (e) {
                 console.error(e);
                 uploadStatus[fileName] = "error";
-                logs = [...logs, $tr("admin.upload.logError").replace("{name}", fileName).replace("{err}", String(e))];
+                logs = [
+                    ...logs,
+                    { type: "erreur", texte: $tr("admin.upload.logError").replace("{name}", fileName).replace("{err}", String(e)) },
+                ];
             }
         }
 
@@ -202,9 +239,14 @@ let files: FileList | null = null;
       seul le corps défile, en-tête et boutons restent visibles. La hauteur
       maximale se rapporte au voile, fixe en inset-0, qui suit déjà l'écran
       réellement visible sans dépendre de l'unité dvh.
+
+      Construite comme les trois autres fenêtres de l'administration : un
+      trait sous l'en-tête et un au-dessus du pied, les mêmes marges (16 puis
+      24 px), les champs espacés de 16 px. Elle n'avait aucun trait. Largeur
+      des formulaires courts, 512 px, comme la fenêtre des comptes.
     -->
     <div
-        class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 backdrop-blur-sm sm:items-center sm:p-4"
+        class="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/40 backdrop-blur-sm sm:items-center sm:p-4"
         role="presentation"
         data-testid="upload-modal"
         on:click={onBackdropClick}
@@ -216,45 +258,33 @@ let files: FileList | null = null;
             role="dialog"
             aria-modal="true"
             aria-labelledby="upload-modal-title"
-            class="flex max-h-[calc(100%-1rem)] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl sm:max-h-[90%] sm:rounded-2xl"
+            class="flex max-h-[calc(100%-1rem)] w-full max-w-lg flex-col rounded-t-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:max-h-[90%] sm:rounded-2xl"
             transition:scale
         >
-            <div class="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3 sm:px-6 sm:pb-4 sm:pt-6">
-                <h2 id="upload-modal-title" class="min-w-0 text-xl font-bold text-slate-900">
+            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800 sm:px-6 sm:py-4">
+                <!-- Titre des fenêtres de l'administration : 20 puis 24 px,
+                     comme « Modifier le document » et « Modifier l'article ». -->
+                <h2 id="upload-modal-title" class="min-w-0 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl">
                     {$tr("admin.upload.title")}
                 </h2>
                 <!-- 44 px : l'icône seule faisait une cible de 24 px. -->
                 <button
                     on:click={close}
                     aria-label={$tr("common.close")}
-                    class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600"
+                    class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                 >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke-width="2"
-                        stroke="currentColor"
-                        class="h-6 w-6"
-                        aria-hidden="true"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                        />
-                    </svg>
+                    <Icone nom="x" class="h-6 w-6" />
                 </button>
             </div>
 
             <!-- overscroll-contain : arrivé au bout, le défilement ne passe pas
                  à la page derrière. -->
-            <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6">
+            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-6">
                 <!-- Document Title -->
-                <div class="mb-4">
+                <div>
                     <label
                         for="doc-title"
-                        class="block text-sm font-medium text-slate-700 mb-1"
+                        class={LIBELLE}
                     >
                         {$tr("admin.doc.title")}
                     </label>
@@ -263,18 +293,19 @@ let files: FileList | null = null;
                         id="doc-title"
                         bind:value={documentTitle}
                         placeholder={$tr("admin.upload.titlePlaceholder")}
-                        class="w-full rounded-lg border-slate-300 bg-white py-2 px-3 text-base shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                        class="{CHAMP} px-3"
                     />
                 </div>
 
-                <!-- Document Reference -->
-                <div class="mb-4">
+                <!-- Document Reference. « (optionnel) » gris et sans gras après
+                     le libellé, comme dans le générateur d'articles. -->
+                <div>
                     <label
                         for="doc-ref"
-                        class="block text-sm font-medium text-slate-700 mb-1"
+                        class={LIBELLE}
                     >
-                        {$tr("admin.reference")} <span class="text-slate-500 font-normal"
-                            >{$tr("admin.upload.optional")}</span
+                        {$tr("admin.reference")} <span class="font-normal text-zinc-500 dark:text-zinc-400"
+                            >{$tr("admin.optional")}</span
                         >
                     </label>
                     <input
@@ -282,35 +313,43 @@ let files: FileList | null = null;
                         id="doc-ref"
                         bind:value={documentReference}
                         placeholder={$tr("admin.upload.refPlaceholder")}
-                        class="w-full rounded-lg border-slate-300 bg-white py-2 px-3 text-base shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                        class="{CHAMP} px-3"
                     />
-                    <p class="text-xs text-slate-500 mt-1">
+                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                         {$tr("admin.upload.refHint")}
                     </p>
                 </div>
 
                 <!-- Category Selector -->
-                <div class="mb-4">
+                <div>
                     <label
                         for="category-select"
-                        class="block text-sm font-medium text-slate-700 mb-1"
+                        class={LIBELLE}
                     >
                         {$tr("admin.upload.category")}
                     </label>
+                    <!-- Les options portent le nom seul : l'icône de la base est
+                         un émoji, et une <option> ne peut contenir que du
+                         texte, donc pas l'icône Lucide du domaine.
+                         Première option : « Aucune catégorie », la valeur
+                         réelle que garde le texte si l'on n'en choisit pas,
+                         comme dans « Modifier le document ». L'invite
+                         « -- Sélectionner une catégorie -- », en noir, se
+                         lisait comme une catégorie choisie. -->
                     <select
                         id="category-select"
                         bind:value={selectedCategoryId}
-                        class="w-full rounded-lg border-slate-300 bg-white py-2 px-3 text-base shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                        class="{CHAMP} pl-3 pr-10"
                     >
                         <option value={null}
-                            >{$tr("admin.upload.selectCategory")}</option
+                            >{$tr("admin.doc.noCategory")}</option
                         >
                         {#each categories as cat (cat.id)}
-                            <option value={cat.id}>{cat.icon} {nomCategorie(cat.name, $language.current)}</option>
+                            <option value={cat.id}>{nomCategorie(cat.name, $language.current)}</option>
                         {/each}
                     </select>
                     {#if loadingCategories}
-                        <p class="text-xs text-slate-500 mt-1">
+                        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                             {$tr("admin.upload.loadingCategories")}
                         </p>
                     {/if}
@@ -318,34 +357,29 @@ let files: FileList | null = null;
 
                 <!-- Upload Area : le champ est sr-only et non plus `hidden`, qui le
                      rendait inatteignable au clavier ; la zone s'entoure quand il
-                     a le focus. -->
-                <div class="mb-6">
+                     a le focus. La même zone que l'import en lot : tuile d'icône
+                     du guide (rounded-xl, et non ronde), l'icône `file-up`, le
+                     survol par la bordure. La consigne suit le POINTEUR : « Touchez »
+                     au doigt, « Cliquez » à la souris. Sur écran court
+                     (`court:`), zone et tuile resserrées, comme sur la page
+                     d'import en lot. -->
+                <div>
                     <label
                         for="file-upload"
-                        class="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-8 sm:py-10 text-center hover:bg-slate-100 cursor-pointer transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30"
+                        class="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 py-8 sm:py-10 court:py-4 text-center hover:border-zinc-950 cursor-pointer transition-colors focus-within:border-zinc-950 focus-within:ring-2 focus-within:ring-zinc-950/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-zinc-400 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200/20"
                     >
-                        <div
-                            class="rounded-full bg-blue-100 p-3 text-blue-600 mb-3"
+                        <span
+                            class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 court:mb-2 court:h-9 court:w-9"
                         >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke-width="2"
-                                stroke="currentColor"
-                                class="h-6 w-6"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                                />
-                            </svg>
-                        </div>
-                        <p class="text-sm font-medium text-slate-900">
-                            {$tr("admin.upload.clickToSelect")}
+                            <Icone nom="file-up" class="text-2xl court:text-xl" />
+                        </span>
+                        <p class="text-sm font-medium text-zinc-950 dark:text-zinc-100">
+                            <span class="[@media(pointer:fine)]:hidden">{$tr("admin.upload.tapToSelect")}</span>
+                            <span class="hidden [@media(pointer:fine)]:inline">{$tr("admin.upload.clickToSelect")}</span>
                         </p>
-                        <p class="text-xs text-slate-500 mt-1">
+                        <!-- zinc-600 et non 500 : au survol, la zone passe en
+                             zinc-100, où zinc-500 ne fait plus que 4,4:1. -->
+                        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
                             {$tr("admin.upload.formats")}
                         </p>
                         <input
@@ -363,27 +397,42 @@ let files: FileList | null = null;
                      plafond de 200 px, et reste lisible en entier au survol. -->
                 {#if files && files.length > 0}
                     <div
-                        class="mb-6 max-h-40 overflow-y-auto space-y-2 rounded-lg border border-slate-100 bg-slate-50 p-3"
+                        class="max-h-40 overflow-y-auto space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700/60 dark:bg-zinc-800/50"
                     >
                         {#each Array.from(files) as file (file.name)}
                             <div class="flex items-center justify-between gap-3 text-sm">
-                                <span class="min-w-0 truncate text-slate-700" title={file.name}
+                                <span class="min-w-0 truncate text-zinc-700 dark:text-zinc-300" title={file.name}
                                     >{file.name}</span
                                 >
+                                <!-- En noir et blanc, comme les badges de statut : le
+                                     libellé et l'icône disent l'état que donnaient le
+                                     bleu, l'ambre et le vert ; seul l'échec reste rouge.
+                                     Seule l'icône s'anime, et non la ligne : pulsée
+                                     jusqu'à 50 % d'opacité, comme le badge
+                                     « processing » (StatusBadge), la ligne tombait à
+                                     moins de 3:1 au creux de chaque pulsation sur
+                                     le bloc zinc-50. Le cercle de chargement tourne
+                                     (guide § 4.12), la flèche d'envoi pulse. -->
                                 {#if uploadStatus[file.name] === "uploading"}
-                                    <span class="shrink-0 text-blue-600 motion-safe:animate-pulse"
-                                        >{$tr("admin.upload.statusUploading")}</span
+                                    <span class="inline-flex shrink-0 items-center gap-1 text-zinc-700 dark:text-zinc-300"
+                                        ><Icone nom="upload" class="motion-safe:animate-pulse" />{$tr("admin.upload.statusUploading")}</span
                                     >
                                 {:else if uploadStatus[file.name] === "processing"}
-                                    <span class="shrink-0 text-amber-600 motion-safe:animate-pulse"
-                                        >{$tr("admin.upload.statusProcessing")}</span
+                                    <span class="inline-flex shrink-0 items-center gap-1 text-zinc-700 dark:text-zinc-300"
+                                        ><Icone nom="loader-circle" class="motion-safe:animate-spin" />{$tr("admin.upload.statusProcessing")}</span
                                     >
                                 {:else if uploadStatus[file.name] === "done"}
-                                    <span class="shrink-0 text-emerald-600">{$tr("admin.upload.statusDone")}</span>
+                                    <span class="inline-flex shrink-0 items-center gap-1 text-zinc-950 dark:text-white"
+                                        ><Icone nom="circle-check" />{$tr("admin.upload.statusDone")}</span
+                                    >
                                 {:else if uploadStatus[file.name] === "error"}
-                                    <span class="shrink-0 text-red-600">{$tr("admin.upload.statusError")}</span>
+                                    <span class="inline-flex shrink-0 items-center gap-1 text-red-600 dark:text-red-400"
+                                        ><Icone nom="circle-x" />{$tr("admin.upload.statusError")}</span
+                                    >
                                 {:else}
-                                    <span class="shrink-0 text-slate-500">{$tr("admin.upload.statusPending")}</span>
+                                    <span class="inline-flex shrink-0 items-center gap-1 text-zinc-500 dark:text-zinc-400"
+                                        ><Icone nom="clock" />{$tr("admin.upload.statusPending")}</span
+                                    >
                                 {/if}
                             </div>
                         {/each}
@@ -394,10 +443,13 @@ let files: FileList | null = null;
                      sans espace se coupent au lieu d'élargir le panneau. -->
                 {#if logs.length > 0}
                     <div
-                        class="coupe-mots mb-6 max-h-24 overflow-y-auto rounded bg-slate-900 p-2 text-xs font-mono text-emerald-400"
+                        class="coupe-mots max-h-24 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs font-mono text-zinc-700 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-300"
                     >
                         {#each logs as log, i (i)}
-                            <div>{log}</div>
+                            <div class="flex items-start gap-1.5 {log.type === 'erreur' ? 'text-red-600 dark:text-red-400' : ''}">
+                                <Icone nom={ICONE_JOURNAL[log.type]} class="mt-0.5" />
+                                <span class="min-w-0">{log.texte}</span>
+                            </div>
                         {/each}
                     </div>
                 {/if}
@@ -405,18 +457,19 @@ let files: FileList | null = null;
 
             <!-- Pied toujours visible, au-dessus de la barre d'accueil de
                  l'iPhone (zone sûre) ; sur téléphone, deux boutons de 44 px à
-                 parts égales. -->
-            <div class="shrink-0 pb-zone-sure">
-                <div class="flex justify-end gap-3 px-4 py-3 sm:px-6 sm:pb-6 sm:pt-2">
+                 parts égales. Séparé du corps par un trait, aux marges des
+                 trois autres fenêtres. -->
+            <div class="shrink-0 border-t border-zinc-200 pb-zone-sure dark:border-zinc-800">
+                <div class="flex justify-end gap-3 px-4 py-3 sm:px-6 sm:py-4">
                     <button
                         on:click={close}
-                        class="inline-flex h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 sm:flex-none"
+                        class="inline-flex h-11 flex-1 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:flex-none"
                         >{$tr("common.cancel")}</button
                     >
                     <button
                         on:click={handleUpload}
                         disabled={uploading || !files}
-                        class="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:flex-none"
+                        class="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 sm:flex-none"
                     >
                         {uploading
                             ? $tr("admin.upload.processing")

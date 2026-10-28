@@ -36,7 +36,13 @@ export interface NavLink {
 
 export const NAV_LINKS: readonly NavLink[] = [
   { href: '/', key: 'nav.home', isActive: (p) => p === '/' },
-  { href: '/laws', key: 'nav.documents', isActive: (p) => p.startsWith('/laws') },
+  // La page d'une catégorie (/categories/13) est rangée sous « Documents »,
+  // comme dans le fil d'Ariane d'un texte : aucune entrée n'y était active.
+  {
+    href: '/laws',
+    key: 'nav.documents',
+    isActive: (p) => p.startsWith('/laws') || p.startsWith('/categories'),
+  },
   { href: '/blog', key: 'nav.blog', isActive: (p) => p.startsWith('/blog') },
   { href: '/search', key: 'nav.search', isActive: (p) => p.startsWith('/search') },
   { href: '/compare', key: 'nav.compare', isActive: (p) => p.startsWith('/compare') },

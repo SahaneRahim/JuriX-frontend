@@ -4,13 +4,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [sveltekit()],
   build: {
-    // Jamais de police incrustee en base64 : le sous-ensemble de Material
-    // Icons (src/lib/polices, 3 Ko) passe sous le seuil de 4 Ko de Vite. Dans
-    // la feuille de style, il en grossirait le chemin critique a chaque
-    // deploiement qui touche une classe ; et src/hooks.server.ts ne pourrait
-    // plus le precharger (une adresse data: au lieu d'un fichier). Seul, il
-    // reste un fichier immuable, en cache un an. Les autres fichiers gardent
-    // le seuil par defaut (undefined).
+    // Jamais de police incrustee en base64, meme sous le seuil de 4 Ko de
+    // Vite : dans la feuille de style, elle en grossirait le chemin critique a
+    // chaque deploiement qui touche une classe, et src/hooks.server.ts ne
+    // pourrait plus la precharger (une adresse data: au lieu d'un fichier).
+    // Seule, elle reste un fichier immuable, en cache un an. Les autres
+    // fichiers gardent le seuil par defaut (undefined).
     assetsInlineLimit: (fichier) => (fichier.endsWith('.woff2') ? false : undefined)
   },
   test: {

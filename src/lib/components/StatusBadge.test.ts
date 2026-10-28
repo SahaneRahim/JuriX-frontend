@@ -23,7 +23,7 @@ describe('StatusBadge', () => {
     for (const [statut, attendu] of [
       ['draft', 'Brouillon'],
       ['pending', 'En attente'],
-      ['processing', 'Traitement...'],
+      ['processing', 'En traitement'],
       ['published', 'Publié'],
       ['refused', 'Refusé'],
       ['archived', 'Archivé'],
@@ -39,6 +39,13 @@ describe('StatusBadge', () => {
     const badge = getByTestId('status-badge');
     expect(badge.textContent?.trim()).toBe('inconnu');
     expect(badge.getAttribute('data-status')).toBe('inconnu');
+  });
+
+  it('traduit « uploading », l’envoi d’un fichier dans l’import en lot', () => {
+    // Sans entree, le badge montrait le mot anglais brut et un point
+    // d'interrogation pendant tout l'envoi.
+    const { getByTestId } = render(StatusBadge, { status: 'uploading' });
+    expect(getByTestId('status-badge').textContent?.trim()).toBe('Envoi…');
   });
 
   it('n’anime que « processing », le seul etat ou un travail est en cours', () => {

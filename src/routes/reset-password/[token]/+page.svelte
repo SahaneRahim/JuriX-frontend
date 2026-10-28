@@ -15,7 +15,10 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { API_URL } from "$lib/api";
+  import ChampMotDePasse from "$lib/components/ChampMotDePasse.svelte";
+  import Icone from "$lib/components/Icone.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { tr } from "$lib/stores/language";
   import "../../../app.css";
@@ -142,45 +145,75 @@
 <MetaSeo titre={$tr("reset.title")} indexable={false} />
 
 <!-- Même coquille que login/+page.svelte : colonne de la hauteur de l'écran
-     visible, carte ancrée en haut sous sm, liens texte de 44 px. -->
+     visible, cibles de 44 px à toutes les tailles, champs en 16 px sous un
+     pointeur tactile, tuile douce à l'icône de la tâche, règles d'écran
+     court, pied du site. Sous sm, la carte n'est ancrée en haut que tant que
+     le formulaire est affiché (le clavier : voir login/+page.svelte) ; le
+     succès et le lien refusé n'ont plus de champ, la carte y est centrée,
+     comme sur /forgot-password une fois la demande envoyée.
+
+     Écran court : 12 px entre les champs, et carte élargie à max-w-lg à
+     partir de sm, comme sur signup/+page.svelte (deux champs, l'aide et
+     20 px d'écart mettaient le bouton d'envoi à 330-374 px, hors d'un écran
+     de 360 ; calculé en 740x360, il finit à 358). La carte élargie garde
+     l'aide sur une ligne en anglais. -->
 <div class="flex min-h-app flex-col">
 <SiteHeader />
 
 <main id="contenu" class="flex flex-1 flex-col">
+  <!-- À partir de sm, la carte est ancrée à 12 % de la hauteur de l'écran
+       (`sm:pt-[12vh]`), la même ancre que les autres pages de compte :
+       centrée selon sa propre hauteur, la tuile et le titre sautaient d'une
+       page sœur à l'autre. De lg à xl, autant sous elle (`lg:pb-[12vh]`) : le
+       pied empilé sous un écran bas la faisait paraître posée sur lui ; 40 px
+       ailleurs (voir login/+page.svelte). Le dernier lien garde sa cible de
+       44 px (`py-3`), son paragraphe rend la marge qu'elle ajoutait sous lui
+       (`-mb-3`) : la carte paraissait lestée vers le bas. -->
   <div
-    class="flex flex-1 items-start justify-center bg-slate-50 px-4 py-6 font-sans dark:bg-slate-900 sm:items-center sm:py-10"
+    class="flex flex-1 justify-center bg-background-light px-4 py-6 font-sans dark:bg-background-dark sm:pb-10 sm:pt-[12vh] lg:pb-[12vh] xl:pb-10 court:items-start court:py-3 {succes || lienExpire
+      ? 'items-center sm:items-start'
+      : 'items-start'}"
   >
     <div
-      class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8"
+      class="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:p-8 court:p-4 sm:court:max-w-lg"
     >
       <h1
-        class="mb-2 flex items-center justify-center gap-2 text-xl font-bold text-slate-900 dark:text-white"
+        class="mb-2 flex items-center justify-center gap-2 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl"
       >
-        <span class="text-3xl" aria-hidden="true">&#9878;</span>
+        <span
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-100 text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-200 court:hidden"
+        >
+          <Icone nom="key-round" class="text-lg" />
+        </span>
         {$tr("reset.title")}
       </h1>
-      <p class="mb-6 text-center text-sm text-slate-500 dark:text-slate-400 sm:mb-8">
-        {$tr("reset.subtitle")}
-      </p>
 
+      <!-- La consigne « Choisissez un mot de passe » n'accompagne que le
+           formulaire : au-dessus d'un succès ou d'un lien refusé, elle disait
+           le contraire de l'écran. -->
       {#if succes}
         <!-- Le formulaire disparaît : le jeton est consommé, le renvoyer
-             donnerait un 400 sans rien apporter. -->
+             donnerait un 400 sans rien apporter. En sombre, les couleurs d'un
+             bloc DANS une carte (guide § 4.1) : celles de l'alerte posée sur
+             la page (zinc-900, filet zinc-800) sont celles de la carte, et
+             l'encadré s'y fondait (voir forgot-password/+page.svelte). -->
         <p
           role="status"
           data-testid="reset-success"
-          class="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800 dark:bg-green-900/20 dark:text-green-300"
+          class="mt-6 flex gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-300"
         >
-          {$tr("reset.success")}
+          <Icone nom="circle-check" class="mt-0.5 text-base text-zinc-950 dark:text-white" />
+          <span>{$tr("reset.success")}</span>
         </p>
-        <p class="mt-3 text-center text-sm sm:mt-6">
-          <a
-            href="/login"
-            data-testid="reset-to-login"
-            class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
-            >{$tr("login.submit")}</a
-          >
-        </p>
+        <!-- La suite logique, en bouton principal et non en lien de texte :
+             le mot de passe vient de changer, il ne reste qu'à s'en servir. -->
+        <a
+          href="/login"
+          data-testid="reset-to-login"
+          class="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200"
+        >
+          {$tr("login.submit")}
+        </a>
       {:else if lienExpire}
         <!-- ÉTAT TERMINAL. Le jeton est refusé : réafficher le formulaire
              inviterait à recliquer « Changer mon mot de passe », ce qui ne peut
@@ -189,9 +222,10 @@
         <p
           role="alert"
           data-testid="reset-error"
-          class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
+          class="mt-6 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
         >
-          {error}
+          <Icone nom="circle-alert" class="mt-0.5 text-base" />
+          <span>{error}</span>
         </p>
         <!-- Les sorties sont HORS du conteneur `role="alert"` : une région live
              est annoncée comme un bloc de texte, et certaines technologies
@@ -200,43 +234,45 @@
         <a
           href="/forgot-password"
           data-testid="reset-ask-new-link"
-          class="mt-6 inline-block w-full rounded-lg bg-blue-600 px-4 py-2.5 text-center font-medium text-white transition-colors hover:bg-blue-700 sm:py-2"
+          class="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200"
         >
           {$tr("reset.askNewLink")}
         </a>
-        <p class="mt-1 text-center text-sm sm:mt-4 sm:text-xs">
+        <p class="-mb-3 mt-3 text-center text-sm">
           <a
             href="/login"
             data-testid="reset-to-login"
-            class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
+            class="inline-block py-3 font-semibold text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-white"
             >{$tr("login.submit")}</a
           >
         </p>
       {:else}
-        <form on:submit|preventDefault={handleSubmit} class="space-y-5" novalidate>
+        <p class="mb-6 text-balance text-center text-sm text-zinc-500 dark:text-zinc-400 sm:mb-8 court:sr-only">
+          {$tr("reset.subtitle")}
+        </p>
+        <form on:submit|preventDefault={handleSubmit} class="space-y-5 court:space-y-3" novalidate>
           <div>
             <label
               for="reset-password"
-              class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              class="mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200"
             >
               {$tr("reset.password")}
             </label>
-            <input
+            <ChampMotDePasse
               id="reset-password"
               data-testid="reset-password"
-              type="password"
               bind:value={motDePasse}
               required
               minlength="8"
               autocomplete="new-password"
               aria-describedby="reset-password-hint"
-              class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:py-2"
+              class="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-base text-zinc-950 placeholder-zinc-400 outline-none transition-colors focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
             />
             <!-- La règle est annoncée AVANT l'envoi : le serveur répond 422 sur
                  un mot de passe faible, autant ne pas le faire découvrir. -->
             <p
               id="reset-password-hint"
-              class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+              class="mt-1 text-pretty text-xs text-zinc-500 dark:text-zinc-400"
             >
               {$tr("signup.passwordHint")}
             </p>
@@ -245,19 +281,18 @@
           <div>
             <label
               for="reset-confirm"
-              class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              class="mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200"
             >
               {$tr("reset.confirm")}
             </label>
-            <input
+            <ChampMotDePasse
               id="reset-confirm"
               data-testid="reset-confirm"
-              type="password"
               bind:value={confirmation}
               required
               minlength="8"
               autocomplete="new-password"
-              class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white sm:py-2"
+              class="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-base text-zinc-950 placeholder-zinc-400 outline-none transition-colors focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
             />
           </div>
 
@@ -268,9 +303,10 @@
             <p
               role="alert"
               data-testid="reset-error"
-              class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
+              class="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
             >
-              {error}
+              <Icone nom="circle-alert" class="mt-0.5 text-base" />
+              <span>{error}</span>
             </p>
           {/if}
 
@@ -278,18 +314,18 @@
             type="submit"
             disabled={loading || !monte}
             data-testid="reset-submit"
-            class="w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
+            class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200"
           >
             {loading ? $tr("reset.submitting") : $tr("reset.submit")}
           </button>
         </form>
 
         <!-- Sortie permanente, même sans erreur. -->
-        <p class="mt-3 text-center text-sm text-slate-500 dark:text-slate-400 sm:mt-6 sm:text-xs">
+        <p class="-mb-3 mt-3 text-center text-sm text-zinc-500 dark:text-zinc-400">
           <a
             href="/login"
             data-testid="reset-to-login"
-            class="inline-block py-3 font-medium text-blue-600 hover:underline dark:text-blue-400 sm:py-0"
+            class="inline-block py-3 font-semibold text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-white"
             >{$tr("login.submit")}</a
           >
         </p>
@@ -297,4 +333,6 @@
     </div>
   </div>
 </main>
+
+<SiteFooter />
 </div>

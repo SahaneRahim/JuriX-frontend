@@ -21,27 +21,31 @@
 }
 
 /*
- * Material Icons, en sous-ensemble : les icônes que le site affiche, et elles
- * seules (src/lib/polices/material-icons.txt), 3 Ko au lieu des 125 Ko de la
- * police complète du paquet material-icons (2 122 icônes), qui était
- * préchargée sur chaque page et disputait la bande passante à cette feuille
- * de style sur une 4G lente. Fichier traité par Vite : nom haché, servi
- * immuable, et jamais incrusté dans la feuille (vite.config.ts) pour rester
- * préchargeable (src/hooks.server.ts).
+ * Geist Mono, servie par le site (@fontsource-variable/geist-mono, latin, 23 Ko),
+ * pour `font-mono` (tailwind.config.js) : surtitres, dates, cotes, compteurs,
+ * touches, « 404 ». Sans police déclarée, `font-mono` prenait la chasse fixe
+ * du système : Liberation Mono sous Linux, proche de Courier et lourde en
+ * gras (l'effet machine à écrire relevé à l'audit), Consolas sous Windows,
+ * SF Mono ou Menlo sous macOS. Le rendu changeait d'un poste à l'autre.
+ * Geist Mono est dessinée pour accompagner une linéale comme Inter.
  *
- * font-display: block, et non swap. Une police d'icônes s'écrit par
- * ligatures : en attendant la police, swap afficherait les noms en toutes
- * lettres (« calendar_today », « arrow_forward ») dans la police de repli,
- * bien plus larges que l'icône, puis tout se redessinerait à son arrivée :
- * boutons élargis, lignes qui sautent. block les garde invisibles le temps
- * qu'elle arrive, très court pour 3 Ko préchargés.
+ * font-display: swap, sans préchargement, à l'inverse d'Inter. Elle ne sert
+ * qu'à de petits textes, et ne doit rien retarder du premier affichage. Avec
+ * optional, une police arrivée en retard était écartée pour TOUTE la visite
+ * (la navigation garde le même document) : la chasse fixe du système
+ * revenait, précisément ce qu'on corrige. Le remplacement ne fait pas sauter
+ * les lignes : Geist Mono a la chasse des polices de repli (0,6 em par
+ * caractère, mesuré dans Chromium, comme Liberation Mono, DejaVu Sans Mono,
+ * SF Mono et Menlo ; 0,55 pour Consolas), et la hauteur de ligne vient des
+ * classes `text-*`.
  */
 @font-face {
-  font-family: 'Material Icons';
+  font-family: 'Geist Mono Variable';
   font-style: normal;
-  font-weight: 400;
-  font-display: block;
-  src: url('./lib/polices/material-icons.woff2') format('woff2');
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @tailwind base;
@@ -49,28 +53,18 @@
 @tailwind utilities;
 
 /*
- * Classe des icônes, reprise du fichier filled.css du paquet. Dans la couche
- * `components`, donc AVANT les utilitaires : `hidden`, `text-xl` ou
- * `leading-6` posés sur une icône doivent l'emporter sur son `display` et sa
- * taille par défaut, comme lorsque filled.css était importé avant app.css.
+ * Icônes Lucide (src/lib/components/Icone.svelte). Dans la couche
+ * `components`, donc AVANT les utilitaires : `hidden`, `sm:hidden`, `block`,
+ * `w-5`, `align-middle` posés sur une icône doivent l'emporter sur son
+ * affichage par défaut. La taille (1em) est portée par les attributs du
+ * <svg> ; le décalage vertical pose l'icône sur la ligne de base du texte
+ * voisin.
  */
 @layer components {
-  .material-icons {
-    font-family: 'Material Icons';
-    font-weight: normal;
-    font-style: normal;
-    font-size: 24px;
-    line-height: 1;
-    letter-spacing: normal;
-    text-transform: none;
+  .icone {
     display: inline-block;
-    white-space: nowrap;
-    word-wrap: normal;
-    direction: ltr;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    font-feature-settings: 'liga';
+    flex-shrink: 0;
+    vertical-align: -0.125em;
   }
 }
 
@@ -81,12 +75,224 @@
  */
 @layer base {
   html {
-    background-color: #f8f9fa;
+    background-color: #FAFAFA;
     color-scheme: light;
   }
   html.dark {
-    background-color: #0a1628;
+    background-color: #09090B;
     color-scheme: dark;
+  }
+}
+
+/*
+ * Le site est en noir et blanc (échelle zinc de Tailwind) ; le rouge est
+ * réservé aux erreurs. Ce qui suit retire les dernières couleurs que la page
+ * ne choisit pas elle-même.
+ *
+ * Mêmes sélecteurs et même poids que ceux de @tailwindcss/forms, écrits
+ * APRÈS lui (dans `@tailwind base`) : ils le remplacent, et tout utilitaire
+ * d'une page (`focus:border-…`, `bg-…`, `text-…`) l'emporte encore sur eux.
+ * Le mode sombre passe par `:where(.dark)`, qui ne pèse rien : une règle
+ * `.dark …` aurait battu un `focus:border-red-600` d'erreur, faute de
+ * variante `dark:`.
+ */
+@layer base {
+  /*
+   * Champs. Le module dessine le focus en bleu (bordure et anneau) et la
+   * bordure au repos en gris bleuté. Au repos : zinc-500, 4,8:1 sur blanc,
+   * 3,7:1 sur une carte zinc-900 et 4,1:1 sur zinc-950, au-dessus des 3:1
+   * qu'une limite de champ doit atteindre. Au focus : la recette des pages
+   * (zinc-950, zinc-200 en sombre). En sombre, le module laissait un champ
+   * BLANC : un champ sans classe de fond y affichait un texte clair (hérité)
+   * sur blanc, invisible. Fond zinc-950 en sombre, comme la recette des
+   * pages : un cran SOUS la carte zinc-900 qui porte le champ, qui s'y
+   * creuse au lieu de s'y fondre.
+   */
+  input:where([type='text'], :not([type]), [type='email'], [type='url'], [type='password'], [type='number'], [type='date'], [type='datetime-local'], [type='month'], [type='search'], [type='tel'], [type='time'], [type='week']),
+  textarea,
+  select {
+    border-color: theme('colors.zinc.500');
+  }
+  :where(.dark) input:where([type='text'], :not([type]), [type='email'], [type='url'], [type='password'], [type='number'], [type='date'], [type='datetime-local'], [type='month'], [type='search'], [type='tel'], [type='time'], [type='week']),
+  :where(.dark) textarea,
+  :where(.dark) select {
+    background-color: theme('colors.zinc.950');
+  }
+  input:where([type='text'], :not([type]), [type='email'], [type='url'], [type='password'], [type='number'], [type='date'], [type='datetime-local'], [type='month'], [type='search'], [type='tel'], [type='time'], [type='week']):focus,
+  textarea:focus,
+  select:focus {
+    --tw-ring-color: theme('colors.zinc.950');
+    border-color: theme('colors.zinc.950');
+  }
+  :where(.dark) input:where([type='text'], :not([type]), [type='email'], [type='url'], [type='password'], [type='number'], [type='date'], [type='datetime-local'], [type='month'], [type='search'], [type='tel'], [type='time'], [type='week']):focus,
+  :where(.dark) textarea:focus,
+  :where(.dark) select:focus {
+    --tw-ring-color: theme('colors.zinc.200');
+    border-color: theme('colors.zinc.200');
+  }
+
+  /*
+   * Texte indicatif : gris bleuté dans le module. zinc-500 en clair (4,8:1),
+   * zinc-400 en sombre (zinc-500 n'y fait que 3,7:1 sur zinc-900). Les pages
+   * qui veulent plus discret posent `placeholder-…`, qui l'emporte.
+   */
+  input::placeholder,
+  textarea::placeholder {
+    color: theme('colors.zinc.500');
+  }
+  :where(.dark) input::placeholder,
+  :where(.dark) textarea::placeholder {
+    color: theme('colors.zinc.400');
+  }
+
+  /*
+   * Remplissage automatique (adresse, mot de passe enregistrés). Chrome et
+   * Edge peignent le champ rempli en bleu clair (bleu-gris en sombre) et
+   * imposent leur couleur de texte, avec `!important` dans LEUR feuille de
+   * style : aucune classe de la page ne peut reprendre ce fond. D'où :
+   *
+   * - une ombre intérieure de la couleur du champ, peinte PAR-DESSUS le fond.
+   *   `--fond-champ` vaut le fond de la recette des champs (blanc, zinc-950
+   *   en sombre) ; un champ d'un autre fond la redéfinit. Les anneaux et
+   *   ombres des pages (`--tw-ring-…`, `--tw-shadow`) sont recomposés
+   *   devant elle : sans eux, un champ prérempli perdait son anneau de focus.
+   *   `!important`, parce que tout utilitaire d'ombre de la page
+   *   (`focus:ring-1`, `dark:shadow-none`) pèse plus lourd que ce sélecteur
+   *   et remettait le bleu, au focus ou en sombre ;
+   * - une transition de fond retardée d'une semaine : tant qu'elle n'a pas
+   *   démarré, elle l'emporte même sur l'`!important` du navigateur, et le
+   *   fond reste celui du champ, transparent compris ;
+   * - `-webkit-text-fill-color`, qui passe devant la couleur de texte
+   *   imposée, et le curseur, aux couleurs du site.
+   *
+   * Survol, focus et appui sont nommés : un `hover:…` ou `focus:…` d'une page
+   * (deux classes) pèserait sinon plus lourd que les déclarations sans
+   * `!important` (texte, curseur, transition). Seule la forme normalisée
+   * `:autofill` est écrite ici :
+   * autoprefixer (postcss.config.js) en tire la règle `:-webkit-autofill`
+   * pour les navigateurs qui ne connaissent que celle-là, dans une règle à
+   * part (une pseudo-classe inconnue invaliderait toute la liste).
+   */
+  html {
+    --fond-champ: theme('colors.white');
+    --texte-champ: theme('colors.zinc.950');
+  }
+  html.dark {
+    --fond-champ: theme('colors.zinc.950');
+    --texte-champ: theme('colors.zinc.100');
+  }
+  input:autofill,
+  input:autofill:hover,
+  input:autofill:focus,
+  input:autofill:active,
+  textarea:autofill,
+  textarea:autofill:hover,
+  textarea:autofill:focus,
+  textarea:autofill:active,
+  select:autofill,
+  select:autofill:hover,
+  select:autofill:focus,
+  select:autofill:active {
+    -webkit-text-fill-color: var(--texte-champ);
+    caret-color: var(--texte-champ);
+    box-shadow:
+      var(--tw-ring-offset-shadow, 0 0 #0000),
+      var(--tw-ring-shadow, 0 0 #0000),
+      var(--tw-shadow, 0 0 #0000),
+      inset 0 0 0 1000px var(--fond-champ) !important;
+    transition: background-color 0s 604800s, color 0s 604800s;
+  }
+
+  /*
+   * Chevron des listes déroulantes, dessiné par le module en gris bleuté. Les
+   * listes multiples ou à plusieurs lignes n'en ont pas : la remise à zéro du
+   * module est répétée APRÈS, sinon le chevron leur reviendrait.
+   */
+  select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+  :where(.dark) select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+  select:where([multiple]),
+  select:where([size]:not([size='1'])) {
+    background-image: initial;
+  }
+
+  /*
+   * Cases à cocher et boutons radio : cochés, ils prennent `currentColor`, que
+   * le module fixe au bleu. zinc-900 en clair, coche blanche ; en sombre,
+   * la case cochée s'inverse (blanche) comme tout élément actif du site, donc
+   * sa coche et son point passent en zinc-950 : blancs, ils disparaîtraient.
+   */
+  input:where([type='checkbox']),
+  input:where([type='radio']) {
+    color: theme('colors.zinc.900');
+    border-color: theme('colors.zinc.500');
+  }
+  :where(.dark) input:where([type='checkbox']),
+  :where(.dark) input:where([type='radio']) {
+    color: theme('colors.white');
+    background-color: theme('colors.zinc.900');
+  }
+  input:where([type='checkbox']):focus,
+  input:where([type='radio']):focus {
+    --tw-ring-color: theme('colors.zinc.950');
+  }
+  :where(.dark) input:where([type='checkbox']):focus,
+  :where(.dark) input:where([type='radio']):focus {
+    --tw-ring-color: theme('colors.white');
+    --tw-ring-offset-color: theme('colors.zinc.950');
+  }
+  :where(.dark) input:where([type='checkbox']):checked {
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='%2309090b' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+  }
+  :where(.dark) input:where([type='radio']):checked {
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='%2309090b' xmlns='http://www.w3.org/2000/svg'%3e%3ccircle cx='8' cy='8' r='3'/%3e%3c/svg%3e");
+  }
+  :where(.dark) input:where([type='checkbox']):indeterminate {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16'%3e%3cpath stroke='%2309090b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h8'/%3e%3c/svg%3e");
+  }
+
+  /*
+   * Contrôles natifs que le module ne dessine pas (curseur, barre de
+   * progression, cases en mode de contraste forcé) : sans `accent-color`, ils
+   * restaient dans le bleu du système.
+   */
+  html {
+    accent-color: theme('colors.zinc.900');
+  }
+  html.dark {
+    accent-color: theme('colors.zinc.100');
+  }
+
+  /*
+   * Focus clavier : le contour par défaut du navigateur est bleu dans Firefox
+   * et Safari. Il devient zinc-950 (blanc en sombre), sur tout élément qui ne
+   * dessine pas le sien : un `focus:outline-none` ou un `focus-visible:ring-…`
+   * d'une page l'emporte. Jamais retiré : seule sa couleur change.
+   */
+  :focus-visible {
+    outline: 2px solid theme('colors.zinc.950');
+    outline-offset: 2px;
+  }
+  :where(.dark) :focus-visible {
+    outline-color: theme('colors.white');
+  }
+
+  /*
+   * Sélection de texte : le bleu du système, remplacé par un gris moyen avec
+   * un texte forcé en noir (blanc en sombre). Forcé, pour rester lisible dans
+   * un bloc inversé (bulle de message, badge) : sans lui, un texte blanc
+   * sélectionné sur zinc-300 ne se lirait plus.
+   */
+  ::selection {
+    background-color: theme('colors.zinc.300');
+    color: theme('colors.zinc.950');
+  }
+  :where(.dark) ::selection {
+    background-color: theme('colors.zinc.700');
+    color: theme('colors.white');
   }
 }
 
@@ -138,6 +344,6 @@
   }
   
   .glass-dark {
-    @apply bg-slate-900/80 backdrop-blur-lg border border-white/10 shadow-lg;
+    @apply bg-zinc-900/80 backdrop-blur-lg border border-white/10 shadow-lg;
   }
 }

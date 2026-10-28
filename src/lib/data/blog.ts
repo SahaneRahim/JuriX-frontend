@@ -1,3 +1,5 @@
+import { translations, type Language } from '$lib/stores/language';
+
 export interface BlogCitation {
   lawId: number;
   articleNumber?: string;
@@ -14,6 +16,12 @@ export interface BlogPost {
   formattedDate: string;
   readingTime: string;
   category: 'Immobilier' | 'Travail' | 'Numérique' | 'Affaires' | 'Famille';
+  /**
+   * Clé de traduction du badge de l'article à la une (`blog.badge.*`,
+   * src/lib/stores/language.ts), affichée par `$tr`. Un libellé français
+   * écrit ici (ou par les chargeurs de /blog) restait en français dans
+   * l'interface anglaise.
+   */
   badge: string;
   author: {
     name: string;
@@ -39,7 +47,7 @@ export const BLOG_POSTS: BlogPost[] = [
     formattedDate: '24 octobre 2026',
     readingTime: '4 min',
     category: 'Immobilier',
-    badge: 'Décryptage de la semaine',
+    badge: 'blog.badge.weekly',
     author: {
       name: 'Rédaction Juridique & IA',
       role: 'Veille réglementaire',
@@ -88,7 +96,7 @@ export const BLOG_POSTS: BlogPost[] = [
     formattedDate: '18 octobre 2026',
     readingTime: '5 min',
     category: 'Travail',
-    badge: 'Droit du travail',
+    badge: 'blog.badge.labour',
     author: {
       name: 'Rédaction Juridique & IA',
       role: 'Veille droit social',
@@ -137,7 +145,7 @@ export const BLOG_POSTS: BlogPost[] = [
     formattedDate: '10 octobre 2026',
     readingTime: '4 min',
     category: 'Numérique',
-    badge: 'Cybercriminalité',
+    badge: 'blog.badge.cybercrime',
     author: {
       name: 'Rédaction Juridique & IA',
       role: 'Technologies & Droit',
@@ -174,4 +182,53 @@ export const BLOG_POSTS: BlogPost[] = [
 
 export function getPostBySlug(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((p) => p.slug === slug);
+}
+
+/**
+ * Rubrique d'un article dans la langue de l'interface.
+ *
+ * POURQUOI. La rubrique vient de l'API, en français et en texte libre (le
+ * générateur d'articles en choisit une : « Immobilier & Logement », « Travail
+ * & Emploi »…). L'interface anglaise l'affichait telle quelle dans les filtres,
+ * les badges et le fil d'Ariane, seul « Tous » étant traduit.
+ *
+ * Les traductions sont des clés `blog.rubrique.<nom sans accents, en
+ * minuscules, mots joints par des tirets>` de src/lib/stores/language.ts (FR
+ * et EN). Une rubrique composée inconnue (« Famille & Emploi ») est traduite
+ * partie par partie ; s'il manque une partie, le nom revient tel quel : mieux
+ * vaut du français exact qu'un mélange des deux langues. En français, le nom
+ * de l'API est rendu sans changement.
+ */
+export function nomRubrique(nom: string | null | undefined, lang: Language): string {
+  const brut = (nom ?? '').trim();
+  if (!brut || lang === 'fr') return brut;
+  const table = translations[lang] as Record<string, string | undefined>;
+  const entier = table[cleRubrique(brut)];
+  if (entier) return entier;
+
+  // Parties aux indices pairs, séparateurs (« & », « , », « et ») aux indices
+  // impairs, grâce aux parenthèses capturantes du découpage.
+  const morceaux = brut.split(/(\s*&\s*|\s*,\s*|\s+et\s+)/);
+  const traduits: string[] = [];
+  for (let i = 0; i < morceaux.length; i++) {
+    if (i % 2 === 1) {
+      traduits.push(/\bet\b/.test(morceaux[i]) ? ' and ' : morceaux[i]);
+      continue;
+    }
+    const partie = table[cleRubrique(morceaux[i])];
+    if (!partie) return brut;
+    traduits.push(partie);
+  }
+  return traduits.join('');
+}
+
+/** Clé de traduction d'une rubrique : « Économie & Fiscalité » → `blog.rubrique.economie-fiscalite`. */
+export function cleRubrique(nom: string): string {
+  const mots = nom
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `blog.rubrique.${mots}`;
 }

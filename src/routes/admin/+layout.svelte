@@ -3,6 +3,7 @@
   import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/stores";
   import AdminSidebar from "$lib/components/admin/AdminSidebar.svelte";
+  import Icone from "$lib/components/Icone.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { authStore } from "$lib/stores/auth";
   import { tr } from "$lib/stores/language";
@@ -19,9 +20,9 @@
     "/admin": "admin.dashboard",
     "/admin/documents": "admin.documents",
     "/admin/documents/batch-upload": "admin.batchUpload",
+    "/admin/blog": "admin.blog",
     "/admin/users": "admin.users",
   };
-  // La clé seule sert aussi au titre de la barre du haut, sur téléphone.
   $: cleTitre = TITRES_ADMIN[$page.url.pathname] ?? "admin.administration";
   $: titreAdmin = `${$tr(cleTitre)} — Admin`;
 
@@ -65,15 +66,23 @@
   }
 
   /**
-   * Tiroir de navigation, sous lg.
+   * Tiroir de navigation, sous xl.
    *
    * La barre latérale fixe de 256 px laissait 104 px de contenu à 360 px de
-   * large, et tout débordait sur la droite. Sous lg, elle devient un tiroir
+   * large, et tout débordait sur la droite. Sous xl, elle devient un tiroir
    * ouvert depuis la barre du haut, avec le patron du menu mobile de
    * SiteHeader : fermé après chaque navigation et par Échap.
+   *
+   * xl et non lg : en colonne dès 1 024 px, elle ne laissait qu'environ
+   * 704 px au contenu, MOINS que la tablette en portrait (720 px, tiroir
+   * fermé). La tablette en paysage recevait donc la version la plus serrée de
+   * chaque page (adresses coupées en plein mot, titres tronqués, tableaux
+   * rognés). En tiroir jusqu'à xl, le contenu garde au moins 960 px de 1 024
+   * à 1 920 px, colonne ou non ; l'en-tête du site garde lui aussi son menu
+   * jusqu'à xl.
    */
   let menuOuvert = false;
-  /** Vrai à partir de lg, où la barre redevient la colonne fixe d'origine. */
+  /** Vrai à partir de xl, où la barre redevient la colonne fixe d'origine. */
   let large = false;
 
   afterNavigate(() => (menuOuvert = false));
@@ -85,10 +94,12 @@
   }
 
   onMount(() => {
-    const requete = window.matchMedia("(min-width: 1024px)");
+    // Le point de rupture xl de Tailwind (1 280 px), celui des classes xl: de
+    // la barre, du fond et de la barre du haut.
+    const requete = window.matchMedia("(min-width: 1280px)");
     const suivre = () => {
       large = requete.matches;
-      // Une tablette qu'on tourne passe à lg tiroir ouvert : il devient une
+      // Une fenêtre qu'on élargit passe à xl tiroir ouvert : il devient une
       // colonne fixe, et garderait sinon le piège à focus et le verrou du
       // défilement sans aucun moyen visible de les lever.
       if (large) menuOuvert = false;
@@ -140,15 +151,21 @@
 <MetaSeo titre={titreAdmin} indexable={false} />
 
 {#if checked}
-  <div class="min-h-app bg-slate-50 font-sans text-slate-900">
-    <!-- Barre du haut, sous lg seulement : la seule porte vers la navigation
-         une fois la barre latérale repliée. Elle garde le titre de la page en
-         vue pendant le défilement. -->
+  <div class="min-h-app bg-background-light font-sans text-zinc-950 dark:bg-background-dark dark:text-zinc-100">
+    <!-- Barre du haut, sous xl seulement : la seule porte vers la navigation
+         une fois la barre latérale repliée. Elle porte la marque, comme la
+         barre latérale qu'elle remplace, et non plus le titre de la page :
+         celui-ci se répétait 60 px plus bas dans le h1 (« Tableau de Bord »
+         deux fois), ou le contredisait (« Documents » au-dessus de « Gestion
+         des Documents »). La page courante reste marquée dans le tiroir.
+         Écran court (`court:`, téléphone en paysage) : 48 px et non 56, comme
+         l'en-tête de la barre latérale ; collante, elle prenait 16 % des 360 px
+         de hauteur. Les boutons gardent leurs 44 px. -->
     <header
       data-testid="admin-topbar"
-      class="sticky top-0 z-20 border-b border-slate-200 bg-white pt-zone-sure px-zone-sure lg:hidden"
+      class="sticky top-0 z-20 border-b border-zinc-200 bg-white pt-zone-sure px-zone-sure dark:border-zinc-800 dark:bg-zinc-900 xl:hidden"
     >
-      <div class="flex h-14 items-center gap-2 px-2">
+      <div class="flex h-14 items-center gap-2 px-2 court:h-12">
         <button
           type="button"
           on:click={() => (menuOuvert = true)}
@@ -156,13 +173,23 @@
           aria-expanded={menuOuvert}
           aria-controls="admin-sidebar"
           aria-label={$tr("a11y.menu")}
-          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100"
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
         >
-          <!-- Largeur fixe : avant la police d'icônes, le mot « menu » est
-               plus large que le pictogramme. -->
-          <span class="material-icons w-6 overflow-hidden" aria-hidden="true">menu</span>
+          <Icone nom="menu" class="text-2xl" />
         </button>
-        <span class="min-w-0 truncate text-base font-semibold text-slate-900">{$tr(cleTitre)}</span>
+        <!-- 44 px de haut au doigt ; la tuile et le nom de la barre latérale. -->
+        <a
+          href="/admin"
+          data-testid="admin-topbar-home"
+          class="flex min-h-11 min-w-0 items-center gap-2.5 rounded-xl pr-2 font-bold text-zinc-950 dark:text-white"
+        >
+          <span
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950 dark:shadow-none"
+          >
+            <Icone nom="scale" class="text-lg" />
+          </span>
+          <span class="truncate text-lg tracking-tight">JuriX Admin</span>
+        </a>
       </div>
     </header>
 
@@ -172,7 +199,7 @@
       role="presentation"
       aria-hidden="true"
       on:click={() => (menuOuvert = false)}
-      class="fixed inset-0 z-30 bg-slate-900/40 transition-opacity duration-200 motion-reduce:transition-none lg:hidden {menuOuvert
+      class="fixed inset-0 z-30 bg-zinc-950/40 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none xl:hidden {menuOuvert
         ? 'opacity-100'
         : 'pointer-events-none opacity-0'}"
     ></div>
@@ -187,7 +214,7 @@
          parcourue, ni au clavier ni au lecteur d'écran. Les marges latérales
          de zone sûre (encoche, en paysage) vivent ici, l'espacement du contenu
          dans le bloc suivant : les deux se seraient écrasés sur un même élément. -->
-    <main inert={menuOuvert} class="px-zone-sure lg:ml-64">
+    <main inert={menuOuvert} class="px-zone-sure xl:ml-64">
       <div class="p-4 sm:p-6 lg:p-8">
         <div class="mx-auto max-w-6xl">
           <slot />
@@ -197,7 +224,7 @@
   </div>
 {:else}
   <!-- Évite que l'interface d'administration apparaisse le temps de la redirection -->
-  <div class="flex min-h-app items-center justify-center bg-slate-50">
-    <p class="text-sm text-slate-500">{$tr("admin.checkingSession")}</p>
+  <div class="flex min-h-app items-center justify-center bg-background-light dark:bg-background-dark">
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">{$tr("admin.checkingSession")}</p>
   </div>
 {/if}

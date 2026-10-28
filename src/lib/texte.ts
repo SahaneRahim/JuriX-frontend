@@ -22,9 +22,13 @@
  * Le contrat est volontairement étroit : cinq formes, rien d'autre — titre,
  * puce, paragraphe, tableau, bloc de code. Chacune ne porte que du TEXTE : une
  * cellule de tableau est une chaîne, un bloc de code aussi, et l'affichage les
- * pose en nœuds de texte comme le reste. Pas de liens, pas de HTML en ligne :
- * élargir la grammaire à une forme qui porterait du balisage rouvrirait la
- * question de l'échappement.
+ * pose en nœuds de texte comme le reste. Pas de HTML en ligne : élargir la
+ * grammaire à une forme qui porterait du balisage rouvrirait la question de
+ * l'échappement.
+ *
+ * Les liens ne changent pas ce contrat : un bloc reste du texte, et
+ * `morceauxDuTexte` (en fin de fichier) y repère les adresses au moment de
+ * l'affichage, en texte et en adresses http(s) — jamais en balisage.
  *
  * Tableaux et code sont venus après coup, pour le téléphone : un tableau
  * markdown recollé en paragraphe donnait une suite de `|` et de `|---|---|`
@@ -372,4 +376,150 @@ export function blocsDeReponse(texte: string): Bloc[] {
   viderTableau();
   viderParagraphe();
   return blocs;
+}
+
+// ---------------------------------------------------------------------------
+// Liens
+// ---------------------------------------------------------------------------
+
+/** Un morceau du texte d'un bloc : du texte simple, ou un lien. */
+export interface Morceau {
+  /** Texte affiché, en nœud de texte ; pour un lien, son adresse abrégée. */
+  texte: string;
+  /** Adresse complète d'un lien, toujours en `http://` ou `https://`. */
+  lien?: string;
+}
+
+/**
+ * Une adresse, sous l'une des trois formes qu'écrit un modèle : lien markdown
+ * `[libellé](https://…)` (une paire de parenthèses permise dans l'adresse,
+ * comme chez Wikipédia), adresse entre chevrons `<https://…>`, ou adresse nue.
+ *
+ * Seuls `http://` et `https://` sont reconnus : `javascript:`, `data:` ou un
+ * chemin relatif restent du texte, quoi qu'écrive le modèle. C'est ce qui rend
+ * le lien sûr : Svelte échappe l'attribut, il ne juge pas le schéma.
+ */
+const ADRESSE =
+  /\[([^\]\n]*)\]\((https?:\/\/(?:[^\s()<>]|\([^\s()<>]*\))+)\)|<(https?:\/\/[^\s<>]+)>|(https?:\/\/[^\s<>"«»]+)/gi;
+
+/** Ponctuation qui suit une adresse dans une phrase, sans en faire partie. */
+const PONCTUATION_FINALE = /[.,;:!?…'"’”*]/;
+
+/**
+ * Au-delà, l'adresse affichée est abrégée. Environ une ligne de bulle sur un
+ * téléphone de 390 px : une adresse entière en prenait trois, coupée
+ * n'importe où.
+ */
+const LONGUEUR_MAX_ADRESSE = 40;
+
+/**
+ * Retire d'une adresse nue la ponctuation de la phrase qui la suit : le point
+ * final, la virgule, la parenthèse qui fermait « (voir https://…) ». Une
+ * parenthèse fermante qui a son ouvrante dans l'adresse en fait partie.
+ */
+function sansPonctuationFinale(adresse: string): string {
+  const compter = (fin: number, caractere: string) => {
+    let n = 0;
+    for (let i = 0; i < fin; i += 1) if (adresse[i] === caractere) n += 1;
+    return n;
+  };
+  let fin = adresse.length;
+  while (fin > 0) {
+    const dernier = adresse[fin - 1];
+    if (
+      PONCTUATION_FINALE.test(dernier) ||
+      (dernier === ')' && compter(fin, '(') < compter(fin, ')')) ||
+      (dernier === ']' && compter(fin, '[') < compter(fin, ']'))
+    ) {
+      fin -= 1;
+    } else {
+      break;
+    }
+  }
+  return adresse.slice(0, fin);
+}
+
+/** L'adresse lue, ou `null` si elle n'en est pas une (sans hôte, mal formée). */
+function lireAdresse(adresse: string): URL | null {
+  try {
+    const url = new URL(adresse);
+    return url.hostname ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * L'adresse telle qu'on l'affiche : l'hôte sans `https://` ni `www.`, puis le
+ * dernier segment du chemin (le nom du fichier, le plus parlant), ceux du
+ * milieu réduits à « … ». L'hôte reste entier : c'est lui qui dit où mène le
+ * lien. Le lien, lui, garde l'adresse complète.
+ */
+function abregerAdresse(url: URL): string {
+  const hote = url.host.replace(/^www\./i, '');
+  const segments = url.pathname.split('/').filter(Boolean);
+  if (segments.length === 0) return hote;
+
+  let dernier = segments[segments.length - 1];
+  try {
+    dernier = decodeURIComponent(dernier);
+  } catch {
+    // Séquence %… mal formée : le segment s'affiche tel qu'il est écrit.
+  }
+  // En points de code : couper entre les deux moitiés d'un caractère hors du
+  // plan de base laisserait un caractère invalide.
+  const chemin = Array.from(`/${segments.length > 1 ? '…/' : ''}${dernier}`);
+  const place = LONGUEUR_MAX_ADRESSE - hote.length;
+  if (place < 4) return `${hote}/…`;
+  return hote + (chemin.length > place ? `${chemin.slice(0, place - 1).join('')}…` : chemin.join(''));
+}
+
+/**
+ * Découpe le texte d'un bloc en texte simple et en liens.
+ *
+ * POURQUOI. Les adresses restaient du texte brut : de longues chaînes
+ * illisibles, et qu'on ne pouvait pas suivre (« Le texte intégral :
+ * https://…/decret_2018_9387_cab_pm_…pdf »). Elles sont reconnues ici, dans
+ * le texte d'un bloc déjà débarrassé de son emphase : `blocsDeReponse` et son
+ * contrat ne changent pas, et l'explication d'article de `/laws/[id]`, qui
+ * n'appelle pas cette fonction, affiche toujours le texte.
+ *
+ * Un lien markdown `[libellé](adresse)` devient « libellé (adresse) », et non
+ * le seul libellé cliquable : écrit par un modèle nourri de documents
+ * ingérés, un libellé peut annoncer un site et mener à un autre. L'adresse
+ * affichée montre toujours l'hôte réel.
+ */
+export function morceauxDuTexte(texte: string): Morceau[] {
+  // Presque aucun bloc ne contient d'adresse : un seul test, et rien d'autre.
+  if (!/https?:\/\//i.test(texte)) return [{ texte }];
+
+  const morceaux: Morceau[] = [];
+  const ajouterTexte = (t: string) => {
+    if (!t) return;
+    const precedent = morceaux[morceaux.length - 1];
+    if (precedent && precedent.lien === undefined) precedent.texte += t;
+    else morceaux.push({ texte: t });
+  };
+
+  let curseur = 0;
+  for (const trouve of texte.matchAll(ADRESSE)) {
+    const [entier, libelle, entreParentheses, entreChevrons, nue] = trouve;
+    const debut = trouve.index ?? 0;
+    // Une adresse nue s'arrête avant la ponctuation qui la suit : celle-ci
+    // revient au texte d'après.
+    const adresse = entreParentheses ?? entreChevrons ?? sansPonctuationFinale(nue);
+    const url = lireAdresse(adresse);
+    // Pas une adresse : le passage reste dans le texte, repris au prochain lien.
+    if (!url) continue;
+
+    ajouterTexte(texte.slice(curseur, debut));
+    const intitule = entreParentheses === undefined ? '' : libelle.trim();
+    const avecIntitule = intitule !== '' && !/^https?:\/\//i.test(intitule);
+    if (avecIntitule) ajouterTexte(`${intitule} (`);
+    morceaux.push({ texte: abregerAdresse(url), lien: adresse });
+    if (avecIntitule) ajouterTexte(')');
+    curseur = nue === undefined ? debut + entier.length : debut + adresse.length;
+  }
+  ajouterTexte(texte.slice(curseur));
+  return morceaux;
 }

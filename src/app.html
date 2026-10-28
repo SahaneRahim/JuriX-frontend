@@ -17,9 +17,11 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <!-- Couleur de la barre du navigateur mobile ; le script ci-dessous et
-         src/lib/stores/theme.ts la passent au fond sombre en mode sombre. -->
-    <meta name="theme-color" content="#f8f9fa" />
+    <!-- Couleur de la barre du navigateur mobile, celle du fond de la page
+         (background-light, #FAFAFA) ; le script ci-dessous et
+         src/lib/stores/theme.ts la passent au fond sombre (#09090B) en mode
+         sombre. Les trois valeurs doivent rester identiques. -->
+    <meta name="theme-color" content="#FAFAFA" />
     <!--
       Theme pose AVANT le premier affichage : les pages arrivent rendues par le
       serveur, qui ne connait pas le choix (localStorage). Sans ce script, un
@@ -33,7 +35,7 @@
         var r = document.documentElement;
         r.classList.add(d ? 'dark' : 'light');
         r.setAttribute('data-theme', d ? 'dark' : 'light');
-        if (d) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0a1628');
+        if (d) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#09090B');
       } catch (e) {}
     </script>
     %sveltekit.head%

@@ -1,30 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background: Royal Blue Rounded Square -->
-  <rect x="0" y="0" width="512" height="512" rx="110" fill="#2563EB"/>
-  
-  <!-- Icon: Scales of Justice (White) -->
-  <g fill="none" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Center Post -->
+  <!--
+    La balance du logo, en noir et blanc comme le site : la tuile du logo de
+    l'en-tete (bg-zinc-950, trait blanc). Navigateur en theme sombre : tuile
+    inversee (blanche, trait noir), comme le logo du site en mode sombre ; une
+    tuile noire se serait fondue dans une barre d'onglets sombre.
+  -->
+  <style>
+    .fond { fill: #09090B; }
+    .trait { stroke: #FFFFFF; }
+    .plein { fill: #FFFFFF; }
+    @media (prefers-color-scheme: dark) {
+      .fond { fill: #FAFAFA; }
+      .trait { stroke: #09090B; }
+      .plein { fill: #09090B; }
+    }
+  </style>
+
+  <!-- Fond : carre arrondi -->
+  <rect class="fond" x="0" y="0" width="512" height="512" rx="110"/>
+
+  <!-- Balance de la justice -->
+  <g class="trait" fill="none" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Fut central et socle -->
     <line x1="256" y1="100" x2="256" y2="400" />
-    <line x1="200" y1="400" x2="312" y2="400" /> <!-- Base -->
+    <line x1="200" y1="400" x2="312" y2="400" />
 
-    <!-- Top Beam -->
+    <!-- Fleau -->
     <line x1="128" y1="140" x2="384" y2="140" />
-    
-    <!-- Pivot Top -->
-    <circle cx="256" cy="140" r="12" fill="white" stroke="none"/>
 
-    <!-- Left Pan -->
+    <!-- Pivot -->
+    <circle class="plein" cx="256" cy="140" r="12" stroke="none"/>
+
+    <!-- Plateau gauche -->
     <path d="M128 140 L100 240" stroke-width="16"/>
     <path d="M128 140 L156 240" stroke-width="16"/>
-    <path d="M100 240 A 40 20 0 0 0 156 240 Z" fill="white" stroke="none" opacity="0.2"/> <!-- Subtle fill -->
-    <path d="M88 240 A 40 40 0 0 0 168 240" stroke-width="20" fill="none"/> <!-- Pan Bowl -->
+    <path class="plein" d="M100 240 A 40 20 0 0 0 156 240 Z" stroke="none" opacity="0.2"/>
+    <path d="M88 240 A 40 40 0 0 0 168 240" stroke-width="20" fill="none"/>
     <line x1="88" y1="240" x2="168" y2="240" stroke-width="16"/>
 
-    <!-- Right Pan -->
+    <!-- Plateau droit -->
     <path d="M384 140 L356 240" stroke-width="16"/>
     <path d="M384 140 L412 240" stroke-width="16"/>
-    <path d="M344 240 A 40 40 0 0 0 424 240" stroke-width="20" fill="none"/> <!-- Pan Bowl -->
+    <path d="M344 240 A 40 40 0 0 0 424 240" stroke-width="20" fill="none"/>
     <line x1="344" y1="240" x2="424" y2="240" stroke-width="16"/>
   </g>
 </svg>

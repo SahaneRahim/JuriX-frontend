@@ -2,6 +2,7 @@
   import { browser } from "$app/environment";
   import { page } from "$app/stores";
   import ChatFab from "$lib/components/ChatFab.svelte";
+  import Icone from "$lib/components/Icone.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { language, tr } from "$lib/stores/language";
@@ -131,7 +132,7 @@
   {#if isChat}
     <a
       href="#contenu"
-      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:font-semibold focus:text-white lg:hidden"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-zinc-950 focus:px-4 focus:py-2 focus:font-semibold focus:text-white dark:focus:bg-white dark:focus:text-zinc-950 lg:hidden"
       >{$tr("a11y.skipToContent")}</a
     >
   {/if}
@@ -153,27 +154,41 @@
     Marges latérales : 16 px puis 24 px à partir de md, et au moins la zone
     sûre d'un iPhone en paysage. Sur /chat, aucune sous sm : la conversation
     prend toute la largeur du téléphone.
+
+    Marge haute : 32 px à partir de sm, plus celle du hero ci-dessous. Elle
+    passait à 80 px à partir de md (`md:pt-20`) : avec le hero, 190 px de
+    vide sous l'en-tête, et la barre de recherche sortait du premier écran
+    en 1 024 × 768.
   -->
   <main
     id="contenu"
     class="relative flex w-full flex-col overflow-x-hidden overflow-x-clip {isChat
       ? 'min-h-0 flex-1 sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] lg:px-6 lg:pt-6'
-      : 'flex-grow items-center justify-start pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 sm:pt-8 md:pl-[max(1.5rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))] md:pt-20 court:!pt-2'}"
+      : 'flex-grow items-center justify-start pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 sm:pt-8 md:pl-[max(1.5rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))] court:!pt-2'}"
   >
-    <!-- Background Gradient -->
+    <!-- Background Subtle Glow (Noir & Blanc) -->
     <div
-      class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] bg-gradient-to-b from-blue-50/50 via-white to-transparent dark:from-slate-800/20 dark:via-background-dark dark:to-background-dark -z-10 pointer-events-none"
+      class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[450px] bg-gradient-to-b from-zinc-200/40 via-transparent to-transparent dark:from-zinc-800/20 dark:via-transparent dark:to-transparent -z-10 pointer-events-none"
     ></div>
 
     <!-- Hero persistant (accueil) et contenu de la page. Marges du hero
          réduites sur téléphone : la barre de recherche commençait vers 780 px
          du haut, sous la ligne de flottaison de tous les téléphones.
+         À partir de md, la marge haute suit la HAUTEUR de l'écran (5vh, 48 px
+         au plus) : 112 px fixes repoussaient la barre de recherche sous la
+         ligne de flottaison des portables (1 024 × 768, 1 366 × 650), et la
+         grille des catégories hors du premier écran en 1 440 × 900.
          `court:!…` (téléphone en paysage) : Tailwind émet la variante
-         `court` AVANT sm/md/lg, dont les valeurs l'emporteraient sinon. -->
+         `court` AVANT sm/md/lg, dont les valeurs l'emporteraient sinon.
+         Marge basse : 32 px, puis 48 à partir de sm, celle du blog et de
+         l'article (`py-8 sm:py-12`) et de /about. L'accueil ajoutait la
+         sienne (`pb-20 sm:pb-28`) à celle-ci (`md:pb-12`) : 161 px de vide
+         entre la dernière rangée de catégories et le pied de page, contre
+         48 sur le blog ; la grille semblait finir sur un trou. -->
     <div
       class="relative flex w-full flex-col {isChat
         ? 'min-h-0 flex-1'
-        : 'items-center px-0 pt-6 pb-6 sm:px-4 sm:pt-12 md:pt-32 md:pb-12 court:!pt-4'}"
+        : 'items-center px-0 pt-6 pb-8 sm:px-4 sm:pt-10 sm:pb-12 md:pt-[min(3rem,5vh)] court:!pt-4'}"
     >
       {#if !isChat}
         <!--
@@ -191,34 +206,49 @@
               in:fade={{ duration: duree(200), delay: duree(100) }}
               out:fade={{ duration: duree(150) }}
             >
-              <!-- Badge -->
+              <!-- Badge Minimaliste. Sans `tracking-wide` : à 12 px,
+                   l'interlettrage arrondi au pixel ouvrait des trous au milieu
+                   des mots (« Camer ounaise », « A I »). Retiré sur écran court
+                   (téléphone en paysage), comme le sous-titre : avec eux, le
+                   hero remplissait les 360 px de haut et la barre de recherche
+                   commençait sous la ligne de flottaison. -->
               <div
-                class="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-xs sm:text-sm font-semibold mb-5 md:mb-8 court:!mb-3 backdrop-blur-sm"
+                class="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md text-zinc-900 dark:text-zinc-100 text-xs font-medium mb-6 md:mb-8 shadow-sm dark:shadow-none court:hidden"
               >
-                <span class="w-2 h-2 rounded-full bg-primary motion-safe:animate-pulse"
-                ></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-zinc-950 dark:bg-white motion-safe:animate-pulse"></span>
                 {$tr("hero.badge")}
               </div>
 
               <!-- Title. 36 px sur téléphone : à 48 px, le titre tenait sur
-                   quatre lignes à 360 px de large. Le mot en dégradé a sa
+                   quatre lignes à 360 px de large. Le mot mis en retrait a sa
                    propre clé : il était retranché du titre par
                    `.replace("IA", "")`, sans effet sur « Your AI Legal
                    Assistant », et l'anglais affichait le titre entier suivi
-                   d'un « IA » français. -->
+                   d'un « IA » français. Retrait en zinc-500 et non 400 : même
+                   en grand texte, le zinc-400 n'atteint pas 3:1 sur le fond
+                   clair. Sur écran court, le retour à la ligne est retiré :
+                   le mot reste sur la ligne du titre, une ligne de gagnée.
+                   Interligne de 1,08 posé AVEC chaque taille
+                   (`sm:text-5xl/[1.08]`) : `sm:text-5xl md:text-6xl
+                   lg:text-7xl` apportaient leur interligne de 1, écrit dans
+                   leur requête donc après `leading-[1.08]`, qui ne valait
+                   plus qu'au téléphone (5 px entre « Juridique » et « IA » à
+                   768 px). Sur écran court, 16 px sous le titre et sous les
+                   onglets (8 et 12 auparavant) : le jambage du « q »
+                   touchait presque la piste, et la barre de recherche reste
+                   dans le premier écran (fin vers 280 px sur 360). -->
               <h1
-                class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl court:!text-4xl font-extrabold text-center text-slate-900 dark:text-white leading-[1.1] mb-4 md:mb-6 court:!mb-2 max-w-4xl tracking-tight"
+                class="text-4xl/[1.08] sm:text-5xl/[1.08] md:text-6xl/[1.08] lg:text-7xl/[1.08] court:!text-4xl font-extrabold text-center text-zinc-950 dark:text-white mb-4 md:mb-6 court:!mb-4 max-w-4xl tracking-tight"
               >
-                {$tr("hero.title")}<br />
-                <span
-                  class="bg-gradient-to-r from-blue-500 to-blue-400 bg-clip-text text-transparent"
+                {$tr("hero.title")}<br class="court:hidden" />
+                <span class="text-zinc-500 dark:text-zinc-400 font-semibold"
                   >{$tr("hero.titleHighlight")}</span
                 >
               </h1>
 
-              <!-- Subtitle -->
+              <!-- Subtitle (retiré sur écran court, voir le badge) -->
               <p
-                class="text-center text-secondary-text-light dark:text-secondary-text-dark/70 text-base sm:text-lg md:text-xl court:!text-base max-w-2xl mb-6 md:mb-12 court:!mb-4 leading-relaxed"
+                class="text-center text-zinc-600 dark:text-zinc-400 text-base sm:text-lg md:text-xl max-w-2xl mb-8 md:mb-10 leading-relaxed font-normal court:hidden"
               >
                 {$tr("hero.subtitle")}
               </p>
@@ -227,14 +257,16 @@
         </div>
 
         <!-- Search Tabs. Pleine largeur (320 px au plus) sur téléphone : avec
-             deux onglets de 140 px minimum, la bascule débordait à 320 px. -->
+             deux onglets de 140 px minimum, la bascule débordait à 320 px.
+             Onglet au repos en zinc-600 : sur la piste zinc-100, le zinc-500
+             n'atteint que 4,4:1. -->
         <div
-          class="relative grid w-full max-w-xs grid-cols-2 bg-white border border-gray-100 dark:bg-white/5 p-1 rounded-xl dark:backdrop-blur-md dark:border-white/10 mb-6 md:mb-8 court:!mb-4 shadow-sm dark:shadow-none sm:inline-grid sm:w-auto sm:max-w-none"
+          class="relative grid w-full max-w-xs grid-cols-2 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-full border border-zinc-200 dark:border-zinc-800 mb-8 md:mb-10 court:!mb-4 shadow-sm dark:shadow-none sm:inline-grid sm:w-auto sm:max-w-none"
           use:surveillerHero
         >
           <!-- Sliding Background -->
           <div
-            class="sliding-pill-tabs absolute top-1 bottom-1 rounded-lg bg-blue-50 dark:bg-blue-500/20 shadow-sm"
+            class="sliding-pill-tabs absolute top-1 bottom-1 rounded-full bg-white dark:bg-zinc-800 shadow-sm dark:shadow-none border border-zinc-200/80 dark:border-zinc-700/80"
             class:left-1={$page.url.pathname === "/"}
             class:right-1={$page.url.pathname === "/chat"}
             style="width: calc(50% - 4px);"
@@ -242,22 +274,22 @@
 
           <a
             href="/"
-            class="relative z-10 flex min-h-11 min-w-0 items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-300 sm:min-w-[140px] sm:px-6 {$page
+            class="relative z-10 flex min-h-11 min-w-0 items-center justify-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-colors duration-200 sm:min-w-[140px] {$page
               .url.pathname === '/'
-              ? 'text-blue-600 dark:text-blue-100'
-              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}"
+              ? 'text-zinc-950 dark:text-white'
+              : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}"
           >
-            <span class="material-icons text-sm" aria-hidden="true">search</span>
+            <Icone nom="search" class="text-base" />
             {$tr("mode.search")}
           </a>
           <a
             href="/chat"
-            class="relative z-10 flex min-h-11 min-w-0 items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-300 sm:min-w-[140px] sm:px-6 {$page
+            class="relative z-10 flex min-h-11 min-w-0 items-center justify-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-colors duration-200 sm:min-w-[140px] {$page
               .url.pathname === '/chat'
-              ? 'text-blue-600 dark:text-blue-100'
-              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}"
+              ? 'text-zinc-950 dark:text-white'
+              : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}"
           >
-            <span class="material-icons text-sm" aria-hidden="true">auto_awesome</span>
+            <Icone nom="sparkles" class="text-base" />
             {$tr("mode.chat")}
           </a>
         </div>
