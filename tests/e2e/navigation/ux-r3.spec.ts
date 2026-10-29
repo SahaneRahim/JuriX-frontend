@@ -370,7 +370,7 @@ test.describe('Aucune clé de traduction à l’écran (listes, recherche, accue
         expect({ resultats, rien: await clesAffichees(page) }).toEqual({ resultats: [], rien: [] });
       });
 
-      test('chat : l’accueil avec les chiffres du corpus (nouvelle API)', async ({ page }) => {
+      test('chat : l’accueil, avec GET /corpus (nouvelle API)', async ({ page }) => {
         await intercepterLApi(page, (methode, chemin) => {
           if (chemin === '/corpus') return { json: CORPUS };
           if (chemin === '/rag/conversations') return { json: [] };
@@ -380,8 +380,12 @@ test.describe('Aucune clé de traduction à l’écran (listes, recherche, accue
         await page.goto('/chat');
         await attendreLaLangue(page, langue);
         await expect(page.getByTestId('chat-suggestion').first()).toBeVisible();
-        // Le périmètre chiffré : le premier message cite le nombre de textes.
-        await expect(page.getByRole('log')).toContainText(/2[\s\u202f\u00a0,]?275/);
+        // La bienvenue ouvre le fil (elle a remplacé le périmètre chiffré le
+        // 29/10) ; GET /corpus sert encore au deuxième message.
+        await expect(page.getByRole('log')).toContainText(langue === 'fr' ? 'je suis JuriX' : "I'm JuriX");
+        await expect(page.getByRole('log')).toContainText(
+          langue === 'fr' ? 'Chaque réponse cite ses articles' : 'Each answer cites its articles',
+        );
         expect(await clesAffichees(page)).toEqual([]);
       });
     });

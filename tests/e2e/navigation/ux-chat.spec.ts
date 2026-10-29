@@ -160,20 +160,15 @@ async function poser(page: Page, effet = page.getByTestId('chat-citation')) {
 }
 
 test.describe('P4 : l’accueil et l’avertissement', () => {
-  test('nouvelle API : trois messages, le périmètre chiffré et daté, trois questions', async ({ page }) => {
+  test('nouvelle API : trois messages, la bienvenue d’abord, trois questions', async ({ page }) => {
     await simuler(page, { corpus: true });
     await page.goto('/chat');
 
     const fil = page.getByRole('log');
-    // La date est celle du dernier texte AJOUTÉ à JuriX (`dernier_ajout_le`),
-    // dite comme telle : « à jour au » affirmait un corpus complet à cette
-    // date, ce que la donnée ne prouve pas (contrat de l'API §0.4 ; clé
-    // `chat.welcome.scopeLastAdded`, corrections du chat r3 du 29/10).
-    await expect(fil).toContainText(
-      'Je réponds à partir de 2 275 textes officiels camerounais, OHADA et CIMA (dernier texte ajouté à JuriX le 14 octobre 2026).',
-    );
-    await expect(fil).not.toContainText('à jour au');
-    await expect(fil).toContainText('Je ne connais ni la jurisprudence ni votre dossier.');
+    // La bienvenue remplace la phrase du périmètre (« Je réponds à partir de
+    // 2 275 textes… »), à la demande du propriétaire (29/10).
+    await expect(fil).toContainText('Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question ?');
+    await expect(fil).not.toContainText('Je réponds à partir');
     await expect(fil).toContainText('Chaque réponse cite ses articles : touchez-les pour lire le texte officiel.');
     await expect(fil).toContainText('N’écrivez ni nom ni numéro de téléphone.');
     await expect(page.getByTestId('chat-suggestion')).toHaveCount(3);
@@ -182,12 +177,13 @@ test.describe('P4 : l’accueil et l’avertissement', () => {
     );
   });
 
-  test('ancienne API (GET /corpus en 404) : aucun chiffre ni date inventés', async ({ page }) => {
+  test('ancienne API (GET /corpus en 404) : la même bienvenue, aucun chiffre ni date inventés', async ({ page }) => {
     await simuler(page, { corpus: false });
     await page.goto('/chat');
 
     const fil = page.getByRole('log');
-    await expect(fil).toContainText('Je réponds à partir des textes officiels publiés dans JuriX.');
+    await expect(fil).toContainText('Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question ?');
+    await expect(fil).toContainText('Chaque réponse indique ses sources');
     await expect(fil).not.toContainText('2 275');
     await expect(fil).not.toContainText('à jour au');
   });

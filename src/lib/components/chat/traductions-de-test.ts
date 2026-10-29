@@ -10,13 +10,7 @@
 
 export const TEXTES_DE_TEST: Record<string, string> = {
   'common.close': 'Fermer',
-  // Remplace « chat.welcome.scope » (« …, à jour au {date}. ») : la date est
-  // celle du dernier texte ajouté, qui ne prouve pas un corpus à jour.
-  'chat.welcome.scopeLastAdded':
-    'Je réponds à partir de {n} {sources} (dernier texte ajouté à JuriX le {date}). Je ne connais ni la jurisprudence ni votre dossier.',
-  'chat.welcome.scopeNoDate': 'Je réponds à partir de {n} {sources}. Je ne connais ni la jurisprudence ni votre dossier.',
-  'chat.welcome.scopeGeneric':
-    'Je réponds à partir des textes officiels publiés dans JuriX. Je ne connais ni la jurisprudence ni votre dossier.',
+  'chat.welcome.greeting': 'Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question ?',
   'chat.welcome.verify': 'Chaque réponse cite ses articles : touchez-les pour lire le texte officiel.',
   'chat.welcome.verifyGeneric': 'Chaque réponse indique ses sources : ouvrez-les pour lire le texte officiel.',
   'chat.welcome.privacy': 'N’écrivez ni nom ni numéro de téléphone.',

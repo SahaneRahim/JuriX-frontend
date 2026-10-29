@@ -959,10 +959,7 @@ export const translations = {
     // Chat (P3, P4, P5). Accueil en trois messages, ligne permanente sous le
     // champ, état de la réponse en texte, bouton « Arrêter », citations
     // cliquables et leur aperçu, question du profil posée dans le fil.
-    'chat.welcome.scopeLastAdded':
-      'Je réponds à partir de {n} {sources} (dernier texte ajouté à JuriX le {date}). Je ne connais ni la jurisprudence ni votre dossier.',
-    'chat.welcome.scopeNoDate': 'Je réponds à partir de {n} {sources}. Je ne connais ni la jurisprudence ni votre dossier.',
-    'chat.welcome.scopeGeneric': 'Je réponds à partir des textes officiels publiés dans JuriX. Je ne connais ni la jurisprudence ni votre dossier.',
+    'chat.welcome.greeting': 'Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question ?',
     'chat.welcome.verify': 'Chaque réponse cite ses articles : touchez-les pour lire le texte officiel.',
     'chat.welcome.verifyGeneric': 'Chaque réponse indique ses sources : ouvrez-les pour lire le texte officiel.',
     'chat.welcome.privacy': 'N’écrivez ni nom ni numéro de téléphone.',
@@ -1893,10 +1890,7 @@ export const translations = {
     'loi.ia.avertissement': 'AI-generated answer. Check it against the article text above.',
 
     // Chat (P3, P4, P5).
-    'chat.welcome.scopeLastAdded':
-      'I answer from {n} {sources} (last text added to JuriX on {date}). I know neither case law nor your own case.',
-    'chat.welcome.scopeNoDate': 'I answer from {n} {sources}. I know neither case law nor your own case.',
-    'chat.welcome.scopeGeneric': 'I answer from the official texts published in JuriX. I know neither case law nor your own case.',
+    'chat.welcome.greeting': "Hello, I'm JuriX, your legal assistant. I'm here to help. What is your question?",
     'chat.welcome.verify': 'Each answer cites its articles: tap them to read the official text.',
     'chat.welcome.verifyGeneric': 'Each answer lists its sources: open them to read the official text.',
     'chat.welcome.privacy': 'Do not write any name or phone number.',

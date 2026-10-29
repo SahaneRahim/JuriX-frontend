@@ -70,7 +70,6 @@
     annonceDeFin,
     libelleDeLaCitation,
     libelleDeLEtape,
-    phraseDuPerimetre,
   } from "$lib/components/chat/libelles";
 
   /** Une source de l'ancienne liste « Sources » (`sources` du dernier événement). */
@@ -182,10 +181,10 @@
   let controleur: AbortController | null = null;
 
   /**
-   * Chiffres du corpus (`GET /corpus`) pour le premier message de l'accueil.
-   * Déjà lus si l'on revient sur /chat pendant la visite ; au serveur et à la
-   * première visite, `null` jusqu'à leur arrivée : un texte générique, sans
-   * nombre ni date, en attendant (ou pour de bon, sur l'ancienne API).
+   * Chiffres du corpus (`GET /corpus`) : leur présence dit que l'API sait
+   * ouvrir un article cité (deuxième message de l'accueil). Déjà lus si l'on
+   * revient sur /chat pendant la visite ; au serveur et à la première visite,
+   * `null` jusqu'à leur arrivée (ou pour de bon, sur l'ancienne API).
    */
   let chiffres: ChiffresDuCorpus | null = chiffresDejaLus();
 
@@ -214,17 +213,23 @@
     conversationDuChatEnCours.set(conversationEnCours && questionEnAttente === null);
   }
   /**
-   * L'accueil en trois messages (P4, maquette chat-accueil-p4a) : le
-   * périmètre (textes, date, ni jurisprudence ni dossier), la vérification par
-   * les articles cités, les données personnelles ; puis trois questions
-   * validées. DÉRIVÉ du profil, de la langue et des chiffres du corpus.
+   * L'accueil en trois messages (P4, maquette chat-accueil-p4a) : la
+   * bienvenue, la vérification par les articles cités, les données
+   * personnelles ; puis trois questions validées. DÉRIVÉ du profil, de la
+   * langue et des chiffres du corpus.
+   *
+   * La bienvenue (« Bonjour, je suis JuriX… Quelle est votre question ? »)
+   * remplace, à la demande du propriétaire (29/10), la phrase du périmètre
+   * (« Je réponds à partir de 2 275 textes… ni la jurisprudence ni votre
+   * dossier ») : jugée froide en premier mot. La limite reste dite sous le
+   * champ (« Information juridique générale, pas un avis sur votre cas »).
    *
    * Le deuxième message promet des articles qu'on touche pour lire le texte :
    * vrai sur la nouvelle API seulement, dont `GET /corpus` est le témoin. Sur
    * l'ancienne, il parle des sources, qui sont des liens.
    *
-   * Hors de la première visite (`accueilEntier` faux), le seul premier
-   * message, qui porte alors les trois questions.
+   * Hors de la première visite (`accueilEntier` faux), la seule bienvenue,
+   * qui porte alors les trois questions.
    */
   $: questionsDeLAccueil = [...suggestionsDeLAccueil(personaAffiche, $language.current)];
   $: bienvenue = (
@@ -233,7 +238,7 @@
           {
             id: 0,
             type: "assistant",
-            content: phraseDuPerimetre(chiffres, $language.current, t),
+            content: t("chat.welcome.greeting"),
             timestamp: "",
           },
           {
@@ -256,7 +261,7 @@
           {
             id: 0,
             type: "assistant",
-            content: phraseDuPerimetre(chiffres, $language.current, t),
+            content: t("chat.welcome.greeting"),
             suggestions: questionsDeLAccueil,
             timestamp: "",
           },

@@ -14,7 +14,7 @@
  * base intègre déjà des modifications, ce qui est le cas de deux textes.
  */
 
-import { DATE_ABSENTE, formatDate, formatDateCourte } from '$lib/format';
+import { formatDate, formatDateCourte } from '$lib/format';
 import { nomCourtDuTexte, typographieDesNumeros } from '$lib/sources';
 
 // Réexportée : les écrans du chat la prennent ici, avec les autres libellés.
@@ -22,7 +22,6 @@ export { typographieDesNumeros };
 import type { Language } from '$lib/stores/language';
 import type {
   ArticleApercu,
-  ChiffresDuCorpus,
   CitationsDeLaReponse,
   EtatProuve,
   ProgressionDuChat,
@@ -427,38 +426,4 @@ export function annonceDeFin(listes: CitationsDeLaReponse | null | undefined, t:
     annonce += ` ${t(perdues === 1 ? 'chat.announce.unfoundOne' : 'chat.announce.unfound').replace('{n}', String(perdues))}`;
   }
   return annonce;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Accueil : le périmètre                                                      */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Le premier message de l'accueil (P4) : « Je réponds à partir de 2 275 textes
- * officiels camerounais, OHADA et CIMA (dernier texte ajouté à JuriX le
- * 14 octobre 2026). Je ne connais ni la jurisprudence ni votre dossier. »
- *
- * Nombre, périmètre et date viennent de `GET /corpus`. La date est
- * `dernier_ajout_le` : le jour où le dernier texte est entré dans JuriX, une
- * date technique (contrat §1.1 et §2). La phrase le dit tel quel. Elle
- * disait « à jour au 14 octobre 2026 », ce qui affirmait que tout texte paru
- * jusque-là était dans JuriX : la donnée ne le prouve pas (contrat §0.4 : ne
- * rien affirmer que les données ne prouvent pas), et la page d'un texte a
- * remplacé pour la même raison « Mis à jour le » par « Ajouté à JuriX le »
- * (P1). Sans ces chiffres (ancienne API, panne), un texte générique SANS
- * nombre ni date : un chiffre écrit en dur vieillirait en silence.
- */
-export function phraseDuPerimetre(chiffres: ChiffresDuCorpus | null, langue: Language, t: Traduire): string {
-  const sources = chiffres?.libelle_sources?.[langue];
-  if (!chiffres || !Number.isInteger(chiffres.textes) || chiffres.textes < 1 || typeof sources !== 'string' || !sources) {
-    return t('chat.welcome.scopeGeneric');
-  }
-  const nombre = new Intl.NumberFormat(langue === 'fr' ? 'fr-FR' : 'en-US').format(chiffres.textes);
-  const date = chiffres.dernier_ajout_le ? formatDate(chiffres.dernier_ajout_le, langue) : null;
-  // « le 1er octobre » et non « le 1 octobre » (sans effet sur l'anglais).
-  const modele =
-    date && date !== DATE_ABSENTE
-      ? t('chat.welcome.scopeLastAdded').replace('{date}', joursSansZero(date))
-      : t('chat.welcome.scopeNoDate');
-  return modele.replace('{n}', nombre).replace('{sources}', sources);
 }

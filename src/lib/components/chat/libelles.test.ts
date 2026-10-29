@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ArticleApercu, Changement, ChiffresDuCorpus, StatutProuve, TexteLie } from '$lib/types';
+import type { ArticleApercu, Changement, StatutProuve, TexteLie } from '$lib/types';
 import {
   annonceDeFin,
   designationDuTexte,
@@ -13,7 +13,6 @@ import {
   lignesDuStatutDeLArticle,
   mentionDuStatut,
   nomRaccourci,
-  phraseDuPerimetre,
   ponctuationFrancaise,
   typographieDesNumeros,
 } from './libelles';
@@ -49,11 +48,6 @@ const FR: Record<string, string> = {
   'chat.announce.doneCitedOne': 'Réponse terminée, 1 article cité.',
   'chat.announce.unfound': '{n} citations non retrouvées.',
   'chat.announce.unfoundOne': '1 citation non retrouvée.',
-  'chat.welcome.scopeLastAdded':
-    'Je réponds à partir de {n} {sources} (dernier texte ajouté à JuriX le {date}). Je ne connais ni la jurisprudence ni votre dossier.',
-  'chat.welcome.scopeNoDate': 'Je réponds à partir de {n} {sources}. Je ne connais ni la jurisprudence ni votre dossier.',
-  'chat.welcome.scopeGeneric':
-    'Je réponds à partir des textes officiels publiés dans JuriX. Je ne connais ni la jurisprudence ni votre dossier.',
 };
 const t = (cle: string) => FR[cle] ?? cle;
 
@@ -392,31 +386,6 @@ describe('annonceDeFin', () => {
     const deux = [{}, {}] as never[];
     expect(annonceDeFin({ articles_cites: deux, citations_introuvables: [{}] as never[] }, t)).toBe(
       'Réponse terminée, 2 articles cités. 1 citation non retrouvée.',
-    );
-  });
-});
-
-describe('phraseDuPerimetre', () => {
-  const CHIFFRES = {
-    textes: 2275,
-    dernier_ajout_le: '2026-10-14',
-    libelle_sources: { fr: 'textes officiels camerounais, OHADA et CIMA', en: 'official texts of Cameroon, OHADA and CIMA' },
-  } as ChiffresDuCorpus;
-
-  it('chiffres, périmètre, et la date telle qu’elle est : celle du dernier texte ajouté', () => {
-    expect(phraseDuPerimetre(CHIFFRES, 'fr', t)).toBe(
-      'Je réponds à partir de 2\u202F275 textes officiels camerounais, OHADA et CIMA (dernier texte ajouté à JuriX le 14 octobre 2026). Je ne connais ni la jurisprudence ni votre dossier.',
-    );
-    // Jamais « à jour au » : la date d'un ajout ne prouve pas un corpus complet.
-    expect(phraseDuPerimetre(CHIFFRES, 'fr', t)).not.toContain('à jour');
-    expect(phraseDuPerimetre({ ...CHIFFRES, dernier_ajout_le: '2026-10-01' }, 'fr', t)).toContain('le 1er octobre 2026');
-  });
-
-  it('sans date, sans la date ; sans chiffres, le texte générique', () => {
-    expect(phraseDuPerimetre({ ...CHIFFRES, dernier_ajout_le: null }, 'fr', t)).not.toContain('ajouté');
-    expect(phraseDuPerimetre(null, 'fr', t)).toBe(FR['chat.welcome.scopeGeneric']);
-    expect(phraseDuPerimetre({ ...CHIFFRES, libelle_sources: {} } as unknown as ChiffresDuCorpus, 'en', t)).toBe(
-      FR['chat.welcome.scopeGeneric'],
     );
   });
 });

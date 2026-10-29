@@ -249,12 +249,12 @@ afterEach(() => {
 });
 
 describe('accueil en trois messages (P4)', () => {
-  it('ancienne API : périmètre générique, sans chiffre ni date ; trois questions ; avertissement sous le champ', async () => {
+  it('ancienne API : la bienvenue, sans chiffre ni date ; trois questions ; avertissement sous le champ', async () => {
     const ecran = render(Page);
     await waitFor(() => expect(simule.chiffres).toHaveBeenCalled());
 
     const texte = fil().textContent ?? '';
-    expect(texte).toContain('Je réponds à partir des textes officiels publiés dans JuriX.');
+    expect(texte).toContain('Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question ?');
     expect(texte).toContain('Chaque réponse indique ses sources');
     expect(texte).toContain('N’écrivez ni nom ni numéro de téléphone.');
     expect(texte).not.toMatch(/\d{4}/);
@@ -266,7 +266,7 @@ describe('accueil en trois messages (P4)', () => {
     expect(document.querySelector('.animate-pulse, [class*="animate-pulse"]')).toBeNull();
   });
 
-  it('nouvelle API : le nombre de textes, leur périmètre et la date de GET /corpus', async () => {
+  it('nouvelle API : la même bienvenue, sans chiffre ni date, et les articles qu’on touche (GET /corpus)', async () => {
     simule.chiffres.mockResolvedValue({
       textes: 2275,
       articles: 27157,
@@ -279,21 +279,22 @@ describe('accueil en trois messages (P4)', () => {
     render(Page);
 
     await waitFor(() =>
-      expect(fil().textContent).toContain(
-        'Je réponds à partir de 2\u202F275 textes officiels camerounais, OHADA et CIMA (dernier texte ajouté à JuriX le 14 octobre 2026).',
-      ),
+      expect(fil().textContent).toContain('Chaque réponse cite ses articles : touchez-les pour lire le texte officiel.'),
     );
-    expect(fil().textContent).toContain('Chaque réponse cite ses articles : touchez-les pour lire le texte officiel.');
+    // La bienvenue remplace la phrase du périmètre (demande du propriétaire,
+    // 29/10) : ni le nombre de textes ni la date n'y figurent plus.
+    expect(fil().textContent).toContain('Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question ?');
+    expect(fil().textContent).not.toMatch(/2\u202F?275|14 octobre 2026|Je réponds à partir/);
   });
 });
 
 describe('l’accueil entier à la première visite seulement (P4, variante A)', () => {
-  it('un habitué (une question déjà posée) : le périmètre et les trois questions, sans les deux autres messages', async () => {
+  it('un habitué (une question déjà posée) : la bienvenue et les trois questions, sans les deux autres messages', async () => {
     localStorage.setItem('jurix-chat-accueil-vu', '1');
     const ecran = render(Page);
 
     await waitFor(() => expect(fil().textContent).not.toContain('N’écrivez ni nom ni numéro de téléphone.'));
-    expect(fil().textContent).toContain('Je réponds à partir des textes officiels publiés dans JuriX.');
+    expect(fil().textContent).toContain('Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question ?');
     expect(fil().textContent).not.toContain('Chaque réponse indique ses sources');
     expect(ecran.getAllByTestId('chat-suggestion')).toHaveLength(3);
     // L'avertissement sous le champ, lui, reste.
