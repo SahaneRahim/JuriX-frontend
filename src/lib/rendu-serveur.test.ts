@@ -15,7 +15,15 @@ import { describe, expect, it, vi } from 'vitest';
  */
 vi.mock('$app/environment', () => ({ browser: false, building: false, dev: false, version: 'test' }));
 
-const modules = import.meta.glob(['./**/*.ts', '!./**/*.test.ts', '!./**/*.spec.ts', '!./**/*.d.ts']);
+// Les modules réservés aux tests (`*-de-test.ts`) ne sont importés par aucun
+// code de l'application : le serveur ne les charge jamais.
+const modules = import.meta.glob([
+  './**/*.ts',
+  '!./**/*.test.ts',
+  '!./**/*.spec.ts',
+  '!./**/*.d.ts',
+  '!./**/*-de-test.ts',
+]);
 
 const GLOBALES_DU_NAVIGATEUR = ['window', 'localStorage', 'sessionStorage'] as const;
 

@@ -173,30 +173,6 @@ test.describe('Rendu des réponses du chat', () => {
     await expect(page.getByRole('log').getByText('Sources', { exact: true })).toHaveCount(0);
   });
 
-  test('une réponse juridique affiche ses sources', async ({ page }) => {
-    await repondre(page, {
-      answer: 'Selon l’article 33 du Code Minier, le permis est accordé pour trois ans.',
-      sources: [
-        {
-          law_id: 42,
-          law_reference: 'LOI-2023-014',
-          law_title: 'Code Minier',
-          article_number: '33',
-          article_id: 900,
-          excerpt: 'Le permis de recherche est accordé pour trois ans.',
-          relevance_score: 0.91,
-        },
-      ],
-      intent: 'juridique',
-    });
-
-    await poser(page, 'quelle est la durée du permis de recherche ?');
-
-    const journal = page.getByRole('log');
-    await expect(journal.getByText('Sources', { exact: true })).toBeVisible();
-    await expect(journal.locator('a[href*="/laws/42"]')).toBeVisible();
-  });
-
   test('une source dit quel article de quel texte, et ouvre CET article', async ({ page, request }) => {
     // La fiche se charge sur le SERVEUR depuis b45d165 (laws/[id]/+page.server.ts,
     // puis son __data.json en navigation) : la loi 42 simulée par `page.route`

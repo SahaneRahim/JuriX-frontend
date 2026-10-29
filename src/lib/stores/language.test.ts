@@ -16,10 +16,6 @@ describe('language store', () => {
     language.set({ current: 'fr' });
   });
 
-  it('la langue par defaut est le francais', () => {
-    expect(get(language).current).toBe('fr');
-  });
-
   it('change la langue courante', () => {
     switchLanguage('en');
     expect(get(language).current).toBe('en');

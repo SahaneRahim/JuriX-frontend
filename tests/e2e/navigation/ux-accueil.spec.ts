@@ -6,12 +6,14 @@
  * CE QUE CE FICHIER GARDE.
  *  - P8 : sans JavaScript, la recherche de l'accueil part vers /search?q=…
  *    (vrai formulaire GET), et la loupe de l'en-tête est un lien vers
- *    /search ; avec JavaScript, la loupe ouvre toujours la palette.
+ *    /search ; avec JavaScript, la recherche part sans recharger, et une
+ *    recherche vide reste sur l'accueil. La loupe qui ouvre la palette, une
+ *    fois la page montée, se vérifie dans palette.spec.ts.
  *  - Q2 et Q3 : une seule liste de domaines, dans l'ordre provisoire, des
  *    lignes de 64 px au moins (72 sur ordinateur, deux colonnes), toute la
  *    ligne cliquable, le lien sur le nom décrit par ses textes phares, le
- *    contour de focus autour de la ligne, ni compteur ni pied « Consulter les
- *    textes ».
+ *    contour de focus autour de la ligne. Ni compteur ni pied « Consulter les
+ *    textes » : au rendu serveur, dans accueil.serveur.test.ts.
  *  - Q1 et Q5 : un titre de tâche en Literata, 36 puis 56 px, deux lignes au
  *    plus à 360 px, sans badge.
  *  - Restes r3 n° 3 et 42 : la navigation de l'en-tête suit le logo, et le
@@ -72,18 +74,10 @@ test.describe('Accueil sans JavaScript (P8)', () => {
   test.describe('téléphone', () => {
     test.use(TELEPHONE);
 
-    test('Entrée dans le champ envoie la recherche vers /search?q=', async ({ page }) => {
+    // Entrée dans le champ : ux-complements.spec.ts, jusqu'aux résultats.
+    test('le bouton « Rechercher » envoie le même formulaire', async ({ page }) => {
       // /search est rendue par le serveur : sa recherche est servie par la
       // doublure de l'API (playwright.config.ts), sans appel au modèle.
-      await enregistrerLaRecherche(page.request, ['bail commercial']);
-      await ouvrirAuServeur(page, '/');
-      const champ = champDeLAccueil(page);
-      await champ.fill('bail commercial');
-      await champ.press('Enter');
-      await expect(page).toHaveURL(/\/search\?q=bail\+commercial$/);
-    });
-
-    test('le bouton « Rechercher » envoie le même formulaire', async ({ page }) => {
       await enregistrerLaRecherche(page.request, ['code du travail']);
       await ouvrirAuServeur(page, '/');
       await champDeLAccueil(page).fill('code du travail');
@@ -120,16 +114,11 @@ test.describe('Accueil sans JavaScript (P8)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// P8 : avec JavaScript, la palette reste
+// P8 : avec JavaScript, la recherche part sans recharger
 // ---------------------------------------------------------------------------
 
 test.describe('Accueil avec JavaScript', () => {
   test.use(BUREAU);
-
-  test('la loupe de l’en-tête ouvre la palette une fois la page montée', async ({ page }) => {
-    await ouvrirAuServeur(page, '/');
-    await cliquerJusqualEffet(loupeEnBouton(page), page.getByRole('dialog', { name: 'Palette de commande' }));
-  });
 
   test('une recherche vide ne quitte pas l’accueil', async ({ page }) => {
     await ouvrirAuServeur(page, '/');
@@ -218,13 +207,6 @@ test.describe('Liste des domaines (Q2 A, Q3 A)', () => {
       );
       for (const { hauteur } of boites) expect(hauteur).toBeGreaterThanOrEqual(63.5);
       expect(new Set(boites.map((b) => Math.round(b.x))).size).toBe(1);
-    });
-
-    test('ni compteur ni pied « Consulter les textes »', async ({ page }) => {
-      await ouvrirAuServeur(page, '/');
-      await expect(page.getByText('Consulter les textes')).toHaveCount(0);
-      // « 1 277 textes » (fonction publique) se lisait comme une couverture.
-      await expect(listeDesDomaines(page)).not.toContainText(/\d[\d\s\u202f\u00a0]*\stextes?\b(?! officiels)/);
     });
   });
 

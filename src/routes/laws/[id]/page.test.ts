@@ -808,11 +808,11 @@ describe('un article que le découpage ne trouve pas (P2, r3)', () => {
     expect(ouverture().open).toBe(true);
   });
 
+  // Un cas suffit : toute valeur qui n'est pas un numéro arrive à la page sous
+  // la forme `null`, que numeroAAfficher rend pour chacune (« $& », « $' »,
+  // « DISPOSITIF »… : src/lib/article.test.ts).
   it.each([
     ['abrogé, voir wa.me/2376XXXXXXXX', 'abrog%C3%A9%2C%20voir%20wa.me%2F2376XXXXXXXX'],
-    ['$&', '%24%26'],
-    ["$'", "$'"],
-    ['DISPOSITIF', 'DISPOSITIF'],
   ])('ne recopie jamais une valeur qui n’est pas un numéro : %j', async (valeur, encodee) => {
     await monter({ law: NOUVELLE }, `/laws/1740?article=${encodee}`);
     expect(screen.getByTestId('law-full-text')).toBeTruthy();

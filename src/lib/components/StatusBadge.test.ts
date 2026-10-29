@@ -12,14 +12,9 @@ import { render } from '@testing-library/svelte';
 import StatusBadge from './StatusBadge.svelte';
 
 describe('StatusBadge', () => {
-  it('traduit le libelle au lieu de l’ecrire en dur', () => {
-    const { getByTestId } = render(StatusBadge, { status: 'published' });
+  it('couvre les six statuts reels du modele Law', () => {
     // Le libelle vient desormais du store de traductions : batch-upload
     // affichait l'enumeration anglaise brute alors que la cle existait.
-    expect(getByTestId('status-badge').textContent?.trim()).toBe('Publié');
-  });
-
-  it('couvre les six statuts reels du modele Law', () => {
     for (const [statut, attendu] of [
       ['draft', 'Brouillon'],
       ['pending', 'En attente'],

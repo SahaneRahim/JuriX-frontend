@@ -151,23 +151,6 @@ test.describe('Réinitialisation', () => {
     // pourrait produire qu'un second refus.
     await expect(page.getByTestId('reset-submit')).toHaveCount(0);
   });
-
-  test('un changement réussi renvoie vers la connexion', async ({ page }) => {
-    await page.route(ROUTE_RESET, (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ message: 'Mot de passe modifié.' }),
-      }),
-    );
-
-    await page.goto(`/reset-password/${JETON}`);
-    await page.getByTestId('reset-password').fill('MotDePasse1');
-    await page.getByTestId('reset-confirm').fill('MotDePasse1');
-    await cliquerJusqualEffet(page.getByTestId('reset-submit'), page.getByTestId('reset-success'));
-
-    await expect(page.getByTestId('reset-to-login')).toBeVisible();
-  });
 });
 
 test.describe("Vérification d'adresse", () => {

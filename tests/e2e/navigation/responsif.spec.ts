@@ -10,7 +10,9 @@
  * éléments plus larges que l'écran, et des hauteurs fixes (px, vh). Ce fichier
  * garde les deux.
  *
- * POUR CHAQUE PAGE ET CHAQUE TAILLE :
+ * POUR CHAQUE PAGE ET CHAQUE TAILLE (à 740×360 et 1024×768, /chat et
+ * /laws/[id] seulement : les autres pages y sont mesurées, à la même largeur,
+ * par les écrans courts de redimensionnement.spec.ts) :
  *  - rien ne dépasse à droite (`scrollWidth <= innerWidth + 1`). En échec, le
  *    message nomme les éléments fautifs et leur bord droit ;
  *  - une capture pleine page, test-results/responsif/<page>-<l>x<h>.png. Un
@@ -89,7 +91,19 @@ interface Taille {
    * l'agent annonce un Android.
    */
   telephone: boolean;
+  /** Les seules pages de PARCOURS mesurées à cette taille ; toutes, sans cette liste. */
+  pages?: readonly string[];
 }
+
+/**
+ * Les pages que ce fichier est seul à mesurer à 740×360 et 1024×768 : le chat
+ * vide, sa saisie et son bouton d'envoi dans l'écran, et une autre loi
+ * (`/laws/?limit=1`) que celle des écrans courts (`loiAvecArticles`). Les
+ * autres pages y passent par les écrans courts de redimensionnement.spec.ts
+ * (740×360 et 1024×600) : même contexte neuf, même largeur, même contrôle de
+ * `scrollWidth`, plus l'action principale et le défilement.
+ */
+const PAGES_SEULES_ICI = ['/chat', '/laws/[id]'];
 
 const TAILLES: Taille[] = [
   // Android courant : la plupart des visiteurs, au Cameroun, sont sur mobile.
@@ -97,13 +111,13 @@ const TAILLES: Taille[] = [
   // iPhone 12 à 14.
   { largeur: 390, hauteur: 844, telephone: true },
   // Le premier, tourné : 360 px de haut pour l'en-tête, le chat et la saisie.
-  { largeur: 740, hauteur: 360, telephone: true },
+  { largeur: 740, hauteur: 360, telephone: true, pages: PAGES_SEULES_ICI },
   // Tablette en portrait : sous `lg`, donc encore en mise en page mobile.
   { largeur: 768, hauteur: 1024, telephone: false },
   // Tablette en paysage, ou petit portable : pile sur `lg`, la plus étroite
   // des mises en page de bureau (conversations en colonne). L'en-tête y garde
   // son menu : il bascule à xl (1 280 px), voir SiteHeader.svelte.
-  { largeur: 1024, hauteur: 768, telephone: false },
+  { largeur: 1024, hauteur: 768, telephone: false, pages: PAGES_SEULES_ICI },
   { largeur: 1440, hauteur: 900, telephone: false },
 ];
 
@@ -483,7 +497,7 @@ for (const taille of TAILLES) {
       ...(taille.telephone ? { userAgent: AGENT_MOBILE } : {}),
     });
 
-    for (const parcours of PARCOURS) {
+    for (const parcours of PARCOURS.filter((p) => taille.pages?.includes(p.chemin) ?? true)) {
       test(`${parcours.chemin} : rien ne dépasse de l’écran`, async ({ page, request }) => {
         await parcours.ouvrir(page, request);
         await attendreLeRepos(page);

@@ -3,7 +3,7 @@
  *
  * POURQUOI CE FICHIER EXISTE. Le propriétaire veut un site qui suive tous les
  * écrans (téléphone, tablette, portable, bureau) ET la fenêtre qu'on
- * redimensionne. responsif.spec.ts charge chaque page à six tailles fixes :
+ * redimensionne. responsif.spec.ts charge chaque page à des tailles fixes :
  * il ne voit ni les largeurs entre deux (l'en-tête coupait « Créer un
  * compte » vers 1 024 px et la page glissait de côté), ni ce qui arrive à une
  * page déjà ouverte quand la fenêtre change (un tiroir resté ouvert, un
@@ -30,8 +30,10 @@
  * connecté, avec sa colonne des conversations.
  *
  * ÉCRANS COURTS : 740×360 et 844×390 (téléphones en paysage), 1024×600 et
- * 1280×600 : l'action principale de la page s'atteint (elle vient à l'écran
- * et rien ne la couvre), et le contenu défile.
+ * 1280×600 : la page ne glisse pas de côté, l'action principale de la page
+ * s'atteint (elle vient à l'écran et rien ne la couvre), et le contenu défile.
+ * À 740×360 et à 1 024 px de large, responsif.spec.ts ne mesure plus que
+ * /chat et /laws/[id] : pour les autres pages, ce contrôle-ci le remplace.
  *
  * ÉTATS QUI TRAVERSENT UN REDIMENSIONNEMENT : menu du site ouvert à 390 px
  * puis 1 280 ; menu des réglages et du compte (de lg à xl) ouvert à 1 100 px
@@ -76,9 +78,6 @@ const LARGEURS = [
 ];
 /** 900 px de haut jusqu'à 768 px de large (portables, tablettes), 800 en dessous. */
 const hauteurPour = (largeur: number) => (largeur >= 768 ? 900 : 800);
-
-/** Le point de rupture `lg` : en dessous, menus et tiroirs ; au-dessus, colonnes. */
-const LARGEUR_LG = 1024;
 
 /** Cible tactile minimale (WCAG 2.5.5, et le choix du site depuis l'audit mobile). */
 const CIBLE_MIN = 44;
@@ -1048,10 +1047,4 @@ test.describe('390x844 au doigt', () => {
       ).toEqual([]);
     });
   }
-});
-
-/** Contrôle : la largeur `lg` du site, pour qui lit ce fichier sans tailwind.config.js. */
-test('le balayage passe de part et d’autre de lg', () => {
-  expect(LARGEURS).toContain(LARGEUR_LG);
-  expect(LARGEURS).toContain(LARGEUR_LG - 1);
 });

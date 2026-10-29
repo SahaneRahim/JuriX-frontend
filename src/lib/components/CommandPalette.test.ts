@@ -351,7 +351,8 @@ describe('CommandPalette au clavier', () => {
  * Fermée, la palette rend le focus à l'élément qui l'avait ouverte. Il
  * tombait sur <body>, et la tabulation suivante repartait du bout du
  * document (la palette est le dernier élément du layout racine) au lieu de
- * reprendre à la loupe de l'en-tête.
+ * reprendre à la loupe de l'en-tête. Fermée par Échap, elle le rend à la
+ * loupe dans le vrai layout, page inerte comprise (src/routes/layout.test.ts).
  */
 describe('CommandPalette, focus rendu à la fermeture', () => {
   let loupe: HTMLButtonElement;
@@ -386,14 +387,6 @@ describe('CommandPalette, focus rendu à la fermeture', () => {
     await waitFor(() => expect(document.activeElement).toBe(champ));
     return { ...rendu, champ };
   }
-
-  it('Échap le rend à la loupe', async () => {
-    const { champ } = await ouvrirDepuisLaLoupe();
-    await fireEvent.keyDown(champ, { key: 'Escape' });
-    await tick();
-    expect(get(commandPaletteOpen)).toBe(false);
-    expect(document.activeElement).toBe(loupe);
-  });
 
   it('un clic sur le fond aussi', async () => {
     const { container } = await ouvrirDepuisLaLoupe();

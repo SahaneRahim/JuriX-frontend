@@ -510,7 +510,9 @@ describe('attente lisible et « Arrêter » (P4)', () => {
 /**
  * Un bouton activé au clavier garde le focus ; désactivé par l'envoi, il le
  * perdait, et la tabulation suivante repartait du haut de la page. Sous jsdom,
- * un clic sans `detail` est un clic au clavier.
+ * un clic sans `detail` est un clic au clavier. Quand la question attend son
+ * profil (P5), le focus passe au premier profil : voir « un profil venu d’un
+ * autre onglet… », dans « la question du profil, dans le fil (P5) ».
  */
 describe('le focus, quand l’envoi désactive le bouton qui l’avait', () => {
   it('à la fin de la réponse, « Envoyer » désactivé rend le focus au champ', async () => {
@@ -526,20 +528,6 @@ describe('le focus, quand l’envoi désactive le bouton qui l’avait', () => {
     await ecran.findByText('Voici la réponse.');
     await waitFor(() => expect(bouton.disabled).toBe(true));
     await waitFor(() => expect(document.activeElement).toBe(champ));
-  });
-
-  it('la question attend son profil (P5) : le focus passe au premier profil', async () => {
-    localStorage.removeItem('jurix-persona');
-    personaStore._reinitialiser();
-    const ecran = render(Page);
-    await fireEvent.input(ecran.getByRole('textbox'), { target: { value: 'Quels sont mes droits en garde à vue ?' } });
-    const bouton = ecran.getByTestId('chat-send');
-
-    bouton.focus();
-    await fireEvent.click(bouton);
-
-    await ecran.findByTestId('chat-profile-question');
-    await waitFor(() => expect(document.activeElement).toBe(ecran.getByTestId('chat-profile-citoyen')));
   });
 
   it('une suggestion, puis « Reposer la question » : le focus passe au champ', async () => {
@@ -842,17 +830,6 @@ describe('sous le tiroir des conversations (connecté, sous lg)', () => {
     expect(annonce()).toBe('');
   });
 
-  it('une erreur arrivée sous le tiroir y est dite aussi', async () => {
-    const { ecran, pilote } = await tiroirOuvertPendantUneReponse();
-
-    pilote.envoyer({ chunk: '', done: false, error: 'Service saturé', error_code: 'overloaded' });
-
-    const erreur = await ecran.findByTestId('chat-error');
-    const texte = erreur.querySelector('p')?.textContent?.trim() ?? '';
-    expect(texte).not.toBe('');
-    await waitFor(() => expect(annonceDuTiroir()).toBe(texte));
-  });
-
   it('refermé, il rend la parole à la page ; rouvert, il part d’une région vide', async () => {
     const { ecran, pilote } = await tiroirOuvertPendantUneReponse();
     pilote.envoyer({ chunk: 'Voici la réponse.', done: false });
@@ -887,6 +864,7 @@ describe('sous le tiroir des conversations (connecté, sous lg)', () => {
 
     const erreur = await ecran.findByTestId('chat-error');
     const texte = erreur.querySelector('p')?.textContent?.trim() ?? '';
+    expect(texte).not.toBe('');
     await waitFor(() => expect(annonceDuTiroir()).toBe(texte));
     expect(inerte(erreur)).toBe(true);
     expect(inerte(ecran.getByTestId('chat-drawer-announce'))).toBe(false);

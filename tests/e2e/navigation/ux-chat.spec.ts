@@ -1,7 +1,8 @@
 /**
  * Le chat de la refonte UX : P3 (citations vérifiables), P4 (accueil,
- * avertissement, attente lisible, « Arrêter »), P5 (« Qui êtes-vous ? » posé
- * dans le fil, plus jamais à l'arrivée).
+ * avertissement, attente lisible, « Arrêter »), P5 (la boîte du profil,
+ * ouverte à la demande). La question « Qui êtes-vous ? », posée dans le fil et
+ * plus jamais à l'arrivée, se vérifie dans persona.spec.ts.
  *
  * CE QUE CE FICHIER PROTÈGE.
  * - Une citation se lit dans la phrase même : un toucher ouvre l'article
@@ -12,8 +13,8 @@
  * - L'accueil dit le périmètre réel du corpus (GET /corpus) et rien de plus
  *   quand l'API ne le donne pas ; l'avertissement reste sous le champ.
  * - « Arrêter » coupe la requête ; l'attente est dite en texte.
- * - La boîte « Qui êtes-vous ? » ne s'ouvre plus d'elle-même ; le chat pose la
- *   question à la première question, dans le fil.
+ * - « Changer de profil » prévient qu'une conversation en cours sera
+ *   remplacée.
  * - Sur l'ancienne API (sans ces champs), le chat se comporte comme avant.
  *
  * Tout est simulé : aucun appel au modèle, aucun backend requis.
@@ -390,47 +391,9 @@ test.describe('ancienne API : rien ne change', () => {
   });
 });
 
-test.describe('P5 : « Qui êtes-vous ? » dans le fil, jamais à l’arrivée', () => {
+test.describe('P5 : la boîte du profil, ouverte à la demande', () => {
   // Navigateur vide : aucun profil choisi.
   test.use({ storageState: { cookies: [], origins: [] } });
-
-  for (const chemin of ['/', '/about', '/chat']) {
-    test(`aucune boîte à l’arrivée sur ${chemin}`, async ({ page }) => {
-      await simuler(page);
-      await page.goto(chemin);
-      await page.waitForLoadState('networkidle');
-
-      await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
-    });
-  }
-
-  test('la première question attend le profil, puis part avec lui', async ({ page }) => {
-    const questions = await simuler(page);
-    await page.goto('/chat');
-
-    await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-profile-question'));
-    expect(questions).toHaveLength(0);
-    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
-
-    await page.getByTestId('chat-profile-avocat').click();
-
-    await expect(page.getByTestId('chat-citation')).toBeVisible();
-    expect(questions).toHaveLength(1);
-    expect(questions[0].persona).toBe('avocat');
-    await expect(page.getByTestId('chat-profile-chosen')).toContainText('Avocat ou juriste');
-    expect(await page.evaluate(() => localStorage.getItem('jurix-persona'))).toBe('avocat');
-  });
-
-  test('« Continuer sans profil » : la question part sans profil', async ({ page }) => {
-    const questions = await simuler(page);
-    await page.goto('/chat');
-
-    await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-profile-skip'));
-    await page.getByTestId('chat-profile-skip').click();
-
-    await expect(page.getByTestId('chat-citation')).toBeVisible();
-    expect('persona' in questions[0]).toBe(false);
-  });
 
   test('« Changer de profil » prévient qu’une conversation en cours sera remplacée', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('jurix-persona', 'citoyen'));

@@ -172,7 +172,10 @@ describe('ce qui n’est pas une panne', () => {
     expect(espion).not.toHaveBeenCalled();
   });
 
-  it.each(['012', '1e3', 'abc', '99999999999'])('l’identifiant %s donne 404 sans appeler l’API', async (id) => {
+  // La valeur à laquelle l'API répondait 500. Les autres formes refusées
+  // (« 012 », « 1e3 », « abc »…) prennent la même branche : identifiantDepuis
+  // rend `null` pour chacune (src/lib/identifiant.test.ts).
+  it.each(['99999999999'])('l’identifiant %s donne 404 sans appeler l’API', async (id) => {
     const fetch = vi.fn<Appel>();
     await expect(chargerFiche({ fetch, params: { id } } as never)).rejects.toSatisfy((e) => isHttpError(e, 404));
     await expect(

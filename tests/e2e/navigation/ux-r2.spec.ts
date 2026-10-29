@@ -424,38 +424,38 @@ test.describe('P7 : l’état vide d’un onglet, sans JavaScript', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('P3 : une citation se lit dans la phrase', () => {
-  for (const reglage of [TELEPHONE, BUREAU]) {
-    test.describe(`${reglage.viewport.width} px`, () => {
-      test.use(reglage);
+  // Une seule taille : aucun style de citation ne dépend de la largeur
+  // (LigneCitee.svelte n'a aucune variante sm:, md: ni lg:).
+  test.describe(`${TELEPHONE.viewport.width} px`, () => {
+    test.use(TELEPHONE);
 
-      test('soulignée en zinc-400, § de 14 px, sans numéro ; l’introuvable en tirets', async ({ page }) => {
-        await simulerLeChatR2(page);
-        await page.goto('/chat');
-        await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-citation'));
+    test('soulignée en zinc-400, § de 14 px, sans numéro ; l’introuvable en tirets', async ({ page }) => {
+      await simulerLeChatR2(page);
+      await page.goto('/chat');
+      await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-citation'));
 
-        const citation = page.getByTestId('chat-citation');
-        const style = await citation.evaluate((a) => {
-          const s = getComputedStyle(a);
-          const icone = a.querySelector('svg')?.getBoundingClientRect();
-          return {
-            ligne: s.textDecorationLine,
-            couleur: s.textDecorationColor,
-            icone: icone ? { largeur: Math.round(icone.width), hauteur: Math.round(icone.height) } : null,
-          };
-        });
-        expect(style.ligne).toContain('underline');
-        expect(style.couleur).toBe('rgb(161, 161, 170)'); // zinc-400
-        expect(style.icone).toEqual({ largeur: 14, hauteur: 14 });
-        // Pas de numéro [1] : la citation est la phrase même.
-        await expect(page.getByRole('log')).not.toContainText(/\[\d+\]/);
-
-        const introuvable = page.getByTestId('chat-citation-introuvable');
-        await expect(introuvable).toHaveCSS('text-decoration-style', 'dashed');
-        // Jamais de rouge : l'introuvable n'est pas une erreur du site.
-        expect(await introuvable.evaluate((s) => getComputedStyle(s).textDecorationColor)).toBe('rgb(113, 113, 122)');
+      const citation = page.getByTestId('chat-citation');
+      const style = await citation.evaluate((a) => {
+        const s = getComputedStyle(a);
+        const icone = a.querySelector('svg')?.getBoundingClientRect();
+        return {
+          ligne: s.textDecorationLine,
+          couleur: s.textDecorationColor,
+          icone: icone ? { largeur: Math.round(icone.width), hauteur: Math.round(icone.height) } : null,
+        };
       });
+      expect(style.ligne).toContain('underline');
+      expect(style.couleur).toBe('rgb(161, 161, 170)'); // zinc-400
+      expect(style.icone).toEqual({ largeur: 14, hauteur: 14 });
+      // Pas de numéro [1] : la citation est la phrase même.
+      await expect(page.getByRole('log')).not.toContainText(/\[\d+\]/);
+
+      const introuvable = page.getByTestId('chat-citation-introuvable');
+      await expect(introuvable).toHaveCSS('text-decoration-style', 'dashed');
+      // Jamais de rouge : l'introuvable n'est pas une erreur du site.
+      expect(await introuvable.evaluate((s) => getComputedStyle(s).textDecorationColor)).toBe('rgb(113, 113, 122)');
     });
-  }
+  });
 });
 
 // ---------------------------------------------------------------------------

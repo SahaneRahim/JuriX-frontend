@@ -34,7 +34,8 @@
  *    les chiffres de GET /corpus ne l'étaient pas : trois clés manquaient à
  *    language.ts sans qu'aucune spec ne le voie (vérification r3 du 29/10 :
  *    « laws.searchForText », « listes.plageSurTotal »,
- *    « chat.welcome.scopeLastAdded »).
+ *    « chat.welcome.scopeLastAdded »). L'accueil du chat n'est lu ici qu'en
+ *    anglais : en français, ux-r2 et ux-chat le lisent déjà.
  *
  * DONNÉES. Les pages rendues par le serveur lisent la vraie API (sautées
  * quand elle est éteinte, échouées avec E2E_EXIGER_BACKEND=1) ; /search reçoit
@@ -370,24 +371,27 @@ test.describe('Aucune clé de traduction à l’écran (listes, recherche, accue
         expect({ resultats, rien: await clesAffichees(page) }).toEqual({ resultats: [], rien: [] });
       });
 
-      test('chat : l’accueil, avec GET /corpus (nouvelle API)', async ({ page }) => {
-        await intercepterLApi(page, (methode, chemin) => {
-          if (chemin === '/corpus') return { json: CORPUS };
-          if (chemin === '/rag/conversations') return { json: [] };
-          return undefined;
+      // En anglais seulement. En français, ux-r2.spec.ts lit le même accueil
+      // (« chat : la barre du profil, une réponse citée et ses aperçus »), et
+      // ux-chat.spec.ts son texte exact, avec GET /corpus.
+      if (langue === 'en') {
+        test('chat : l’accueil, avec GET /corpus (nouvelle API)', async ({ page }) => {
+          await intercepterLApi(page, (methode, chemin) => {
+            if (chemin === '/corpus') return { json: CORPUS };
+            if (chemin === '/rag/conversations') return { json: [] };
+            return undefined;
+          });
+          await poserLaLangue(page, langue);
+          await page.goto('/chat');
+          await attendreLaLangue(page, langue);
+          await expect(page.getByTestId('chat-suggestion').first()).toBeVisible();
+          // La bienvenue ouvre le fil (elle a remplacé le périmètre chiffré le
+          // 29/10) ; GET /corpus sert encore au deuxième message.
+          await expect(page.getByRole('log')).toContainText("I'm JuriX");
+          await expect(page.getByRole('log')).toContainText('Each answer cites its articles');
+          expect(await clesAffichees(page)).toEqual([]);
         });
-        await poserLaLangue(page, langue);
-        await page.goto('/chat');
-        await attendreLaLangue(page, langue);
-        await expect(page.getByTestId('chat-suggestion').first()).toBeVisible();
-        // La bienvenue ouvre le fil (elle a remplacé le périmètre chiffré le
-        // 29/10) ; GET /corpus sert encore au deuxième message.
-        await expect(page.getByRole('log')).toContainText(langue === 'fr' ? 'je suis JuriX' : "I'm JuriX");
-        await expect(page.getByRole('log')).toContainText(
-          langue === 'fr' ? 'Chaque réponse cite ses articles' : 'Each answer cites its articles',
-        );
-        expect(await clesAffichees(page)).toEqual([]);
-      });
+      }
     });
   }
 });

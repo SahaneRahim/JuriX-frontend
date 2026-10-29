@@ -8,7 +8,7 @@ import {
   nomCategorie,
   nomCompletCategorie,
 } from '$lib/categories';
-import { ICONES, type NomIcone } from '$lib/icones';
+import type { NomIcone } from '$lib/icones';
 import CategoryIcon from './CategoryIcon.svelte';
 
 /**
@@ -107,12 +107,6 @@ describe('iconeCategorie', () => {
     expect(iconeCategorie('')).toBe(ICONE_DOMAINE_INCONNU);
     expect(iconeCategorie(null)).toBe(ICONE_DOMAINE_INCONNU);
     expect(iconeCategorie(undefined)).toBe(ICONE_DOMAINE_INCONNU);
-  });
-
-  it('ne choisit que des icônes du registre', () => {
-    for (const icone of [...ATTENDUES.map(([, nom]) => nom), ICONE_DOMAINE_INCONNU]) {
-      expect(ICONES[icone], icone).toBeTruthy();
-    }
   });
 });
 

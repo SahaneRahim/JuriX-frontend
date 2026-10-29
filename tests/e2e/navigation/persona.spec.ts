@@ -248,20 +248,11 @@ test.describe('La question « Qui êtes-vous ? »', () => {
     return onglet;
   }
 
-  // P5 : plus de boîte à l'arrivée, nulle part, pages de compte et
-  // d'administration comprises (où elle n'était déjà jamais posée). Le chat
-  // lui-même ne demande rien tant qu'aucune question n'est posée.
-  for (const chemin of [
-    '/',
-    '/about',
-    '/chat',
-    '/login',
-    '/signup',
-    '/forgot-password',
-    '/reset-password/jeton-x',
-    '/verify-email/jeton-x',
-    '/admin',
-  ]) {
+  // P5 : plus de boîte à l'arrivée. Elle ne s'ouvre plus qu'au clic, sans
+  // choix par page : une ouverture qui reviendrait se verrait d'abord sur
+  // l'accueil. Le chat lui-même ne demande rien tant qu'aucune question n'est
+  // posée. /about : « à l’arrivée, rien ne couvre la page », plus bas.
+  for (const chemin of ['/', '/chat']) {
     test(`jamais posée à l’arrivée sur ${chemin}`, async ({ page }) => {
       await page.goto(chemin);
       await page.waitForLoadState('networkidle');

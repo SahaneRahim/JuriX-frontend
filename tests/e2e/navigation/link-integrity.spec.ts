@@ -366,13 +366,12 @@ test.describe('Contenu rendu par le serveur', () => {
  */
 test.describe('Sans backend', () => {
   // Refusées avant tout appel ($lib/identifiant) : l'API répondait 500 à un
-  // identifiant non numérique, là où la bonne réponse est 404.
+  // identifiant non numérique, là où la bonne réponse est 404. Les autres
+  // formes refusées (négatif, zéro initial, hors bornes) prennent la même
+  // branche : src/lib/identifiant.test.ts les vérifie une à une.
   for (const { chemin, quoi } of [
     { chemin: '/laws/abc', quoi: 'identifiant non numérique' },
     { chemin: '/categories/abc', quoi: 'identifiant non numérique' },
-    { chemin: '/laws/-1', quoi: 'identifiant négatif' },
-    { chemin: '/laws/012', quoi: 'zéro initial, un doublon de /laws/12' },
-    { chemin: '/laws/99999999999', quoi: 'au-delà d’un entier 32 bits' },
   ]) {
     test(`${chemin} répond 404 (${quoi})`, async ({ request }) => {
       const res = await request.get(chemin, { failOnStatusCode: false });

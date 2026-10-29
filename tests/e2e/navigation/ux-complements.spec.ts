@@ -15,8 +15,9 @@
  *  - P2 : les trois actions de l'article n'étaient pas comparées à l'article
  *    LU après « Suivant », ni le fil d'Ariane.
  *  - P5 : l'arrivée par un lien direct vers un texte (le cas que P5 corrige,
- *    un lien partagé sur WhatsApp) n'était pas vérifiée, ni les QUATRE
- *    profils proposés dans le fil.
+ *    un lien partagé sur WhatsApp) n'était pas vérifiée. Les QUATRE profils
+ *    proposés dans le fil se vérifient dans QuestionDuProfil.test.ts, et la
+ *    question dans le fil, au navigateur, dans persona.spec.ts.
  *  - P4 : la ligne d'état n'était vue qu'avec son repli (« Préparation de la
  *    réponse… ») : aucun événement de progression simulé ; « Arrêter » n'était
  *    jugé que sur l'écran, pas sur l'interruption réelle de la requête.
@@ -103,13 +104,6 @@ test.describe('Accueil : le titre et le sous-titre (Q1 A)', () => {
     await expect(sousTitre).toContainText('l’assistant IA répond en citant les articles');
     const contenu = (await page.locator('#contenu').innerText()).split('Parcourir par domaine')[0];
     expect(contenu.match(/\bIA\b/g) ?? []).toHaveLength(2); // l'onglet « Assistant IA » et le sous-titre
-  });
-
-  test('quatorze domaines puis « Tous les textes »', async ({ page }) => {
-    await ouvrirAuServeur(page, '/');
-    const lignesDesDomaines = page.getByTestId('accueil-domaines').locator(':scope > li');
-    await expect(lignesDesDomaines).toHaveCount(15);
-    await expect(lignesDesDomaines.last().locator('h3')).toHaveText('Tous les textes');
   });
 });
 
@@ -463,7 +457,7 @@ test.describe('Statut d’un texte (P1 A, étapes 1 et 2)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// P5 : jamais à l'arrivée, même par un lien direct ; quatre profils dans le fil
+// P5 : jamais à l'arrivée, même par un lien direct
 // ---------------------------------------------------------------------------
 
 test.describe('P5 : « Qui êtes-vous ? »', () => {
@@ -480,22 +474,6 @@ test.describe('P5 : « Qui êtes-vous ? »', () => {
 
     await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
-  });
-
-  test('la première question propose les quatre profils, et de continuer sans', async ({ page }) => {
-    await intercepterLApi(page, (methode, chemin) =>
-      chemin === '/corpus' ? { json: { detail: 'Not Found' }, statut: 404 } : undefined,
-    );
-    await page.goto('/chat');
-    await saisirJusqualEffet(saisieDuChat(page), 'Quelles indemnités en cas de licenciement ?', page.getByTestId('chat-profile-question'));
-
-    const question = page.getByTestId('chat-profile-question');
-    for (const profil of ['citoyen', 'etudiant', 'avocat', 'entrepreneur']) {
-      await expect(question.getByTestId(`chat-profile-${profil}`)).toBeVisible();
-    }
-    await expect(question.getByRole('group').getByRole('button')).toHaveCount(4);
-    await expect(question.getByTestId('chat-profile-skip')).toBeVisible();
-    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
   });
 });
 

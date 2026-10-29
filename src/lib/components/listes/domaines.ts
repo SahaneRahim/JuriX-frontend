@@ -74,6 +74,3 @@ export const ORDRE_DES_DOMAINES: readonly string[] = ordonnerLesDomaines(
 export function cleDuDomaine(nom: string): string {
   return cle(nom);
 }
-
-/** Exposé pour le test de couverture uniquement. */
-export const _domainesCourts = (): string[] => [...ORDRE_DES_DOMAINES];

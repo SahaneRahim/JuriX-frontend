@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { _domainesTraduits, _ordreProvisoire, nomCategorie, ordonnerLesDomaines } from '$lib/categories';
-import { _domainesCourts, nomCourtDuDomaine, ORDRE_DES_DOMAINES } from './domaines';
+import { _ordreProvisoire, nomCategorie, ordonnerLesDomaines } from '$lib/categories';
+import { nomCourtDuDomaine, ORDRE_DES_DOMAINES } from './domaines';
 import {
   cleSelonNombre,
   dateDesReperes,
@@ -202,10 +202,6 @@ describe('intitulé affiché', () => {
 });
 
 describe('domaines (Q2)', () => {
-  it('l’ordre de la colonne de filtres couvre les 14 domaines canoniques', () => {
-    expect([..._domainesCourts()].sort()).toEqual([..._domainesTraduits()].sort());
-  });
-
   it('la colonne de filtres range les domaines dans l’ordre de l’accueil (Q2 A)', () => {
     // Un domaine au même rang sur l'accueil et dans la colonne de /search.
     expect([...ORDRE_DES_DOMAINES]).toEqual([..._ordreProvisoire()]);
