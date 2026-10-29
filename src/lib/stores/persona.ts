@@ -1,6 +1,7 @@
 /**
- * Le profil (persona) de l'utilisateur : la question posée à l'entrée du site,
- * sa mémoire, et ce qui en découle pour le chat.
+ * Le profil (persona) de l'utilisateur : la question « Qui êtes-vous ? »,
+ * posée dans le chat à la première question (P5), sa mémoire, et ce qui en
+ * découle pour le chat.
  *
  * Module feuille : il n'importe que `svelte/store` et `$lib/chat-session`, si
  * bien que `auth.ts` peut l'importer sans cycle.
@@ -8,11 +9,11 @@
  * TROIS MÉMOIRES, TROIS PORTÉES.
  * - `jurix-persona` (localStorage) : le profil choisi, gardé d'une visite à
  *   l'autre.
- * - `jurix-persona-refus` (COOKIE DE SESSION, sans Max-Age) : « Ne pas
- *   répondre » vaut pour la visite. Un cookie, et non sessionStorage : ce
+ * - `jurix-persona-refus` (COOKIE DE SESSION, sans Max-Age) : « Continuer sans
+ *   profil » vaut pour la visite. Un cookie, et non sessionStorage : ce
  *   dernier est propre à chaque onglet, et la question revenait dans chaque
- *   nouvel onglet ouvert depuis la recherche. Le cookie reste sur le domaine
- *   du front : l'API est appelée sans `credentials`.
+ *   nouvel onglet. Le cookie reste sur le domaine du front : l'API est
+ *   appelée sans `credentials`.
  * - `jurix-persona-a-envoyer` (localStorage) : un changement que le compte n'a
  *   pas encore reçu (voir `$lib/persona-compte`).
  *
@@ -85,39 +86,6 @@ export function personaDeLaSessionMemorisee(): Persona | null {
   return brut === null ? 'citoyen' : normaliserPersona(brut);
 }
 
-/**
- * Pages où la question n'est jamais posée : administration, connexion,
- * inscription, et pages ouvertes depuis un lien de courriel.
- */
-export const ROUTES_SANS_QUESTION = [
-  '/admin',
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/reset-password',
-  '/verify-email',
-] as const;
-
-/** `routeId` est celui de SvelteKit (`/reset-password/[token]`, `/(main)/chat`…). */
-export function estRouteSansQuestion(routeId: string | null): boolean {
-  if (routeId === null) return true;
-  return ROUTES_SANS_QUESTION.some((r) => routeId === r || routeId.startsWith(`${r}/`));
-}
-
-/**
- * Robots d'indexation et d'aperçu. Le site est rendu côté navigateur : un robot
- * qui exécute le JavaScript, sans profil mémorisé, verrait la boîte de
- * dialogue sur chaque page profonde — un interstitiel intrusif pour les
- * moteurs. Le contenu reste le même pour tous : ce n'est pas du cloaking.
- * Jamais `navigator.webdriver` : Playwright l'active.
- */
-const MOTIF_ROBOT =
-  /googlebot|google-inspectiontool|googleother|bingbot|duckduckbot|yandex(bot)?|baiduspider|applebot|chrome-lighthouse|facebookexternalhit|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot/i;
-
-export function estUnRobot(userAgent: string | undefined | null): boolean {
-  return Boolean(userAgent && MOTIF_ROBOT.test(userAgent));
-}
-
 export interface EtatPersona {
   persona: Persona | null;
   refuseCetteSession: boolean;
@@ -125,20 +93,22 @@ export interface EtatPersona {
   choix: number;
 }
 
-/** La question est-elle à poser, ici et maintenant ? */
-export function questionAPoser(
-  etat: EtatPersona,
-  routeId: string | null,
-  enErreur: boolean,
-  userAgent: string | undefined | null,
-): boolean {
-  return (
-    etat.persona === null &&
-    !etat.refuseCetteSession &&
-    !enErreur &&
-    !estRouteSansQuestion(routeId) &&
-    !estUnRobot(userAgent)
-  );
+/**
+ * Le chat doit-il demander « Qui êtes-vous ? » avant d'envoyer la première
+ * question d'une conversation (P5, variante A) ? Oui si aucun profil n'est
+ * choisi ni refusé pour cette visite.
+ *
+ * LA QUESTION N'EST PLUS POSÉE À L'ARRIVÉE, sur aucune page. La boîte
+ * s'ouvrait après l'hydratation, d'autant plus tard que le réseau était lent :
+ * à l'arrivée par un lien partagé vers une loi, elle couvrait 678 px sur 800
+ * d'un téléphone, souvent quand la lecture avait commencé (capture du
+ * 28/10/2026). Le profil ne change que les réponses du chat : la question
+ * s'y pose, dans le fil, au moment où elle sert. La liste des pages
+ * épargnées et la détection des robots, qui ne servaient qu'à cette boîte,
+ * ont disparu avec elle.
+ */
+export function questionDuProfilAPoser(etat: EtatPersona): boolean {
+  return etat.persona === null && !etat.refuseCetteSession;
 }
 
 // ---------------------------------------------------------------- stockage
@@ -278,8 +248,9 @@ function creerPersonaStore() {
 
     /**
      * Déconnexion : le profil du navigateur est effacé (appareil partagé, une
-     * profession est une donnée personnelle). Le refus de session est posé,
-     * pour que la question ne s'ouvre pas à l'instant même.
+     * profession est une donnée personnelle). Le refus de session est posé :
+     * le chat ne redemande pas le profil pendant le reste de la visite, et
+     * répond en profil général.
      */
     oublier(): void {
       ecrirePersona(null);
@@ -299,8 +270,18 @@ function creerPersonaStore() {
 
 export const personaStore = creerPersonaStore();
 
-/** Ouverture de la boîte de dialogue en mode « changement » (en-tête, chat). */
+/**
+ * Ouverture de la boîte « Changer de profil » (en-tête, chat). C'est la seule
+ * façon de l'ouvrir : elle ne s'ouvre plus d'elle-même à l'arrivée (P5).
+ */
 export const choixPersonaOuvert = writable(false);
+
+/**
+ * Une conversation est affichée dans le chat (posée par la page du chat). La
+ * boîte « Changer de profil » prévient alors qu'un autre profil ouvre une
+ * nouvelle conversation (P4) : le changement l'effaçait sans le dire.
+ */
+export const conversationDuChatEnCours = writable(false);
 
 /**
  * Le profil que la boîte marque « Actuel ». Depuis le chat, c'est celui de la
@@ -310,7 +291,18 @@ export const choixPersonaOuvert = writable(false);
  */
 export const profilDuChoix = writable<Persona | null | undefined>(undefined);
 
+/**
+ * Ce que le chat annonce pendant que la boîte est ouverte (étapes, fin de
+ * réponse, arrêt, erreurs), dit par une région DANS la boîte. Ouverte, elle
+ * rend toute la page inerte (src/routes/+layout.svelte), région d'annonce du
+ * chat comprise : la fin d'une réponse arrivée pendant ce temps n'était
+ * jamais dite. Écrit par la page du chat seulement ; vide à chaque ouverture
+ * et à chaque fermeture.
+ */
+export const annonceDuChat = writable('');
+
 export function ouvrirChoixPersona(affiche?: Persona | null): void {
+  annonceDuChat.set('');
   profilDuChoix.set(affiche);
   choixPersonaOuvert.set(true);
 }
@@ -318,6 +310,7 @@ export function ouvrirChoixPersona(affiche?: Persona | null): void {
 export function fermerChoixPersona(): void {
   choixPersonaOuvert.set(false);
   profilDuChoix.set(undefined);
+  annonceDuChat.set('');
 }
 
 export function oublierPersona(): void {

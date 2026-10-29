@@ -27,8 +27,6 @@ export const load: PageLoad = async ({ params, fetch }) => {
         // Repli traduit dans l'interface anglaise, comme toute rubrique de
         // l'API (`nomRubrique` de $lib/data/blog, clé `blog.rubrique.affaires`).
         category: data.category || 'Affaires',
-        // Clé de traduction (`blog.badge.*`), comme dans blog/+page.ts.
-        badge: 'blog.badge.ai',
         author: {
           name: 'Rédaction Juridique & IA',
           role: 'Veille réglementaire'
@@ -47,7 +45,10 @@ export const load: PageLoad = async ({ params, fetch }) => {
           citizenImpact: data.botAnalysis?.citizenImpact || ''
         },
         suggestedChatQuestion: data.suggestedQuestion || '',
-        tags: data.tags || []
+        tags: data.tags || [],
+        // Écrit par le modèle (`POST /blog/generate`) : étiquette « Généré par
+        // IA » et titre en Inter (Q5). Aucun relecteur : l'API n'en connaît pas.
+        genereParIA: true
       };
       return { post };
     }

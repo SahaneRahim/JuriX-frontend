@@ -8,22 +8,17 @@
    * et sur `/login`.
    *
    * Il porte en revanche ce qui n'a de sens qu'au niveau du document : la
-   * langue, la question du profil, et la synchronisation du profil avec le
-   * compte.
+   * langue, la boîte « Changer de profil », et la synchronisation du profil
+   * avec le compte.
    */
   import { onMount, tick } from "svelte";
   import { afterNavigate } from "$app/navigation";
-  import { page } from "$app/stores";
   import ChoixPersona from "$lib/components/ChoixPersona.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import { synchroniserPersonaAuDemarrage } from "$lib/persona-compte";
+  import { commandPaletteOpen } from "$lib/stores/commandPalette";
   import { language } from "$lib/stores/language";
-  import {
-    choixPersonaOuvert,
-    fermerChoixPersona,
-    personaStore,
-    questionAPoser,
-  } from "$lib/stores/persona";
+  import { choixPersonaOuvert, fermerChoixPersona } from "$lib/stores/persona";
   // Police servie par le site lui-meme, et non par fonts.googleapis.com : sa
   // feuille de style bloquait l'affichage (0,2 s pour Inter, mesure Lighthouse
   // mobile), sur deux origines tierces. Inter est declaree dans app.css
@@ -33,51 +28,43 @@
   import "../app.css";
 
   /**
-   * La question du profil vit ICI : c'est le seul layout qui couvre toutes les
-   * pages d'entrée (un lien profond vers /laws/123 compris) sans être re-monté
-   * d'une page à l'autre. Elle attend la synchronisation avec le compte, pour
-   * ne jamais apparaître en éclair devant un utilisateur connecté qui a déjà
-   * un profil.
+   * La boîte « Changer de profil » vit ICI : c'est le seul layout qui couvre
+   * toutes les pages sans être re-monté d'une page à l'autre. Elle ne s'ouvre
+   * que sur demande (en-tête, menu mobile, chat).
+   *
+   * Elle ne s'ouvre PLUS d'elle-même à l'arrivée (P5). Ouverte après
+   * l'hydratation sur toute première visite, lien partagé vers une loi
+   * compris, elle couvrait 678 px sur 800 d'un téléphone et bloquait la
+   * lecture déjà commencée. Le chat pose la question dans son fil, à la
+   * première question, là où le profil sert (src/routes/(main)/chat).
    */
-  let compteVerifie = false;
-  let agentUtilisateur = "";
-
   onMount(() => {
-    agentUtilisateur = navigator.userAgent;
-    synchroniserPersonaAuDemarrage().finally(() => (compteVerifie = true));
+    void synchroniserPersonaAuDemarrage();
   });
 
   // Une boîte de changement ne survit pas à une navigation (retour vers /login…).
   afterNavigate(() => fermerChoixPersona());
 
-  $: accueil =
-    compteVerifie &&
-    questionAPoser($personaStore, $page.route.id, Boolean($page.error), agentUtilisateur);
-  let dialogue: "accueil" | "changement" | null = null;
-  $: dialogue = $choixPersonaOuvert ? "changement" : accueil ? "accueil" : null;
+  $: dialogue = $choixPersonaOuvert;
 
-  // Fermée, la boîte de CHANGEMENT rend le focus au bouton qui l'a ouverte
-  // (en-tête, menu mobile ou chat). Si la page était encore inerte à cet
-  // instant, le focus tombe sur <body> : on le rattrape. En accueil, on le
-  // laisse au début du document, pour que la première tabulation atteigne le
-  // lien d'évitement.
+  // Fermée, la boîte rend le focus au bouton qui l'a ouverte (en-tête, menu
+  // mobile ou chat). Si la page était encore inerte à cet instant, le focus
+  // tombe sur <body> : on le rattrape.
   //
   // Ouverte, la boîte bloque aussi le défilement de la page derrière elle.
-  let modePrecedent: typeof dialogue = null;
+  let ouvertePrecedemment = false;
   let ouvreur: HTMLElement | null = null;
   let debordementAvant = "";
-  $: if (typeof document !== "undefined" && dialogue !== modePrecedent) {
-    if (modePrecedent === null) {
+  $: if (typeof document !== "undefined" && dialogue !== ouvertePrecedemment) {
+    if (dialogue) {
       debordementAvant = document.body.style.overflow;
       document.body.style.overflow = "hidden";
-    } else if (dialogue === null) {
+      ouvreur = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    } else {
       document.body.style.overflow = debordementAvant;
     }
-    if (dialogue === "changement" && modePrecedent !== "changement") {
-      ouvreur = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    }
-    const ferme = modePrecedent === "changement" && dialogue === null;
-    modePrecedent = dialogue;
+    const ferme = ouvertePrecedemment && !dialogue;
+    ouvertePrecedemment = dialogue;
     if (ferme) {
       const cible = ouvreur;
       tick().then(() => {
@@ -108,13 +95,25 @@
 </script>
 
 <!-- `display: contents` : l'enveloppe ne crée aucune boîte, la mise en page
-     des pages ne change pas. `inert` rend la page inerte derrière la question. -->
-<div style="display: contents" inert={dialogue !== null}>
+     des pages ne change pas. `inert` rend la page inerte derrière la boîte
+     du profil, et derrière la palette (Ctrl K), modale elle aussi
+     (`aria-modal`). Sans lui, Maj+Tab menait du champ de la palette à la
+     page cachée sous son fond, où Entrée activait un contrôle invisible :
+     l'envoi du brouillon du chat, un lien vers une autre page.
+     Ouverte, la palette note qui avait le focus (la loupe, la saisie du
+     chat) dans la même tâche, avant que le navigateur ne le retire à la
+     page devenue inerte (vérifié dans Chrome 154 le 2026-10-29). Fermée,
+     elle le lui rend une fois l'inertie levée (CommandPalette.svelte). Un
+     navigateur qui ignore `inert` laisse le focus entrer dans la page : la
+     palette le renvoie à son champ. Inerte, la page se tait aussi : le chat
+     annonce alors par la région de la boîte ouverte (`annonceDuChat`,
+     `annonceDansLaPalette`). -->
+<div style="display: contents" inert={dialogue || $commandPaletteOpen}>
   <slot />
 </div>
 
 {#if dialogue}
-  <ChoixPersona mode={dialogue} />
+  <ChoixPersona />
 {/if}
 
 <CommandPalette />

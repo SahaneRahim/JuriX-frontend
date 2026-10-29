@@ -10,7 +10,8 @@
  *   attendre la page ; sinon le compte fait foi, `null` compris (un « Profil
  *   général » choisi sur un autre appareil n'est pas annulé par celui-ci). Une
  *   réponse devenue périmée pendant l'appel (choix, autre onglet,
- *   déconnexion) est ignorée ;
+ *   déconnexion) est ignorée. La question du profil (chat, P5) attend cette
+ *   lecture : voir `lectureDuCompteEnCours` ;
  * - un changement explicite s'écrit d'abord dans le navigateur, puis sur le
  *   compte ;
  * - « Ne pas répondre » vaut pour la visite : jamais envoyé au compte.
@@ -35,6 +36,23 @@ import {
 const DELAI_MS = 4000;
 
 let numeroEnvoi = 0;
+
+/**
+ * La lecture du compte au démarrage, tant qu'elle court ; `null` sinon
+ * (anonyme, envoi en attente, lecture finie). Elle ne rejette jamais.
+ */
+let lectureEnCours: Promise<void> | null = null;
+
+/**
+ * Ce que la question du profil (chat, P5) attend avant de se poser. La
+ * question n'attendait plus rien depuis qu'elle a quitté le layout : connecté,
+ * elle demandait un profil que le compte avait déjà, le choix fait dans le
+ * fil le remplaçait sur le compte, et « Continuer sans profil » effaçait celui
+ * qui venait d'arriver. `DELAI_MS` au plus.
+ */
+export function lectureDuCompteEnCours(): Promise<void> | null {
+  return lectureEnCours;
+}
 
 /**
  * La valeur du compte dans une réponse : un profil, `null` (aucun profil), ou
@@ -82,11 +100,25 @@ export function refuserPourCetteSession(): void {
 export async function synchroniserPersonaAuDemarrage(): Promise<void> {
   if (!get(authStore).isAuthenticated) return;
   if (lireAEnvoyer()) {
-    // Sans attendre : la question du profil attend la fin de cette fonction,
-    // et un backend lent la retenait sans borne. Le profil local fait foi.
+    // Sans attendre, ni rien faire attendre : le profil local fait foi, et la
+    // question du profil n'attend que la lecture du compte. Attendre l'envoi
+    // la retenait sans borne derrière un backend lent.
     void envoyer(get(personaStore).persona);
     return;
   }
+  // Posée avant le premier `await` : le chat la voit dès que le layout a
+  // lancé la synchronisation.
+  const lecture = lireLeCompte();
+  lectureEnCours = lecture;
+  try {
+    await lecture;
+  } finally {
+    if (lectureEnCours === lecture) lectureEnCours = null;
+  }
+}
+
+/** Adopte le profil du compte, sauf réponse périmée. Ne rejette jamais. */
+async function lireLeCompte(): Promise<void> {
   const { choix: choixAvant, persona: personaAvant } = get(personaStore);
   const jetonAvant = get(authStore).token;
   const controleur = new AbortController();
@@ -127,7 +159,8 @@ export function reconcilierPersonaALaConnexion(reponse: unknown): void {
   personaStore.appliquerDepuisCompte(valeur);
 }
 
-/** Réservé aux tests. */
+/** Réservé aux tests : les envois, et la lecture qu'un test aurait laissée en cours. */
 export function _reinitialiserEnvois(): void {
   numeroEnvoi = 0;
+  lectureEnCours = null;
 }

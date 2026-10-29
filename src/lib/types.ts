@@ -151,6 +151,30 @@ export interface Law {
    * soit selon l'endpoint : ne pas dériver l'un de l'autre.
    */
   category: Category | null;
+
+  // Refonte UX (contrat-api.md §1.1 et §3, `GET /laws/{id}` seulement).
+  // FACULTATIFS, et le resteront tant que le front peut partir avant l'API :
+  // l'ancienne API ne les envoie pas. Tester la présence de la clé
+  // (`'statut_juridique' in loi`), pas seulement sa valeur. Lecture prête à
+  // l'emploi : `statutJuridiqueDe`, `dateDeLActe`, `ajouteLe` ($lib/api-publique).
+
+  /** Date de l'acte (« Signé le … »). Nulle si seule l'année est sûre, ou si l'intitulé ne date que le JO. */
+  date_signature?: string | null;
+  /** Année de l'acte, sûre même quand le jour ne l'est pas. */
+  annee?: number | null;
+  /** Date du Journal officiel, SEULEMENT quand c'est la seule date de l'intitulé (deux Actes uniformes OHADA). */
+  date_publication_jo?: string | null;
+  /**
+   * Jour d'ajout à JuriX (« Ajouté à JuriX le … ») : une date technique,
+   * jamais juridique. Ancienne API : `created_at.slice(0, 10)`, même valeur.
+   */
+  ajoute_le?: string;
+  /**
+   * Statut prouvé par le relevé des liens entre textes. `null` quand son
+   * calcul a échoué : même repli que l'absence de la clé (aucun encadré, et
+   * surtout jamais « En vigueur », que rien ne prouve).
+   */
+  statut_juridique?: StatutJuridique | null;
 }
 
 /**
@@ -198,6 +222,261 @@ export interface Article {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Repères et statut prouvé — refonte UX (data/ux-impl/contrat-api.md)         */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Ces types décrivent la branche `feat/ux-api`, PAS ENCORE DÉPLOYÉE. Un
+ * champ nouveau posé sur un type existant (Law, SearchResult…) est donc
+ * facultatif : l'ancienne API ne l'envoie pas. À l'intérieur d'une structure
+ * nouvelle (StatutJuridique, Changement…), les champs suivent le schéma
+ * OpenAPI de la branche (d99e23c) : si la structure est là, ils le sont aussi.
+ * Une exception, `date_publication_jo`, absente d'une API faite des seules
+ * branches de zone (contrat §8) : facultative partout, à lire comme `null`.
+ *
+ * Aucun de ces champs ne prouve qu'un texte est « en vigueur » : ce que le
+ * relevé du 14 oct. 2026 ne contient pas, JuriX ne le sait pas (contrat §0.4).
+ */
+
+/** Résumé des changements ACTUELS d'un texte (`StatutJuridique.etat`, `StatutDeLArticle.etat_du_texte`). */
+export type EtatDuTexte = 'aucune_modification_connue' | 'modifie' | 'abroge' | 'remplace';
+
+/** Ce qu'un texte en a fait à un autre (`Changement.type`, `StatutJuridique.types`). */
+export type TypeDeChangement = 'modifie' | 'complete' | 'abroge' | 'abroge_partiellement' | 'remplace';
+
+/** Le type, ou « réécrit en entier » quand le relevé le dit : c'est lui qu'on traduit en anglais. */
+export type NatureDeModification = TypeDeChangement | 'reecrit_en_entier';
+
+/**
+ * Un texte nommé par un lien, l'aperçu d'un article ou les chiffres du corpus.
+ *
+ * `id` n'est renseigné que si le texte est publié dans JuriX : c'est la seule
+ * condition d'un lien `/laws/{id}`. Un texte absent du corpus, connu par son
+ * seul intitulé, a `id` et `reference` nuls et `consultable` faux.
+ */
+export interface TexteLie {
+  id: number | null;
+  /** Cote interne (PRC-…) : jamais affichée (P2, P11). */
+  reference: string | null;
+  /** `laws.type`, accents compris ; « instruction » possible pour un texte hors corpus. */
+  nature: string;
+  /** Numéro propre de l'acte (« 2018/763 ») ; nul pour un code ou un traité. */
+  numero: string | null;
+  titre: string;
+  date_signature: string | null;
+  annee: number | null;
+  date_publication_jo?: string | null;
+  consultable: boolean;
+}
+
+/** Un lien prouvé entre deux textes (contrat §3.2). */
+export interface Changement {
+  /** « c1 », « c2 »… unique dans la réponse : la clé de `par_morceau` et `par_article`. */
+  id: string;
+  /** `modifie_par` : un autre texte a touché celui-ci ; `modifie` : celui-ci a touché l'autre. */
+  sens: 'modifie_par' | 'modifie';
+  type: TypeDeChangement;
+  nature_modification: NatureDeModification;
+  /** Libellé FRANÇAIS seulement (« réécrit en entier ») : en anglais, partir de `nature_modification`. */
+  libelle: string;
+  /** L'AUTRE texte du lien. */
+  texte: TexteLie;
+  etendue: 'articles' | 'texte' | 'inconnue';
+  /** Articles du texte touché, plages gardées (« 34 à 101 »). Vide : voir `etendue`. */
+  articles_cibles: string[];
+  /** Le changement ne vaut que dans cette section (compilations comme le Code civil). */
+  section: string | null;
+  /** Morceaux du texte plus récent qui portent le changement ; parfois des pseudo-numéros (« DISPOSITIF »). */
+  articles_source: string[];
+  /** Phrase française du relevé, sans point final. */
+  portee: string | null;
+  /** Un texte plus récent a réécrit ou abrogé les mêmes dispositions : c'est de l'historique. */
+  depasse: boolean;
+  depasse_par: TexteLie | null;
+  /** Le document affiché intègre déjà ce changement. */
+  integre_au_texte: boolean;
+}
+
+/** Le document en base intègre déjà ces changements : ne pas écrire « version d'origine, non consolidée ». */
+export interface VersionEnBase {
+  consolidee: boolean;
+  textes_integres: TexteLie[];
+}
+
+/**
+ * Statut d'un texte, historique compris (`GET /laws/{id}` → `statut_juridique`).
+ *
+ * Sert à l'en-tête et à l'onglet « Historique » de la page d'un texte, et aux
+ * marques « · modifié » du sommaire (`par_morceau`, exact, et non
+ * `par_article`, qui a des collisions dans les compilations).
+ */
+export interface StatutJuridique {
+  /** Date du relevé des liens : « aucune modification relevée par JuriX au … ». */
+  releve_le: string;
+  etat: EtatDuTexte;
+  /**
+   * Types actuels. `abroge` et `remplace` y figurent AUSSI quand ils ne visent
+   * que des articles : pour dire le texte entier abrogé, lire `etat` ou `abroge`.
+   */
+  types: TypeDeChangement[];
+  /** Le texte ENTIER est abrogé ou remplacé. */
+  abroge: boolean;
+  abroge_par: TexteLie | null;
+  version_en_base: VersionEnBase | null;
+  /** Ce que d'autres textes lui ont fait, du plus ancien au plus récent, historique compris. */
+  modifie_par: Changement[];
+  /** Ce que ce texte a fait à d'autres. */
+  modifie: Changement[];
+  /** Numéro d'article (majuscules, « 1er » → « 1 ») → identifiants de changements. Collisions possibles. */
+  par_article: Record<string, string[]>;
+  /** `articles[].id` (en chaîne) → identifiants de changements. Exact : c'est lui qu'on lit. */
+  par_morceau: Record<string, string[]>;
+}
+
+/**
+ * Clés de `StatutEnBref.natures`, dans l'ordre des libellés du contrat (§1.3).
+ * `remplace_partiellement` est arrivée avec la revue du 28 octobre : une clé
+ * inconnue d'un ajout futur est à ignorer, jamais à afficher telle quelle.
+ */
+export type NatureEnBref =
+  | 'abroge'
+  | 'remplace'
+  | 'abroge_partiellement'
+  | 'remplace_partiellement'
+  | 'modifie'
+  | 'complete';
+
+/**
+ * Résumé des changements actuels, sur les lignes de liste et de recherche.
+ * `null` si aucun lien n'est connu, ce qui ne veut jamais dire « en vigueur ».
+ * Sa date de relevé est celle de `GET /corpus` (`liens_releves_le`).
+ */
+export interface StatutEnBref {
+  /** Vrai si et seulement si `natures` contient `abroge` ou `remplace`. */
+  abroge: boolean;
+  /** Nombre de textes distincts à l'origine des changements. */
+  textes: number;
+  natures: Partial<Record<NatureEnBref, number>>;
+  date_dernier_texte: string;
+}
+
+/** Statut d'un article dans son aperçu (`ArticleApercu.statut`). */
+export interface StatutDeLArticle {
+  releve_le: string;
+  etat_du_texte: EtatDuTexte;
+  version_en_base: VersionEnBase | null;
+  /** Changements qui touchent l'article ou qu'il porte, plus ceux du texte entier, historique compris. */
+  changements: Changement[];
+}
+
+/** Un autre article du même numéro dans le texte (les quatre « 53 » du Code civil). */
+export interface ArticleHomonyme {
+  article_id: number;
+  section: string | null;
+}
+
+/**
+ * Aperçu d'un article, pour la feuille d'une citation du chat
+ * (`GET /laws/{law_id}/articles/{numero}`, `ArticleApercuResponse`). Jamais la
+ * loi entière : l'article seul, recousu s'il est en plusieurs morceaux.
+ */
+export interface ArticleApercu {
+  law_id: number;
+  texte: TexteLie;
+  /** Sans suffixe de morceau : « 55 » pour 55.1 + 55.2. */
+  numero: string;
+  titre: string | null;
+  section: string | null;
+  /** Page du PDF, à partir de 1. */
+  page: number | null;
+  article_ids: number[];
+  /** L'article entier, morceaux recousus. Le passage cité, c'est au front de le mettre en gras. */
+  contenu: string;
+  /** Coupé à 20 000 caractères : proposer « Lire dans le texte intégral ». */
+  tronque: boolean;
+  /** `contenu` est le morceau qui porte cet article AVEC d'autres : le dire au lecteur. */
+  englobant: boolean;
+  homonymes: ArticleHomonyme[];
+  statut: StatutDeLArticle;
+}
+
+/** Repères d'un texte sur une ligne de liste ou de recherche (contrat §1.1, §1.2). Absents de l'ancienne API. */
+export interface ReperesDuTexte {
+  /** Objet en clair (« Révocation d'un magistrat ») ; nul : découpe pas sûre, afficher le titre. */
+  objet?: string | null;
+  numero?: string | null;
+  date_signature?: string | null;
+  annee?: number | null;
+  date_publication_jo?: string | null;
+  statut?: StatutEnBref | null;
+}
+
+/** Ordre des listes de textes (`GET /laws/?sort=`) : par `publication_date`, sans date en dernier. */
+export type TriDesTextes = 'date_desc' | 'date_asc';
+
+/**
+ * Une ligne de liste de textes (`LawListLightItem`), réduite à ce que les
+ * listes affichent : ni texte, ni cote PRC, ni champ d'administration.
+ * Sur l'ancienne API, les repères manquent ($lib/api-publique.listerTextes).
+ */
+export interface LigneDeTexte extends ReperesDuTexte {
+  id: number;
+  title: string;
+  type: LawType;
+  language: LangueDocument | null;
+  category_id: number | null;
+  category_name: string | null;
+  publication_date: string | null;
+  article_count: number;
+}
+
+/** `LawListPage`, la page légère que rend `GET /laws/?page=` sur la nouvelle API. */
+export interface PageDeTextes {
+  items: LigneDeTexte[];
+  total: number;
+  page: number;
+  page_size: number;
+  /** ⌈total / page_size⌉, 0 si `total` est nul. */
+  pages: number;
+  sort: TriDesTextes;
+}
+
+/** Une nature du corpus et son nombre de textes publiés. */
+export interface NatureDuCorpus {
+  nature: string;
+  textes: number;
+}
+
+/** Provenance des textes publiés (la somme des `textes` égale `ChiffresDuCorpus.textes`). */
+export interface SourceDuCorpus {
+  code: 'prc' | 'ohada' | 'cima' | 'autres';
+  libelle: { fr: string; en: string };
+  textes: number;
+}
+
+/**
+ * `GET /corpus` (`CorpusResponse`) : les chiffres de l'accueil du chat et de
+ * l'état vide de la recherche. Route nouvelle : 404 sur l'ancienne API, et
+ * alors aucun chiffre ni aucune date (texte générique).
+ */
+export interface ChiffresDuCorpus {
+  textes: number;
+  /** Un article en plusieurs morceaux (55.1, 55.2) compte une fois. */
+  articles: number;
+  textes_par_nature: NatureDuCorpus[];
+  texte_le_plus_recent: TexteLie | null;
+  /** Dernier texte AJOUTÉ à JuriX (date technique). */
+  dernier_ajout_le: string | null;
+  /** Date du relevé des liens entre textes : la date du statut en bref des listes. */
+  liens_releves_le: string;
+  sources: SourceDuCorpus[];
+  /** Le périmètre en une phrase (« textes officiels camerounais, OHADA et CIMA »). */
+  libelle_sources: { fr: string; en: string };
+  /** Heure du calcul (UTC). */
+  calcule_le: string;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Recherche — app/schemas/search.py                                           */
 /* -------------------------------------------------------------------------- */
 
@@ -210,12 +489,76 @@ export interface SearchFilters {
   year_to?: number;
 }
 
+/** Tri de la recherche affinée (contrat §6.1) ; les textes sans date passent en dernier. */
+export type TriDeRecherche = 'pertinence' | 'date_desc' | 'date_asc';
+
+/**
+ * `SearchRefine` : filtres appliqués à l'ensemble candidat, sans le recalculer.
+ *
+ * Ces clés, ET ELLES SEULES : la nouvelle API rend 422 sur une clé inconnue
+ * (« nature » pour « types »), pour qu'une liste non filtrée ne s'affiche plus
+ * comme filtrée. Clés différentes en ET, valeurs d'une même liste en OU. Des
+ * bornes inversées donnent aussi 422.
+ */
+export interface AffinageDeRecherche {
+  /** Natures ; accents, casse, « _ » et « - » ignorés (« decret », « acte_uniforme »). */
+  types?: string[];
+  category_ids?: number[];
+  /** Année de l'acte, de 1900 à 2100, bornes incluses. */
+  year_from?: number;
+  year_to?: number;
+  /** « AAAA-MM-JJ », bornes incluses. */
+  date_from?: string;
+  date_to?: string;
+}
+
 export interface SearchRequest {
   query: string;
   mode: string;
   filters?: SearchFilters;
   limit: number;
   offset: number;
+  /*
+   * Recherche affinée (contrat §6). L'un de ces trois champs fait passer la
+   * requête par l'ensemble candidat ; sans eux, la recherche classique répond
+   * exactement comme avant. L'ancienne API les IGNORE : tester `facets` dans
+   * la réponse ($lib/api-publique.rechercherTextes le fait).
+   */
+  sort?: TriDeRecherche;
+  refine?: AffinageDeRecherche;
+  /** `true` bascule seul dans la recherche affinée (qui rend toujours ses effectifs). */
+  facets?: boolean;
+}
+
+/** Effectif d'une nature dans les résultats affinés. */
+export interface FacetteValeur {
+  value: string;
+  count: number;
+}
+
+/** Effectif d'un domaine ; un domaine absent vaut 0 (compléter avec `GET /categories`). */
+export interface FacetteCategorie {
+  id: number | null;
+  name: string | null;
+  count: number;
+}
+
+/** Effectif d'une année ; `value` nulle : textes sans date, rangés en dernier. */
+export interface FacetteAnnee {
+  value: number | null;
+  count: number;
+}
+
+/**
+ * Effectifs DISJONCTIFS de la recherche affinée : chacun compte les résultats
+ * qui passent tous les filtres de `refine` sauf le sien. « Tous » = somme de
+ * `types[].count`. Calculés sur l'ensemble candidat (6 à 62 textes mesurés),
+ * pas sur tout le corpus : de l'ordre de la dizaine, jamais « Décrets (412) ».
+ */
+export interface FacettesDeRecherche {
+  types: FacetteValeur[];
+  categories: FacetteCategorie[];
+  years: FacetteAnnee[];
 }
 
 /** Article correspondant, imbriqué dans un `SearchResult`. */
@@ -228,7 +571,12 @@ export interface ArticleMatch {
   relevance_score: number;
 }
 
-export interface SearchResult {
+/**
+ * Un résultat de recherche. Les repères (`objet`, `numero`, dates, `statut` en
+ * bref) arrivent sur les deux parcours de la nouvelle API ; absents de
+ * l'ancienne (`ReperesDuTexte`, tous facultatifs).
+ */
+export interface SearchResult extends ReperesDuTexte {
   /**
    * Identifiant du DOCUMENT. Il n'existe pas de champ `id` sur ce type — le
    * front écrit encore `result.law_id ?? result.id` par prudence, ce qui est du
@@ -277,6 +625,18 @@ export interface SearchResponse {
   direct_navigation: boolean;
   target_law_id: number | null;
   target_article: string | null;
+
+  /*
+   * Recherche affinée (contrat §6.2). Nuls sur le parcours classique de la
+   * nouvelle API, ABSENTS de l'ancienne, qui ignore `sort`, `refine` et
+   * `facets` : seul `facets != null` prouve que le tri et les filtres envoyés
+   * ont été appliqués.
+   */
+  /** Tri appliqué (« pertinence » par défaut). */
+  sort?: string | null;
+  /** Taille de l'ensemble candidat AVANT `refine`. */
+  candidates?: number | null;
+  facets?: FacettesDeRecherche | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -496,4 +856,155 @@ export interface ConversationMessage {
 
 export interface ConversationDetail extends ConversationSummary {
   messages: ConversationMessage[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Citations et progression du chat — refonte UX (contrat-api.md §7)           */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Le dernier événement du flux (`done: true`) et `POST /rag/ask` gagnent
+ * quatre listes ; les événements d'avant le premier mot gagnent `progression`.
+ * L'ancienne API n'envoie ni l'un ni l'autre : revenir alors à `sources`
+ * (affichage d'avant), sans liens dans la phrase ni alertes (contrat §8).
+ *
+ * Une conversation RECHARGÉE (`GET /rag/conversations/{id}`) n'a jamais ces
+ * listes : les positions des citations ne sont pas gardées en base (§9).
+ */
+
+/** Le lien prouvé le plus fort (`StatutProuve.etat`). */
+export type EtatProuve = 'modifie' | 'complete' | 'abroge' | 'abroge_partiellement' | 'remplace';
+
+/** Un lien que le modèle a lu pour l'extrait cité (§7.2). */
+export interface LienProuve {
+  nature: EtatProuve;
+  libelle: string;
+  /** Écrit pour une phrase : « la Loi N°2008/001 du 14 avril 2008 ». */
+  par_titre: string;
+  par_date: string;
+  par_reference: string | null;
+  /** Lien `/laws/{id}` ; nul si le texte n'est pas publié dans JuriX : pas de lien. */
+  par_law_id: number | null;
+  /** Vide : le lien vise le texte entier. */
+  articles: string[];
+  par_articles: string[];
+  portee: string | null;
+}
+
+/**
+ * Ce que le modèle a lu du statut d'un extrait. `etat` nul et `liens` vides :
+ * rien de prouvé, ce qui n'est PAS « en vigueur ». Pour un texte entier, `etat`
+ * ne compte que les liens qui le visent tout entier : `etat` nul avec des
+ * `liens` veut dire « des articles de ce texte ont été modifiés depuis ».
+ */
+export interface StatutProuve {
+  etat: EtatProuve | null;
+  /** Du plus récent au plus ancien. */
+  liens: LienProuve[];
+  /** Lignes lues par le modèle, pour audit : références internes (« (PRC-6284) »), NE PAS AFFICHER. */
+  lignes: string[];
+}
+
+/**
+ * Une citation reconnue dans la réponse, liée à son texte.
+ *
+ * `debut` et `fin` sont en unités UTF-16 (fin exclue), sur le texte BRUT
+ * affiché, markdown compris : `texte.slice(debut, fin) === texte_cite`. Poser
+ * les liens avant le rendu markdown, ou garder la correspondance des positions.
+ * Un passage cité ne contient jamais `*` ni `_`.
+ */
+export interface CitationPositionnee {
+  debut: number;
+  fin: number;
+  texte_cite: string;
+  law_id: number;
+  /** « 35 » pour un article en plusieurs morceaux ; nul pour un texte cité sans article (lien vers `/laws/{law_id}`). */
+  article: string | null;
+  /** Le morceau lu par le modèle : il choisit l'article parmi les homonymes de l'aperçu. */
+  article_id: number | null;
+  reference: string;
+  titre: string;
+  /** Même règle que `date_signature`. */
+  date_du_texte: string | null;
+  statut: StatutProuve;
+}
+
+/** Une citation qu'aucun texte consulté ne porte : soulignée en tirets, avec l'alerte. */
+export interface CitationIntrouvable {
+  debut: number;
+  fin: number;
+  texte_cite: string;
+  /** `article_non_consulte` : l'article n'est pas parmi les extraits lus ; `texte_non_consulte` : aucun texte lu ne répond au nom écrit. */
+  raison: 'article_non_consulte' | 'texte_non_consulte';
+}
+
+/** « Articles cités » : une entrée par article cité, dans l'ordre du texte. */
+export interface SourceCitee {
+  law_id: number;
+  law_reference: string;
+  law_title: string;
+  article_number: string | null;
+  article_id: number | null;
+  /** 300 caractères au plus. */
+  excerpt: string;
+  relevance_score: number;
+  date_du_texte: string | null;
+  statut: StatutProuve;
+}
+
+/** « Textes consultés, non cités » : remis au modèle, aucune citation n'en vient. */
+export interface TexteConsulte {
+  law_id: number;
+  law_reference: string;
+  law_title: string;
+  date_du_texte: string | null;
+  /** Numéros des articles lus. */
+  articles: string[];
+  /** Statut du texte entier. */
+  statut: StatutProuve;
+}
+
+/** Les quatre listes du dernier événement et de `RAGResponse` ; absentes de l'ancienne API. */
+export interface CitationsDeLaReponse {
+  citations?: CitationPositionnee[];
+  citations_introuvables?: CitationIntrouvable[];
+  articles_cites?: SourceCitee[];
+  textes_consultes_non_cites?: TexteConsulte[];
+}
+
+/** Étapes du chat avant le premier mot, dans cet ordre ; `redaction` manque quand rien n'est trouvé. */
+export type EtapeDuChat = 'recherche' | 'textes_trouves' | 'redaction';
+
+/** Un texte trouvé par la recherche, annoncé par l'étape `textes_trouves`. */
+export interface TexteTrouve {
+  law_id: number;
+  law_reference: string;
+  law_title: string;
+  date_du_texte: string | null;
+  /** Articles de ce texte remontés par la recherche. */
+  nb_articles: number;
+}
+
+/**
+ * Une étape du chat en flux (`progression`), avant le premier mot. Le libellé
+ * est prêt à afficher, dans la langue de la question ; les compteurs
+ * n'existent qu'à l'étape `textes_trouves`.
+ */
+export interface ProgressionDuChat {
+  etape: EtapeDuChat;
+  libelle: string;
+  nb_articles?: number;
+  nb_textes?: number;
+  /** Du mieux classé au moins bien classé. */
+  textes?: TexteTrouve[];
+}
+
+/**
+ * Champs ajoutés aux événements du flux (`$lib/flux.EvenementDeFlux`) :
+ * `progression` (avec `chunk: ""` et `done: false`, et déjà `session_id` et
+ * `persona`, à garder : une réponse ARRÊTÉE n'a jamais de dernier événement),
+ * puis les quatre listes sur le dernier événement.
+ */
+export interface AjoutsDuFlux extends CitationsDeLaReponse {
+  progression?: ProgressionDuChat;
 }

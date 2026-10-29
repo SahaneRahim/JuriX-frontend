@@ -124,7 +124,7 @@
            autres tailles. Devant l'encadré de confirmation, la marge du titre
            se fond dans celle de l'encadré (mt-6) : rien n'y change. -->
       <h1
-        class="mb-2 flex items-center justify-center gap-2 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl court:text-xl"
+        class="mb-2 flex items-center justify-center gap-2 text-xl font-titre font-semibold text-zinc-950 dark:text-white sm:text-2xl court:text-xl"
       >
         <span
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-100 text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-200 court:hidden"

@@ -5,7 +5,15 @@
   import { urlCanonique } from "$lib/seo";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
-  import { nomRubrique, type BlogPost } from "$lib/data/blog";
+  import {
+    adresseDeCitation,
+    articleDeCitation,
+    nomRubrique,
+    referenceAffichable,
+    titreDeCitation,
+    type BlogCitation,
+    type BlogPost,
+  } from "$lib/data/blog";
   import { formatDate } from "$lib/format";
   import { language, tr } from "$lib/stores/language";
 
@@ -81,6 +89,46 @@
   $: urlTwitter = `https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(urlActuelle)}`;
   $: urlLinkedIn = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlActuelle)}`;
   $: urlChatAvecQuestion = `/chat?q=${encodeURIComponent(post.suggestedChatQuestion)}`;
+
+  /**
+   * Titre en serif (Literata, Q5) seulement pour un article écrit ou relu par
+   * une personne (`reluPar`) : une analyse générée habillée de la serif
+   * officielle paraîtrait plus sûre qu'elle ne l'est (même raison que
+   * src/app.css). Aucune donnée ne nomme de relecteur aujourd'hui : Inter, au
+   * gabarit du titre de page du guide (§ 4.2).
+   */
+  $: classesDuTitre = post.reluPar
+    ? "font-titre font-semibold"
+    : "font-bold tracking-tight";
+
+  /**
+   * Ce qu'une carte de citation affiche : son intitulé (sans cote), et ses
+   * repères, « Article 299 · Code pénal (loi n° 2016/007) ». La cote interne
+   * (« PRC-4722 »), que le générateur met dans `reference` et dans l'intitulé
+   * par défaut (« Article 35.1 - PRC-4722 »), n'apparaît nulle part (P2).
+   * Sans intitulé, la citation se nomme par son article.
+   */
+  function vueDeCitation(citation: BlogCitation, t: (cle: string) => string) {
+    const numero = articleDeCitation(citation);
+    const article = numero ? `${t("blog.article")} ${numero}` : t("blog.legalExcerpt");
+    const titre = titreDeCitation(citation) || article;
+    // Espace insécable avant le point, comme les repères des listes (P11) :
+    // à la coupure, le point finit la ligne au lieu d'ouvrir la suivante.
+    const reperes = [titre === article ? "" : article, referenceAffichable(citation) ?? ""]
+      .filter(Boolean)
+      .join("\u00a0· ");
+    return { titre, reperes, adresse: adresseDeCitation(citation) };
+  }
+
+  /**
+   * Le lien d'une carte de citation (Q3 A, comme les cartes de /blog et la
+   * liste des domaines de l'accueil) : posé sur l'intitulé, étendu à la carte
+   * par son `::after`, contour de focus autour de la carte. Il remplace le
+   * pied « Consulter le texte complet de la loi → », répété sur chaque carte,
+   * et vise l'ARTICLE cité (`?article=N`, P2), non le début du texte.
+   */
+  const LIEN_ETENDU =
+    "after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-zinc-950 dark:focus-visible:after:outline-white";
 </script>
 
 <MetaSeo
@@ -131,14 +179,33 @@
           >
             {rubrique}
           </span>
-          <span class="text-xs text-zinc-500 dark:text-zinc-400 font-mono tabular-nums">
-            {datePubliee} • {post.readingTime} {$tr("blog.reading")}
+          <!-- L'étiquette d'un article écrit par le modèle (Q5 : « l'analyse
+               générée reste en Inter, avec l'étiquette Généré par IA »).
+               Badge bordé, sans fond : il se distingue de la rubrique. -->
+          {#if post.genereParIA}
+            <span
+              class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-600"
+              data-testid="blog-genere-par-ia"
+            >
+              <Icone nom="bot" class="text-sm" />{$tr("blog.badge.ai")}
+            </span>
+          {/if}
+          <!-- Date et durée en Inter, chiffres alignés (Q5 A : deux voix au
+               plus, la chasse fixe ne garde que les touches). Séparées par le
+               point médian des repères des listes (P11), comme sur /blog ;
+               l'espace insécable qui le précède le garde en fin de ligne. -->
+          <span class="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+            {datePubliee}&nbsp;· {post.readingTime} {$tr("blog.reading")}
           </span>
         </div>
 
-        <!-- Sans `text-balance` : en équilibrant, le navigateur coupait
-             « a-t-il » à son trait d'union (« a- / t-il » à 390 et 640 px).
-             L'espace insécable suffit à garder le « ? » avec son mot.
+        <!-- `text-balance` (Q5) : à 390 px, le titre se coupait en « … de /
+             loyer : ce que dit / réellement la loi / camerounaise », et à
+             740 px un mot restait seul. Il était retiré parce qu'en
+             équilibrant, le navigateur coupait « a-t-il » à son trait d'union ;
+             `insecables` y pose désormais des traits d'union insécables
+             (U+2011). L'espace insécable garde le « ? » avec son mot.
+             Police : `classesDuTitre` (Inter sauf article relu).
              Titre de page du guide (§ 4.2), comme /about et /blog : en
              48 px extra-gras, l'échelle changeait d'une page à l'autre.
              Interligne posé AVEC la taille (`text-4xl/tight`) : `sm:text-5xl`
@@ -146,7 +213,7 @@
              `leading-tight`, qui ne valait plus qu'au téléphone ; il ne
              restait qu'un pixel entre le jambage du « g » et les accents de
              la ligne suivante. -->
-        <h1 class="text-3xl/tight sm:text-4xl/tight font-bold tracking-tight text-zinc-950 dark:text-white">
+        <h1 class="text-3xl/tight sm:text-4xl/tight text-balance {classesDuTitre} text-zinc-950 dark:text-white">
           {insecables(post.title)}
         </h1>
 
@@ -157,12 +224,22 @@
           </p>
         {/if}
 
-        <!-- Barre de partage rapide -->
+        <!-- Barre de partage rapide. À gauche, en Inter (Q5 A), qui a écrit
+             l'article : « Rédigé avec l'assistance de JuriX IA » pour ceux de
+             la rédaction ; un article généré le dit déjà par son étiquette,
+             au-dessus du titre. Puis le relecteur, s'il y en a un. -->
         <div class="pt-2 flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-6">
-          <div class="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-            <Icone nom="bot" class="text-base text-zinc-950 dark:text-white" />
-            <span>{$tr("blog.writtenWith")} <strong>{$tr("blog.aiName")}</strong></span>
-          </div>
+          {#if !post.genereParIA || post.reluPar}
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {#if !post.genereParIA}
+                <Icone nom="bot" class="text-base text-zinc-950 dark:text-white" />
+                <span>{$tr("blog.writtenWith")} <strong>{$tr("blog.aiName")}</strong></span>
+              {/if}
+              {#if post.reluPar}
+                <span>{$tr("blog.reviewedBy").replace("{nom}", () => post.reluPar ?? "")}</span>
+              {/if}
+            </div>
+          {/if}
 
           <!-- Logos de WhatsApp, LinkedIn et X dessinés ici : Lucide ne fournit
                aucun logo de marque. Monochromes (currentColor, sans la couleur
@@ -235,12 +312,14 @@
            barre bleue recolorée.
            Icône des titres alignée sur la PREMIÈRE ligne (`items-start`) :
            centrée (`items-center`), elle tombait entre les deux lignes d'un
-           titre replié au téléphone (« …en 2 minutes (le / contexte) »).
-           `-mt-px` : l'icône de 18 px sur une ligne de 16 px garde le même
-           milieu que le texte. -->
+           titre replié au téléphone.
+           Surtitre en Inter, dans sa casse (Q5 A : deux voix au plus) : en
+           capitales à chasse fixe espacées, le motif « à éviter », il
+           tenait sur deux lignes à 390 px. 14 px sur une ligne de 20 :
+           `mt-px` garde l'icône de 18 px au milieu de la première ligne. -->
       <section class="bg-zinc-100/70 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700/60 rounded-2xl p-6 sm:p-8 space-y-3">
-        <div class="flex items-start gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
-          <Icone nom="newspaper" class="-mt-px text-lg" />
+        <div class="flex items-start gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+          <Icone nom="newspaper" class="mt-px text-lg" />
           <span>{$tr("blog.contextTitle")}</span>
         </div>
         <p class="max-w-[34em] text-base sm:text-lg text-zinc-800 dark:text-zinc-200 leading-relaxed font-normal">
@@ -251,8 +330,10 @@
       <!-- BLOC 2 : Ce que dit la loi — L'Analyse du Bot -->
       <section class="space-y-8">
         <div class="space-y-3">
-          <div class="flex items-start gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-            <Icone nom="gavel" class="-mt-px text-lg" />
+          <!-- Même surtitre que le bloc 1, en Inter ; zinc-500 sur le fond
+               de page (4,6:1). -->
+          <div class="flex items-start gap-2 text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+            <Icone nom="gavel" class="mt-px text-lg" />
             <span>{$tr("blog.lawTitle")}</span>
           </div>
           <!-- Titre de section du guide (§ 4.2) : gras, et non extra-gras. -->
@@ -280,7 +361,7 @@
             <span>{$tr("blog.keyPoints")}</span>
           </h3>
           <ul class="max-w-[34em] space-y-3">
-            {#each post.botAnalysis.keyPoints as point}
+            {#each post.botAnalysis.keyPoints as point, i (i)}
               <li class="flex items-start gap-3 text-zinc-700 dark:text-zinc-300 text-sm sm:text-base leading-relaxed">
                 <span class="text-zinc-950 dark:text-zinc-100 font-bold" aria-hidden="true">•</span>
                 <span>{insecables(point)}</span>
@@ -297,58 +378,62 @@
               <span>{$tr("blog.citationsTitle")}</span>
             </h3>
 
-            <div class="grid grid-cols-1 gap-4">
-              {#each post.botAnalysis.citations as citation}
-                <div
-                  class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 sm:p-6 space-y-3 relative hover:border-zinc-950 dark:hover:border-zinc-400 transition-colors shadow-sm dark:shadow-none"
+            <!-- Une liste de cartes (Q3 A) : l'intitulé de chaque citation est
+                 son lien, étendu à la carte (`LIEN_ETENDU`) ; une flèche
+                 décorative dit l'action. Repères en Inter, sans la cote
+                 interne (`vueDeCitation`, P2). L'extrait vérifié mot pour mot
+                 dans la base (articles de la rédaction) est dans la police du
+                 texte officiel (Q5) ; celui qu'écrit le modèle reste en Inter.
+                 Sans texte sûr (`adresse` nulle), la carte n'est pas un lien. -->
+            <ul class="grid grid-cols-1 gap-4">
+              {#each post.botAnalysis.citations as citation, i (i)}
+                {@const vue = vueDeCitation(citation, $tr)}
+                <li
+                  class="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 sm:p-6 space-y-2 shadow-sm dark:shadow-none {vue.adresse
+                    ? 'transition-colors hover:border-zinc-950 dark:hover:border-zinc-400'
+                    : ''}"
                 >
-                  <!-- Badge du guide (§ 4.8), le gabarit des rubriques : Inter
-                       dans sa casse, la chasse fixe pour le seul numéro. Il
-                       était entier en capitales mono semi-grasses et espacées,
-                       plus haut d'un cran (`py-1`). -->
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                      {#if citation.articleNumber}
-                        {$tr("blog.article")} <span class="font-mono tabular-nums">{citation.articleNumber}</span>
+                  <div class="flex items-start justify-between gap-3">
+                    <h4 class="coupe-mots font-bold text-zinc-950 dark:text-white text-base">
+                      {#if vue.adresse}
+                        <a href={vue.adresse} aria-describedby={vue.reperes ? `citation-${i}-reperes` : undefined} class={LIEN_ETENDU}
+                          >{insecables(vue.titre)}</a
+                        >
                       {:else}
-                        {$tr("blog.legalExcerpt")}
+                        {insecables(vue.titre)}
                       {/if}
-                    </span>
-                    <!-- coupe-mots : une cote (« N°2018/9387/CAB/PM ») n'a pas
-                         d'espace où passer à la ligne sur un écran étroit. -->
-                    <span class="coupe-mots min-w-0 text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                      {citation.reference}
-                    </span>
+                    </h4>
+                    {#if vue.adresse}
+                      <Icone
+                        nom="arrow-right"
+                        class="mt-0.5 shrink-0 text-lg text-zinc-500 dark:text-zinc-400 transition-colors group-hover:text-zinc-950 dark:group-hover:text-white"
+                      />
+                    {/if}
                   </div>
 
-                  <h4 class="font-bold text-zinc-950 dark:text-white text-base">
-                    {insecables(citation.title)}
-                  </h4>
+                  <!-- `coupe-mots` : un nom de texte sans espace où passer à
+                       la ligne sur un écran étroit. -->
+                  {#if vue.reperes}
+                    <p id="citation-{i}-reperes" class="coupe-mots text-xs text-zinc-500 dark:text-zinc-400">
+                      {vue.reperes}
+                    </p>
+                  {/if}
 
-                  <!-- Mesure de lecture de l'article (34em, soit 476 px à
-                       14 px) : sur toute la largeur de la carte, la citation
-                       comptait 115 à 130 caractères par ligne, en italique
-                       serré, la plus longue mesure de la page. -->
-                  <blockquote class="max-w-[34em] italic text-sm text-zinc-600 dark:text-zinc-400 pl-4 border-l-2 border-zinc-300 dark:border-zinc-700 leading-relaxed font-normal">
-                    {insecables(`« ${citation.excerpt} »`)}
-                  </blockquote>
-
-                  <!-- 44 px de haut à toutes les largeurs (16 px sur tablette
-                       avec `sm:min-h-0`) ; à partir de sm, la marge négative
-                       rend à la ligne sa hauteur d'avant, et la zone d'appui
-                       déborde dans l'espace libre autour du lien. -->
-                  <div class="pt-2">
-                    <a
-                      href="/laws/{citation.lawId}"
-                      class="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-zinc-950 dark:text-zinc-100 hover:underline sm:-my-3.5"
+                  <!-- Mesure de lecture de l'article (34em) : sur toute la
+                       largeur de la carte, la citation comptait 115 à 130
+                       caractères par ligne, la plus longue mesure de la page. -->
+                  {#if citation.excerpt}
+                    <blockquote
+                      class="max-w-[34em] pt-1 text-sm text-zinc-600 dark:text-zinc-400 pl-4 border-l-2 border-zinc-300 dark:border-zinc-700 leading-relaxed font-normal {citation.verifie
+                        ? 'font-texte'
+                        : 'italic'}"
                     >
-                      <span>{$tr("blog.readLaw")}</span>
-                      <Icone nom="arrow-right" class="text-sm" />
-                    </a>
-                  </div>
-                </div>
+                      {insecables(`« ${citation.excerpt} »`)}
+                    </blockquote>
+                  {/if}
+                </li>
               {/each}
-            </div>
+            </ul>
           </div>
         {/if}
 
@@ -370,17 +455,14 @@
            boutons ont les couleurs du mode sombre dans les deux thèmes, et un
            contour clavier blanc, car celui du site (zinc-950) s'y perdait.
            Rayon des cartes (rounded-2xl, guide § 4.1), comme ses voisines.
-           La pastille est le badge du blog (Inter, casse d'origine), en
-           inline-flex avec mb-3 : simple span en ligne, elle n'était qu'à
-           8 px du titre ; avec le space-y-2, l'écart passe à 20 px, le rythme
-           du reste de la page. -->
+           Plus de pastille « Assistance juridique sur mesure », ni de
+           promesse d'analyser « les spécificités de votre cas » : l'assistant
+           répond à partir des textes, à une date, sans jurisprudence ni
+           dossier (P4 A), et le site ne promet pas de conseil juridique. -->
       <section
         class="bg-zinc-950 dark:bg-zinc-900 rounded-2xl p-6 sm:p-10 text-white space-y-6 border border-zinc-800"
       >
         <div class="space-y-2">
-          <span class="mb-3 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-white/10 text-zinc-300 border border-white/20">
-            {$tr("blog.assistanceBadge")}
-          </span>
           <h3 class="text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-balance">
             {insecables($tr("blog.similarTitle"))}
           </h3>

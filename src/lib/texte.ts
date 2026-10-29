@@ -73,8 +73,14 @@ export interface Bloc {
   lignes?: string[][];
 }
 
-/** Une ligne entièrement entre `**` ou `__` : un titre de section. */
-const TITRE_MARQUE = /^(\*\*|__)(.+?)\1$/;
+/**
+ * Une ligne entièrement entre `**` ou `__` : un titre de section. Sans la
+ * même marque à l'intérieur : « **Réponse directe** : oui, **sous
+ * conditions** » commence et finit par `**` sans être un titre, et le
+ * prendre pour tel laissait des astérisques au milieu (« Réponse directe* :
+ * oui, *sous conditions »). C'est un paragraphe, et ses deux gras.
+ */
+const TITRE_MARQUE = /^(\*\*|__)((?:(?!\1).)+)\1$/;
 
 /** Un titre ATX, `## Comme ceci`, que le modèle produit parfois malgré tout. */
 const TITRE_DIESE = /^#{1,6}\s+(.+)$/;
@@ -163,13 +169,68 @@ function sansEmphase(ligne: string): string {
     .trim();
 }
 
+// ---------------------------------------------------------------------------
+// Gras dans la ligne (chat)
+// ---------------------------------------------------------------------------
+
 /**
- * Les cellules d'une ligne de tableau, sans emphase.
+ * Marques du gras dans le texte d'un bloc, en mode `gras` : deux caractères
+ * de la zone d'usage privé d'Unicode, comme les marques des citations
+ * ($lib/components/chat/citations.ts, qui les lit avec elles). Ni le modèle ni
+ * un texte de loi n'en écrivent, et le contrat du bloc ne change pas : son
+ * texte reste du TEXTE, que l'affichage découpe et pose en nœuds Svelte, sans
+ * `{@html}`.
+ */
+export const OUVRE_GRAS = '\uE003';
+export const FERME_GRAS = '\uE004';
+
+/**
+ * Le gras dans une ligne : deux ou trois astérisques (`***gras italique***`
+ * compris), deux ou trois soulignés en bord de mot, comme `EMPHASE`.
+ */
+const GRAS =
+  /(\*{2,3})(?=\S)(.*?\S)\1|(^|[^\p{L}\p{N}\p{M}_])(_{2,3})(?=[^\s_])(.*?[^\s_])\4(?![\p{L}\p{N}\p{M}_])/gu;
+
+/**
+ * Comme `sansEmphase`, mais le gras reste, entre `OUVRE_GRAS` et
+ * `FERME_GRAS`.
+ *
+ * POURQUOI. Le prompt du backend fait commencer la réponse par
+ * « 📌 **Réponse directe** : selon … » (contrat-api.md §7.3). Écrit seul sur
+ * sa ligne, ce libellé devient un titre ; écrit dans la phrase, comme dans
+ * l'exemple réel du contrat, il perdait son gras, et « Réponse directe :
+ * selon … » se lisait en graisse normale (capture chat-citations r2) là où
+ * la maquette chat-p3a le montre en gras. L'italique, lui, reste retiré :
+ * Inter n'est chargée qu'en romain, et un faux italique déforme le dessin.
+ */
+function emphaseEnGras(ligne: string): string {
+  const marquee = ligne.replace(GRAS, (_marque, etoiles, entreEtoiles, avant, _soulignes, entreSoulignes) =>
+    etoiles
+      ? `${OUVRE_GRAS}${entreEtoiles}${FERME_GRAS}`
+      : `${avant}${OUVRE_GRAS}${entreSoulignes}${FERME_GRAS}`,
+  );
+  return sansEmphase(marquee);
+}
+
+/** Options de `blocsDeReponse`. */
+export interface OptionsDesBlocs {
+  /**
+   * Garder le gras dans la ligne, en marques (`OUVRE_GRAS`, `FERME_GRAS`).
+   * Réservé à un affichage qui les lit (le chat) : l'explication d'article de
+   * /laws/[id] rend le texte des blocs tel quel, et y verrait des caractères
+   * inconnus.
+   */
+  gras?: boolean;
+}
+
+/**
+ * Les cellules d'une ligne de tableau, sans emphase (ou avec le gras en
+ * marques : `emphase`).
  *
  * Les barres des deux bords sont facultatives en markdown ; `\|` est une barre
  * écrite dans le texte de la cellule, pas un séparateur.
  */
-function cellulesDe(ligne: string): string[] {
+function cellulesDe(ligne: string, emphase: (ligne: string) => string = sansEmphase): string[] {
   let corps = ligne.trim();
   if (corps.startsWith('|')) corps = corps.slice(1);
   if (corps.endsWith('|') && !corps.endsWith('\\|')) corps = corps.slice(0, -1);
@@ -192,10 +253,86 @@ function cellulesDe(ligne: string): string[] {
   return cellules.map((cellule) =>
     cellule
       .split(SAUT_DANS_UNE_CELLULE)
-      .map(sansEmphase)
+      .map((morceau) => emphase(morceau))
       .join('\n')
       .trim(),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Pictogrammes émoji
+// ---------------------------------------------------------------------------
+
+/**
+ * Un pictogramme émoji, avec ce qui l'accompagne : teinte de peau, sélecteur de
+ * présentation (U+FE0F), étiquettes d'un drapeau régional, et les suivants
+ * qu'un U+200D lie au premier (« 👨‍⚖️ »).
+ *
+ * POURQUOI. Le site n'a ni émoji ni teinte autre que le rouge des erreurs
+ * (guide de la refonte, § 1). Une réponse qui commençait par « 📌 » posait une
+ * punaise ROUGE en tête de bulle (capture chat-citations du 29/10/2026), et
+ * l'historique que le serveur donne au modèle est étiqueté « 👤 » et « 🤖 »
+ * (prompts.py), ce qui l'y invite. Aucune des 1 167 réponses d'évaluation
+ * n'en contenait : c'est un filet, pas un nettoyage de routine.
+ *
+ * Seuls les caractères dessinés en émoji COULEUR sont visés : ceux qui le sont
+ * d'office (le plan U+1F000-1FAFF, et la courte liste du plan de base qui a la
+ * présentation émoji par défaut), et tout symbole suivi de U+FE0F, qui la
+ * demande. Les symboles de texte restent : « → », « ■ », « ★ », « © »,
+ * « ☐ » d'un modèle de formulaire, « ❶ » d'une liste. Des plages de code
+ * points écrites en clair, et non `\p{Extended_Pictographic}` : comme
+ * l'assertion arrière plus haut, une propriété inconnue d'un vieux Safari
+ * ferait refuser le module entier, et le chat ne s'afficherait plus.
+ */
+const SEQUENCE_EMOJI =
+  '(?:[\\u{1F000}-\\u{1FAFF}]|[\\u231A\\u231B\\u23E9-\\u23EC\\u23F0\\u23F3\\u25FD\\u25FE\\u2614\\u2615\\u2648-\\u2653\\u267F\\u2693\\u26A1\\u26AA\\u26AB\\u26BD\\u26BE\\u26C4\\u26C5\\u26CE\\u26D4\\u26EA\\u26F2\\u26F3\\u26F5\\u26FA\\u26FD\\u2705\\u270A\\u270B\\u2728\\u274C\\u274E\\u2753-\\u2755\\u2757\\u2795-\\u2797\\u27B0\\u27BF\\u2B1B\\u2B1C\\u2B50\\u2B55]|[\\u00A9\\u00AE\\u203C\\u2049\\u2122\\u2139\\u2194-\\u2199\\u21A9\\u21AA\\u2300-\\u23FF\\u24C2\\u25A0-\\u25FF\\u2600-\\u27BF\\u2934\\u2935\\u2B05-\\u2B55\\u3030\\u303D\\u3297\\u3299]\\uFE0F)' +
+  '(?:[\\u{1F3FB}-\\u{1F3FF}]|\\uFE0F|[\\u{E0020}-\\u{E007F}])*' +
+  '(?:\\u200D(?:[\\u{1F000}-\\u{1FAFF}]|[\\u2600-\\u27BF\\u2B00-\\u2BFF])\\uFE0F?(?:[\\u{1F3FB}-\\u{1F3FF}]|[\\u{E0020}-\\u{E007F}])*)*';
+
+/** Un pictogramme quelque part dans la ligne : le test rapide, sans drapeau `g`. */
+const UN_PICTOGRAMME = new RegExp(SEQUENCE_EMOJI, 'u');
+
+/** Les pictogrammes qui se suivent, avec les blancs qui les entourent (rendus à part). */
+const PICTOGRAMMES = new RegExp(`([ \\t]*)((?:${SEQUENCE_EMOJI})+)([ \\t]*)`, 'gu');
+
+/**
+ * Coche et croix gardent leur sens : dans un tableau « Condition | Remplie »,
+ * un « ✅ » retiré laisserait une case vide. Elles deviennent les signes de
+ * texte « ✓ » et « ✗ », dessinés dans la couleur du texte.
+ */
+const COCHE_EMOJI = new RegExp('\\u2705|[\\u2714\\u2611]\\uFE0F', 'g');
+const CROIX_EMOJI = new RegExp('[\\u274C\\u274E]\\uFE0F?|\\u2716\\uFE0F', 'g');
+
+/** Reste d'un chiffre en touche (« 1️⃣ ») : le chiffre est gardé, l'habillage retiré. */
+const HABILLAGE_DE_TOUCHE = new RegExp('\\uFE0F?\\u20E3', 'g');
+
+/** Ce qui ouvre un passage : après lui, le blanc qui suivait le pictogramme n'a plus lieu d'être. */
+const OUVERTURE = /[([«“‘"'*_]/;
+/** Ce qui ferme un passage, ou une ponctuation basse : devant elle, pas de blanc. */
+const FERMETURE = /[)\]»”’"'*_.,…]/;
+
+/**
+ * La ligne sans ses pictogrammes émoji, et sans le blanc qu'ils laissaient :
+ * « 📌 **Réponse directe** » devient « **Réponse directe** » (et non
+ * « ** Réponse directe** », que l'emphase ne reconnaîtrait plus), « Délai : 📌
+ * 3 jours » devient « Délai : 3 jours », « (📌 note) » devient « (note) ».
+ *
+ * Exportée pour les tests du chat.
+ */
+export function sansPictogrammes(ligne: string): string {
+  const signes = ligne.replace(COCHE_EMOJI, '\u2713').replace(CROIX_EMOJI, '\u2717');
+  if (!UN_PICTOGRAMME.test(signes)) return signes.replace(HABILLAGE_DE_TOUCHE, '');
+  return signes
+    .replace(PICTOGRAMMES, (tout: string, avant: string, _pictos: string, apres: string, position: number, chaine: string) => {
+      const gauche = chaine[position - 1];
+      const droite = chaine[position + tout.length];
+      // Bord de ligne, ou collé des deux côtés (« Oui🎉non ») : rien à garder.
+      if (gauche === undefined || droite === undefined || (!avant && !apres)) return '';
+      if (OUVERTURE.test(gauche) || FERMETURE.test(droite)) return '';
+      // Entre deux mots : un seul blanc.
+      return avant || apres;
+    })
+    .replace(HABILLAGE_DE_TOUCHE, '');
 }
 
 /** Retire au plus `retrait` espaces en tête : celles de la clôture ouvrante. */
@@ -215,18 +352,27 @@ function sansRetrait(ligne: string, retrait: number): string {
  * Seul un bloc de code garde ses lignes et ses espaces tels quels : c'est sa
  * raison d'être. Il court jusqu'à sa clôture, ou jusqu'à la fin du texte —
  * pendant le flux, la clôture n'est souvent pas encore arrivée.
+ *
+ * `options.gras` : le gras dans la ligne reste, en marques (voir
+ * `emphaseEnGras`), dans les paragraphes, les puces et les cellules. Un
+ * titre est déjà en gras tout entier : il n'en porte pas.
  */
-export function blocsDeReponse(texte: string): Bloc[] {
+export function blocsDeReponse(texte: string, options: OptionsDesBlocs = {}): Bloc[] {
   if (!texte || !texte.trim()) return [];
 
+  const emphase = options.gras ? emphaseEnGras : sansEmphase;
   const blocs: Bloc[] = [];
   let paragraphe: string[] = [];
   let tableau: { entetes: string[]; lignes: string[][]; delimite: boolean } | null = null;
   let code: { marque: string; retrait: number; lignes: string[] } | null = null;
 
+  // Seuls les blancs ORDINAIRES se recollent. `\s` attrapait aussi les
+  // espaces insécables (U+00A0 après « n° », U+202F dans « 2 275 » ou devant
+  // « : ») : devenues espaces simples, « 2 » et « 275 » pouvaient finir sur deux
+  // lignes, et un deux-points commencer la suivante.
   const viderParagraphe = () => {
     if (paragraphe.length === 0) return;
-    const assemble = sansEmphase(paragraphe.join(' ').replace(/\s+/g, ' '));
+    const assemble = emphase(paragraphe.join(' ').replace(/[ \t\r\n\f\v]+/g, ' '));
     if (assemble) blocs.push({ type: 'paragraphe', texte: assemble });
     paragraphe = [];
   };
@@ -267,7 +413,13 @@ export function blocsDeReponse(texte: string): Bloc[] {
     if (contenu) blocs.push({ type: 'code', texte: contenu });
   };
 
-  for (const ligneBrute of texte.split(/\r?\n/)) {
+  for (const ligneLue of texte.split(/\r?\n/)) {
+    // Les pictogrammes émoji partent avant tout le reste (voir
+    // `sansPictogrammes`). Une ligne qui n'était faite que d'eux disparaît
+    // entière : vidée, elle aurait coupé le paragraphe en deux, comme une
+    // ligne vide.
+    const ligneBrute = sansPictogrammes(ligneLue);
+    if (ligneBrute !== ligneLue && !ligneBrute.trim() && ligneLue.trim()) continue;
     const cloture = ligneBrute.match(CLOTURE_DE_CODE);
 
     if (code) {
@@ -311,7 +463,7 @@ export function blocsDeReponse(texte: string): Bloc[] {
       } else if (!tableau && paragraphe.length && paragraphe[paragraphe.length - 1].includes('|')) {
         const entete = paragraphe.pop() as string;
         viderParagraphe();
-        tableau = { entetes: cellulesDe(entete), lignes: [], delimite: true };
+        tableau = { entetes: cellulesDe(entete, emphase), lignes: [], delimite: true };
       }
       // Ailleurs, un délimiteur isolé est simplement ignoré.
       continue;
@@ -320,7 +472,7 @@ export function blocsDeReponse(texte: string): Bloc[] {
     // Une fois le tableau ouvert, ses lignes peuvent omettre la barre de tête.
     if (LIGNE_DE_TABLEAU.test(ligne) || (tableau && ligne.includes('|'))) {
       viderParagraphe();
-      const cellules = cellulesDe(ligne);
+      const cellules = cellulesDe(ligne, emphase);
       // « | » ou « | | » seuls : rien à montrer. Pendant le flux, c'est le
       // début d'une ligne dont la suite n'est pas encore arrivée.
       if (cellules.every((cellule) => !cellule)) continue;
@@ -357,7 +509,7 @@ export function blocsDeReponse(texte: string): Bloc[] {
     const puce = ligne.match(PUCE);
     if (puce) {
       viderParagraphe();
-      const t = sansEmphase(puce[2]);
+      const t = emphase(puce[2]);
       const chiffres = /^\d+/.exec(puce[1]);
       if (t) {
         blocs.push(
@@ -376,6 +528,35 @@ export function blocsDeReponse(texte: string): Bloc[] {
   viderTableau();
   viderParagraphe();
   return blocs;
+}
+
+// ---------------------------------------------------------------------------
+// Espaces insécables
+// ---------------------------------------------------------------------------
+
+/**
+ * « n° 92/007 », « art. 35 », « l’article 312 » : l'espace qui suit « n° »,
+ * « art. » ou « article » devient insécable, pour que le numéro ne parte pas
+ * seul à la ligne suivante.
+ *
+ * POURQUOI. Le modèle écrit une espace ordinaire : à 390 px, on lisait « …de
+ * la loi n° » en fin de ligne et « 92/007 fixerait le barème » au début de
+ * la suivante (capture chat r2). Les intitulés composés par le chat avaient
+ * déjà leur insécable ($lib/components/chat/libelles, `typographieDesNumeros`),
+ * pas le texte de la réponse. Une espace contre une espace : la longueur du
+ * texte ne change pas, et les marques des citations restent à leur place.
+ * Seule la casse écrite est gardée ; rien d'autre ne bouge.
+ *
+ * « article » et « articles » se lient au numéro seulement (« 312 », « 1er »,
+ * « premier ») : le prompt impose « l’article X du Code Y », la forme la plus
+ * fréquente, et « et l’article » finissait encore une ligne à 390 px, « 312
+ * du Code pénal » commençant la suivante (revue du chat, 29/10). Suivi d'un
+ * mot (« l’article cité »), il se coupe comme avant.
+ */
+export function insecablesDuTexte(texte: string): string {
+  return texte
+    .replace(/(\b[Nn][°º]|\b[Aa]rt\.)[ \t]+(?=\S)/g, '$1\u00A0')
+    .replace(/(\b[Aa]rticles?)[ \t]+(?=\d|premi(?:er|ère)\b)/g, '$1\u00A0');
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { libelleDeSource, nomCourtDuTexte } from './sources';
+import { libelleDeLaCitation } from './components/chat/libelles';
+import { estUneCoteInterne, libelleDeSource, nomCourtDuTexte } from './sources';
 
 describe('le nom court d une source', () => {
   it.each([
@@ -36,10 +37,40 @@ describe('le nom court d une source', () => {
     expect(nomCourtDuTexte(titre)).toBe(nom);
   });
 
-  it('sans titre, la cote ; sans motif reconnu, le titre entier', () => {
-    expect(nomCourtDuTexte('', 'PRC-4722')).toBe('PRC-4722');
-    expect(nomCourtDuTexte(null, 'PRC-4722')).toBe('PRC-4722');
+  it('sans titre, jamais la cote (P2, P11) ; sans motif reconnu, le titre entier', () => {
+    // « Art. 12 — PRC-9153 » se serait affiché dans les listes du chat.
+    expect(nomCourtDuTexte('', 'PRC-4722')).toBe('');
+    expect(nomCourtDuTexte(null, 'PRC-4722')).toBe('');
+    expect(nomCourtDuTexte('  ', 'LOI-1992-007')).toBe('');
+    expect(nomCourtDuTexte(undefined, 'OHADA-AUDCG-2010')).toBe('');
+    // Une référence saisie comme un nom, et non une cote, en reste un.
+    expect(nomCourtDuTexte('', 'Décret N°2024/PM/123')).toBe('Décret N°2024/PM/123');
     expect(nomCourtDuTexte('Code OHADA')).toBe('Code OHADA');
+  });
+});
+
+describe('une cote interne', () => {
+  it('reconnaît les cotes de jurix_dev, et laisse les noms', () => {
+    for (const cote of ['PRC-9153', 'LOI-1992-007', 'DEC-1994-199', 'ORD-1981-002', 'OHADA-AUDCG-2010', 'CODE-CIVIL', 'CIMA-CODE-2019']) {
+      expect(estUneCoteInterne(cote), cote).toBe(true);
+    }
+    for (const nom of ['Code civil applicable au Cameroun', 'Décret N°2024/PM/123', 'COVID-19', '', null]) {
+      expect(estUneCoteInterne(nom), String(nom)).toBe(false);
+    }
+  });
+});
+
+describe('un texte cité sans intitulé, dans le chat', () => {
+  const t = (cle: string) => (cle === 'chat.citation.sansIntitule' ? 'Texte sans intitulé' : cle === 'chat.citation.article' ? 'Art. {n} — {nom}' : cle);
+
+  it('se nomme « Texte sans intitulé », jamais par sa cote', () => {
+    expect(libelleDeLaCitation('12', '', 'PRC-9153', t)).toBe('Art. 12 — Texte sans intitulé');
+    expect(libelleDeLaCitation(null, '', 'PRC-9153', t)).toBe('Texte sans intitulé');
+    expect(libelleDeSource({ law_reference: 'PRC-9153', law_title: '', article_number: '12' }, 'Texte sans intitulé')).toBe(
+      'Article 12 — Texte sans intitulé',
+    );
+    // Sans nom de repli, l'article se nomme seul.
+    expect(libelleDeSource({ law_reference: 'PRC-9153', law_title: '', article_number: '12' })).toBe('Article 12');
   });
 });
 

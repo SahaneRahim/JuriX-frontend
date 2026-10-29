@@ -84,9 +84,14 @@
     class="flex-grow flex flex-col items-center justify-center pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] py-12 sm:py-20 court:py-4 text-center"
     data-testid="error-page"
   >
-    <p class="text-6xl sm:text-7xl court:text-4xl font-extrabold text-zinc-950 dark:text-white mb-4 court:mb-2 font-mono">{$page.status}</p>
+    <!-- Le code en Inter, chiffres alignés (Q5 A : deux voix au plus, la
+         chasse fixe réservée aux codes courts écrits petit, comme « Ctrl K »).
+         En Geist Mono extra-grasse, il faisait une troisième police sur un
+         écran presque vide, au-dessus du titre en Literata et du texte en
+         Inter. -->
+    <p class="text-6xl sm:text-7xl court:text-4xl font-extrabold tracking-tight tabular-nums text-zinc-950 dark:text-white mb-4 court:mb-2">{$page.status}</p>
 
-    <h1 class="text-2xl font-bold text-zinc-950 dark:text-white mb-3 court:mb-1 coupe-mots tracking-tight">
+    <h1 class="text-2xl font-titre font-semibold text-zinc-950 dark:text-white mb-3 court:mb-1 coupe-mots">
       {titre}
     </h1>
 
@@ -114,7 +119,10 @@
           >{$tr("error.retry")}</a
         >
       {/if}
-      <a href="/" class={indisponible ? SECONDAIRE : PRINCIPAL}>
+      <!-- `error-home` : l'action principale de la page pour les tests
+           d'écran court (tests/e2e/pages-du-site.ts), présente à toutes les
+           largeurs, contrairement aux liens de navigation plus bas. -->
+      <a href="/" class={indisponible ? SECONDAIRE : PRINCIPAL} data-testid="error-home">
         <Icone nom="house" class="text-base" />
         {$tr("categories.backHome")}
       </a>
@@ -161,8 +169,11 @@
     <!-- Les autres destinations de la navigation, en liens discrets (même
          liste : une seule à maintenir). `text-balance` : sur téléphone, les
          lignes s'équilibrent au lieu de laisser un lien seul en dessous.
-         Le pied de page ne les répète pas ici (`navigation={false}`). -->
-    <nav class="mt-6 max-w-md text-balance sm:mt-8 court:mt-2">
+         Le pied de page ne les répète pas ici (`navigation={false}`).
+         `lg:hidden` : à partir de lg, l'en-tête affiche ces mêmes liens juste
+         au-dessus, et la liste paraissait deux fois. En dessous, il les range
+         dans son menu : ici, ils restent à portée sans l'ouvrir. -->
+    <nav class="mt-6 max-w-md text-balance sm:mt-8 court:mt-2 lg:hidden">
       {#each AUTRES_DESTINATIONS as lien (lien.href)}
         <a
           href={lien.href}

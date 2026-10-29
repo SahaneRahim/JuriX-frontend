@@ -250,7 +250,7 @@
          de quoi il s'agissait. Le titre dit maintenant la tâche, en 24 px dès
          sm : au-dessus des libellés de 14 px et du bouton, sans égaler le h1
          d'une page (guide § 4.2). -->
-    <h1 class="mb-2 flex items-center justify-center gap-2 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl">
+    <h1 class="mb-2 flex items-center justify-center gap-2 text-xl font-titre font-semibold text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl">
       <span
         class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-100 text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-200 court:hidden"
       >

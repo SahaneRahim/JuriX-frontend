@@ -10,6 +10,7 @@ import { lireAEnvoyer, lirePersona, personaStore } from '$lib/stores/persona';
 import {
   _reinitialiserEnvois,
   changerPersona,
+  lectureDuCompteEnCours,
   lireValeurDuCompte,
   reconcilierPersonaALaConnexion,
   refuserPourCetteSession,
@@ -210,6 +211,72 @@ describe('au demarrage', () => {
     await enCours;
 
     expect(get(personaStore).persona).toBe('avocat');
+  });
+});
+
+/**
+ * La question du profil (chat, P5) attend la lecture du compte : posée avant,
+ * elle demandait un profil que le compte avait déjà, et le choix fait dans le
+ * fil le remplaçait sur le compte.
+ */
+describe('la lecture du compte, attendue par la question du profil', () => {
+  it('anonyme : rien a attendre', async () => {
+    repondreAvec();
+
+    const enCours = synchroniserPersonaAuDemarrage();
+
+    expect(lectureDuCompteEnCours()).toBeNull();
+    await enCours;
+  });
+
+  it('connecte : la lecture se laisse attendre, et le profil du compte est en place a sa fin', async () => {
+    connecte();
+    let liberer: (r: Response) => void = () => {};
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((r) => { liberer = r; })));
+
+    const enCours = synchroniserPersonaAuDemarrage();
+    const lecture = lectureDuCompteEnCours();
+    expect(lecture).not.toBeNull();
+    let finie = false;
+    void lecture?.then(() => (finie = true));
+    await Promise.resolve();
+    expect(finie).toBe(false);
+
+    liberer(json({ persona: 'avocat' }));
+    await lecture;
+
+    expect(get(personaStore).persona).toBe('avocat');
+    await enCours;
+    expect(lectureDuCompteEnCours()).toBeNull();
+  });
+
+  it('en echec ou au-dela de 4 s, l attente finit aussi', async () => {
+    connecte();
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) =>
+      new Promise<Response>((_r, rejeter) => {
+        init?.signal?.addEventListener('abort', () => rejeter(new DOMException('abandon', 'AbortError')));
+      }),
+    ));
+
+    const enCours = synchroniserPersonaAuDemarrage();
+    const lecture = lectureDuCompteEnCours();
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await expect(lecture).resolves.toBeUndefined();
+    await enCours;
+    expect(lectureDuCompteEnCours()).toBeNull();
+  });
+
+  it('un envoi en attente : rien a attendre, le profil local fait foi', async () => {
+    connecte();
+    repondreAvec(new Error('reseau'));
+    await changerPersona('étudiant');
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {}))); // ne repond jamais
+
+    await synchroniserPersonaAuDemarrage();
+
+    expect(lectureDuCompteEnCours()).toBeNull();
   });
 });
 

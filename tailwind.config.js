@@ -53,6 +53,27 @@ export default {
         // systeme, qui change d'un poste a l'autre. Les polices de Tailwind
         // restent en repli, pour un caractere hors du latin (⌘ des touches).
         mono: ["Geist Mono Variable", ...defaultTheme.fontFamily.mono],
+        // Literata, la serif de la refonte (Q5 A), auto-hebergee (src/app.css).
+        // Deux voix au plus sur une page : Inter partout, la serif pour les
+        // seuls titres d'affichage et le texte officiel. La chasse fixe ne
+        // garde que les codes courts (« Ctrl K ») : surtitres, dates et
+        // compteurs passent en Inter.
+        //
+        // `font-titre` : instance figee en taille optique 72, graisse 600, pour
+        // le h1 de l'accueil et des pages, le titre officiel d'un texte et
+        // « Article N ». Avec `font-semibold` (la graisse du fichier) et sans
+        // `tracking-tight` : interlettrage nul, le dessin d'affichage est deja
+        // serre. Interligne de 1,15 a 1,25, `text-balance`.
+        //
+        // `font-texte` : taille optique 16, graisse 400, pour le corps des
+        // articles, les apercus de citation et les extraits cites mot pour
+        // mot. Jamais pour ce que l'IA redige, qui reste en Inter.
+        //
+        // Chaque famille est suivie de ses replis ajustes (Noto Serif, puis
+        // Georgia ; @font-face de src/app.css), puis de la pile serif de
+        // Tailwind pour un poste qui n'aurait ni l'une ni l'autre.
+        titre: ["Literata Titre", "Literata Titre repli Noto", "Literata Titre repli Georgia", ...defaultTheme.fontFamily.serif],
+        texte: ["Literata Texte", "Literata Texte repli Noto", "Literata Texte repli Georgia", ...defaultTheme.fontFamily.serif],
       },
       boxShadow: {
         'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',

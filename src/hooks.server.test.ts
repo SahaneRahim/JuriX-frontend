@@ -234,3 +234,33 @@ describe('handle : noindex des pages privées', () => {
     }
   });
 });
+
+describe('handle : polices préchargées', () => {
+  type Preload = (entree: { type: 'font' | 'css' | 'js' | 'asset'; path: string }) => boolean;
+
+  /** Le filtre `preload` que `handle` remet à SvelteKit pour une page publique. */
+  async function filtre(): Promise<Preload> {
+    let preload: Preload | undefined;
+    await handle({
+      event: { url: new URL('https://jurix.example/'), isDataRequest: false } as never,
+      resolve: async (_event, options) => {
+        preload = options?.preload;
+        return new Response('<html></html>', { headers: { 'content-type': 'text/html' } });
+      },
+    });
+    if (!preload) throw new Error('handle ne passe plus de filtre `preload`');
+    return preload;
+  }
+
+  it('précharge Inter, le JavaScript et la feuille de style, jamais Literata', async () => {
+    const preload = await filtre();
+    expect(preload({ type: 'font', path: '/_app/immutable/assets/inter-latin-wght-normal.DjQ2pHkf.woff2' })).toBe(true);
+    expect(preload({ type: 'js', path: '/_app/immutable/entry/start.BxQ1.js' })).toBe(true);
+    expect(preload({ type: 'css', path: '/_app/immutable/assets/0.Cq7.css' })).toBe(true);
+    // Raisons dans src/app.css : 20 Kio disputés à Inter sur chaque page,
+    // pour des titres qui ont leur repli ajusté.
+    expect(preload({ type: 'font', path: '/_app/immutable/assets/literata-titre.B1x2Yz.woff2' })).toBe(false);
+    expect(preload({ type: 'font', path: '/_app/immutable/assets/literata-texte.C3y4Wv.woff2' })).toBe(false);
+    expect(preload({ type: 'font', path: '/_app/immutable/assets/geist-mono-latin-wght-normal.D5.woff2' })).toBe(false);
+  });
+});

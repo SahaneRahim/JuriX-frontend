@@ -70,8 +70,18 @@
     return lawUrl.replace("/download", "");
   }
 
-  // Keyboard navigation handler
+  /** La visionneuse entière (barre d'outils et cadre) : les flèches n'agissent que dedans. */
+  let racine: HTMLDivElement | undefined;
+
+  /**
+   * Flèches du clavier : page précédente ou suivante, SEULEMENT quand le focus
+   * est dans la visionneuse. Écoutées sur toute la fenêtre, elles volaient les
+   * flèches de la page entière dès que le document d'origine était ouvert :
+   * « ↓ » tournait la page du PDF au lieu de faire défiler l'article, et
+   * `preventDefault` empêchait le défilement au clavier.
+   */
   function handleKeydown(event: KeyboardEvent) {
+    if (!racine || !(event.target instanceof Node) || !racine.contains(event.target)) return;
     if (
       totalPages === 0 ||
       // `activeElement` est nul quand aucun element n'a le focus — au premier
@@ -103,7 +113,6 @@
 
     try {
       const baseUrl = getBaseUrl(url);
-      console.log("Fetching PDF info from:", `${baseUrl}/pdf-info`);
 
       // Get PDF info (page count)
       const infoResponse = await fetch(`${baseUrl}/pdf-info`);
@@ -115,7 +124,6 @@
 
       const pdfInfo = await infoResponse.json();
       totalPages = pdfInfo.page_count;
-      console.log(`PDF has ${totalPages} pages`);
 
       loading = false;
       // Le cadre doit exister pour etre mesure : c'est sa largeur qui fixe la
@@ -166,7 +174,6 @@
     try {
       const baseUrl = getBaseUrl(url);
       const pageUrl = `${baseUrl}/page/${num}?dpi=${dpi}`;
-      console.log(`Loading page ${num}:`, pageUrl);
 
       // Preload image
       const response = await fetch(pageUrl);
@@ -216,6 +223,22 @@
   }
 
   $: verifierResolution(zoom);
+
+  /**
+   * La visionneuse suit l'article lu : ouverte pendant la lecture, elle va à
+   * la page du nouvel article (`initialPage`, calculée par la page du texte).
+   * Rien avant le premier chargement, que `onMount` fait déjà sur cette page,
+   * ni vers la page affichée ; une page choisie à la main reste jusqu'au
+   * prochain article.
+   */
+  let pageDemandeeAvant = initialPage;
+  $: suivreLaPageDemandee(initialPage);
+  function suivreLaPageDemandee(demandee: number) {
+    if (demandee === pageDemandeeAvant) return;
+    pageDemandeeAvant = demandee;
+    if (loading || totalPages === 0) return;
+    if (demandee >= 1 && demandee <= totalPages && demandee !== pageNum) void loadPage(demandee);
+  }
 
   // La largeur du cadre ne change qu'avec celle de la fenetre (rotation,
   // redimensionnement) : l'evenement `resize` suffit, sans ResizeObserver.
@@ -311,6 +334,7 @@
   l'entoure : les pages, blanches, s'y détachent comme sur une table de lecture.
 -->
 <div
+  bind:this={racine}
   class="pdf-viewer flex w-full flex-col items-center gap-2 bg-zinc-50 p-2 sm:gap-3 sm:p-4 dark:bg-zinc-950"
 >
   {#if loading}
@@ -334,7 +358,9 @@
       Deux groupes qui passent a la ligne en bloc, centres : les pages, puis le
       zoom. L'ancien separateur (bordure et marge a gauche du zoom) restait
       accroche en debut de ligne une fois le groupe renvoye dessous. Boutons de
-      44 px sous `sm` ; Precedent / Suivant n'y sont plus que des fleches,
+      44 px au doigt, tablette comprise (36 px seulement sous un pointeur fin a
+      partir de `lg`, la regle de la page) ; Precedent / Suivant n'y sont plus
+      que des fleches,
       nommees par aria-label.
 
       Page precedente / suivante au dessin de la pagination du site (/search,
@@ -350,7 +376,7 @@
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:border-zinc-800 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 lg:[@media(pointer:fine)]:h-9 lg:[@media(pointer:fine)]:w-9 dark:border-zinc-800 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={onPrevPage}
           disabled={pageNum <= 1 || pageLoading}
           aria-label={$tr("pdf.previousPage")}
@@ -372,13 +398,13 @@
             value={pageNum}
             on:change={(e) => goToPage((e.currentTarget as HTMLInputElement).value)}
             disabled={pageLoading}
-            class="h-11 w-14 rounded-lg border-zinc-300 bg-white px-1 text-center text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 sm:h-9 sm:w-16 sm:text-sm dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
+            class="h-11 w-14 rounded-lg border-zinc-300 bg-white px-1 text-center text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 sm:w-16 lg:[@media(pointer:fine)]:h-9 sm:text-sm dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
           />
           {$tr("pdf.of")} {totalPages}
         </span>
         <button
           type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:border-zinc-800 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 lg:[@media(pointer:fine)]:h-9 lg:[@media(pointer:fine)]:w-9 dark:border-zinc-800 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={onNextPage}
           disabled={pageNum >= totalPages || pageLoading}
           aria-label={$tr("pdf.nextPage")}
@@ -392,7 +418,7 @@
       <div class="zoom-controls flex items-center gap-1">
         <button
           type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 lg:[@media(pointer:fine)]:h-9 lg:[@media(pointer:fine)]:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={zoomOut}
           disabled={zoom <= NIVEAUX_ZOOM[0]}
           aria-label={$tr("pdf.zoomOut")}
@@ -406,7 +432,7 @@
         >
         <button
           type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 lg:[@media(pointer:fine)]:h-9 lg:[@media(pointer:fine)]:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={zoomIn}
           disabled={zoom >= NIVEAUX_ZOOM[NIVEAUX_ZOOM.length - 1]}
           aria-label={$tr("pdf.zoomIn")}
@@ -418,7 +444,7 @@
              `scan` n'a que les coins. -->
         <button
           type="button"
-          class="ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
+          class="ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 lg:[@media(pointer:fine)]:h-9 lg:[@media(pointer:fine)]:w-9 dark:text-zinc-400 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white"
           on:click={ajusterALaLargeur}
           disabled={zoom === NIVEAUX_ZOOM[0]}
           aria-label={$tr("pdf.fitWidth")}

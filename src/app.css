@@ -48,6 +48,170 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/*
+ * Literata, la serif de la refonte (proposition Q5, variante A), en deux
+ * instances STATIQUES tirées du fichier variable officiel (googlefonts/literata,
+ * étiquette 3.103, commit 0c2761b7, licence OFL 1.1 : src/lib/polices/literata/
+ * OFL.txt) et réduites à la plage d'Inter, latin et ponctuation française :
+ * - « Literata Titre » : taille optique 72, graisse 600, 20,0 Kio. Grands
+ *   titres seulement (h1 de l'accueil et des pages, titre officiel d'un texte,
+ *   « Article N »), classe `font-titre` ;
+ * - « Literata Texte » : taille optique 16, graisse 400, 19,0 Kio. Le texte
+ *   officiel lui-même (corps des articles, aperçus de citation, extraits cités
+ *   mot pour mot), classe `font-texte`.
+ * Inter garde tout le reste, et tout ce que l'IA rédige : une réponse générée
+ * habillée de la serif officielle paraîtrait plus sûre qu'elle ne l'est.
+ * Jamais le fichier variable complet (107,5 Kio), jamais fonts.googleapis.com.
+ * Fabrication (fontTools 4.60), depuis fonts/variable/Literata[opsz,wght].ttf :
+ * `instancer.instantiateVariableFont` au point (opsz, wght), puis `subset` en
+ * woff2 sur la plage ci-dessous, avec les fonctionnalités kern, liga, calt,
+ * ccmp, locl, mark, mkmk, rlig, lnum, tnum et case, et les noms 0 à 6, 13, 14,
+ * 16 et 17 : le fichier servi porte ainsi sa notice de copyright et sa licence.
+ *
+ * font-display: optional, comme Inter : arrivée trop tard, la police n'est pas
+ * substituée en cours de lecture (aucun saut), elle sert à l'affichage suivant,
+ * depuis le cache (fichier immuable, gardé un an).
+ *
+ * AUCUN PRÉCHARGEMENT (src/hooks.server.ts ne précharge qu'Inter). Le titre
+ * en serif est un plus, pas une condition de lecture. Préchargé sur chaque
+ * page, ce fichier de 20 Kio disputerait la bande passante à la feuille de
+ * style, au JavaScript et à Inter (environ 0,1 s à 1,6 Mbit/s) : sur un réseau
+ * lent, c'est Inter, la police de tout le texte, qui risquerait alors de
+ * manquer son affichage. Sans préchargement, un titre manqué s'affiche dans
+ * son repli ajusté (plus bas), une serif de la même chasse, et la visite
+ * suivante a Literata. Le texte officiel, lui, n'est demandé que sur les pages
+ * qui l'affichent (/laws, la comparaison, l'aperçu du chat) : le précharger
+ * partout coûterait 19 Kio à toutes les autres.
+ *
+ * Gras dans le texte officiel (passage cité en gras dans l'aperçu, P3) :
+ * l'instance titre sert de graisse 600 à « Literata Texte ». Un vrai gras,
+ * sans octet de plus (même fichier, déjà en cache dès qu'un titre l'a
+ * demandé), là où le navigateur aurait épaissi le 400 (faux gras). Sur le
+ * texte des articles, il ne chasse que 2 % de plus que le romain.
+ * Sur /chat, aucun titre ne le demande (celui de la page est masqué) : en
+ * optional, arrivé à l'ouverture de l'aperçu, il manquait la visite, et le
+ * passage en gras sortait en Noto Serif Bold dans un romain Literata. Le chat
+ * demande donc les deux graisses de « Literata Texte » au repos, dès qu'une
+ * réponse porte des citations (src/lib/components/chat/polices.ts).
+ */
+@font-face {
+  font-family: 'Literata Titre';
+  font-style: normal;
+  font-display: optional;
+  font-weight: 600;
+  src: url('./lib/polices/literata/literata-titre.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Literata Texte';
+  font-style: normal;
+  font-display: optional;
+  font-weight: 400;
+  src: url('./lib/polices/literata/literata-texte.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Literata Texte';
+  font-style: normal;
+  font-display: optional;
+  font-weight: 600;
+  src: url('./lib/polices/literata/literata-titre.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/*
+ * Replis de Literata : des polices DU SYSTÈME, ajustées pour occuper la place
+ * de Literata. Noto Serif d'abord, la serif d'Android (AOSP, fonts.xml ; elle
+ * est aussi sur la plupart des Linux), puis Georgia (Windows, macOS, iOS).
+ * Seules celles du poste servent : `local()` ne télécharge rien.
+ *
+ * Avec optional, une Literata en retard n'est jamais substituée : le repli
+ * reste à l'écran toute la visite. Ajusté, il coupe les lignes presque aux
+ * mêmes endroits (un titre d'accueil sur deux lignes à 360 px le reste), et
+ * la visite suivante, qui a Literata, garde la même mise en page.
+ *
+ * Réglages mesurés sur les fichiers eux-mêmes (avances de la table hmtx, sans
+ * crénage), à la manière de next/font et de Fontaine, mais sur du français
+ * réel : les 2 275 titres du corpus pour le titre, le texte de trois lois pour
+ * le corps (Noto Serif 2.004 ; Georgia 2.05, des « core fonts » de Microsoft).
+ * Vérifié dans Chromium à 360 px : titre d'accueil, titres officiels et
+ * paragraphe d'article gardent le même nombre de lignes et la même hauteur
+ * avec chacun des replis qu'avec Literata.
+ * - size-adjust : chasse moyenne de Literata / chasse moyenne du repli ;
+ * - ascent-override, descent-override, line-gap-override : hauteurs de
+ *   Literata (1,177 et 0,308 em, sans interligne) divisées par size-adjust,
+ *   pour que la ligne garde sa hauteur et sa ligne de base.
+ * Le gras du système (700) remplace l'instance 600, faute de demi-gras ; pour
+ * le titre, il vient des titres, pour le gras du texte, du corps des articles.
+ */
+@font-face {
+  font-family: 'Literata Titre repli Noto';
+  font-style: normal;
+  font-weight: 600;
+  src: local('Noto Serif Bold'), local('NotoSerif-Bold');
+  size-adjust: 95.75%;
+  ascent-override: 122.93%;
+  descent-override: 32.17%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Literata Titre repli Georgia';
+  font-style: normal;
+  font-weight: 600;
+  src: local('Georgia Bold'), local('Georgia-Bold');
+  size-adjust: 93.2%;
+  ascent-override: 126.29%;
+  descent-override: 33.05%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Literata Texte repli Noto';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Noto Serif Regular'), local('NotoSerif-Regular'), local('Noto Serif'), local('NotoSerif');
+  size-adjust: 99.19%;
+  ascent-override: 118.67%;
+  descent-override: 31.05%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Literata Texte repli Noto';
+  font-style: normal;
+  font-weight: 600;
+  src: local('Noto Serif Bold'), local('NotoSerif-Bold');
+  size-adjust: 95.11%;
+  ascent-override: 123.75%;
+  descent-override: 32.38%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Literata Texte repli Georgia';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Georgia');
+  size-adjust: 106.88%;
+  ascent-override: 110.12%;
+  descent-override: 28.82%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Literata Texte repli Georgia';
+  font-style: normal;
+  font-weight: 600;
+  src: local('Georgia Bold'), local('Georgia-Bold');
+  size-adjust: 93.86%;
+  ascent-override: 125.4%;
+  descent-override: 32.82%;
+  line-gap-override: 0%;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -321,6 +485,18 @@
     /* Repli pour les navigateurs sans `anywhere` (Safari avant 15.4). */
     overflow-wrap: break-word;
     overflow-wrap: anywhere;
+  }
+
+  /*
+   * Literata (familles de tailwind.config.js, polices plus haut) : des
+   * instances figées, chacune à sa graisse et à sa taille optique. Le
+   * navigateur ne doit jamais les épaissir ni les pencher lui-même : un faux
+   * gras bave, un faux italique déforme le dessin. Un `font-bold` ou un
+   * `<strong>` prend la graisse 600 déclarée, rien d'autre.
+   */
+  .font-titre,
+  .font-texte {
+    font-synthesis: none;
   }
 
   /*

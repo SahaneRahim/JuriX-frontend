@@ -67,17 +67,69 @@ describe('SearchBar', () => {
     expect(await findByText(/membres/)).toBeTruthy();
   });
 
-  it('emet search sur Entree', async () => {
+  it('est un vrai formulaire GET vers /search, avec un champ q (P8)', () => {
+    // Sans JavaScript, c'est le navigateur qui l'envoie : la méthode, l'adresse
+    // et le nom du champ sont tout ce qui fait partir la recherche.
+    const { container } = render(SearchBar, {
+      props: { value: 'bail', champs: [['categorie', '13'], ['tri', 'recent']] }
+    });
+    const formulaire = container.querySelector('form')!;
+    expect(formulaire.getAttribute('method')).toBe('get');
+    expect(formulaire.getAttribute('action')).toBe('/search');
+    expect(formulaire.getAttribute('role')).toBe('search');
+    expect(new FormData(formulaire).getAll('q')).toEqual(['bail']);
+    expect(new FormData(formulaire).getAll('categorie')).toEqual(['13']);
+    expect(new FormData(formulaire).getAll('tri')).toEqual(['recent']);
+    // Entrée et la touche « Rechercher » du clavier envoient par ce bouton :
+    // jamais inactif au rendu, sinon l'envoi par Entrée serait bloqué lui aussi.
+    const envoi = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+    expect(envoi.disabled).toBe(false);
+    expect(envoi.getAttribute('aria-label')).toBeTruthy();
+  });
+
+  it('pendant une recherche, la roue tourne mais le bouton reste actif : Entrée envoie la requête corrigée', () => {
+    // Désactivé pendant `loading`, il bloquait l'envoi implicite par Entrée :
+    // la requête corrigée pendant la recherche ne partait pas.
+    const { container } = render(SearchBar, { props: { value: 'bail commercial', loading: true } });
+    const envoi = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+    expect(container.querySelector('[data-icone="loader-circle"]')).not.toBeNull();
+    expect(envoi.disabled).toBe(false);
+    expect(envoi.getAttribute('aria-label')).toBeTruthy();
+  });
+
+  it('emet search a l’envoi du formulaire', async () => {
     const onSearch = vi.fn();
     const { container } = render(SearchBar, {
       props: { value: 'nomination' },
       events: { search: onSearch }
     });
-    const input = container.querySelector('input')!;
 
-    await fireEvent.keyDown(input, { key: 'Enter' });
+    await fireEvent.submit(container.querySelector('form')!);
 
-    expect(onSearch).toHaveBeenCalled();
+    expect(onSearch).toHaveBeenCalledOnce();
+    expect(onSearch.mock.calls[0][0].detail).toEqual({ query: 'nomination' });
+  });
+
+  it('une requete vide ne part pas quand le JavaScript tourne', async () => {
+    const onSearch = vi.fn();
+    const { container } = render(SearchBar, { props: { value: '   ' }, events: { search: onSearch } });
+    const formulaire = container.querySelector('form')!;
+    const envoi = new Event('submit', { cancelable: true, bubbles: true });
+
+    formulaire.dispatchEvent(envoi);
+
+    expect(envoi.defaultPrevented).toBe(true);
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('Entree sans suggestion choisie laisse le navigateur envoyer le formulaire', async () => {
+    const { container } = render(SearchBar, { props: { value: 'nomination' } });
+    const input = container.querySelector('input[name="q"]')!;
+    const touche = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
+
+    input.dispatchEvent(touche);
+
+    expect(touche.defaultPrevented).toBe(false);
   });
 
   it('une erreur reseau ne casse pas la saisie', async () => {

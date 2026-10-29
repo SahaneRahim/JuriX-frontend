@@ -6,6 +6,7 @@ import {
   _domainesTraduits,
   iconeCategorie,
   nomCategorie,
+  nomCompletCategorie,
 } from '$lib/categories';
 import { ICONES, type NomIcone } from '$lib/icones';
 import CategoryIcon from './CategoryIcon.svelte';
@@ -54,13 +55,26 @@ describe('iconeCategorie', () => {
   });
 
   it('donne la même icône au nom traduit en anglais', () => {
-    // La page d'une catégorie passe `nomCategorie(…, langue)` : en anglais,
-    // « Civil Service » ne doit pas devenir le droit civil, ni « Law of
-    // Persons, Family and Civil Status ».
+    // Un écran peut passer le nom complet traduit : en anglais, « Civil
+    // Service » ne doit pas devenir le droit civil, ni « Law of Persons,
+    // Family and Civil Status ».
     for (const [nom, icone] of ATTENDUES) {
-      const anglais = nomCategorie(nom, 'en');
+      const anglais = nomCompletCategorie(nom, 'en');
       expect(anglais, `traduction de ${nom}`).not.toBe(nom);
       expect(iconeCategorie(anglais), anglais).toBe(icone);
+    }
+  });
+
+  it('donne la même icône au nom court, en français comme en anglais (Q2 A)', () => {
+    // Le nom affiché partout est désormais le nom court (`nomCategorie`) :
+    // « Administration et collectivités » n'a plus le mot « administratif »,
+    // ni « Treaties and agreements » le mot « international ». Un écran qui
+    // passerait ce nom à CategoryIcon garderait l'icône du domaine.
+    for (const [nom, icone] of ATTENDUES) {
+      for (const langue of ['fr', 'en'] as const) {
+        const court = nomCategorie(nom, langue);
+        expect(iconeCategorie(court), `${court} (${langue})`).toBe(icone);
+      }
     }
   });
 

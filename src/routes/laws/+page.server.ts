@@ -1,9 +1,12 @@
 import type { Config } from '@sveltejs/adapter-vercel';
+import { listerTextes } from '$lib/api-publique';
+import { ordonnerLesDomaines } from '$lib/categories';
+import { ligneAffichee, lotDepuis } from '$lib/components/listes/lots';
 import { API_URL, DELAI_API_MS } from '$lib/config';
 import { identifiantDepuis } from '$lib/identifiant';
 import { TAILLE_PAGE_LOIS } from '$lib/pagination';
 import { leverIndisponible, lireJson } from '$lib/panne';
-import type { Category, Law, LoiDeListe } from '$lib/types';
+import type { Category, FiltreLangue } from '$lib/types';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -12,114 +15,89 @@ import type { PageServerLoad } from './$types';
  * Cameroun) ; un document ingéré y apparaît au plus 10 min plus tard.
  *
  * La clé du cache porte les trois paramètres que lit `parametres()`, et eux
- * seuls : chaque filtre et chaque page a sa version, et les autres paramètres
- * (`utm_*`…) n'atteignent pas la fonction.
+ * seuls : chaque filtre et chaque lot a sa version, et les autres paramètres
+ * (`utm_*`…) n'atteignent pas la fonction. `page` compte désormais les lots
+ * à partir de 1 (« Afficher 20 de plus » mène à `?page=2`, P11).
  */
 export const config: Config = {
   isr: { expiration: 600, allowQuery: ['page', 'category', 'lang'] },
 };
 
 /**
- * Chargement SERVEUR, et non universel : la page n'affiche que le titre, la
- * référence, la date, le type et le nombre d'articles, alors que l'API renvoie
- * chaque texte EN ENTIER. Un `load` universel incrusterait ces réponses brutes
- * dans le HTML (300 à 350 Ko par page) ; celui-ci ne renvoie que l'utile, y
- * compris en navigation dans le navigateur.
+ * Chargement SERVEUR, et non universel : la page n'affiche que les repères et
+ * l'objet de chaque texte, alors que l'ancienne API renvoie chaque texte EN
+ * ENTIER. Un `load` universel incrusterait ces réponses brutes dans le HTML ;
+ * celui-ci ne renvoie que l'utile, y compris en navigation dans le navigateur.
  *
- * Filtres et pagination lus depuis l'URL, jamais depuis un état local.
+ * Filtres et lot lus depuis l'URL, jamais depuis un état local : une liste
+ * filtrée se partage et se met en signet, et le retour arrière défait le
+ * dernier filtre.
  *
- * POURQUOI DÉPLACER L'ÉTAT DANS L'URL. Les filtres vivaient dans le composant :
- * toutes les combinaisons partageaient donc la MÊME adresse. Une liste filtrée
- * était impossible à partager, impossible à mettre en signet, et le retour
- * arrière du navigateur sautait la page entière au lieu de défaire le filtre.
- * Portés par l'URL, ils deviennent l'entrée d'un `load`, ce qui règle les trois
- * d'un coup.
- *
- * Toute valeur reçue est validée : ces paramètres viennent de l'extérieur, et un
- * `page=-5` non contrôlé produirait un `skip` négatif que l'API rejette.
+ * Toute valeur reçue est validée : ces paramètres viennent de l'extérieur.
+ * 99999999999 en catégorie faisait échouer l'API (500), et une adresse
+ * malformée était servie comme une panne (503).
  */
 function parametres(url: URL) {
-  const lang = url.searchParams.get('lang');
+  const brut = url.searchParams.get('lang');
   const category = url.searchParams.get('category');
-  const brutPage = Number(url.searchParams.get('page'));
-
-  // Un identifiant de catégorie valide ($lib/identifiant) ; tout le reste vaut
-  // « toutes », plutôt qu'une requête vouée à l'échec. La page est bornée pour
-  // que `skip` reste un entier que l'API accepte : 99999999999 en catégorie
-  // ou 1e21 en page faisaient échouer l'API (500, 422), et une adresse
-  // malformée était servie comme une panne (503).
   const idCategorie = identifiantDepuis(category ?? '');
+  const lang: FiltreLangue = brut === 'fr' || brut === 'en' ? brut : 'all';
   return {
-    lang: lang === 'fr' || lang === 'en' ? lang : 'all',
+    lang,
     category: idCategorie === null ? 'all' : String(idCategorie),
-    page: Number.isFinite(brutPage) && brutPage > 0 ? Math.min(Math.floor(brutPage), PAGE_MAX) : 0,
+    idCategorie,
+    page: lotDepuis(url.searchParams.get('page')),
   };
 }
 
-/** Dernière page demandable : au-delà, `skip` dépasserait un entier 32 bits. */
-const PAGE_MAX = Math.floor(2_147_483_647 / TAILLE_PAGE_LOIS) - 1;
-
 export const load: PageServerLoad = async ({ fetch, url }) => {
-  const { lang, category, page } = parametres(url);
-
-  const params = new URLSearchParams({
-    skip: String(page * TAILLE_PAGE_LOIS),
-    // limit + 1 : une ligne de plus que la page suffit à savoir s'il existe une
-    // suite, sans second appel de comptage. L'API ne renvoie pas de total.
-    limit: String(TAILLE_PAGE_LOIS + 1),
-    // Aucun texte : la liste n'en affiche pas une ligne, et l'API renvoyait
-    // chaque document EN ENTIER, lu, transmis et analysé à chaque génération
-    // de la page. Son poids dépend des 21 lignes reçues, dans un ordre que
-    // l'API ne fixe pas : 36 Ko de texte pour la première page en ligne
-    // (28/10) ; sur le corpus local, 160 Ko par page en médiane, jusqu'à 5 Mo.
-    // 0 : la base ne lit même pas la colonne. Une API qui ignorerait ce
-    // paramètre rendrait le texte entier, comme avant : rien ne casse.
-    content_max_chars: '0',
-  });
-  if (lang !== 'all') params.set('language', lang);
-  if (category !== 'all') params.set('category_id', category);
+  const { lang, category, idCategorie, page } = parametres(url);
 
   // Les deux requêtes en parallèle : la liste des catégories ne dépend d'AUCUN
-  // filtre, l'enchaîner derrière la liste des lois était une cascade gratuite
-  // qui doublait le temps d'affichage. `allSettled` : aucune promesse rejetée
-  // ne reste sans consommateur.
-  const signal = AbortSignal.timeout(DELAI_API_MS);
-  const [reponseLois, reponseCategories] = await Promise.allSettled([
-    fetch(`${API_URL}/laws/?${params}`, { signal }),
-    fetch(`${API_URL}/categories`, { signal }),
+  // filtre. `listerTextes` ne lève jamais : il rend la cause d'un échec.
+  // Une seule requête pour les deux API (lots, tri par date, total sur la
+  // nouvelle ; `skip`/`limit` sans texte sur l'ancienne) : $lib/api-publique.
+  const [liste, [appelCategories]] = await Promise.all([
+    listerTextes(
+      {
+        categorie: idCategorie,
+        langue: lang === 'all' ? null : lang,
+        page,
+        parPage: TAILLE_PAGE_LOIS,
+        // Du plus récent au plus ancien (P11) : l'ancienne API, qui n'a pas de
+        // tri, l'ignore, et la page ne l'annonce alors pas.
+        tri: 'date_desc',
+      },
+      { fetch },
+    ),
+    Promise.allSettled([fetch(`${API_URL}/categories`, { signal: AbortSignal.timeout(DELAI_API_MS) })]),
   ]);
 
   // PANNE DE L'API : 503 au rendu comme en navigation, y compris quand seules
-  // les catégories manquent. Sans cache, la liste s'affichait sans ses filtres
-  // (un confort) plutôt que pas du tout. Mise en cache, cette liste incomplète
-  // serait servie à tous pendant 10 min, et remplacerait la version complète
-  // si la panne tombait sur une régénération ; un 503 n'est jamais gardé, et
-  // Vercel continue de servir la version précédente. `erreur` reste dans les
-  // données pour la page, toujours vide.
-  const lectureLois = await lireJson<Law[]>(reponseLois);
-  const lectureCategories = await lireJson<Category[]>(reponseCategories);
-  if (!lectureLois.ok) leverIndisponible('/laws', lectureLois.cause);
+  // les catégories manquent. Mise en cache, une liste incomplète serait servie
+  // à tous pendant 10 min, et remplacerait la version complète si la panne
+  // tombait sur une régénération ; un 503 n'est jamais gardé, et Vercel
+  // continue de servir la version précédente. `erreur` reste dans les données
+  // pour la page, toujours vide.
+  const lectureCategories = await lireJson<Category[]>(appelCategories);
+  if (!liste.ok) leverIndisponible('/laws', liste.cause);
   if (!lectureCategories.ok) leverIndisponible('/laws', lectureCategories.cause);
 
-  // Seuls les champs que la liste affiche : l'API renvoie chaque texte EN
-  // ENTIER, avec une douzaine de champs dont la page ne lit aucun.
-  const donnees: LoiDeListe[] = lectureLois.valeur.map(
-    ({ id, title, reference, publication_date, article_count, type }) => ({
-      id,
-      title,
-      reference,
-      publication_date,
-      article_count,
-      type,
-    }),
-  );
-  const hasMore = donnees.length > TAILLE_PAGE_LOIS;
-
+  const lot = liste.valeur;
   return {
-    laws: hasMore ? donnees.slice(0, TAILLE_PAGE_LOIS) : donnees,
-    categories: lectureCategories.valeur,
-    hasMore,
-    page,
+    // Seuls les champs que la liste affiche (repères, objet, statut) : ni
+    // texte, ni cote, ni langue.
+    lignes: lot.lignes.map(ligneAffichee),
+    page: lot.page,
+    parPage: lot.parPage,
+    total: lot.total,
+    suivante: lot.suivante,
+    tri: lot.tri,
+    // La liste déroulante des domaines n'en lit que l'identifiant et le nom,
+    // dans l'ordre de l'accueil et de la colonne de filtres de /search
+    // (`ordonnerLesDomaines`) : un domaine au même rang partout, et non dans
+    // l'ordre de l'API (Constitution, administration…).
+    categories: ordonnerLesDomaines(lectureCategories.valeur).map(({ id, name }) => ({ id, name })),
     lang,
     category,
     erreur: '',

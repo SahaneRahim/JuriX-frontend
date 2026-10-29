@@ -5,6 +5,7 @@ import * as categorie from '../routes/categories/[id]/+page.server';
 import * as liste from '../routes/laws/+page.server';
 import * as fiche from '../routes/laws/[id]/+page.server';
 import * as chat from '../routes/(main)/chat/+page';
+import * as recherche from '../routes/search/+page.server';
 
 /**
  * Pages publiques mises en cache par Vercel (ISR, `config.isr` de
@@ -87,7 +88,9 @@ const ROUTES: Route[] = [
   {
     chemin: '/categories/[id]',
     module: categorie as never,
-    attendu: { expiration: 600, allowQuery: ['lang'] },
+    // `page` entre dans la clé avec les lots de 20 (P11) : « Afficher 20 de
+    // plus » mène à `?page=2`, une autre liste, donc une autre version.
+    attendu: { expiration: 600, allowQuery: ['lang', 'page'] },
     adresse: 'http://site/categories/3?lang=en&utm_source=x&page=2',
     params: { id: '3' },
     composants: ['/src/routes/categories/[id]/+page.svelte', '/src/routes/+layout.svelte'],
@@ -203,6 +206,26 @@ describe('/chat : la coquille en cache', () => {
     );
     expect(lus).toEqual(['q']);
     expect(SOURCES['/src/routes/(main)/+layout.svelte']).not.toMatch(/searchParams\s*\.\s*(?:get|getAll|has)\(/);
+  });
+});
+
+describe('/search : rendue à chaque requête, jamais en cache', () => {
+  // P8 : la recherche est rendue par le serveur, pour que le formulaire parte
+  // et que les résultats s'affichent sans JavaScript. Elle lit la question et
+  // tous les filtres de l'adresse (q, nature, categorie…) : en cache, une
+  // clé incomplète servirait à un visiteur les résultats d'une autre question,
+  // et une clé complète coûterait une génération par recherche.
+  it('n’a pas de `config.isr`', () => {
+    expect('config' in recherche).toBe(false);
+  });
+
+  it('son `load` ne reçoit rien du visiteur', () => {
+    const signature = /export const load: PageServerLoad = async \(\{([^}]*)\}\)/.exec(
+      SOURCES['/src/routes/search/+page.server.ts'],
+    );
+    expect(signature, 'signature du load de /search').not.toBeNull();
+    const recus = (signature?.[1] ?? '').split(',').map((nom) => nom.trim()).filter(Boolean);
+    expect(recus.filter((nom) => !['fetch', 'params', 'url'].includes(nom))).toEqual([]);
   });
 });
 

@@ -11,8 +11,16 @@
  * événement fait foi.
  */
 
-/** Un événement du chat en flux, tel que l'émet `RAGStreamChunk`. */
-export interface EvenementDeFlux {
+import type { AjoutsDuFlux } from '$lib/types';
+
+/**
+ * Un événement du chat en flux, tel que l'émet `RAGStreamChunk`.
+ *
+ * `AjoutsDuFlux` : la progression et les quatre listes de citations de la
+ * refonte (contrat-api.md §7), toutes facultatives, l'API déployée ne les
+ * envoyant pas encore.
+ */
+export interface EvenementDeFlux extends AjoutsDuFlux {
   chunk?: string;
   done?: boolean;
   sources?: unknown[];

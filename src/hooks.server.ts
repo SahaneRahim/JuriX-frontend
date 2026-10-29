@@ -36,6 +36,10 @@ function sousArbre(chemin: string, prefixes: string[]): boolean {
  * prechargement y est ajoute a la main. Sans lui, Inter arrivait trop tard sur
  * un premier /chat et manquait pour toute la visite, la navigation gardant le
  * meme document.
+ *
+ * Literata (titres et texte officiel en serif) n'est PAS prechargee : ses
+ * 20 Kio disputeraient la bande passante a Inter sur chaque page, pour un
+ * titre qui a son repli ajuste. Raisons detaillees dans src/app.css.
  */
 const POLICES_A_PRECHARGER = /\/inter-latin-wght-normal[^/]*\.woff2$/;
 const PRECHARGEMENT_DES_COQUILLES = `<link rel="preload" as="font" type="font/woff2" crossorigin href="${inter}" />`;

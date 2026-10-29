@@ -1,4 +1,5 @@
 import type { Config } from '@sveltejs/adapter-vercel';
+import { lireChiffresDuCorpus } from '$lib/api-publique';
 import { API_URL, DELAI_API_MS } from '$lib/config';
 import { leverIndisponible } from '$lib/panne';
 import type { Category } from '$lib/types';
@@ -42,8 +43,20 @@ export const config: Config = {
  * toute première génération d'un déploiement peut encore montrer la page
  * d'erreur, avec son lien « Réessayer ». `erreur` reste dans les données pour
  * la page, toujours vide.
+ *
+ * LE NOMBRE DE TEXTES (Q1 A) vient de GET /corpus, lu en même temps que les
+ * catégories : le sous-titre et la ligne « Tous les textes » l'écrivent
+ * (« Cherchez dans 2 275 textes officiels »). Il est FACULTATIF : l'ancienne
+ * API ne connaît pas la route (404), et une panne de /corpus seul ne vaut pas
+ * un 503 ; la page écrit alors ses phrases sans chiffre, jamais un nombre en
+ * dur qui vieillirait en silence. Seul `textes` part dans la page : le reste
+ * de la réponse (natures, sources, dates) alourdirait le HTML et le
+ * `__data.json` mis en cache pour un nombre affiché.
  */
 export const load: PageServerLoad = async ({ fetch }) => {
+  // Lancé avant d'attendre les catégories : les deux appels partent ensemble.
+  // `lireChiffresDuCorpus` ne lève jamais (null sur toute erreur).
+  const chiffres = lireChiffresDuCorpus({ fetch });
   let cause: unknown;
   try {
     const reponse = await fetch(`${API_URL}/categories`, { signal: AbortSignal.timeout(DELAI_API_MS) });
@@ -51,7 +64,8 @@ export const load: PageServerLoad = async ({ fetch }) => {
       // Dans le try : un 200 qui n'est pas du JSON (un proxy qui répond à la
       // place de l'API) est une panne de l'API, pas une erreur de la page.
       const categories: Category[] = await reponse.json();
-      return { categories, erreur: '' };
+      const corpus = await chiffres;
+      return { categories, corpus: corpus ? { textes: corpus.textes } : null, erreur: '' };
     }
     cause = reponse;
   } catch (e) {

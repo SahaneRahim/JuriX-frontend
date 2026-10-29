@@ -178,7 +178,7 @@
       class="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:p-8 court:p-4 sm:court:max-w-lg"
     >
       <h1
-        class="mb-2 flex items-center justify-center gap-2 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl"
+        class="mb-2 flex items-center justify-center gap-2 text-xl font-titre font-semibold text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl"
       >
         <span
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-100 text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-200 court:hidden"

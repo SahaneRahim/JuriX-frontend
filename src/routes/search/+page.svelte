@@ -1,494 +1,534 @@
 <script lang="ts">
-  import { API_URL } from '$lib/api';
-  
-  import { nombreDePages, pagesVisibles, TAILLE_PAGE_RECHERCHE } from '$lib/pagination';
-  import SearchBar from '$lib/components/SearchBar.svelte';
-  // Cette page recopiait le header à la main (90 lignes) : la copie et
-  // l'original avaient divergé — le lien mort vers /categories a dû être
-  // corrigé deux fois, et le bouton flottant « assistant » pointait ici vers
-  // l'accueil au lieu de /chat.
-  import SiteFooter from '$lib/components/SiteFooter.svelte';
-  import SiteHeader from '$lib/components/SiteHeader.svelte';
-  import ChatFab from '$lib/components/ChatFab.svelte';
-  import { browser } from "$app/environment";
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import SearchResultCard from "$lib/components/SearchResultCard.svelte";
-  import Icone from "$lib/components/Icone.svelte";
-  import type { NomIcone } from "$lib/icones";
-  import { BADGE_DE_TYPE_EMPHASE, BADGE_DE_TYPE_NEUTRE, typeDeTexte } from "$lib/type-de-texte";
-  import { onMount, tick } from "svelte";
-  import { tr, language } from "$lib/stores/language";
-  import { nomCategorie } from "$lib/categories";
-  import MetaSeo from "$lib/components/MetaSeo.svelte";
-  import { urlCanonique } from "$lib/seo";
-  import type { SearchResponse, Category, SearchResult } from '$lib/types';
-
-// State
-  // Lus depuis l'URL des l'initialisation, au serveur comme dans le navigateur :
-  // le HTML servi porte deja la requete et son titre, et ne montre des
-  // squelettes que s'il y a une recherche a faire. Initialises a vide, le
-  // champ arrivait vide et desactive (isLoading), puis basculait a
-  // l'hydratation.
-  let searchQuery = $page.url.searchParams.get("q") ?? "";
-  let activeTab = "all";
-  let isLoading = searchQuery.trim() !== "";
-  let results: SearchResult[] = [];
-  let totalResults = 0;
-  let searchTimeMs = 0;
-  let currentPage = 1;
-  let errorMessage = "";
-  let sortBy = "relevance";
-
   /**
-   * Filtres latéraux.
+   * Recherche (P7 A et P8 A).
    *
-   * Les radios et les cases n'avaient AUCUN `bind:` ni `on:change` : la colonne
-   * de filtres était entièrement décorative, elle ne filtrait rien.
+   * RENDUE PAR LE SERVEUR (+page.server.ts) à partir de l'adresse : requête,
+   * nature, domaines, période, tri et page sont des paramètres d'URL
+   * (./parametres.ts). Onglets, cases, tri et numéros de page sont des liens
+   * ou des formulaires GET : tout marche sans JavaScript, et avec lui ce sont
+   * des navigations sans rechargement (SvelteKit relit le `load`). La page ne
+   * charge plus rien dans `onMount`.
    *
-   * Les catégories sont désormais chargées depuis l'API. Les six libellés
-   * codés en dur étaient des chaînes traduites SANS identifiant : impossible
-   * de les envoyer à `SearchFilters.category_ids`, qui attend des entiers.
+   * FILTRES ET TRI CALCULÉS PAR LE SERVEUR (P7). Ils ne portaient que sur la
+   * page affichée : dès la page 2, effectifs et ordre étaient faux. La
+   * nouvelle API les applique à tout l'ensemble trouvé et rend l'effectif de
+   * chaque nature et de chaque domaine ; l'ancienne ne sait pas le faire, et la
+   * page n'en montre alors rien plutôt que d'afficher des chiffres faux
+   * (contrat §8).
+   *
+   * Une ligne par résultat (SearchResultCard), « Poser cette question à
+   * l'assistant » en tête quand il y a des résultats, et un état « aucun
+   * résultat » qui propose des pistes au lieu d'une impasse (dont la même
+   * question à l'assistant).
    */
-  const RESULTS_PER_PAGE = TAILLE_PAGE_RECHERCHE;
+  import { onDestroy, onMount, tick } from "svelte";
+  import { afterNavigate, goto, invalidateAll, replaceState } from "$app/navigation";
+  import { navigating, page } from "$app/stores";
+  import ChatFab from "$lib/components/ChatFab.svelte";
+  import Icone from "$lib/components/Icone.svelte";
+  import MetaSeo from "$lib/components/MetaSeo.svelte";
+  import SearchBar from "$lib/components/SearchBar.svelte";
+  import SearchResultCard from "$lib/components/SearchResultCard.svelte";
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
+  import { nomCourtDuDomaine } from "$lib/components/listes/domaines";
+  import { cleSelonNombre, formatNombre, remplir } from "$lib/components/listes/reperes";
+  import { nombreDePages, pagesVisibles, TAILLE_PAGE_RECHERCHE } from "$lib/pagination";
+  import { urlCanonique } from "$lib/seo";
+  import { language, tr } from "$lib/stores/language";
+  import { collanteSiElleTient } from "./colonne";
+  import { ongletActifEnVue } from "./onglets";
+  import {
+    adresseDeRecherche,
+    aDesFiltres,
+    filtresDuPanneau,
+    lireParametres,
+    NATURES,
+    PAGE_MAX,
+    type NatureDuFiltre,
+    type ParametresDeRecherche,
+    type PeriodeDuFiltre,
+  } from "./parametres";
 
-  let dateRange: "all" | "year" | "5y" = "all";
-  let selectedCategoryIds: number[] = [];
-  let categories: { id: number; name: string }[] = [];
+  export let data;
+
+  /** Les onglets de nature, dans l'ordre de la maquette ; `null` : tous. */
+  const ONGLETS: { nature: NatureDuFiltre | null; cle: string }[] = [
+    { nature: null, cle: "search.nature.all" },
+    { nature: "decret", cle: "search.decrees" },
+    { nature: "loi", cle: "search.laws" },
+    { nature: "arrete", cle: "search.nature.arretes" },
+    { nature: "acte-uniforme", cle: "search.nature.actesUniformes" },
+    { nature: "autres", cle: "search.nature.autres" },
+  ];
+
+  const PERIODES_AFFICHEES: { periode: PeriodeDuFiltre | null; cle: string }[] = [
+    { periode: null, cle: "search.allTime" },
+    { periode: "annee", cle: "search.thisYear" },
+    { periode: "5ans", cle: "search.last5Years" },
+  ];
 
   /**
-   * Filtres repliés sous `lg`.
+   * « Aucun décret ne contient « … » » : le genre change d'une nature à
+   * l'autre. Pour l'onglet « Autres », « Aucun AUTRE texte ne contient… » se
+   * lisait « aucun texte de plus », juste au-dessus de « Textes trouvés :
+   * 12 décrets, 7 lois… » : le titre nomme donc la nature, exemples à
+   * l'appui (« Aucun texte d'une autre nature (ordonnance, circulaire,
+   * décision…) ne contient… »), ceux que l'onglet regroupe
+   * (TYPES_DES_NATURES, ./parametres.ts).
+   */
+  const AUCUN_PAR_NATURE: Record<NatureDuFiltre, string> = {
+    decret: "search.empty.nature.decret",
+    loi: "search.empty.nature.loi",
+    arrete: "search.empty.nature.arrete",
+    "acte-uniforme": "search.empty.nature.acteUniforme",
+    autres: "search.empty.nature.autresNatures",
+  };
+
+  /** « 4 actes uniformes », « 1 loi » : la nature et son nombre, au singulier ou au pluriel. */
+  const COMPTE_PAR_NATURE: Record<NatureDuFiltre, string> = {
+    decret: "search.natureCount.decret",
+    loi: "search.natureCount.loi",
+    arrete: "search.natureCount.arrete",
+    "acte-uniforme": "search.natureCount.acteUniforme",
+    autres: "search.natureCount.autres",
+  };
+
+  /**
+   * Classes d'un onglet (maquette recherche-p7a) : la recette « filtre à
+   * bascule » du guide (§ 4.7). 16 px de côté tant que la bande défile (sous
+   * lg), 20 à partir de lg comme la maquette en 1440 : à 768 px, les six
+   * onglets tiennent alors sur la rangée, sans défiler.
+   */
+  const ONGLET =
+    "flex min-h-11 shrink-0 snap-start items-center gap-2 px-4 lg:px-5 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-colors";
+  const ONGLET_ACTIF = "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950";
+  const ONGLET_INACTIF =
+    "border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-400 dark:hover:text-white";
+
+  const LIEN =
+    "font-medium text-zinc-950 underline decoration-zinc-400 underline-offset-4 hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-500 dark:hover:decoration-white";
+
+  $: p = data.parametres;
+  $: langue = $language.current;
+
+  /**
+   * Le titre « Résultats pour « … » », en Literata. Le sous-ensemble
+   * auto-hébergé de Literata n'a pas l'espace fine insécable (U+202F) des
+   * guillemets français : la police de repli la dessinait presque sans
+   * largeur, et les guillemets collaient à la requête (« «travail» »).
+   * L'espace insécable ordinaire (U+00A0), présente dans le sous-ensemble, la
+   * remplace dans ce seul titre ; les textes en Inter gardent l'espace fine.
+   */
+  const ESPACE_FINE_INSECABLE = /\u202f/g;
+  $: titreDeLaRecherche = remplir($tr("search.resultsForQuery").replace(ESPACE_FINE_INSECABLE, "\u00a0"), { q: p.q });
+
+  /**
+   * Une navigation vers /search est en cours, avec ou sans requête : son
+   * départ est noté pour le champ (`noterLeDepart`, plus bas). Un booléen et
+   * non `$navigating` : une navigation qui en remplace une autre encore en
+   * cours (une seconde case cochée) le laisse vrai, et ne reprend pas pour
+   * départ ce que le lecteur a écrit entre les deux.
+   */
+  $: versLaRecherche = Boolean($navigating && $navigating.to?.url.pathname === "/search");
+
+  /**
+   * Une recherche est en cours (nouvelle requête, filtre, page). Vers /search
+   * sans requête (le lien « Recherche » de l'en-tête), rien n'est cherché : ni
+   * « Recherche en cours… » ni roue.
+   */
+  $: enCours = versLaRecherche && Boolean(($navigating?.to?.url.searchParams.get("q") ?? "").trim());
+
+  /**
+   * Le texte du champ : la requête cherchée, posée à chaque navigation, SAUF
+   * si le lecteur a écrit dans le champ pendant qu'elle se faisait. On peut
+   * corriger sa requête pendant qu'elle part (le champ n'est plus désactivé) :
+   * la remettre à l'ancienne à l'arrivée des résultats, sous ses doigts,
+   * effaçait la correction. `saisieAuDepart` est le texte du champ au départ
+   * de la navigation (ou à la dernière requête posée) : s'il n'a pas changé
+   * depuis, rien de ce que le lecteur a écrit ne se perd.
    *
-   * Dépliés d'office, avec trois dates et quatorze catégories, ils occupaient
-   * environ 650 px AU-DESSUS des résultats : un écran de téléphone entier
-   * avant le premier résultat. À partir de `lg`, la colonne latérale les
-   * montre toujours, et cet état n'y change plus rien.
+   * Le départ est noté pour TOUTE navigation vers /search, requête ou non.
+   * Noté seulement quand une recherche partait (`enCours`), il manquait vers
+   * la page sans requête (lien « Recherche » de l'en-tête, retour arrière) :
+   * un texte écrit avant, jamais envoyé, passait pour une retouche faite en
+   * route, et restait dans le champ de « Commencez votre recherche ».
+   *
+   * Les deux blocs ne dépendent, l'un que de `versLaRecherche`, l'autre que
+   * de `data` : les fonctions lisent et écrivent la saisie sans en dépendre.
+   */
+  let saisie = data.parametres.q;
+  let saisieAuDepart = saisie;
+
+  function noterLeDepart() {
+    saisieAuDepart = saisie;
+  }
+
+  function poserLaRequete(q: string) {
+    if (saisie === saisieAuDepart) saisie = q;
+    saisieAuDepart = q;
+  }
+
+  $: if (versLaRecherche) noterLeDepart();
+  $: poserLaRequete(data.parametres.q);
+
+  /**
+   * Onglets à effectifs, colonne de filtres et tri : seulement quand le
+   * serveur les a calculés (nouvelle API) et que la recherche a trouvé
+   * quelque chose, filtres mis à part.
+   */
+  $: affiner = data.etat === "resultats" && data.affinee && (data.candidats ?? 0) > 0;
+  $: natures = data.natures ?? { tous: 0, decret: 0, loi: 0, arrete: 0, "acte-uniforme": 0, autres: 0 };
+  $: nombreDeFiltres = filtresDuPanneau(p);
+
+  /**
+   * Les filtres en cours, qu'une nouvelle requête garde (champs cachés du
+   * formulaire) : le périmètre d'une page de domaine aussi, une nouvelle
+   * requête y cherche encore.
+   */
+  $: champsCaches = [
+    ...p.perimetre.map((id) => ["perimetre", String(id)]),
+    ...(p.nature ? [["nature", p.nature]] : []),
+    ...p.categories.map((id) => ["categorie", String(id)]),
+    ...(p.periode ? [["periode", p.periode]] : []),
+    ...(p.tri ? [["tri", p.tri]] : []),
+  ] as [string, string][];
+
+  /** Une recherche sans aucun filtre, périmètre compris, ni tri : « Réinitialiser », « sans filtre ». */
+  function sansFiltre(q: string, tri: ParametresDeRecherche["tri"] = null): ParametresDeRecherche {
+    return { q, perimetre: [], nature: null, categories: [], periode: null, tri, page: 1 };
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Ligne d'état                                                            */
+  /* ---------------------------------------------------------------------- */
+
+  $: premierRang = (p.page - 1) * TAILLE_PAGE_RECHERCHE + 1;
+  $: dernierRang = premierRang + data.resultats.length - 1;
+
+  /**
+   * L'ANNONCE D'UNE PAGE NEUVE. Une région `role="status"` n'est lue que si
+   * elle existe AVANT que son texte change : arrivée avec son texte, elle se
+   * tait. Une recherche partie d'une autre page (l'accueil, l'en-tête, un
+   * retour arrière) crée cette page avec ses résultats, et le nombre de
+   * résultats n'était jamais dit. La région garde alors « Recherche en
+   * cours… » un instant de plus, le temps que les lecteurs d'écran la
+   * connaissent, puis prend le nombre : un changement, qu'ils annoncent.
+   * Au premier chargement (`enter`, rendu du serveur), rien n'est différé :
+   * la page se lit en entier.
+   *
+   * SEULE L'ANNONCE ATTEND, l'écran non. La ligne affichée disait « Recherche
+   * en cours… » pendant ce délai, à chaque arrivée, sans roue ni liste
+   * atténuée, à côté de résultats déjà là : rien ne se cherchait. Elle montre
+   * donc le nombre aussitôt (`statutAffiche`), et la région, hors de l'écran,
+   * attend (`statutAnnonce`).
+   *
+   * 300 ms : la liste à l'écran est déjà la bonne, seul le texte de la région
+   * attend. Les annonceurs éprouvés attendent 100 ms dans une région déjà
+   * présente (LiveAnnouncer d'Angular CDK) ; celle-ci vient d'être créée.
+   */
+  const DELAI_D_ANNONCE_MS = 300;
+  let annonceDifferee = false;
+  let premiereNavigation = true;
+  let minuterieDAnnonce: ReturnType<typeof setTimeout> | undefined;
+
+  afterNavigate(({ type }) => {
+    if (!premiereNavigation) return;
+    premiereNavigation = false;
+    if (type === "enter") return;
+    annonceDifferee = true;
+    minuterieDAnnonce = setTimeout(() => (annonceDifferee = false), DELAI_D_ANNONCE_MS);
+  });
+
+  onDestroy(() => clearTimeout(minuterieDAnnonce));
+
+  /**
+   * « Résultats 1 à 20 sur 100 », « 7 résultats », ou ce qui se passe. Le
+   * nombre est celui que le serveur a compté, filtres compris. La durée de la
+   * recherche est partie : elle ne disait rien d'utile au lecteur. Vide sans
+   * requête : la région existe déjà, et une recherche lancée d'ici la change
+   * (« Recherche en cours… », puis le nombre), ce qui s'entend.
+   */
+  $: bilan =
+    data.etat === "debut"
+      ? ""
+      : data.etat === "erreur"
+        ? $tr(data.erreur)
+        : data.total === 0
+          ? $tr("search.noResultsTitle")
+          : data.resultats.length > 0 && (p.page > 1 || data.total > data.resultats.length)
+            ? remplir($tr("search.range"), {
+                debut: formatNombre(premierRang, langue),
+                fin: formatNombre(dernierRang, langue),
+                total: formatNombre(data.total, langue),
+              })
+            : remplir($tr(cleSelonNombre("search.count", data.total, langue)), {
+                n: formatNombre(data.total, langue),
+              });
+
+  /** Ce que montre la ligne : « Recherche en cours… » seulement quand une recherche part. */
+  $: statutAffiche = enCours ? $tr("search.searching") : bilan;
+  /** Ce que dit sa région : la même chose, une fois l'annonce d'une page neuve passée. */
+  $: statutAnnonce = enCours || (annonceDifferee && data.etat !== "debut") ? $tr("search.searching") : bilan;
+
+  /**
+   * Aucun résultat, filtres compris : la carte de l'état vide le dit déjà en
+   * titre (« Aucun texte ne contient « … » »), juste dessous. La ligne d'état
+   * ne le répète plus à l'écran, et le tri, sans rien à trier, disparaît :
+   * sur téléphone, « Filtres | Aucun résultat trouvé » puis « Trier par »
+   * ajoutaient deux rangées, environ 100 px, avant la carte ; la maquette de
+   * l'état vide (recherche-vide-p7a) commence directement par elle. La ligne
+   * reste annoncée aux lecteurs d'écran (`role="status"`, en sr-only).
+   */
+  $: rienATrier = data.etat === "resultats" && data.total === 0;
+
+  /**
+   * En panne, de même : la carte d'erreur, juste dessous, dit la panne en
+   * titre (« Erreur de recherche. Veuillez réessayer. »), et la ligne d'état
+   * la répétait en rouge, mot pour mot. Elle n'est plus qu'annoncée, comme
+   * pour l'état vide ; la carte a son `role="alert"`. Sans colonne de filtres
+   * (pas de résultats, donc pas d'`affiner`), toute la ligne sort du flux.
+   * Sans requête non plus : rien à y lire, mais la région est là pour la
+   * recherche que l'on va lancer.
+   */
+  $: etatSeulementAnnonce = rienATrier || data.etat === "erreur" || data.etat === "debut";
+
+  /** Le libellé de chaque tri, celui de son <option> ; `""` : la pertinence. */
+  const LIBELLE_DU_TRI: Record<string, string> = {
+    "": "search.relevance",
+    recent: "search.recentDate",
+    ancien: "search.oldestDate",
+  };
+
+  /**
+   * Le tri affiché dans la liste. Remis au tri de l'adresse à chaque
+   * navigation (le bloc ne dépend que de `data`) ; entre deux, celui que l'on
+   * vient de choisir : la largeur de la liste le suit aussitôt, sans attendre
+   * la nouvelle recherche.
+   */
+  let triChoisi: string = data.parametres.tri ?? "";
+  $: triChoisi = data.parametres.tri ?? "";
+  $: libelleDuTri = $tr(LIBELLE_DU_TRI[triChoisi] ?? LIBELLE_DU_TRI[""]);
+
+  function changerDeTri(event: Event) {
+    triChoisi = (event.currentTarget as HTMLSelectElement).value;
+    appliquerFormulaire();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Colonne de filtres                                                      */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Repliée sous lg : dépliée d'office, avec trois dates et quatorze domaines,
+   * elle occupait environ 650 px AU-DESSUS des résultats. À partir de lg, la
+   * colonne latérale la montre toujours.
+   *
+   * Sans JavaScript, le bouton « Filtres » est un lien vers son ancre
+   * (#filtres-recherche) : la colonne s'ouvre alors par `:target` (classe
+   * `target:block`), et son bouton « Voir les résultats » envoie le
+   * formulaire.
+   *
+   * HYDRATÉE, ELLE NE SUIT PLUS QUE `filtresOuverts`. Ouverte par l'ancre
+   * avant l'hydratation, elle ne se refermait plus : retirer l'ancre de
+   * l'adresse (`replaceState`, l'History API) ne change pas l'élément ciblé,
+   * seule une navigation vers une autre ancre le fait, et `target:block`
+   * l'emportait sur `hidden`. « Filtres » et « Voir les résultats » la
+   * disaient fermée, chevron compris, et elle restait à l'écran, 650 px
+   * au-dessus des résultats.
    */
   let filtresOuverts = false;
+  let hydratee = false;
+  let formulaire: HTMLFormElement | undefined;
 
-  // Ce qu'annonce le bouton « Filtres (N) » : ce qui est réglé DANS le
-  // panneau. Les onglets et le tri restent visibles, ils ne comptent pas.
-  $: nombreFiltresActifs =
-    selectedCategoryIds.length + (dateRange !== "all" ? 1 : 0);
+  onMount(() => {
+    // Ouverte avant l'hydratation par l'ancre : l'état la reprend, dans la
+    // même mise à jour que `hydratee`, sans qu'elle se ferme un instant.
+    // L'ancre quitte l'adresse : une page rechargée ou partagée ne s'ouvre
+    // pas d'office sur la colonne.
+    hydratee = true;
+    if (location.hash === "#filtres-recherche") {
+      filtresOuverts = true;
+      try {
+        replaceState(new URL(`${location.pathname}${location.search}`, location.href), $page.state);
+      } catch {
+        // Routeur pas encore prêt (en développement) : l'ancre reste, sans
+        // autre effet, la classe ne lisant plus `:target`.
+      }
+    }
+  });
 
-  /** Début de la colonne des résultats, où ramène un changement de page. */
-  let resultatsEl: HTMLElement | undefined;
-  /** Panneau des filtres : déplié sous lg, il passe aussi sous le bouton flottant. */
-  let filtresEl: HTMLElement | undefined;
+  function basculerFiltres(event: MouseEvent) {
+    event.preventDefault();
+    filtresOuverts = !filtresOuverts;
+  }
 
+  /**
+   * Une case, une date ou le tri changent : la recherche repart aussitôt, au
+   * premier rang, depuis CE QUE MONTRE le formulaire (cases cochées, date,
+   * tri) et non depuis l'adresse : deux cases cochées coup sur coup, avant le
+   * retour de la première recherche, comptent toutes les deux. `keepFocus` :
+   * le focus reste sur la case ; `noScroll` : la page ne remonte pas.
+   */
+  function appliquerFormulaire() {
+    if (!formulaire) return;
+    const parametres = new URLSearchParams();
+    for (const [nom, valeur] of new FormData(formulaire)) {
+      if (typeof valeur === "string") parametres.append(nom, valeur);
+    }
+    const suivant = lireParametres(parametres);
+    goto(adresseDeRecherche({ ...suivant, page: 1 }), { keepFocus: true, noScroll: true });
+  }
+
+  /** Début des résultats, où ramène « Voir les résultats ». */
   function allerAuxResultats() {
     // Passé en JavaScript, `behavior: "smooth"` ignore la préférence
     // « réduire les animations » : elle est donc lue ici.
-    const sansAnimation = window.matchMedia?.(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    resultatsEl?.scrollIntoView?.({
+    const sansAnimation = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById("resultats")?.scrollIntoView?.({
       block: "start",
       behavior: sansAnimation ? "auto" : "smooth",
     });
   }
 
-  /** Referme le panneau (sous lg) et ramène au premier résultat. */
-  async function voirLesResultats() {
+  /**
+   * Sous lg, la colonne dépliée s'intercale AU-DESSUS des résultats : chaque
+   * case relance la recherche, mais le résultat arrive hors de la vue. Avec
+   * JavaScript, « Voir les résultats » referme la colonne et y ramène ; sans
+   * lui, c'est le bouton d'envoi du formulaire.
+   */
+  async function voirLesResultats(event: MouseEvent) {
+    event.preventDefault();
     filtresOuverts = false;
     await tick();
     allerAuxResultats();
   }
 
+  /* ---------------------------------------------------------------------- */
+  /* Résultats, pages, états vides                                           */
+  /* ---------------------------------------------------------------------- */
+
+  $: totalPages = Math.min(nombreDePages(data.total, TAILLE_PAGE_RECHERCHE), PAGE_MAX);
   /**
-   * Le bouton flottant de l'assistant et les résultats.
-   *
-   * Fixé en bas à droite, il se posait sur les cartes : la fin de « Lire le
-   * texte complet » du premier résultat dès le premier écran en 1024×768, le
-   * texte de la deuxième carte en 768×1024, le bord droit de la première en
-   * 390×844.
-   *
-   * Il se retire donc tant qu'un résultat, ou le panneau des filtres déplié,
-   * passe dessous, et revient dès qu'on remonte la page, le geste de qui
-   * cherche autre chose, ou quand la liste est finie : le pied de page lui
-   * réserve sa place. Ainsi sous 1 440 px, à toutes les hauteurs. Au-delà, la
-   * colonne de la page s'arrête avant lui, et il reste affiché.
-   *
-   * La rangée des filtres et des résultats lui réservait une gouttière de
-   * 80 px à droite, de 640 à 1 439 px : les cartes s'arrêtaient 32 px avant
-   * la barre de recherche, en escalier, une bande vide de 80 à 105 px à leur
-   * droite et la pagination centrée sur la colonne réduite. En paysage
-   * (740×360), où le bouton se retirait de toute façon, la place était
-   * perdue pour rien. Le panneau des filtres déplié (sous lg) compte aussi :
-   * le bouton se posait sur ses cases (« Droit foncier… », 390×844).
-   *
-   * Retiré d'emblée au rendu serveur, comme sur l'accueil : affiché par
-   * défaut, il aurait glissé hors de l'écran juste après l'hydratation sur un
-   * téléphone. Ailleurs, il apparaît au montage. Un bouton qui a le focus ne
-   * se retire pas (ChatFab).
+   * Fenêtre de pagination : au plus 5 numéros centrés sur la page courante,
+   * 3 sous sm (les deux autres masqués en CSS : la fenêtre de 3 est toujours
+   * incluse dans celle de 5). Des LIENS, vers `#resultats` : sans JavaScript,
+   * et sans remonter au titre et aux filtres à chaque page.
    */
-  const ECRAN_SANS_GOUTTIERE = "(max-width: 1439.98px), (max-height: 500px)";
+  $: visiblePages = pagesVisibles(p.page, totalPages);
+  $: pagesTelephone = pagesVisibles(p.page, totalPages, 3);
+  $: lienPagePrecedente = adresseDeRecherche({ ...p, page: p.page - 1 }, "resultats");
+  $: lienPageSuivante = adresseDeRecherche({ ...p, page: p.page + 1 }, "resultats");
+  $: numerosDePage = visiblePages.map((n) => ({ n, href: adresseDeRecherche({ ...p, page: n }, "resultats") }));
+
+  /** Avec JavaScript, « Réessayer » relance le `load` ; sans lui, le lien recharge la page. */
+  function reessayer(event: MouseEvent) {
+    event.preventDefault();
+    invalidateAll();
+  }
+
+  $: assistant = `/chat?q=${encodeURIComponent(p.q)}`;
   /**
-   * Bande du bas, et du bord droit, où se pose le bouton : 56 à 64 px, sa
-   * marge, la zone sûre de l'iPhone.
+   * La recherche a trouvé des textes (même sur une page au-delà de la
+   * dernière, dont la carte ne propose pas l'assistant) : le lien vers
+   * l'assistant sous le champ ne s'affiche qu'alors. Sinon, la carte de
+   * l'état vide le porte.
    */
-  const BANDE_DU_BOUTON = 120;
-  /** Défilement qui compte comme un geste : ni le rebond d'iOS ni un arrondi. */
-  const SEUIL_DE_DEFILEMENT = 8;
+  $: avecResultats = data.etat === "resultats" && data.total > 0;
 
-  let boutonMasque = true;
-  let ecranSansGouttiere: MediaQueryList | null = null;
-  let dernierDefilement = 0;
-  let remonte = false;
-  let imagePrevue = 0;
-
-  function majBoutonFlottant() {
-    imagePrevue = 0;
-    if (!ecranSansGouttiere?.matches) {
-      boutonMasque = false;
-      return;
-    }
-    const y = window.scrollY;
-    if (Math.abs(y - dernierDefilement) >= SEUIL_DE_DEFILEMENT) {
-      remonte = y < dernierDefilement;
-      dernierDefilement = y;
-    }
-    const hauteur = window.innerHeight;
-    const largeur = window.innerWidth;
-    // Un panneau replié (`hidden`) a une boîte vide : il ne compte pas. Le
-    // coin du bas à droite seulement : à partir de lg, la colonne des
-    // filtres, collante à GAUCHE, descend aussi dans la bande du bas, et
-    // aurait retenu le bouton en fin de liste.
-    const passeDessous = (element: HTMLElement | undefined) => {
-      const zone = element?.getBoundingClientRect();
-      return (
-        !!zone &&
-        zone.height > 0 &&
-        zone.top < hauteur &&
-        zone.bottom > hauteur - BANDE_DU_BOUTON &&
-        zone.right > largeur - BANDE_DU_BOUTON
-      );
-    };
-    boutonMasque = (passeDessous(resultatsEl) || passeDessous(filtresEl)) && !remonte;
+  /** « a, b et c ». */
+  function joindre(morceaux: string[], et: string): string {
+    if (morceaux.length < 2) return morceaux.join("");
+    return `${morceaux.slice(0, -1).join(", ")} ${et} ${morceaux[morceaux.length - 1]}`;
   }
 
-  /** Une mesure par image au plus : le défilement émet bien plus d'événements. */
-  function planifierBoutonFlottant() {
-    if (!imagePrevue) imagePrevue = requestAnimationFrame(majBoutonFlottant);
-  }
-
-  onMount(() => {
-    ecranSansGouttiere = window.matchMedia?.(ECRAN_SANS_GOUTTIERE) ?? null;
-    dernierDefilement = window.scrollY;
-    majBoutonFlottant();
-    window.addEventListener("scroll", planifierBoutonFlottant, { passive: true });
-    window.addEventListener("resize", planifierBoutonFlottant);
-    ecranSansGouttiere?.addEventListener?.("change", planifierBoutonFlottant);
-    return () => {
-      window.removeEventListener("scroll", planifierBoutonFlottant);
-      window.removeEventListener("resize", planifierBoutonFlottant);
-      ecranSansGouttiere?.removeEventListener?.("change", planifierBoutonFlottant);
-      if (imagePrevue) cancelAnimationFrame(imagePrevue);
-    };
-  });
-
-  async function loadCategories() {
-    try {
-      const r = await fetch(`${API_URL}/categories`);
-      if (r.ok) {
-        const data = await r.json();
-        categories = (Array.isArray(data) ? data : []).map(
-          (c: Category) => ({ id: c.id, name: c.name }),
-        );
-      }
-    } catch {
-      // Les filtres restent vides : la recherche fonctionne sans eux.
-    }
-  }
-
-  /** Traduit `dateRange` en bornes d'années comprises par l'API. */
-  function yearBounds(): { year_from?: number } {
-    const now = new Date().getFullYear();
-    if (dateRange === "year") return { year_from: now };
-    if (dateRange === "5y") return { year_from: now - 4 };
-    return {};
-  }
-
-  function resetFilters() {
-    dateRange = "all";
-    selectedCategoryIds = [];
-    activeTab = "all";
-    sortBy = "relevance";
-    currentPage = 1;
-    performSearch();
-  }
-
-  function toggleCategory(id: number) {
-    selectedCategoryIds = selectedCategoryIds.includes(id)
-      ? selectedCategoryIds.filter((c) => c !== id)
-      : [...selectedCategoryIds, id];
-    currentPage = 1;
-    performSearch();
-  }
-
-  $: totalPages = nombreDePages(totalResults, RESULTS_PER_PAGE);
-
-  async function goToPage(n: number) {
-    if (n < 1 || n > totalPages || n === currentPage) return;
-    currentPage = n;
-    performSearch();
-    // Au début des RÉSULTATS, et non en haut de la page : sous lg, le haut de
-    // la page, ce sont le titre, la barre de recherche et les filtres, qu'il
-    // fallait redescendre à chaque page. `tick` d'abord, pour viser la page
-    // déjà passée aux squelettes de chargement, à sa hauteur d'arrivée.
-    await tick();
-    allerAuxResultats();
-  }
+  // Les états vides (P7) : l'API a trouvé des textes, que les filtres
+  // excluent tous ; ou elle n'a rien trouvé du tout ; ou la page demandée est
+  // au-delà de la dernière.
+  $: pageAuDela = data.etat === "resultats" && data.total > 0 && data.resultats.length === 0;
+  /**
+   * « Aucun décret ne contient « … » », seulement quand la nature est le SEUL
+   * filtre. Les effectifs des onglets gardent les autres filtres (domaines,
+   * période, périmètre) : avec l'onglet « Décrets » et un domaine coché, « 2
+   * lois » ailleurs ne prouvait pas qu'aucun décret ne contient la requête,
+   * seulement qu'aucun n'est dans ce domaine, et le bouton « Voir les 2
+   * textes, toutes natures » gardait le domaine. Avec d'autres filtres, c'est
+   * l'état « Aucun texte ne correspond à ces filtres », juste.
+   */
+  $: videParNature =
+    data.etat === "resultats" &&
+    data.total === 0 &&
+    data.affinee &&
+    p.nature !== null &&
+    filtresDuPanneau(p) === 0 &&
+    natures.tous > 0;
+  /**
+   * Des filtres, et rien qui les passe. Dans un périmètre (page d'un domaine),
+   * aussi quand l'API n'y trouve rien du tout (`candidats` nul) : rien dans un
+   * domaine ne veut pas dire rien dans le corpus.
+   */
+  $: videParFiltres =
+    data.etat === "resultats" &&
+    data.total === 0 &&
+    !videParNature &&
+    aDesFiltres(p) &&
+    (!data.affinee || (data.candidats ?? 0) > 0 || p.perimetre.length > 0);
+  /**
+   * Ce que trouve la recherche sans filtre (« Voir les 25 textes, sans
+   * filtre »), quand l'API le dit : `candidats`, l'ensemble avant `refine`.
+   * Pas dans un périmètre : l'ensemble y est celui du domaine, et le bouton
+   * cherche dans tout le corpus. 0 : pas de nombre, « Rechercher sans
+   * filtre ».
+   */
+  $: trouvesSansFiltre = data.affinee && p.perimetre.length === 0 ? (data.candidats ?? 0) : 0;
+  $: trouvees = joindre(
+    NATURES.filter((n) => natures[n] > 0).map((n) =>
+      remplir($tr(cleSelonNombre(COMPTE_PAR_NATURE[n], natures[n], langue)), { n: formatNombre(natures[n], langue) }),
+    ),
+    $tr("listes.et"),
+  );
 
   /**
-   * Fenêtre de pagination : au plus 5 numéros centrés sur la page courante.
-   * Les numéros étaient codés en dur (« 1 2 3 ») et sans `on:click`.
-   *
-   * Sous sm, seuls les 3 numéros de `pagesTelephone` restent affichés : sept
-   * boutons de 40 px débordaient d'un écran de 320 px. Les deux autres sont
-   * masqués en CSS plutôt que retirés par une requête média en JavaScript :
-   * pas d'écouteur à tenir, et l'affichage est juste dès la première image.
-   * Masquer suffit, car la fenêtre de 3 est toujours incluse dans celle de 5
-   * (même page courante, mêmes bornes 1 et totalPages).
+   * Ancienne API, filtres dans l'adresse (une recherche lancée depuis la page
+   * d'un domaine) : ils sont appliqués, sans colonne ni onglets pour les
+   * montrer. Ces rappels le disent, et chacun se retire d'un lien. De même
+   * pour un périmètre où la nouvelle API ne trouve rien : sans résultat, pas
+   * de colonne, et « Aucun texte ne correspond à ces filtres » doit dire
+   * lesquels.
    */
-  $: visiblePages = pagesVisibles(currentPage, totalPages);
-  $: pagesTelephone = pagesVisibles(currentPage, totalPages, 3);
-
-  /**
-   * Un onglet de type de texte. Le type est déclaré pour `icon` : inféré, le
-   * tableau donnerait `string`, et un nom absent du registre d'icônes
-   * (src/lib/icones.ts) passerait la vérification pour finir en icône vide.
-   *
-   * Icônes : une pile de documents pour « tous », les mêmes que les badges
-   * des cartes pour les lois (parchemin) et les décrets (acte signé), et le
-   * « § » pour les articles : ce sont des articles DE LOI, que le journal
-   * (newspaper), réservé au blog, aurait confondus avec ses billets.
-   */
-  type OngletRecherche = {
-    id: string;
-    icon: NomIcone;
-    label: string;
-    filter: string | null;
-  };
-
-  let tabFilters: OngletRecherche[] = [];
-  $: tabFilters = [
-    {
-      id: "all",
-      icon: "files",
-      label: $tr("search.allTexts"),
-      filter: null,
-    },
-    { id: "laws", icon: "scroll-text", label: $tr("search.laws"), filter: "loi" },
-    {
-      id: "decrees",
-      icon: "file-pen-line",
-      label: $tr("search.decrees"),
-      filter: "decret",
-    },
-    {
-      id: "articles",
-      icon: "section",
-      label: $tr("search.articles"),
-      filter: "article",
-    },
-  ];
-
-  onMount(() => {
-    loadCategories();
-    const urlQuery = $page.url.searchParams.get("q");
-    if (urlQuery) {
-      searchQuery = urlQuery;
-      performSearch();
-    } else {
-      isLoading = false;
-    }
-  });
-
-  // Removed: reactive block was preventing user from editing input
-  // The onMount above handles initial URL parameter loading
-
-  async function performSearch() {
-    if (!searchQuery.trim()) {
-      results = [];
-      isLoading = false;
-      return;
-    }
-
-    isLoading = true;
-    errorMessage = "";
-
-    try {
-      const response = await fetch(`${API_URL}/search/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: searchQuery,
-          // Hybride (mots + sens), comme le chat. En « text », la page ne
-          // trouvait la bonne loi dans son top 10 que pour 26,5 % des 102
-          // questions du jeu d'evaluation, et rien du tout pour 26 d'entre
-          // elles ; l'hybride, 82,4 % et aucune page vide
-          // (scripts/eval/evaluer_recherche.py, cote backend).
-          mode: "hybrid",
-          limit: RESULTS_PER_PAGE,
-          // `offset` existe depuis toujours dans SearchRequest : la pagination
-          // affichée n'était simplement jamais envoyée.
-          offset: (currentPage - 1) * RESULTS_PER_PAGE,
-          filters: {
-            status: "published",
-            ...yearBounds(),
-            ...(selectedCategoryIds.length
-              ? { category_ids: selectedCategoryIds }
-              : {}),
-          },
-        }),
-      });
-
-      if (response.ok) {
-        const data: SearchResponse = await response.json();
-
-        // « article 35 du code minier » : le backend a identifie le document ET
-        // verifie que l'article y existe. Ces trois champs etaient calcules
-        // depuis toujours et n'etaient lus nulle part.
-        if (data.direct_navigation && data.target_law_id && data.target_article) {
-          goto(
-            `/laws/${data.target_law_id}?article=${encodeURIComponent(data.target_article)}`,
-          );
-          return;
-        }
-
-        results = data.results || [];
-        totalResults = data.total || results.length;
-        searchTimeMs = data.search_time_ms || 0;
-      } else {
-        errorMessage = $tr("search.errorSearch");
-      }
-    } catch (error) {
-      console.error("Search error:", error);
-      errorMessage = $tr("search.errorServer");
-    } finally {
-      results = errorMessage ? [] : results;
-      isLoading = false;
-    }
-  }
-
-  /**
-   * Le bouton portait une icône de signet sans aucun gestionnaire, et aucune
-   * notion de favori n'existe ni côté front ni côté API. Il copie désormais le
-   * lien du document — même comportement que « Partager » sur /laws/[id].
-   */
-  let copiedId: number | null = null;
-
-  async function copyResultLink(result: SearchResult) {
-    const id = result.law_id;
-    const url = `${window.location.origin}/laws/${id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      copiedId = id;
-      setTimeout(() => (copiedId = null), 2000);
-    } catch {
-      // Presse-papiers refusé (contexte non sécurisé) : on n'affiche rien.
-    }
-  }
-
-  function handleSearchSubmit() {
-    currentPage = 1;
-    goto(`/search?q=${encodeURIComponent(searchQuery)}`, {
-      replaceState: true,
-    });
-    performSearch();
-  }
-
-  // handleKeydown a ete retire : la gestion des touches vit dans SearchBar.
-
-  // Lois et décrets : le TYPE que donne l'API, celui du badge de la carte
-  // (getBadgeInfo). Cherché dans le titre, « loi » retenait toute
-  // « Ordonnance … de la loi de finances » et tout titre où paraît
-  // « emploi », et « decret », sans accent, manquait « Décret N°… ».
-  $: tabFiltered =
-    activeTab === "all"
-      ? results
-      : results.filter((r) => {
-          const tab = tabFilters.find((t) => t.id === activeTab);
-          if (!tab?.filter) return true;
-          if (tab.id === "laws") return r.type === "loi";
-          if (tab.id === "decrees") return r.type === "décret";
-          const title = (r.title || "").toLowerCase();
-          const ref = (r.reference || "").toLowerCase();
-          return title.includes(tab.filter) || ref.includes(tab.filter);
-        });
-
-  /**
-   * Tri appliqué côté client.
-   *
-   * `sortBy` était lié au select mais lu NULLE PART : changer le tri ne
-   * changeait rien à l'affichage. L'API n'expose aucun champ de tri
-   * (`SearchRequest` = query, mode, filters, limit, offset), donc le tri se
-   * fait ici, sur la page courante de résultats. `relevance` conserve l'ordre
-   * rendu par l'API, qui EST le classement par pertinence.
-   */
-  $: filteredResults =
-    sortBy === "relevance"
-      ? tabFiltered
-      : [...tabFiltered].sort((a, b) => {
-          // `|| a.date` retire : le champ n'existe pas sur SearchResult.
-          const da = new Date(a.publication_date || 0).getTime();
-          const db = new Date(b.publication_date || 0).getTime();
-          return sortBy === "date_desc" ? db - da : da - db;
-        });
-
-  /**
-   * Deux sections : le mot cherché est dans le TITRE, ou seulement dans le texte.
-   *
-   * Le découpage est fait APRÈS le filtrage par onglet et le tri, pour que les
-   * deux continuent de s'appliquer — le tri par date agit alors à l'intérieur
-   * de chaque section au lieu de détruire la séparation.
-   *
-   * `match_scope` est calculé côté serveur sur le POIDS des lexèmes (poids A =
-   * titre), pas deviné ici sur la chaîne : une recherche « société » doit
-   * reconnaître « sociétés » dans un titre, ce qu'un `includes()` raterait.
-   */
-  // Durée de la recherche dans la notation de la langue de l'interface :
-  // « 0,31 » en français, « 0.31 » en anglais (`toFixed` écrivait toujours
-  // un point).
-  $: dureeAffichee = new Intl.NumberFormat($language.current, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(searchTimeMs / 1000);
-
-  $: titleMatches = filteredResults.filter((r) => r.match_scope === "title");
-  $: bodyMatches = filteredResults.filter((r) => r.match_scope !== "title");
-
-  // Le bouton flottant (voir majBoutonFlottant) : la colonne des résultats
-  // bouge sans que la page défile quand les résultats arrivent, qu'un onglet
-  // raccourcit la liste ou que le panneau des filtres s'ouvre au-dessus
-  // d'elle. Ces variables ne servent qu'à déclencher une nouvelle mesure.
-  $: if (browser && ecranSansGouttiere) {
-    void [isLoading, filteredResults, filtresOuverts];
-    planifierBoutonFlottant();
-  }
-
-  /**
-   * Le badge d'un résultat, d'après le TYPE que renvoie l'API (`result.type`),
-   * lu à l'ingestion sur le premier mot du titre puis reclassé. Deviné ici sur
-   * le titre entier, il se trompait : `includes("loi")` passait avant
-   * « ordonnance ». Libellé, icône et emphase (la Constitution) viennent de
-   * $lib/type-de-texte, la table commune à /laws, à la fiche d'un texte et à
-   * la page d'une catégorie : le même type s'y affichait de trois façons.
-   */
-  function getBadgeInfo(result: SearchResult): {
-    color: string;
-    labelKey: string;
-    icon: NomIcone;
-  } {
-    const type = typeDeTexte(result.type, result.title);
-    return {
-      color: `border ${type.emphase ? BADGE_DE_TYPE_EMPHASE : BADGE_DE_TYPE_NEUTRE}`,
-      labelKey: type.cle,
-      icon: type.icone,
-    };
-  }
-
+  $: rappels =
+    data.etat === "resultats" && aDesFiltres(p) && !affiner && (!data.affinee || p.perimetre.length > 0)
+      ? [
+          ...p.perimetre.map((id) => ({
+            cle: `perimetre-${id}`,
+            libelle: nomCourtDuDomaine(data.nomsDesDomaines[id], langue) || `${$tr("search.domain")} ${id}`,
+            adresse: adresseDeRecherche({ ...p, perimetre: p.perimetre.filter((c) => c !== id), page: 1 }),
+          })),
+          ...(p.nature
+            ? [
+                {
+                  cle: `nature-${p.nature}`,
+                  libelle: $tr(ONGLETS.find((o) => o.nature === p.nature)?.cle ?? ""),
+                  adresse: adresseDeRecherche({ ...p, nature: null, page: 1 }),
+                },
+              ]
+            : []),
+          ...p.categories.map((id) => ({
+            cle: `categorie-${id}`,
+            libelle: nomCourtDuDomaine(data.nomsDesDomaines[id], langue) || `${$tr("search.domain")} ${id}`,
+            adresse: adresseDeRecherche({ ...p, categories: p.categories.filter((c) => c !== id), page: 1 }),
+          })),
+          ...(p.periode
+            ? [
+                {
+                  cle: `periode-${p.periode}`,
+                  libelle: $tr(PERIODES_AFFICHEES.find((d) => d.periode === p.periode)?.cle ?? ""),
+                  adresse: adresseDeRecherche({ ...p, periode: null, page: 1 }),
+                },
+              ]
+            : []),
+        ]
+      : [];
 </script>
 
 <!-- Hors index : chaque requete produit une URL differente, donc une infinite
@@ -509,480 +549,669 @@
 >
   <SiteHeader />
 
-  <!-- Main Content. Colonne commune aux pages de la section (Documents,
-       catégorie, Recherche, Comparer) : marges de l'en-tête (16, 24 puis
-       48 px : le titre s'aligne sur le logo jusqu'à 1 248 px de large), puis
-       1 152 px de contenu au plus, centrés. Le titre commençait à 112 px en
-       1 440 (max-w-7xl), contre 232 sur /laws et 160 sur /compare : le
-       contenu sautait de côté d'une entrée du menu à l'autre. -->
+  <!-- Colonne commune aux pages de la section (Documents, catégorie,
+       Recherche, Comparer) : marges de l'en-tête (16, 24 puis 48 px), puis
+       1 152 px de contenu au plus, centrés. -->
   <main id="contenu" class="flex-grow w-full max-w-[78rem] mx-auto px-4 sm:px-6 lg:px-12 pt-6 pb-8 sm:pt-8 court:pt-2">
-    <!-- Search Header.
-         Écran court (`court:`, téléphone en paysage) : en 740×360, l'en-tête
-         du site, le titre, la barre, les onglets, le bouton « Filtres » et la
-         ligne d'état remplissaient l'écran, et le premier résultat commençait
-         à 452 px. Marges resserrées (8 à 12 px au lieu de 16 à 40), titre pour
-         les lecteurs d'écran seulement (la requête est dans le champ, juste
-         dessous) et bouton « Filtres » à côté de la ligne d'état (voir la
-         rangée, plus bas) : le premier résultat commence vers 250 px, son
-         titre à l'écran. -->
-    <div class="mb-6 sm:mb-10 court:mb-1">
-      <!-- coupe-mots : la requête est recopiée telle quelle dans le titre, et
+    <div class="mb-6 sm:mb-10 court:mb-2">
+      <!-- Titre de page en Literata (Q5 A : la serif des titres de page), 600,
+           interlettrage nul, équilibré sur ses lignes ; 24 puis 30 px comme la
+           maquette. `coupe-mots` : la requête est recopiée telle quelle, et
            une suite sans espace (référence, URL collée) débordait de l'écran.
-           Titre de page du guide (§ 4.2) : 30 puis 36 px, comme « Documents »
-           et la page d'une catégorie ; en 24 puis 30 px, le titre perdait
-           6 px d'une entrée du menu à l'autre. Guillemets de la langue
-           (« travail » en français, “work” en anglais), et non des
-           guillemets droits. -->
-      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight coupe-mots text-zinc-950 dark:text-white mb-4 sm:mb-6 court:sr-only">
-        {#if searchQuery}
-          <!-- Remplacement par une fonction : une requête qui contiendrait
-               « $& » ou « $1 » serait sinon lue comme un motif de `replace`. -->
-          {$tr("search.resultsForQuery").replace("{q}", () => searchQuery)}
+           Écran court : pour les lecteurs d'écran seulement, la requête est
+           dans le champ juste dessous, et chaque ligne compte en 740×360. -->
+      <h1
+        class="text-2xl sm:text-3xl font-titre font-semibold leading-[1.2] text-balance coupe-mots text-zinc-950 dark:text-white mb-4 sm:mb-6 court:sr-only"
+      >
+        {#if p.q}
+          {titreDeLaRecherche}
         {:else}
           {$tr("nav.search")}
         {/if}
       </h1>
 
-      <!-- Search Bar -->
-      <!-- SearchBar est le seul composant qui appelle /search/suggest : il
-           porte l'anti-rebond de 300 ms, la liste deroulante et la navigation
-           au clavier. Il n'etait importe NULLE PART, et cette page avait son
-           propre champ de saisie sans suggestions — d'ou l'absence totale
-           d'autocompletion a l'ecran, meme apres reparation de l'endpoint. -->
-      <div class="max-w-3xl">
+      <!-- Un vrai formulaire GET vers /search (P8) : la requête part sans
+           JavaScript, et le serveur rend les résultats. Il garde les filtres en
+           cours (champs cachés). SearchBar porte aussi les suggestions.
+           Texte indicatif court sous sm, celui de la page d'un domaine : la
+           phrase entière était coupée net sous la loupe à 390 px. -->
+      <div class="lg:max-w-3xl">
         <SearchBar
           size="large"
-          bind:value={searchQuery}
-          loading={isLoading}
+          bind:value={saisie}
+          loading={enCours}
           placeholder={$tr("search.searchLaw")}
-          on:search={handleSearchSubmit}
-          on:clear={() => {
-            searchQuery = "";
-            results = [];
-          }}
+          placeholderCourt={$tr("categories.searchPlaceholderShort")}
+          champs={champsCaches}
         />
       </div>
 
-      <!-- Tabs -->
-      <!-- Sous sm, la bande défile jusqu'aux bords de l'écran (-mx-4 px-4) :
-           coupée par la marge de la page, elle cachait le dernier onglet sans
-           rien qui invite à la faire glisser. L'aimantation (snap) arrête le
-           geste au début d'un onglet, scroll-px-4 tient compte de la marge. -->
-      <div class="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto overscroll-x-contain px-4 pb-2 mt-4 sm:mx-0 sm:mt-6 sm:scroll-px-0 sm:gap-3 sm:px-0 court:mt-2">
-        <!-- La bordure est posée sur les deux états : portée par les seuls
-             onglets inactifs, elle faisait perdre 2 px de large à l'onglet
-             choisi, et la bande se décalait à chaque changement d'onglet. -->
-        {#each tabFilters as tab}
-          <button
-            class="flex min-h-11 shrink-0 snap-start items-center gap-2 px-4 sm:px-5 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-colors {activeTab ===
-            tab.id
-              ? 'border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950'
-              : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-400 dark:hover:text-white'}"
-            on:click={() => (activeTab = tab.id)}
-          >
-            <Icone nom={tab.icon} class="text-lg" />
-            {tab.label}
-          </button>
-        {/each}
-      </div>
+      <!-- La passerelle vers l'assistant, avec la question déjà écrite (/chat
+           la pré-remplit sans l'envoyer). Lien de la maquette : souligné,
+           44 px de haut au doigt. SEULEMENT AVEC DES RÉSULTATS : dans un état
+           vide, la carte propose déjà « Poser la question à l'assistant »
+           (même adresse), 200 px plus bas ; les deux appels se répétaient, et
+           la maquette de l'état vide (recherche-vide-p7a) n'a que celui de la
+           carte. En panne, l'assistant passe par la même API. -->
+      {#if avecResultats}
+        <p class="mt-3 court:mt-1">
+          <a href={assistant} class="inline-flex min-h-11 items-center gap-2 text-sm {LIEN}">
+            <Icone nom="sparkles" class="text-base" />
+            {$tr("search.askAssistant")}
+          </a>
+        </p>
+      {/if}
+
+      <!-- Onglets de nature, avec l'effectif que le serveur a compté sur
+           TOUT l'ensemble trouvé (et non sur la page affichée). Des liens :
+           sans JavaScript aussi. `keepfocus` et `noscroll` : avec JavaScript,
+           on reste sur l'onglet choisi.
+
+           Sous lg (téléphone, tablette) et sur écran court (téléphone en
+           paysage), UNE rangée qui défile, jusqu'aux bords de l'écran
+           (-mx-4 pl-4, puis -mx-6 pl-6 à partir de sm) : en 768, les six
+           onglets passaient sur deux rangées, le dernier seul sur la seconde,
+           soit 52 px de commandes de plus avant le premier résultat. À partir
+           de lg, les 928 px de contenu au moins les tiennent sur une rangée ;
+           s'il le fallait, ils y passeraient à la ligne, comme dans la
+           maquette, plutôt que de défiler sous une souris.
+
+           Là où elle défile, son bord droit s'estompe sur 40 px, et 40 px de
+           marge en fin de bande (pr-10) laissent le dernier onglet sortir de
+           ce fondu : une bande coupée net au bord de l'écran ne disait pas
+           qu'il restait des onglets à droite. Le bord gauche s'estompe de même,
+           dès qu'un onglet y est coupé (`data-defilee`, posé par l'action) :
+           ouverte sur « Autres », elle tranchait net « Tous » ou « Arrêtés ».
+           Le masque (`--fondus`) ne dessine rien : il rend transparents les
+           deux bords, en clair comme en sombre. La bande s'ouvre sur
+           l'onglet ACTIF et non sur son début (`ongletActifEnVue`,
+           ./onglets.ts) : « Autres » choisi, il était hors de l'écran à
+           390 px, et rien ne disait quelle nature filtrait la liste. Les
+           marges de début (scroll-pl-10) et de fin (pr-10) mesurent les deux
+           fondus : l'action les lit pour sortir l'onglet de l'un et de
+           l'autre.
+
+           `preload-data="tap"` (ici, sur les numéros de page, les liens de
+           l'état vide, les rappels de filtre et la colonne) : chaque adresse
+           de /search relance une recherche à l'API, et le parcours classique
+           fait vectoriser la question. Préchargées au simple survol (réglage
+           du site, app.html), six onglets survolés lanceraient six
+           recherches ; au toucher ou à l'appui, le préchargement ne part
+           qu'avec le clic. Les lignes de résultat, vers /laws/<id> en cache,
+           gardent le survol. -->
+      {#if affiner}
+        <div
+          role="group"
+          aria-label={$tr("search.natureGroup")}
+          use:ongletActifEnVue={{ nature: p.nature, natures }}
+          data-sveltekit-keepfocus
+          data-sveltekit-noscroll
+          data-sveltekit-preload-data="tap"
+          class="-mx-4 mt-4 flex snap-x scroll-pl-10 gap-2 overflow-x-auto overscroll-x-contain pb-2 pl-4 pr-10 [--fondu-gauche:0px] data-[defilee]:[--fondu-gauche:2.5rem] [--fondus:linear-gradient(to_right,transparent,#000_var(--fondu-gauche),#000_calc(100%_-_2.5rem),transparent)] [-webkit-mask-image:var(--fondus)] [mask-image:var(--fondus)] sm:-mx-6 sm:mt-6 sm:pl-6 lg:mx-0 lg:flex-wrap lg:scroll-pl-0 lg:px-0 lg:[-webkit-mask-image:none] lg:[mask-image:none] court:mt-1 court:flex-nowrap court:scroll-pl-10 court:pr-10 court:[-webkit-mask-image:var(--fondus)] court:[mask-image:var(--fondus)]"
+        >
+          {#each ONGLETS as onglet (onglet.cle)}
+            {@const actif = p.nature === onglet.nature}
+            {@const effectif = onglet.nature ? natures[onglet.nature] : natures.tous}
+            {#if effectif === 0 && !actif}
+              <!-- Rien de cette nature : l'onglet reste à sa place, inactif,
+                   et le dit (`aria-disabled`). -->
+              <span role="link" aria-disabled="true" class="{ONGLET} cursor-not-allowed border-zinc-200 text-zinc-700 opacity-60 dark:border-zinc-800 dark:text-zinc-300">
+                {$tr(onglet.cle)}
+                <span class="tabular-nums text-zinc-500 dark:text-zinc-400">{formatNombre(effectif, langue)}</span>
+              </span>
+            {:else}
+              <a
+                href={adresseDeRecherche({ ...p, nature: onglet.nature, page: 1 })}
+                aria-current={actif ? "true" : undefined}
+                class="{ONGLET} {actif ? ONGLET_ACTIF : ONGLET_INACTIF}"
+              >
+                {$tr(onglet.cle)}
+                <span class="tabular-nums {actif ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-500 dark:text-zinc-400'}"
+                  >{formatNombre(effectif, langue)}</span
+                >
+              </a>
+            {/if}
+          {/each}
+        </div>
+      {/if}
     </div>
 
-    <!-- Layout. Sans gouttière pour le bouton flottant : il se retire quand
-         un résultat ou le panneau des filtres passe dessous
-         (majBoutonFlottant). -->
-    <!-- Écran court, de 480 px de large à lg : le bouton « Filtres » flotte à
-         gauche, et la ligne d'état et le tri, boîte flexible donc rangée à
-         côté d'un flottant, se placent à sa droite au lieu de passer
-         dessous : une rangée de 44 px en moins. La rangée passe en `block`,
-         un flottant n'ayant pas cours dans une boîte flexible ; ce qui suit
-         la ligne d'état passe sous le bouton (`clear-left`). Panneau déplié,
-         plus de flottant : il reprend toute la largeur au-dessus des
-         résultats, comme ailleurs (12 px dessous, le `gap` ne jouant plus).
-         Sous 480 px, la ligne d'état et le tri n'auraient plus la place à
-         côté du bouton. -->
-    <div class="flex flex-col lg:flex-row gap-4 lg:gap-8 court:min-[480px]:max-lg:block">
-      <!-- Sidebar Filters -->
-      <aside
-        class="w-full lg:w-64 flex-shrink-0 {filtresOuverts
-          ? 'court:min-[480px]:max-lg:mb-3'
-          : 'court:min-[480px]:max-lg:float-left court:min-[480px]:max-lg:mr-3 court:min-[480px]:max-lg:w-auto'}"
-      >
-        <!-- Bouton de repli, sous lg seulement. L'aria-label ne fait que
-             compléter le libellé visible par le nombre de filtres actifs, que
-             la pastille ne montre qu'en chiffre. -->
-        <button
-          type="button"
-          on:click={() => (filtresOuverts = !filtresOuverts)}
-          aria-expanded={filtresOuverts}
-          aria-controls="filtres-recherche"
-          aria-label={nombreFiltresActifs > 0
-            ? `${$tr("search.filters")} (${nombreFiltresActifs})`
-            : undefined}
-          data-testid="search-filters-toggle"
-          class="lg:hidden inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 text-sm font-semibold text-zinc-800 dark:text-zinc-200 shadow-sm dark:shadow-none hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white transition-colors"
-        >
-          <Icone nom="sliders-horizontal" class="text-lg" />
-          {$tr("search.filters")}
-          {#if nombreFiltresActifs > 0}
-            <span
-              class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 px-1.5 text-xs font-mono font-semibold tabular-nums"
-              >{nombreFiltresActifs}</span
-            >
-          {/if}
-          <Icone
-            nom="chevron-down"
-            class="text-lg transition-transform motion-reduce:transition-none {filtresOuverts
-              ? 'rotate-180'
-              : ''}"
-          />
-        </button>
+    <!-- Trois blocs : la ligne d'état, la colonne de filtres, les résultats.
+         Sous lg, dans cet ordre, l'un sous l'autre : la colonne dépliée
+         s'intercale entre son bouton et les résultats. À partir de lg, une
+         grille : la colonne à gauche sur toute la hauteur, la ligne d'état et
+         les résultats à droite (`grid-rows-[auto_1fr]` : la grande colonne
+         allonge la ligne des résultats, jamais celle de l'état). -->
+    <div
+      class="grid grid-cols-1 gap-y-3 {affiner
+        ? 'lg:grid-cols-[16rem_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-8 lg:gap-y-4'
+        : ''}"
+    >
+      <!-- Ligne d'état. Sous lg, le bouton « Filtres » y prend place, à côté
+           du nombre de résultats : en 768, il occupait seul une ligne
+           entre les onglets et l'état, quatre rangées de commandes avant le
+           premier résultat. `id="resultats"` : là où mènent les numéros de
+           page.
 
-        <!-- Un seul panneau pour toutes les tailles : replié ou non sous lg,
-             toujours affiché à partir de lg. Collant sur grand écran, il est
-             borné à la hauteur de la fenêtre : avec quatorze catégories, le
-             bas sortait de l'écran tant qu'on n'avait pas atteint la fin de
-             la liste. Lignes de 44 px, compactées à partir de lg sous un
-             pointeur fin (souris, pavé) seulement : compactées à toute
-             taille dès lg, les cases et boutons radio de 16 px l'étaient
-             aussi sur une tablette de 1 024 px tenue en paysage. -->
-        <div
-          id="filtres-recherche"
-          bind:this={filtresEl}
-          class="{filtresOuverts
-            ? 'mt-3 block'
-            : 'hidden'} lg:mt-0 lg:block bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 sm:p-6 shadow-sm dark:shadow-none lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain"
-        >
-          <div class="flex items-center justify-between mb-2 lg:mb-4">
-            <h3 class="font-bold text-zinc-950 dark:text-white">
-              {$tr("search.filters")}
-            </h3>
-            <!-- La recette des liens du guide (§ 4.3), soulignée au repos : en
-                 12 px noir, soulignée au seul survol, l'action ne se lisait
-                 pas comme telle. 44 px de haut sauf à partir de lg sous un
-                 pointeur fin (voir les cases, plus bas). -->
-            <button
-              on:click={resetFilters}
-              data-testid="search-reset"
-              class="-mr-2 inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-zinc-950 dark:text-white underline decoration-zinc-300 dark:decoration-zinc-600 underline-offset-4 hover:decoration-zinc-950 dark:hover:decoration-white transition-colors lg:py-1 lg:[@media(pointer:fine)]:min-h-0"
-              >{$tr("search.reset")}</button
-            >
-          </div>
+           Sans résultat (`rienATrier`), il n'y reste à voir que le bouton
+           « Filtres », sous lg : la ligne entière passe en sr-only là où il
+           n'est pas (à partir de lg, ou sans colonne de filtres). Sortie du
+           flux de la grille, elle n'y laisse ni rangée vide ni écart, et la
+           carte de l'état vide monte au niveau de la colonne de filtres. En
+           panne aussi (`etatSeulementAnnonce`), sans colonne de filtres : la
+           carte d'erreur prend sa place.
 
-          <!-- Date Filter -->
-          <!-- Intertitres en zinc-400 en sombre : zinc-500 n'y fait que 3,7:1
-               sur le panneau zinc-900. -->
-          <div class="mb-4 lg:mb-6">
-            <h4
-              class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-1 lg:mb-3"
-            >
-              {$tr("search.datePublication")}
-            </h4>
-            <div class="grid sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-1 lg:gap-y-2">
-              {#each [{ v: "all", label: $tr("search.allTime") }, { v: "year", label: $tr("search.thisYear") }, { v: "5y", label: $tr("search.last5Years") }] as { v, label }}
-                <label class="flex min-h-11 items-center gap-3 lg:gap-2 lg:[@media(pointer:fine)]:min-h-0 cursor-pointer group">
-                  <!-- Ni `form-radio` (inerte depuis la stratégie `base` du
-                       module des formulaires) ni couleur de bordure : app.css
-                       trace le contour en zinc-500, visible sur blanc (4,8:1),
-                       là où un zinc-300 effaçait presque un bouton vide. -->
-                  <input
-                    type="radio"
-                    name="date"
-                    value={v}
-                    bind:group={dateRange}
-                    on:change={() => { currentPage = 1; performSearch(); }}
-                    class="text-zinc-900 dark:text-white focus:ring-zinc-950 dark:focus:ring-white h-5 w-5 shrink-0 lg:h-4 lg:w-4"
-                  />
-                  <span
-                    class="min-w-0 text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-950 dark:group-hover:text-white transition-colors"
-                    >{label}</span
-                  >
-                </label>
-              {/each}
-            </div>
-          </div>
-
-          <!-- Category Filter -->
-          <!-- Deux colonnes de sm à lg : le panneau y prend toute la largeur. -->
-          <div class="mb-6">
-            <h4
-              class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-1 lg:mb-3"
-            >
-              {$tr("search.category")}
-            </h4>
-            <div class="grid sm:grid-cols-2 sm:gap-x-4 lg:grid-cols-1 lg:gap-y-2">
-              {#each categories as category (category.id)}
-                <label class="flex min-h-11 items-center gap-3 lg:gap-2 lg:[@media(pointer:fine)]:min-h-0 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={selectedCategoryIds.includes(category.id)}
-                    on:change={() => toggleCategory(category.id)}
-                    class="rounded text-zinc-900 dark:text-white focus:ring-zinc-950 dark:focus:ring-white h-5 w-5 shrink-0 lg:h-4 lg:w-4"
-                  />
-                  <span
-                    class="min-w-0 text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-950 dark:group-hover:text-white transition-colors"
-                    >{nomCategorie(category.name, $language.current)}</span
-                  >
-                </label>
-              {:else}
-                <p class="text-xs text-zinc-500 dark:text-zinc-400">{$tr("common.loading")}</p>
-              {/each}
-            </div>
-          </div>
-
-          <!-- Sous lg, le panneau déplié s'intercale AU-DESSUS des résultats :
-               chaque case relance la recherche, mais le résultat arrive hors de
-               la vue. Ce bouton referme le panneau et y ramène, sans remonter
-               jusqu'au bouton « Filtres ». -->
-          <button
-            type="button"
-            on:click={voirLesResultats}
-            data-testid="search-filters-done"
-            class="lg:hidden flex min-h-11 w-full items-center justify-center rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 px-4 text-sm font-semibold hover:bg-black dark:hover:bg-zinc-200 transition-colors shadow-sm dark:shadow-none"
-          >
-            {$tr("search.showResults")}
-          </button>
-        </div>
-      </aside>
-
-      <!-- Results -->
-      <!-- min-w-0 : élément flex, la colonne ne descendait pas sous la largeur
-           de son contenu, et une carte au titre insécable l'élargissait
-           au-delà de l'écran. scroll-mt-4 : de l'air au-dessus quand
-           allerAuxResultats y amène. -->
+           TOUJOURS LÀ, même sans requête (vide et sr-only) : elle n'était
+           créée qu'avec une requête, déjà remplie du nombre de résultats, et
+           une région qui arrive avec son texte n'est pas annoncée. Une
+           recherche lancée de la page vide n'était donc jamais dite. -->
       <div
-        bind:this={resultatsEl}
-        class="min-w-0 flex-1 space-y-4 scroll-mt-4 court:space-y-3 court:min-[480px]:max-lg:[&>*+*]:clear-left"
+        id="resultats"
+        class="flex scroll-mt-4 flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400 {affiner
+          ? 'lg:col-start-2 lg:row-start-1'
+          : ''} {etatSeulementAnnonce ? (affiner ? 'lg:sr-only' : 'sr-only') : ''}"
       >
-        <!-- Results Meta -->
-        <!-- Empilée sous sm : à côté du tri, la ligne d'état passait sur deux
-             ou trois lignes. Sans marge basse sur écran court : les 16 px de
-             `space-y-4` suffisent avant la première carte. -->
-        <div
-          class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm text-zinc-500 dark:text-zinc-400 pb-2 court:pb-0"
-        >
-          <!--
-            role="status" (donc aria-live="polite") : apres une recherche, un
-            lecteur d'ecran n'apprenait NI que la requete etait partie, NI
-            combien de resultats revenaient — la page changeait en silence.
-            L'annonce est posee ici, sur la ligne de statut, et non sur la liste
-            de resultats : annoncer les deux ferait entendre l'information deux
-            fois.
-          -->
-          <span role="status" aria-live="polite" data-testid="search-status">
-          {#if isLoading}
-            <span>{$tr("search.searching")}</span>
-          {:else if errorMessage}
-            <!-- red-600 et non red-500 : 3,6:1 seulement sur le fond de page,
-                 sous le seuil AA que vérifie axe. -->
-            <span class="text-red-600 dark:text-red-400">{errorMessage}</span>
-          {:else}
-            <!-- Durée dans la notation de la langue (« 0,31 s » en
-                 français) : `toFixed` écrivait toujours « 0.31 ». Espace
-                 insécable avant l'unité. -->
-            <span
-              >{$tr("search.aboutResults")}
-              {totalResults}
-              {$tr("search.resultsFound")} ({dureeAffichee}&nbsp;{$tr("search.seconds")})</span
-            >
-          {/if}
-          </span>
+        {#if affiner}
+          <!-- Un lien vers la colonne (son ancre), et non un bouton : sans
+               JavaScript, il l'ouvre par `:target`. Avec JavaScript, il la
+               replie et la déplie (`aria-expanded`). Avant l'hydratation, ni
+               `aria-expanded` ni `aria-controls` : un simple lien vers une
+               ancre, qui disait sinon « réduit » la colonne ouverte par
+               `:target`. L'aria-label complète le libellé par le nombre de
+               filtres actifs, que la pastille ne montre qu'en chiffre. -->
+          <a
+            href="#filtres-recherche"
+            on:click={basculerFiltres}
+            aria-expanded={hydratee ? filtresOuverts : undefined}
+            aria-controls={hydratee ? "filtres-recherche" : undefined}
+            aria-label={nombreDeFiltres > 0 ? `${$tr("search.filters")} (${nombreDeFiltres})` : undefined}
+            data-testid="search-filters-toggle"
+            class="lg:hidden inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 text-sm font-semibold text-zinc-800 dark:text-zinc-200 shadow-sm dark:shadow-none hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white transition-colors"
+          >
+            <Icone nom="sliders-horizontal" class="text-lg" />
+            {$tr("search.filters")}
+            {#if nombreDeFiltres > 0}
+              <span
+                class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-950 px-1.5 text-xs font-semibold tabular-nums text-white dark:bg-white dark:text-zinc-950"
+                >{nombreDeFiltres}</span
+              >
+            {/if}
+            <Icone
+              nom="chevron-down"
+              class="text-lg transition-transform motion-reduce:transition-none {filtresOuverts ? 'rotate-180' : ''}"
+            />
+          </a>
+        {/if}
+
+        <!--
+          role="status" (donc aria-live="polite") : apres une recherche, un
+          lecteur d'ecran n'apprenait NI que la requete etait partie, NI
+          combien de resultats revenaient. L'annonce est posee ici, sur la
+          ligne d'etat, et non sur la liste de resultats : annoncer les deux
+          ferait entendre l'information deux fois. Montée avant toute requête,
+          la région change quand une recherche part puis aboutit, et ces
+          changements sont annoncés ; voir aussi `annonceDifferee`.
+
+          DEUX ÉLÉMENTS, pour que seule l'annonce attende : la région, hors de
+          l'écran (sr-only), et ce que voit l'écran, une copie cachée aux
+          lecteurs d'écran (la ligne n'est lue qu'une fois), qui montre le
+          nombre sans attendre. 136 px au moins : plus étroite, la phrase
+          débordait sur le tri (« No results found » en anglais) ; le tri passe
+          alors à la ligne. Le bouton « Filtres » et elle tiennent encore côte
+          à côte à 320 px. Sans résultat ou en panne, pas de copie (voir
+          `etatSeulementAnnonce`) : la carte de l'état vide ou celle de
+          l'erreur le dit à l'écran. Elle n'a donc plus de rouge : affichée,
+          elle ne dit jamais une panne.
+        -->
+        {#if !etatSeulementAnnonce}
+          <span aria-hidden="true" class="min-w-[8.5rem] flex-1">{statutAffiche}</span>
+        {/if}
+        <span role="status" aria-live="polite" data-testid="search-status" class="sr-only">
+          {statutAnnonce}
+        </span>
+
+        {#if affiner && !rienATrier}
+          <!-- Le tri, calculé par le serveur sur tout l'ensemble trouvé. Il
+               appartient au formulaire de la colonne (`form=`) : sans
+               JavaScript, son bouton du <noscript> l'envoie avec les filtres.
+               text-base sous sm : sous 16 px, iOS zoome au focus.
+
+               La flèche suit le mot, comme dans la maquette (« Pertinence ⌄ »).
+               Une liste native prend la largeur de sa plus LONGUE option
+               (« Date ancienne ») : la flèche restait à 40 px de
+               « Pertinence ». Sa largeur vient donc d'une copie invisible du
+               libellé CHOISI (mêmes police, graisse et marges ; 4 px de plus
+               à droite, pour qu'aucun navigateur ne rogne le mot), et la
+               liste s'étend sur elle (`absolute inset-0`). La copie, rendue
+               au serveur, ne bouge pas à l'hydratation ; elle est cachée aux
+               lecteurs d'écran, qui lisent la liste. La copie porte aussi
+               la hauteur : 44 px au doigt, compactée sous un pointeur fin à
+               partir de lg. -->
           <div class="flex items-center gap-2">
             <span>{$tr("search.sortBy")}</span>
-            <!-- text-base sous sm : sous 16 px, iOS zoome la page au focus et
-                 ne la dézoome pas ensuite. 44 px de haut sauf à partir de lg
-                 sous un pointeur fin : réduite dès sm, la liste n'avait plus
-                 que la hauteur de son texte sur les écrans tactiles de 640 à
-                 1 024 px. -->
-            <select
-              bind:value={sortBy}
-          aria-label={$tr("a11y.sortBy")}
-              data-testid="search-sort"
-              class="bg-transparent border-none text-zinc-950 dark:text-white font-medium focus:ring-0 focus-visible:ring-2 focus-visible:ring-zinc-950 dark:focus-visible:ring-white focus-visible:rounded cursor-pointer pr-8 min-h-11 lg:[@media(pointer:fine)]:min-h-0 text-base sm:text-sm"
-            >
-              <option value="relevance">{$tr("search.relevance")}</option>
-              <option value="date_desc">{$tr("search.recentDate")}</option>
-              <option value="date_asc">{$tr("search.oldestDate")}</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Loading State -->
-        <!-- Squelettes au gabarit de la carte de résultat (SearchResultCard :
-             16 puis 20 px de marge, sans ombre), pour que la liste ne saute
-             pas quand les résultats arrivent. -->
-        {#if isLoading}
-          <div class="space-y-4 court:space-y-3">
-            {#each [1, 2, 3] as _}
-              <div
-                class="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 motion-safe:animate-pulse"
+            <span class="relative inline-flex">
+              <span
+                aria-hidden="true"
+                class="invisible inline-flex min-h-11 items-center whitespace-nowrap py-2 pl-3 pr-9 text-base font-medium sm:text-sm lg:[@media(pointer:fine)]:min-h-0"
+                >{libelleDuTri}</span
               >
-                <div
-                  class="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-20 mb-3"
-                ></div>
-                <div
-                  class="h-6 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4 mb-4"
-                ></div>
-                <div
-                  class="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-full mb-2"
-                ></div>
-                <div
-                  class="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3"
-                ></div>
+              <select
+                name="tri"
+                form="filtres-recherche"
+                value={p.tri ?? ""}
+                aria-label={$tr("a11y.sortBy")}
+                data-testid="search-sort"
+                on:change={changerDeTri}
+                class="absolute inset-0 h-full w-full bg-transparent border-none text-zinc-950 dark:text-white font-medium focus:ring-0 focus-visible:ring-2 focus-visible:ring-zinc-950 dark:focus-visible:ring-white focus-visible:rounded cursor-pointer pl-3 pr-8 text-base sm:text-sm"
+              >
+                <option value="">{$tr("search.relevance")}</option>
+                <option value="recent">{$tr("search.recentDate")}</option>
+                <option value="ancien">{$tr("search.oldestDate")}</option>
+              </select>
+            </span>
+            <noscript>
+              <button
+                type="submit"
+                form="filtres-recherche"
+                class="inline-flex min-h-11 items-center rounded-xl border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                >{$tr("search.applySort")}</button
+              >
+            </noscript>
+          </div>
+        {/if}
+      </div>
+
+      {#if affiner}
+        <!-- Colonne de filtres : UN formulaire GET, celui du tri aussi. Avec
+             JavaScript, chaque changement relance la recherche
+             (`appliquerFormulaire`) ; sans lui, « Voir les résultats »
+             l'envoie. Lignes de 44 px, compactées à partir de lg sous un
+             pointeur fin seulement (souris, pavé).
+
+             Elle suit le flux de la page et se lit en entier en descendant,
+             sans hauteur bornée ni défilement à elle : bornée à la fenêtre,
+             elle coupait sa dernière case en 1440×900 et cachait quatre
+             domaines en 1024×768 derrière un défilement dans le défilement.
+             Elle ne colle (à 16 px du haut) que là où elle tient entière
+             dans la fenêtre : `collanteSiElleTient` (./colonne.ts) le mesure
+             et pose `data-collante`. Sans JavaScript, elle ne colle pas. -->
+        <aside class="lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          <form
+            id="filtres-recherche"
+            bind:this={formulaire}
+            use:collanteSiElleTient
+            method="get"
+            action="/search"
+            data-hors-du-bouton
+            data-sveltekit-preload-data="tap"
+            class="{filtresOuverts
+              ? 'block'
+              : hydratee
+                ? 'hidden'
+                : 'hidden target:block'} lg:block bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 sm:p-6 shadow-sm dark:shadow-none lg:data-[collante]:sticky lg:data-[collante]:top-4"
+          >
+            <input type="hidden" name="q" value={p.q} />
+            {#if p.nature}<input type="hidden" name="nature" value={p.nature} />{/if}
+            <!-- Sans résultat, la liste du tri n'est plus affichée : c'est elle
+                 qui portait `tri` dans ce formulaire (`form=`). Le tri choisi
+                 reste donc ici, et une case cochée ou décochée le garde. -->
+            {#if rienATrier && p.tri}<input type="hidden" name="tri" value={p.tri} />{/if}
+
+            <div class="flex items-center justify-between mb-2 lg:mb-4">
+              <h2 class="font-bold text-zinc-950 dark:text-white">{$tr("search.filters")}</h2>
+              <!-- Retire filtres et tri, garde la requête : un lien. -->
+              <a
+                href={adresseDeRecherche(sansFiltre(p.q))}
+                data-testid="search-reset"
+                data-sveltekit-keepfocus
+                data-sveltekit-noscroll
+                class="-mr-2 inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-zinc-950 dark:text-white underline decoration-zinc-300 dark:decoration-zinc-600 underline-offset-4 hover:decoration-zinc-950 dark:hover:decoration-white transition-colors lg:py-1 lg:[@media(pointer:fine)]:min-h-0"
+                >{$tr("search.reset")}</a
+              >
+            </div>
+
+            <!-- Date de l'ACTE (« Date du texte ») : l'année de signature,
+                 et non une date de publication que la base n'a pas. -->
+            <fieldset class="mb-4 lg:mb-6">
+              <legend class="mb-1 text-sm font-semibold text-zinc-950 dark:text-white lg:mb-3">
+                {$tr("search.dateOfText")}
+              </legend>
+              <div class="grid sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-1 lg:gap-y-2">
+                {#each PERIODES_AFFICHEES as choix (choix.cle)}
+                  <label class="flex min-h-11 items-center gap-3 lg:gap-2 lg:[@media(pointer:fine)]:min-h-0 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="periode"
+                      value={choix.periode ?? ""}
+                      checked={p.periode === choix.periode}
+                      on:change={appliquerFormulaire}
+                      class="text-zinc-900 dark:text-white focus:ring-zinc-950 dark:focus:ring-white h-5 w-5 shrink-0 lg:h-4 lg:w-4"
+                    />
+                    <span
+                      class="min-w-0 text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-950 dark:group-hover:text-white transition-colors"
+                      >{$tr(choix.cle)}</span
+                    >
+                  </label>
+                {/each}
               </div>
+            </fieldset>
+
+            <!-- Domaines, en noms courts (Q2), avec l'effectif que le serveur
+                 a compté : disjonctif, il montre d'avance ce qu'une case
+                 ajoute. Une case à zéro est inactive, sauf cochée (on doit
+                 pouvoir la décocher). Ordre fixe, celui de la liste des
+                 domaines de l'accueil (ORDRE_DES_DOMAINES) : une case ne
+                 saute pas d'une ligne à l'autre quand les effectifs changent,
+                 et un domaine a le même rang ici et là.
+
+                 Le PÉRIMÈTRE d'une page de domaine y est coché, sous son nom
+                 (`perimetre`) : décoché, il quitte l'adresse, et la recherche
+                 porte sur tout le corpus. Les autres domaines y sont à zéro,
+                 l'ensemble trouvé n'ayant que ses textes. -->
+            <fieldset class="mb-6">
+              <legend class="mb-1 text-sm font-semibold text-zinc-950 dark:text-white lg:mb-3">
+                {$tr("search.domain")}
+              </legend>
+              <div class="grid sm:grid-cols-2 sm:gap-x-4 lg:grid-cols-1 lg:gap-y-2">
+                {#each data.domaines as domaine (domaine.id ?? domaine.nom)}
+                  {@const inactif = domaine.id === null || (domaine.n === 0 && !domaine.coche)}
+                  {@const duPerimetre = domaine.id !== null && p.perimetre.includes(domaine.id)}
+                  <label
+                    class="flex min-h-11 items-center gap-3 lg:gap-2 lg:[@media(pointer:fine)]:min-h-0 group {inactif
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'}"
+                  >
+                    <input
+                      type="checkbox"
+                      name={duPerimetre ? "perimetre" : "categorie"}
+                      value={domaine.id ?? ""}
+                      checked={domaine.coche}
+                      disabled={inactif}
+                      on:change={appliquerFormulaire}
+                      class="rounded text-zinc-900 dark:text-white focus:ring-zinc-950 dark:focus:ring-white h-5 w-5 shrink-0 lg:h-4 lg:w-4"
+                    />
+                    <span
+                      class="min-w-0 flex-1 text-sm text-zinc-600 dark:text-zinc-400 transition-colors {inactif
+                        ? ''
+                        : 'group-hover:text-zinc-950 dark:group-hover:text-white'}"
+                      >{nomCourtDuDomaine(domaine.nom, langue) || `${$tr("search.domain")} ${domaine.id ?? ""}`}</span
+                    >
+                    <span class="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{formatNombre(domaine.n, langue)}</span>
+                  </label>
+                {/each}
+              </div>
+            </fieldset>
+
+            <!-- Sous lg, avec JavaScript : referme la colonne et ramène aux
+                 résultats. Sans JavaScript, à toute taille, il ENVOIE le
+                 formulaire (à partir de lg, son double du <noscript>). -->
+            <button
+              type="submit"
+              on:click={voirLesResultats}
+              data-testid="search-filters-done"
+              class="lg:hidden flex min-h-11 w-full items-center justify-center rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 px-4 text-sm font-semibold hover:bg-black dark:hover:bg-zinc-200 transition-colors shadow-sm dark:shadow-none"
+            >
+              {$tr("search.showResults")}
+            </button>
+            <noscript>
+              <button
+                type="submit"
+                class="hidden lg:flex min-h-11 w-full items-center justify-center rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 px-4 text-sm font-semibold"
+              >
+                {$tr("search.applyFilters")}
+              </button>
+            </noscript>
+          </form>
+        </aside>
+      {/if}
+
+      <!-- Résultats. min-w-0 : élément de grille, la colonne ne descendait pas
+           sous la largeur de son contenu, et une ligne au titre insécable
+           l'élargissait au-delà de l'écran. Atténués pendant une recherche.
+           Sans résultat, la ligne d'état est hors de la grille à partir de lg
+           (sr-only) : la carte prend sa rangée, en haut, à côté de la colonne
+           de filtres, au lieu de laisser 16 px d'écart au-dessus d'elle. -->
+      <div
+        class="min-w-0 transition-opacity motion-reduce:transition-none {enCours ? 'opacity-60' : ''} {affiner
+          ? `lg:col-start-2 ${rienATrier ? 'lg:row-start-1' : 'lg:row-start-2'}`
+          : ''}"
+        aria-busy={enCours ? "true" : undefined}
+      >
+        {#if rappels.length}
+          <div
+            class="mb-3 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"
+            data-sveltekit-preload-data="tap"
+          >
+            <span>{$tr("search.activeFilters")}</span>
+            {#each rappels as rappel (rappel.cle)}
+              <a
+                href={rappel.adresse}
+                aria-label={remplir($tr("search.removeFilter"), { f: rappel.libelle })}
+                class="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 transition-colors hover:border-zinc-950 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-200 dark:hover:text-white"
+              >
+                {rappel.libelle}
+                <Icone nom="x" class="text-sm" />
+              </a>
             {/each}
           </div>
+        {/if}
 
-          <!-- Empty State -->
-        {:else if !searchQuery}
+        {#if data.etat === "debut"}
+          <!-- `data-hors-du-bouton`, comme les autres blocs de la colonne : en
+               740×360, le bouton flottant de l'assistant couvrait la fin de
+               la phrase (« … des textes juridiq[ues.] ») ; il se retire
+               désormais devant la carte. -->
           <div
+            data-hors-du-bouton
             class="bg-white dark:bg-zinc-900 p-8 sm:p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none text-center"
           >
             <Icone nom="search" class="text-6xl text-zinc-300 dark:text-zinc-600 mb-4" />
-            <h3
-              class="text-xl font-semibold text-zinc-950 dark:text-white mb-2"
-            >
+            <h2 class="text-xl font-semibold text-zinc-950 dark:text-white mb-2">
               {$tr("search.startTitle")}
-            </h3>
+            </h2>
             <p class="text-zinc-600 dark:text-zinc-400">
               {$tr("search.startDesc")}
             </p>
           </div>
 
-          <!-- Erreur : cette branche doit passer AVANT « aucun resultat ».
-               Sans elle, une panne de serveur s'affichait en grand comme
-               « Aucun resultat trouve / Essayez avec d'autres termes », et
-               l'utilisateur reformulait sa requete pour un probleme reseau. -->
-        {:else if errorMessage}
+          <!-- Erreur : avant « aucun résultat ». Une panne affichée en grand
+               comme « Aucun résultat trouvé » faisait reformuler la requête
+               pour un problème de réseau. -->
+        {:else if data.etat === "erreur"}
           <div
             role="alert"
             data-testid="search-error"
+            data-hors-du-bouton
             class="bg-white dark:bg-zinc-900 p-8 sm:p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none text-center"
           >
             <Icone nom="cloud-off" class="text-6xl text-zinc-400 dark:text-zinc-500 mb-4" />
-            <h3 class="text-xl font-semibold text-zinc-950 dark:text-white mb-2">
-              {errorMessage}
-            </h3>
-            <button
-              on:click={() => performSearch()}
+            <h2 class="text-xl font-semibold text-zinc-950 dark:text-white mb-2">
+              {$tr(data.erreur)}
+            </h2>
+            <a
+              href={adresseDeRecherche(p)}
+              on:click={reessayer}
               data-testid="search-retry"
-              class="mt-4 min-h-11 px-6 py-2 bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-semibold rounded-xl hover:bg-black dark:hover:bg-zinc-200 transition-colors shadow-sm dark:shadow-none"
-              >{$tr("common.retry")}</button
+              class="mt-4 inline-flex min-h-11 items-center justify-center px-6 py-2 bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-semibold rounded-xl hover:bg-black dark:hover:bg-zinc-200 transition-colors shadow-sm dark:shadow-none"
+              >{$tr("common.retry")}</a
             >
           </div>
-
-          <!-- No Results -->
-        {:else if filteredResults.length === 0}
+        {:else if pageAuDela}
           <div
-            class="bg-white dark:bg-zinc-900 p-8 sm:p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none text-center"
+            data-hors-du-bouton
+            class="rounded-2xl border border-zinc-200 bg-white p-6 text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-none sm:p-10"
           >
-            <Icone nom="search-x" class="text-6xl text-zinc-300 dark:text-zinc-600 mb-4" />
-            <h3
-              class="text-xl font-semibold text-zinc-950 dark:text-white mb-2"
+            <p>{$tr("search.beyondEnd")}</p>
+            <a href={adresseDeRecherche({ ...p, page: 1 })} class="mt-3 inline-flex min-h-11 items-center text-sm {LIEN}"
+              >{$tr("search.firstPage")}</a
             >
-              {$tr("search.noResultsTitle")}
-            </h3>
-            <p class="text-zinc-600 dark:text-zinc-400">
-              {$tr("search.noResultsDesc")}
+          </div>
+        {:else if data.resultats.length === 0}
+          <!-- Aucun résultat (P7) : jamais une impasse. Les textes trouvés
+               ailleurs (autres natures, sans filtre), l'assistant avec la
+               question déjà écrite, et la liste des domaines. -->
+          <div
+            data-hors-du-bouton
+            data-sveltekit-preload-data="tap"
+            class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:p-10"
+          >
+            <Icone nom="search-x" class="text-4xl text-zinc-500 dark:text-zinc-400 mb-3" />
+            {#if videParNature && p.nature}
+              <h2 class="text-lg sm:text-xl font-semibold text-zinc-950 dark:text-white">
+                {remplir($tr(AUCUN_PAR_NATURE[p.nature]), { q: p.q })}
+              </h2>
+              <p class="mt-2 text-zinc-600 dark:text-zinc-400">{remplir($tr("search.empty.found"), { liste: trouvees })}</p>
+            {:else if videParFiltres}
+              <h2 class="text-lg sm:text-xl font-semibold text-zinc-950 dark:text-white">
+                {$tr("search.empty.filtersTitle")}
+              </h2>
+              {#if trouvesSansFiltre}
+                <p class="mt-2 text-zinc-600 dark:text-zinc-400">
+                  {remplir($tr(cleSelonNombre("search.empty.withoutFilters", trouvesSansFiltre, langue)), {
+                    n: formatNombre(trouvesSansFiltre, langue),
+                  })}
+                </p>
+              {/if}
+            {:else}
+              <h2 class="text-lg sm:text-xl font-semibold text-zinc-950 dark:text-white">
+                {remplir($tr("search.empty.nothingTitle"), { q: p.q })}
+              </h2>
+              <p class="mt-2 text-zinc-600 dark:text-zinc-400">
+                {#if data.corpus}
+                  {remplir($tr("search.empty.corpus"), {
+                    n: formatNombre(data.corpus.textes, langue),
+                    sources: data.corpus.sources[langue] ?? data.corpus.sources.fr,
+                  })}
+                {:else}
+                  {$tr("search.empty.tips")}
+                {/if}
+              </p>
+            {/if}
+
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              {#if videParNature}
+                <a
+                  href={adresseDeRecherche({ ...p, nature: null, page: 1 })}
+                  class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 text-sm font-semibold text-white shadow-sm hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200"
+                >
+                  {remplir($tr(cleSelonNombre("search.empty.allNatures", natures.tous, langue)), {
+                    n: formatNombre(natures.tous, langue),
+                  })}
+                </a>
+              {:else if videParFiltres}
+                <a
+                  href={adresseDeRecherche(sansFiltre(p.q, p.tri))}
+                  class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 text-sm font-semibold text-white shadow-sm hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200"
+                >
+                  {#if trouvesSansFiltre}
+                    {remplir($tr(cleSelonNombre("search.empty.seeWithoutFilters", trouvesSansFiltre, langue)), {
+                      n: formatNombre(trouvesSansFiltre, langue),
+                    })}
+                  {:else}
+                    {$tr("search.empty.removeFilters")}
+                  {/if}
+                </a>
+              {/if}
+              <!-- L'assistant : bouton secondaire quand des textes existent
+                   ailleurs, principal quand la recherche n'a rien trouvé. -->
+              <a
+                href={assistant}
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold {videParNature ||
+                videParFiltres
+                  ? 'border border-zinc-500 text-zinc-950 hover:border-zinc-950 dark:border-zinc-400 dark:text-white dark:hover:border-white'
+                  : 'bg-zinc-950 text-white shadow-sm hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200'}"
+              >
+                <Icone nom="sparkles" class="text-base" />
+                {$tr("search.askAssistantEmpty")}
+              </a>
+            </div>
+            <!-- La liste des domaines de l'accueil (son ancre `domaines`). -->
+            <p class="mt-5 text-sm">
+              <a href="/#domaines" class="inline-flex min-h-11 items-center {LIEN}">{$tr("search.browseDomains")}</a>
             </p>
           </div>
-
-          <!-- Results List -->
         {:else}
-          <!--
-            Deux sections. Les documents dont le TITRE correspond d'abord, ceux
-            qui ne correspondent que par le texte ensuite, sous un intertitre
-            qui le dit. Rien n'est masqué : c'est la lisibilité du classement
-            qui change, pas son contenu.
-          -->
-          <!-- Intitulés des deux groupes à la recette du surtitre (guide,
-               § 4.2 : mono, capitales, espacé), comme « Date de publication »
-               et « Catégorie » dans les filtres ; « Mentions dans le texte »
-               était en sans-serif semi-gras. Le premier groupe a le sien dès
-               que les deux existent : sans lui, la coupure ne se comprenait
-               qu'en arrivant au second. -->
-          {#if titleMatches.length > 0 && bodyMatches.length > 0}
-            <div class="flex items-center gap-3 pb-1">
-              <span
-                class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 whitespace-nowrap"
-              >
-                {$tr("search.titleMatches")}
-              </span>
-              <div class="h-px flex-1 bg-zinc-200 dark:bg-zinc-800"></div>
-            </div>
-          {/if}
-          {#each titleMatches as result}
-            <SearchResultCard
-              {result}
-              badge={getBadgeInfo(result)}
-              copied={copiedId === result.law_id}
-              onCopy={copyResultLink}
-            />
-          {/each}
-
-          {#if bodyMatches.length > 0}
-            <div class="flex items-center gap-3 pt-4 pb-1">
-              <span
-                class="text-xs font-mono font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 whitespace-nowrap"
-              >
-                {$tr("search.bodyMatches")}
-              </span>
-              <div class="h-px flex-1 bg-zinc-200 dark:bg-zinc-800"></div>
-            </div>
-            {#each bodyMatches as result}
-              <SearchResultCard
-                {result}
-                badge={getBadgeInfo(result)}
-                copied={copiedId === result.law_id}
-                onCopy={copyResultLink}
-              />
+          <!-- Une liste bordée à filets, une ligne par résultat (P7).
+               `role="list"` : Safari ne lit plus comme une liste un <ul> sans
+               puces. Le bouton flottant de l'assistant se retire quand elle
+               passe dessous. -->
+          <ul
+            role="list"
+            data-hors-du-bouton
+            class="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800"
+          >
+            {#each data.resultats as resultat (resultat.id)}
+              <SearchResultCard {resultat} />
             {/each}
-          {/if}
+          </ul>
 
-          <!-- Pagination : les numeros etaient codes en dur et sans on:click.
-               Boutons de 44 px, et trois numeros seulement sous sm (voir
-               pagesTelephone) : la rangee tient dans 288 px. 44 px à toute
-               taille : réduits à 40 px dès sm, ils l'étaient aussi sur un
-               téléphone en paysage et sur une tablette ; à cinq numéros, la
-               rangée tient dans 356 px. -->
+          <!-- Pagination : des liens (sans JavaScript aussi), vers le haut des
+               résultats. Carrés de 44 px à toute taille ; trois numéros sous
+               sm, la rangée tient dans 288 px. Une flèche sans page où aller
+               reste à sa place, inactive (`aria-disabled`). -->
           {#if totalPages > 1}
             <nav
-              class="flex flex-wrap justify-center items-center gap-1 sm:gap-2 mt-8 pt-4"
+              class="mt-8 flex flex-wrap items-center justify-center gap-1 pt-4 sm:gap-2"
               aria-label={$tr("pagination.page")}
+              data-hors-du-bouton
+              data-sveltekit-preload-data="tap"
             >
-              <button
-                on:click={() => goToPage(currentPage - 1)}
-                data-testid="search-page-prev"
-                aria-label={$tr("pagination.prev")}
-                class="h-11 w-11 flex items-center justify-center rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 hover:text-zinc-950 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={currentPage === 1}
-              >
-                <Icone nom="chevron-left" class="text-2xl" />
-              </button>
+              {#if p.page > 1}
+                <a
+                  href={lienPagePrecedente}
+                  data-testid="search-page-prev"
+                  aria-label={$tr("pagination.prev")}
+                  class="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                >
+                  <Icone nom="chevron-left" class="text-2xl" />
+                </a>
+              {:else}
+                <span
+                  role="link"
+                  aria-disabled="true"
+                  aria-label={$tr("pagination.prev")}
+                  data-testid="search-page-prev"
+                  class="flex h-11 w-11 cursor-not-allowed items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 opacity-50 dark:border-zinc-800 dark:text-zinc-400"
+                >
+                  <Icone nom="chevron-left" class="text-2xl" />
+                </span>
+              {/if}
 
-              {#each visiblePages as n (n)}
-                <button
-                  on:click={() => goToPage(n)}
+              {#each numerosDePage as { n, href } (n)}
+                <a
+                  {href}
                   data-testid="search-page-{n}"
-                  aria-current={n === currentPage ? "page" : undefined}
+                  aria-current={n === p.page ? "page" : undefined}
                   class="{pagesTelephone.includes(n)
                     ? 'flex'
-                    : 'hidden sm:flex'} h-11 w-11 items-center justify-center rounded-xl font-medium transition-colors {n ===
-                  currentPage
+                    : 'hidden sm:flex'} h-11 min-w-11 items-center justify-center rounded-xl px-2 font-medium tabular-nums transition-colors {n ===
+                  p.page
                     ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
                     : 'border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 hover:text-zinc-950 dark:hover:bg-zinc-800 dark:hover:text-white'}"
-                  >{n}</button
+                  >{n}</a
                 >
               {/each}
 
-              <button
-                on:click={() => goToPage(currentPage + 1)}
-                data-testid="search-page-next"
-                aria-label={$tr("pagination.next")}
-                class="h-11 w-11 flex items-center justify-center rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 hover:text-zinc-950 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={currentPage === totalPages}
-              >
-                <Icone nom="chevron-right" class="text-2xl" />
-              </button>
+              {#if p.page < totalPages}
+                <a
+                  href={lienPageSuivante}
+                  data-testid="search-page-next"
+                  aria-label={$tr("pagination.next")}
+                  class="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                >
+                  <Icone nom="chevron-right" class="text-2xl" />
+                </a>
+              {:else}
+                <span
+                  role="link"
+                  aria-disabled="true"
+                  aria-label={$tr("pagination.next")}
+                  data-testid="search-page-next"
+                  class="flex h-11 w-11 cursor-not-allowed items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 opacity-50 dark:border-zinc-800 dark:text-zinc-400"
+                >
+                  <Icone nom="chevron-right" class="text-2xl" />
+                </span>
+              {/if}
             </nav>
           {/if}
         {/if}
@@ -990,21 +1219,10 @@
     </div>
   </main>
 
-  <!-- Bouton flottant de l'assistant, commun avec l'accueil : la copie locale
-       (56 px, bottom-6 right-6) divergeait de celle de (main)/+layout.svelte,
-       et aucune des deux ne tenait compte de la barre d'accueil de l'iPhone.
-       La place qu'il occupe en fin de défilement est réservée dans le pied de
-       page (reserverBouton), toujours rendu sous les résultats : la dernière
-       carte et la pagination remontent au-dessus du bouton sans qu'une marge
-       vide de plus soit ajoutée à <main>. Avant la fin, il cède la place aux
-       résultats (boutonMasque, voir majBoutonFlottant). -->
-  <ChatFab masque={boutonMasque} />
+  <!-- Bouton flottant de l'assistant, commun au site : il se retire quand la
+       liste, la colonne de filtres, la pagination ou un état vide passent
+       dessous (`eviter`), et revient dès qu'on remonte la page ou en fin de
+       liste, où le pied de page lui réserve sa place (reserverBouton). -->
+  <ChatFab eviter="[data-hors-du-bouton]" />
   <SiteFooter reserverBouton />
 </div>
-
-<style>
-  /* Smooth transitions for sliding pill */
-  .sliding-pill {
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-</style>

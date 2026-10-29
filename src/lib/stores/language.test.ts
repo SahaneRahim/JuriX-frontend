@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { get } from 'svelte/store';
 import { language, t, translations, switchLanguage } from './language';
+import { TEXTES_DE_TEST as TEXTES_DU_CHAT } from '$lib/components/chat/traductions-de-test';
+import { EN as LOI_EN, FR as LOI_FR } from '$lib/components/loi/dictionnaires-de-test';
 
 // Pas de stub de localStorage ici : `src/tests/setup.ts` fournit desormais un
 // vrai stockage en memoire, vide entre chaque test. L'ancien stub rendait
@@ -74,5 +76,24 @@ describe('t()', () => {
     const en = Object.keys(translations.en);
     expect(fr.filter((k) => !en.includes(k)), 'manquantes en anglais').toEqual([]);
     expect(en.filter((k) => !fr.includes(k)), 'manquantes en francais').toEqual([]);
+  });
+
+  it('les dictionnaires des tests d’écran disent mot pour mot ce que dit l’interface', () => {
+    // Les tests du chat et de la page d'un texte montent leurs composants avec
+    // leurs propres copies des phrases, écrites avant l'arrivée des clés ici
+    // (refonte UX, 2026-10-28). Une phrase retouchée d'un seul côté ferait
+    // vérifier aux tests un texte que l'interface n'affiche plus.
+    const ecarts = (copie: Record<string, string>, langue: 'fr' | 'en', origine: string) =>
+      Object.entries(copie)
+        .filter(([cle, texte]) => translations[langue][cle as keyof typeof translations.fr] !== texte)
+        .map(([cle]) => `${origine} (${langue}) : ${cle}`);
+    expect([
+      ...ecarts(TEXTES_DU_CHAT, 'fr', 'chat/traductions-de-test.ts'),
+      ...ecarts(LOI_FR, 'fr', 'loi/dictionnaires-de-test.ts'),
+      ...ecarts(LOI_EN, 'en', 'loi/dictionnaires-de-test.ts'),
+    ]).toEqual([]);
+    // Garde-fou : des copies vidées par erreur passeraient le contrôle.
+    expect(Object.keys(TEXTES_DU_CHAT).length).toBeGreaterThan(60);
+    expect(Object.keys(LOI_FR).length).toBeGreaterThan(150);
   });
 });

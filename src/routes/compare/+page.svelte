@@ -6,9 +6,10 @@
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import ChatFab from "$lib/components/ChatFab.svelte";
   import Icone from "$lib/components/Icone.svelte";
+  import { nomCourtDuTexte, typographieDesNumeros } from "$lib/sources";
   import { tr } from "$lib/stores/language";
   import { language } from "$lib/stores/language";
-  import type { ComparisonCell, ComparisonResponse, ComparisonRow } from "$lib/types";
+  import type { ComparisonCell, ComparisonResponse, ComparisonRow, SourceRef } from "$lib/types";
 
   let sujetA = "";
   let sujetB = "";
@@ -48,6 +49,18 @@
       { cote: "a", cellule: ligne.a },
       { cote: "b", cellule: ligne.b },
     ];
+  }
+
+  /**
+   * Le nom du texte cité (« Code Minier », « Décret n° 2019/143 »), comme les
+   * sources du chat ($lib/sources) : la puce et l'extrait affichaient sa cote
+   * interne (« PRC-4722 · art. 34 »), qui ne dit pas de quel texte il s'agit,
+   * et que P2 et P11 retirent de tout écran. « n° » suivi d'une espace
+   * insécable, la graphie des listes. Sans intitulé en base, « Texte sans
+   * intitulé » : la cote n'est jamais un repli.
+   */
+  function nomDeLaSource(source: SourceRef, t: (cle: string) => string): string {
+    return typographieDesNumeros(nomCourtDuTexte(source.law_title, source.reference)) || t("chat.citation.sansIntitule");
   }
 
   function basculer(cle: string) {
@@ -356,15 +369,20 @@
                              trouvés de /search (SearchResultCard) : badge
                              zinc, inversé au survol.
                              Une puce tient sur UNE ligne : coupée en deux
-                             dans sa pastille (« N°00000127/MINFI/MINCOMMERCE ·
-                             » puis « art. 4 », ou « … 40-2 » puis
-                             « (nouveau) »), elle se lisait mal. En 12 px, une
-                             cote de 28 caractères comme celle-ci tient entière
-                             à 390 px ; plus étroit, c'est la COTE qui s'abrège
-                             (…), et jamais « · art. N », le numéro qu'on vient
-                             vérifier. Cote entière : dans l'extrait déplié,
-                             et pour les lecteurs d'écran (le texte reste
-                             dans la page). -->
+                             dans sa pastille (« … MINFI/MINCOMMERCE · » puis
+                             « art. 4 », ou « … 40-2 » puis « (nouveau) »),
+                             elle se lisait mal. Quand la place manque, c'est
+                             le NOM du texte qui s'abrège (…), et jamais
+                             « · art. N », le numéro qu'on vient vérifier. Nom
+                             entier : dans l'extrait déplié, et pour les
+                             lecteurs d'écran (le texte reste dans la page) ;
+                             l'intitulé officiel, dans l'infobulle.
+                             Le nom et non la cote interne (`nomDeLaSource`) :
+                             la puce passe donc en Inter, comme celle de
+                             /search, sans la chasse fixe des cotes (Q5 A ne
+                             la garde que pour les touches) ni les chiffres
+                             tabulaires, qui élargissaient le trait d'union
+                             (« 40 - 2 »). -->
                         <div
                           class="mt-2 flex flex-wrap gap-2 items-center"
                           aria-label={$tr("compare.sources")}
@@ -373,9 +391,9 @@
                             <a
                               href="/laws/{source.law_id}?article={encodeURIComponent(source.number)}"
                               title={source.law_title}
-                              class="inline-flex min-h-11 min-w-0 max-w-full items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-mono font-medium tabular-nums lg:px-2 lg:py-0.5 lg:[@media(pointer:fine)]:min-h-0 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-950 hover:bg-zinc-950 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-zinc-950 transition-colors"
+                              class="inline-flex min-h-11 min-w-0 max-w-full items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium lg:px-2 lg:py-0.5 lg:[@media(pointer:fine)]:min-h-0 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-950 hover:bg-zinc-950 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-zinc-950 transition-colors"
                             >
-                              <span class="min-w-0 truncate">{source.reference}</span><span class="shrink-0">&nbsp;· art.&nbsp;{source.number}</span>
+                              <span class="min-w-0 truncate">{nomDeLaSource(source, $tr)}</span><span class="shrink-0">&nbsp;· art.&nbsp;{source.number}</span>
                             </a>
                           {/each}
                           <button
@@ -422,7 +440,7 @@
                             {#each cellule.sources as source}
                               <div>
                                 <p class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                                  {source.reference} — Art. {source.number}
+                                  {nomDeLaSource(source, $tr)} — Art. {source.number}
                                   {#if source.page_number}· p. {source.page_number}{/if}
                                 </p>
                                 <!-- text-sm à toute taille : le texte de

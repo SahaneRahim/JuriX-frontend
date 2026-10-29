@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/stores";
+  import { nombreDeTextesDuCorpus } from "$lib/categories";
   import ChatFab from "$lib/components/ChatFab.svelte";
   import Icone from "$lib/components/Icone.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
@@ -22,6 +23,77 @@
    * oblique finale.
    */
   $: isChat = $page.route.id === "/(main)/chat";
+
+  /**
+   * Sous-titre du hero (proposition Q1, variante A). Le titre dit la tâche
+   * (« Que dit la loi camerounaise ? ») ; l'IA est nommée ici, une seule fois,
+   * avec sa garantie : elle « répond en citant les articles ». Le badge « IA
+   * Juridique Camerounaise » à point pulsé, quatrième mention de l'IA au-dessus
+   * du pli, est retiré : un point qui pulse annonce un service « en direct »,
+   * et en monochrome le gris du mot « IA » disait « secondaire ».
+   *
+   * Le nombre de textes vient de l'API (`GET /corpus`), par les données de la
+   * page (`$page.data.corpus`, posé par le `load` de l'accueil). Absent
+   * (ancienne API, panne, `load` qui ne le lit pas encore), la phrase s'écrit
+   * sans chiffre : un nombre écrit en dur vieillirait en silence.
+   * `Intl.NumberFormat` sépare les milliers selon la langue : « 2 275 »
+   * (espace fine insécable) en français, « 2,275 » en anglais.
+   */
+  $: totalDesTextes = nombreDeTextesDuCorpus($page.data?.corpus);
+  $: nombreDeTextes = totalDesTextes === null ? "" : new Intl.NumberFormat($language.current).format(totalDesTextes);
+  $: sousTitre =
+    totalDesTextes === null
+      ? $tr("accueil.sousTitreSansChiffre")
+      : $tr("accueil.sousTitre").replace("{n}", nombreDeTextes);
+
+  /**
+   * Le même sous-titre en une ligne, pour l'écran court (téléphone en
+   * paysage, `court:`) : « 2 275 textes officiels · l'assistant IA cite les
+   * articles ». La phrase entière y prenait deux lignes de 18 px, et la barre
+   * de recherche passait sous la ligne de flottaison ; elle était donc
+   * retirée, et avec elle le nombre de textes et la garantie de l'IA, que Q1 A
+   * place justement dans le sous-titre. Même repli sans chiffre.
+   */
+  $: sousTitreCourt =
+    totalDesTextes === null
+      ? $tr("accueil.sousTitreCourtSansChiffre")
+      : $tr("accueil.sousTitreCourt").replace("{n}", nombreDeTextes);
+
+  /**
+   * Taille du titre ANGLAIS au téléphone : elle suit la largeur de la
+   * colonne, pour que le titre tienne sur deux lignes comme le français
+   * (Q1 A : deux lignes à 360 px). Audit r2, capture
+   * accueil__390x844__light-en.
+   *
+   * « What does Cameroonian law say? » ne se coupe en deux lignes que d'une
+   * façon : « What does / Cameroonian law say? ». La seconde ligne fait
+   * 10,8 em, soit 388 px en 36 px, plus que la colonne (288 à 358 px, de 320
+   * à 390 px de large). En 36 px, le titre prenait donc trois lignes
+   * (« What does / Cameroonian / law say? ») et la barre de recherche
+   * arrivait 42 px plus bas qu'en français.
+   *
+   * Sous sm, la taille vaut donc un 11,2e de la largeur de la colonne
+   * (`100cqi` : le bloc du hero est déclaré conteneur, plus bas), soit 32 px
+   * à 390, 29 px à 360 et 26 px à 320. Pourquoi 11,2 : la seconde ligne a
+   * été mesurée dans Chromium à 10,79 em en Literata, 10,90 em dans son
+   * repli Noto Serif et 10,76 em dans son repli Georgia (polices ajustées de
+   * src/app.css, qui restent toute la visite quand Literata manque son
+   * affichage) ; on y ajoute environ 3 % de marge pour l'arrondi des
+   * avances. Mesures et réplique : data/ux-front/correctifs-r2-titre-en/ du
+   * dépôt backend (deux lignes de 300 à 639 px dans les trois polices).
+   * La taille ne dépasse jamais 36 px (Q1 A), atteints dès 435 px de large.
+   * Elle ne descend pas sous 24 px, plancher atteint vers 300 px de large
+   * (écran plié, fort zoom) : plus étroit encore, le titre repasse à trois
+   * lignes plutôt que de rapetisser.
+   *
+   * Le français garde ses 36 px partout : sa plus longue ligne,
+   * « camerounaise ? », ne fait que 7,5 em (272 px) et tient dès 320 px.
+   * Navigateur sans unités de conteneur (Safari avant 16) : la déclaration y
+   * est ignorée, et le titre anglais reste en 36 px sur trois lignes, comme
+   * avant. Classe écrite en entier, pour que Tailwind la trouve.
+   */
+  const TITRE_ANGLAIS_AU_TELEPHONE = "max-sm:text-[length:clamp(1.5rem,100cqi/11.2,2.25rem)]";
+  $: tailleDuTitreAuTelephone = $language.current === "en" ? TITRE_ANGLAIS_AU_TELEPHONE : "";
 
   /**
    * Durée d'une transition, nulle quand le système demande moins de
@@ -139,9 +211,12 @@
 
   <!-- `contents` hors chat : l'enveloppe ne crée aucune boîte, l'en-tête reste
        un enfant direct de la colonne. Une seule instance dans les deux cas :
-       passer de l'accueil au chat ne la recrée pas. -->
+       passer de l'accueil au chat ne la recrée pas. Sans `variant` : l'en-tête
+       a la même surface sur toutes les pages (fond et filet), accueil et chat
+       compris ; la variante transparente le faisait changer d'aspect d'une
+       page à l'autre. -->
   <div class={isChat ? "hidden lg:block shrink-0" : "contents"}>
-    <SiteHeader variant="transparent" />
+    <SiteHeader />
   </div>
 
   <!--
@@ -151,9 +226,13 @@
     le précède comme repli, pour les navigateurs qui ignorent `clip` (Safari
     avant 16).
 
-    Marges latérales : 16 px puis 24 px à partir de md, et au moins la zone
-    sûre d'un iPhone en paysage. Sur /chat, aucune sous sm : la conversation
-    prend toute la largeur du téléphone.
+    Marges latérales : celles de l'en-tête (SiteHeader), 16 px, 24 px à
+    partir de sm, 48 px à partir de lg, et au moins la zone sûre d'un iPhone
+    en paysage. Le bord de la barre de recherche et de la liste des domaines
+    tombe ainsi sous le logo. Elles valaient 16 puis 24 px à partir de md,
+    plus 16 px du bloc du hero à partir de sm : le contenu commençait à 40 px
+    en 768 et en 1 024, sous un logo à 24 puis à 48 px. Sur /chat, aucune
+    marge sous sm : la conversation prend toute la largeur du téléphone.
 
     Marge haute : 32 px à partir de sm, plus celle du hero ci-dessous. Elle
     passait à 80 px à partir de md (`md:pt-20`) : avec le hero, 190 px de
@@ -164,7 +243,7 @@
     id="contenu"
     class="relative flex w-full flex-col overflow-x-hidden overflow-x-clip {isChat
       ? 'min-h-0 flex-1 sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] lg:px-6 lg:pt-6'
-      : 'flex-grow items-center justify-start pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 sm:pt-8 md:pl-[max(1.5rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))] court:!pt-2'}"
+      : 'flex-grow items-center justify-start pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 sm:pt-8 sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] lg:px-12 court:!pt-2'}"
   >
     <!-- Background Subtle Glow (Noir & Blanc) -->
     <div
@@ -184,11 +263,13 @@
          l'article (`py-8 sm:py-12`) et de /about. L'accueil ajoutait la
          sienne (`pb-20 sm:pb-28`) à celle-ci (`md:pb-12`) : 161 px de vide
          entre la dernière rangée de catégories et le pied de page, contre
-         48 sur le blog ; la grille semblait finir sur un trou. -->
+         48 sur le blog ; la grille semblait finir sur un trou.
+         Aucune marge latérale propre : celle de <main> suffit (voir plus
+         haut), et la reprendre ici décalait le contenu de l'en-tête. -->
     <div
       class="relative flex w-full flex-col {isChat
         ? 'min-h-0 flex-1'
-        : 'items-center px-0 pt-6 pb-8 sm:px-4 sm:pt-10 sm:pb-12 md:pt-[min(3rem,5vh)] court:!pt-4'}"
+        : 'items-center px-0 pt-6 pb-8 sm:pt-10 sm:pb-12 md:pt-[min(3rem,5vh)] court:!pt-4'}"
     >
       {#if !isChat}
         <!--
@@ -198,59 +279,70 @@
           changement de langue. Ce bloc et les onglets sont suivis par
           `surveillerHero` : le bouton flottant reste retiré tant qu'ils sont
           à l'écran.
+          Le bloc est un conteneur de requête (`[container-type:inline-size]`,
+          comme dans l'administration) : au téléphone, le titre anglais prend
+          sa taille dans la largeur de ce bloc, celle de la colonne (`cqi`,
+          voir TITRE_ANGLAIS_AU_TELEPHONE). Sans lui, `cqi` vaudrait la
+          largeur de l'écran, marges comprises, et le titre serait trop
+          grand pour deux lignes. Sans effet sur la mise en page : un
+          conteneur calcule sa largeur sans son contenu, et celle de ce bloc
+          vient déjà de `w-full`.
         -->
-        <div class="grid w-full justify-items-center" use:surveillerHero>
+        <div class="grid w-full justify-items-center [container-type:inline-size]" use:surveillerHero>
           {#key $language.current}
             <div
               class="col-start-1 row-start-1 flex flex-col items-center w-full"
               in:fade={{ duration: duree(200), delay: duree(100) }}
               out:fade={{ duration: duree(150) }}
             >
-              <!-- Badge Minimaliste. Sans `tracking-wide` : à 12 px,
-                   l'interlettrage arrondi au pixel ouvrait des trous au milieu
-                   des mots (« Camer ounaise », « A I »). Retiré sur écran court
-                   (téléphone en paysage), comme le sous-titre : avec eux, le
-                   hero remplissait les 360 px de haut et la barre de recherche
-                   commençait sous la ligne de flottaison. -->
-              <div
-                class="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md text-zinc-900 dark:text-zinc-100 text-xs font-medium mb-6 md:mb-8 shadow-sm dark:shadow-none court:hidden"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-zinc-950 dark:bg-white motion-safe:animate-pulse"></span>
-                {$tr("hero.badge")}
-              </div>
-
-              <!-- Title. 36 px sur téléphone : à 48 px, le titre tenait sur
-                   quatre lignes à 360 px de large. Le mot mis en retrait a sa
-                   propre clé : il était retranché du titre par
-                   `.replace("IA", "")`, sans effet sur « Your AI Legal
-                   Assistant », et l'anglais affichait le titre entier suivi
-                   d'un « IA » français. Retrait en zinc-500 et non 400 : même
-                   en grand texte, le zinc-400 n'atteint pas 3:1 sur le fond
-                   clair. Sur écran court, le retour à la ligne est retiré :
-                   le mot reste sur la ligne du titre, une ligne de gagnée.
-                   Interligne de 1,08 posé AVEC chaque taille
-                   (`sm:text-5xl/[1.08]`) : `sm:text-5xl md:text-6xl
-                   lg:text-7xl` apportaient leur interligne de 1, écrit dans
-                   leur requête donc après `leading-[1.08]`, qui ne valait
-                   plus qu'au téléphone (5 px entre « Juridique » et « IA » à
-                   768 px). Sur écran court, 16 px sous le titre et sous les
-                   onglets (8 et 12 auparavant) : le jambage du « q »
-                   touchait presque la piste, et la barre de recherche reste
-                   dans le premier écran (fin vers 280 px sur 360). -->
+              <!-- Titre de tâche (Q1 A), d'une seule couleur : il dit ce que
+                   l'on obtient, et non la technologie. En Literata (Q5 A,
+                   `font-titre` : instance figée en taille optique 72, graisse
+                   600, d'où `font-semibold` ; interlettrage nul, donc jamais
+                   `tracking-tight`). 36, 48 puis 56 px : deux lignes à 360 px
+                   (« Que dit la loi / camerounaise ? »), une seule sur
+                   ordinateur. `text-balance` équilibre les deux lignes au lieu
+                   de laisser un mot seul sur la seconde.
+                   `max-w-5xl` (1 024 px) et non `max-w-4xl` (896 px) : en
+                   56 px, le titre anglais fait 898 à 903 px (775 en
+                   français). Il passait sur deux lignes à 1 440 px, et la
+                   barre de recherche descendait de 65 px. À partir de lg, la
+                   colonne fait 928 px au moins : une ligne dans les deux
+                   langues. Au téléphone, l'anglais tient aussi sur deux
+                   lignes (« What does / Cameroonian law say? ») : sous
+                   435 px de large, sa taille suit celle de la colonne
+                   (`tailleDuTitreAuTelephone`, plus haut). En 36 px, il en
+                   prenait trois.
+                   Interligne de 1,15 posé AVEC chaque taille (`…/[1.15]`) :
+                   `sm:text-5xl` apporte son interligne de 1, écrit dans sa
+                   requête donc après un `leading-*` posé à part, qui ne
+                   vaudrait plus qu'au téléphone. 1,15 : le bas de la
+                   fourchette prévue par Q5 pour un titre en serif (1,15 à
+                   1,25), qui garde deux lignes serrées à 360 px.
+                   Sur écran court (téléphone en paysage), 36 px, et 8 px
+                   dessous : le sous-titre d'une ligne suit (voir plus bas). -->
               <h1
-                class="text-4xl/[1.08] sm:text-5xl/[1.08] md:text-6xl/[1.08] lg:text-7xl/[1.08] court:!text-4xl font-extrabold text-center text-zinc-950 dark:text-white mb-4 md:mb-6 court:!mb-4 max-w-4xl tracking-tight"
+                class="text-4xl/[1.15] {tailleDuTitreAuTelephone} sm:text-5xl/[1.15] lg:text-[3.5rem]/[1.15] court:!text-4xl/[1.15] font-titre font-semibold text-center text-zinc-950 dark:text-white mb-4 md:mb-6 court:!mb-2 max-w-5xl text-balance"
               >
-                {$tr("hero.title")}<br class="court:hidden" />
-                <span class="text-zinc-500 dark:text-zinc-400 font-semibold"
-                  >{$tr("hero.titleHighlight")}</span
-                >
+                {$tr("accueil.titre")}
               </h1>
 
-              <!-- Subtitle (retiré sur écran court, voir le badge) -->
+              <!-- Sous-titre : l'IA nommée une fois, avec sa garantie (voir
+                   `sousTitre`). `text-balance` : sans lui, le dernier mot
+                   restait seul sur sa ligne à 390 px.
+                   Sur écran court, la version d'une ligne (`sousTitreCourt`),
+                   en 14 px, 12 px au-dessus des onglets. La phrase entière
+                   remplissait le hero sur 360 px de haut ; d'une ligne, elle
+                   descend la barre de recherche de 24 px : à 740 × 360, la
+                   barre finit vers 310 px, au-dessus de la ligne de
+                   flottaison (mesuré sur une réplique dans Chromium,
+                   data/ux-front/correctifs-r1-accueil/ du dépôt backend).
+                   Une seule des deux versions est affichée, donc lue :
+                   l'autre est en `display: none`. -->
               <p
-                class="text-center text-zinc-600 dark:text-zinc-400 text-base sm:text-lg md:text-xl max-w-2xl mb-8 md:mb-10 leading-relaxed font-normal court:hidden"
+                class="text-center text-zinc-600 dark:text-zinc-400 text-base sm:text-lg md:text-xl max-w-2xl mb-8 md:mb-10 leading-relaxed font-normal text-balance court:!mb-3 court:!text-sm/5"
               >
-                {$tr("hero.subtitle")}
+                <span class="court:hidden">{sousTitre}</span><span class="hidden court:inline">{sousTitreCourt}</span>
               </p>
             </div>
           {/key}

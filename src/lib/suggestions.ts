@@ -22,6 +22,13 @@
  * - la patente en anglais : « business licence tax » ramène la contribution
  *   des licences, une autre taxe.
  *
+ * Les questions françaises prennent l'apostrophe typographique (’), comme le
+ * reste de l'interface, messages de l'accueil au-dessus d'elles compris
+ * (revue du chat, 29/10). Seul ce signe a changé depuis la validation : les
+ * mots clés que le serveur tire de la question n'en gardent aucune, droite ou
+ * typographique (rag_service, `extract_keywords`), et c'est celle que posent
+ * les claviers des téléphones.
+ *
  * Seuls des imports de type : le spec e2e importe ce fichier directement.
  */
 
@@ -34,32 +41,32 @@ export const SUGGESTIONS: Record<Language, Record<CleSuggestions, readonly strin
   fr: {
     citoyen: [
       'Quelles indemnités en cas de licenciement abusif ?',
-      "Que risque l'auteur d'une escroquerie sur internet ?",
+      'Que risque l’auteur d’une escroquerie sur internet ?',
       'Quels sont mes droits en garde à vue ?',
       'Quand peut-on invoquer la légitime défense ?',
     ],
     'étudiant': [
       'Quelle différence entre tentative et complicité en droit pénal ?',
       'Comment est élu le Président de la République ?',
-      "Qu'est-ce qui distingue un contrat de travail à durée déterminée d'un contrat à durée indéterminée ?",
-      "Qu'est-ce qu'un groupement d'intérêt économique ?",
+      'Qu’est-ce qui distingue un contrat de travail à durée déterminée d’un contrat à durée indéterminée ?',
+      'Qu’est-ce qu’un groupement d’intérêt économique ?',
     ],
     avocat: [
-      "Quels sont les éléments constitutifs de l'abus de confiance ?",
-      "Quelles peines pour l'accès non autorisé à un système d'information ?",
+      'Quels sont les éléments constitutifs de l’abus de confiance ?',
+      'Quelles peines pour l’accès non autorisé à un système d’information ?',
       'Comment former opposition à une injonction de payer en droit OHADA ?',
       'Quelle est la durée maximale de la garde à vue ?',
     ],
     entrepreneur: [
-      "Quels avantages fiscaux l'ordonnance de 2025 accorde-t-elle à un nouvel investissement ?",
+      'Quels avantages fiscaux l’ordonnance de 2025 accorde-t-elle à un nouvel investissement ?',
       'Quelles pièces justificatives pour immatriculer une société commerciale ?',
-      "Quelles obligations pour l'employeur lors d'une embauche ?",
+      'Quelles obligations pour l’employeur lors d’une embauche ?',
       'Comment obtenir une injonction de payer pour une facture impayée ?',
     ],
     general: [
       'Quelles indemnités en cas de licenciement abusif ?',
       'Quels sont mes droits en garde à vue ?',
-      "Que risque l'auteur d'une escroquerie sur internet ?",
+      'Que risque l’auteur d’une escroquerie sur internet ?',
     ],
   },
   en: {
@@ -98,4 +105,19 @@ export const SUGGESTIONS: Record<Language, Record<CleSuggestions, readonly strin
 /** Les suggestions d'un profil (`null` : profil général) dans une langue. */
 export function suggestionsPour(persona: Persona | null, langue: Language): readonly string[] {
   return SUGGESTIONS[langue][persona ?? 'general'];
+}
+
+/**
+ * Nombre de questions sous l'accueil du chat (P4, maquette chat-accueil-p4a) :
+ * trois, après les trois messages d'accueil. Quatre pastilles sous trois
+ * bulles repoussaient la saisie d'un écran sur un téléphone.
+ */
+export const SUGGESTIONS_A_L_ACCUEIL = 3;
+
+/**
+ * Les questions de l'accueil : les premières du profil, dans l'ordre où elles
+ * ont été validées. Le profil général en a exactement trois.
+ */
+export function suggestionsDeLAccueil(persona: Persona | null, langue: Language): readonly string[] {
+  return suggestionsPour(persona, langue).slice(0, SUGGESTIONS_A_L_ACCUEIL);
 }

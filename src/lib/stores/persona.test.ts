@@ -6,8 +6,6 @@ import {
   PERSONAS,
   champPersona,
   ecrireAEnvoyer,
-  estRouteSansQuestion,
-  estUnRobot,
   lireAEnvoyer,
   lirePersona,
   lireRefusSession,
@@ -15,7 +13,7 @@ import {
   oublierPersona,
   personaDeLaSessionMemorisee,
   personaStore,
-  questionAPoser,
+  questionDuProfilAPoser,
 } from './persona';
 
 function viderLeCookie() {
@@ -42,40 +40,29 @@ describe('les profils', () => {
   });
 });
 
-describe('ou et quand poser la question', () => {
-  it.each([
-    ['/admin', true],
-    ['/admin/documents/batch-upload', true],
-    ['/login', true],
-    ['/signup', true],
-    ['/forgot-password', true],
-    ['/reset-password/[token]', true],
-    ['/verify-email/[token]', true],
-    [null, true],
-    ['/(main)', false],
-    ['/(main)/chat', false],
-    ['/laws/[id]', false],
-    ['/search', false],
-    ['/about', false],
-    ['/compare', false],
-    ['/categories/[id]', false],
-  ])('%s exclue : %s', (route, exclue) => {
-    expect(estRouteSansQuestion(route)).toBe(exclue);
+describe('la question du profil, posee dans le chat (P5)', () => {
+  // Plus de boite a l'arrivee, sur aucune page : la liste des pages epargnees
+  // et la detection des robots ont disparu avec elle. Le chat demande le
+  // profil a la premiere question, s'il n'est ni choisi ni refuse.
+  const sans = { persona: null, refuseCetteSession: false, choix: 0 };
+
+  it('la pose sans profil ni refus', () => {
+    expect(questionDuProfilAPoser(sans)).toBe(true);
   });
 
-  it('ne la pose pas aux robots d indexation', () => {
-    expect(estUnRobot('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)')).toBe(true);
-    expect(estUnRobot('Mozilla/5.0 (Linux; Android 10) Chrome/120 Mobile Safari/537.36')).toBe(false);
+  it('ne la pose pas a qui a choisi, ni a qui a refuse pour la visite', () => {
+    expect(questionDuProfilAPoser({ ...sans, persona: 'avocat' })).toBe(false);
+    expect(questionDuProfilAPoser({ ...sans, refuseCetteSession: true })).toBe(false);
   });
 
-  it('la pose seulement sans profil, sans refus, hors erreur', () => {
-    const sans = { persona: null, refuseCetteSession: false, choix: 0 };
-    expect(questionAPoser(sans, '/', false, 'Firefox')).toBe(true);
-    expect(questionAPoser({ ...sans, persona: 'avocat' }, '/', false, 'Firefox')).toBe(false);
-    expect(questionAPoser({ ...sans, refuseCetteSession: true }, '/', false, 'Firefox')).toBe(false);
-    expect(questionAPoser(sans, '/', true, 'Firefox')).toBe(false);
-    expect(questionAPoser(sans, '/login', false, 'Firefox')).toBe(false);
-    expect(questionAPoser(sans, '/', false, 'Googlebot')).toBe(false);
+  it('le refus de la question vaut pour la visite : plus de question ensuite', () => {
+    viderLeCookie();
+    personaStore._reinitialiser();
+    expect(questionDuProfilAPoser(get(personaStore))).toBe(true);
+
+    personaStore.refuser();
+
+    expect(questionDuProfilAPoser(get(personaStore))).toBe(false);
   });
 });
 

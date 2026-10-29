@@ -1,10 +1,31 @@
 import { error } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
+import { statutJuridiqueDe } from '$lib/api-publique';
 import { API_URL, DELAI_API_MS } from '$lib/config';
 import { identifiantDepuis } from '$lib/identifiant';
 import { absenceConfirmee, leverIndisponible } from '$lib/panne';
-import type { Law } from '$lib/types';
+import type { Law, StatutJuridique } from '$lib/types';
 import type { PageServerLoad } from './$types';
+
+/**
+ * Le statut juridique (P1) réduit à ce que la page lit.
+ *
+ * `par_morceau` part VIDE : la page découpe le texte elle-même et ne connaît
+ * que des numéros d'articles, qu'elle relie au statut par `par_article`
+ * (src/lib/components/loi/statut.ts dit pourquoi). Le garder obligerait à
+ * envoyer aussi l'identifiant de chaque morceau (`articles[].id`, 2 134 pour
+ * le Code civil), dans le HTML comme dans le `__data.json` mis en cache.
+ * Tout le reste sert : les changements des deux sens, dépassés compris, font
+ * l'onglet « Historique ».
+ *
+ * `null` quand la clé manque (ancienne API), vaut null (calcul en échec côté
+ * serveur) ou n'a pas la forme attendue : la page n'affiche alors que
+ * « Version d'origine, non consolidée », sans date.
+ */
+function statutAllege(law: Law): StatutJuridique | null {
+  const statut = statutJuridiqueDe(law);
+  return statut ? { ...statut, par_morceau: {} } : null;
+}
 
 /**
  * Fiche mise en cache par Vercel (ISR) pendant une heure : un texte de loi ne
@@ -24,13 +45,16 @@ import type { PageServerLoad } from './$types';
  * Hors de la clé, Vercel ne transmet pas le paramètre à la fonction : la
  * version en cache est toujours la fiche ouverte sur son premier article, la
  * même pour toutes les variantes, jamais celle d'un autre article. C'est le
- * navigateur qui applique `?article=` (+page.svelte le lit dans `$page.url`,
- * l'adresse réelle, et `afterNavigate` y fait défiler) : aussitôt en
- * navigation dans le site, qui ne demande que le `__data.json` ; à
+ * navigateur qui applique `?article=` et `#art-N` (+page.svelte, dans
+ * `afterNavigate`, sur l'adresse réelle, puis y fait défiler) : aussitôt en
+ * navigation dans le site, qui ne demande que le `__data.json` ; juste après
  * l'hydratation pour un lien ouvert dans un nouvel onglet ou partagé, dont le
- * HTML montre d'abord le premier article. La canonique ne porte de toute
- * façon aucun paramètre ($lib/seo). Les autres paramètres (`utm_*`…)
- * n'atteignent pas non plus la fonction.
+ * HTML montre d'abord le premier article. Le premier rendu du navigateur est
+ * donc celui du serveur, sans article remplacé pendant l'hydratation. La
+ * page réécrit ensuite l'adresse à chaque article lu (P2, routage
+ * superficiel), sans nouvelle requête. La canonique ne porte de toute façon
+ * aucun paramètre ($lib/seo). Les autres paramètres (`utm_*`…) n'atteignent
+ * pas non plus la fonction.
  */
 export const config: Config = {
   isr: { expiration: 3600 },
@@ -91,17 +115,24 @@ export const load: PageServerLoad = async ({ fetch, params }) => {
   }
 
   // Du sommaire, la page ne lit que le numéro et la page du PDF (l'article
-  // demandé par `?article=`) : sans l'identifiant, le titre, la section et la
+  // lu, pour la visionneuse) : sans l'identifiant, le titre, la section et la
   // nature, les 453 articles de /laws/2236 pèsent 48 Ko de moins (3,5 Ko
   // compressés), dans le HTML comme dans le `__data.json` mis en cache.
+  //
+  // Le statut juridique voyage à part, allégé (`statutAllege`), et quitte
+  // `law` : la page ne le lit qu'à un endroit. Les dates nouvelles
+  // (`date_signature`, `annee`, `date_publication_jo`, `ajoute_le`) restent
+  // dans `law`, absentes sur l'ancienne API, ce que la page sait lire.
   //
   // PANNE DE L'API : 503 au rendu comme en navigation (plus de message dans
   // la page) : mise en cache, une fiche en erreur servie en 200 resterait une
   // heure, à la place du texte. Un 503 n'est jamais gardé, Vercel continue de
   // servir la version précédente. `erreur` reste dans les données pour la
   // page, toujours vide.
+  const { statut_juridique: _statut, ...sansStatut } = law;
   return {
-    law: { ...law, articles: law.articles?.map(({ number, page_number }) => ({ number, page_number })) },
+    law: { ...sansStatut, articles: law.articles?.map(({ number, page_number }) => ({ number, page_number })) },
+    statut: statutAllege(law),
     erreur: '',
   };
 };

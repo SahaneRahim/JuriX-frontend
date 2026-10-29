@@ -14,13 +14,36 @@
   /**
    * À poser sur les pages qui montent le bouton flottant de l'assistant
    * (`ChatFab`). En fin de défilement, il se posait sur le copyright au bureau
-   * et sur les liens au téléphone. La réserve est une marge basse, à toutes
-   * les tailles : le bouton (56 px à 16 px du bord, puis 64 px à 32 px à
-   * partir de sm) se pose dessous. Elle était à droite en ligne (`lg:pr-28`) :
-   * le copyright s'y repliait sur deux lignes, et la navigation du pied de
-   * page sautait de 44 px entre l'accueil et les autres pages.
+   * et sur les liens au téléphone. La réserve est une marge basse : le bouton
+   * (56 px à 16 px du bord, puis 64 px à 32 px à partir de sm) se pose
+   * dessous. Elle était à droite en ligne (`lg:pr-28`) : le copyright s'y
+   * repliait sur deux lignes, et la navigation du pied de page sautait de
+   * 44 px entre l'accueil et les autres pages.
+   *
+   * Elle ne vaut que ce que le bouton couvrirait (`RESERVE`, plus bas). Fixée
+   * à 64 puis 80 px partout, elle laissait 104 à 134 px de vide sous le
+   * copyright, contre 40 au-dessus du logo, même aux largeurs où le bouton ne
+   * rencontre rien (reste r3 n° 74, audit r2 du 29/10).
    */
   export let reserverBouton = false;
+
+  /**
+   * La réserve, mesurée en Inter, en français et en anglais, de 320 à
+   * 1 920 px, sur une réplique de ce pied de page dans Chromium (script
+   * data/ux-front/correctifs-r2/pied/mesurer.mjs du dépôt du backend). Sans
+   * réserve, en fin de défilement :
+   * - téléphone : le copyright, centré, occupe 41 à 72 px du bas et atteint
+   *   le bouton (16 à 72 px) à la plupart des largeurs de 320 à 540 px,
+   *   selon la langue et sa coupure : 40 px le remontent à 8 px au-dessus ;
+   * - de sm à md : le copyright reste à l'écart, mais le dernier lien
+   *   (« À propos », 80 à 124 px du bas) passe sous le bouton (32 à 96 px)
+   *   de 640 à 700 px : 24 px suffisent ;
+   * - de md à xl : ni le copyright ni les liens, centrés, n'atteignent le
+   *   bouton : aucune réserve ;
+   * - à partir de xl : le copyright, calé à droite, est sous le bouton, sur
+   *   une ou deux lignes : 64 px.
+   */
+  const RESERVE = "pb-10 sm:pb-6 md:pb-0 xl:pb-16";
 
   /**
    * Faux sur la page d'erreur, qui pose déjà ces liens sous sa recherche :
@@ -62,7 +85,7 @@
        milieu est vide : le logo et le copyright restent aux deux bords. -->
   <div
     class="flex flex-col items-center gap-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] lg:px-12 xl:grid xl:grid-cols-[1fr_auto_1fr] xl:gap-8 {reserverBouton
-      ? 'pb-16 sm:pb-20'
+      ? RESERVE
       : ''}"
   >
     <!-- `xl:justify-self-start` : étiré sur toute sa colonne de grille, le

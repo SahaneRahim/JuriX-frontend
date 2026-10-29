@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blocsDeReponse } from './texte';
+import { FERME_GRAS, OUVRE_GRAS, blocsDeReponse, insecablesDuTexte } from './texte';
 
 describe('blocsDeReponse', () => {
   it('rend une liste vide sur une entree absente', () => {
@@ -16,6 +16,13 @@ describe('blocsDeReponse', () => {
       { type: 'paragraphe', texte: 'Premier paragraphe.' },
       { type: 'paragraphe', texte: 'Second paragraphe.' }
     ]);
+  });
+
+  it('garde les espaces insecables en recollant les lignes', () => {
+    // « 2 275 » (U+202F) et « n° 92/007 » (U+00A0) ne doivent pas se couper.
+    const blocs = blocsDeReponse('Selon 2\u202F275 textes,\net la loi n°\u00A092/007.');
+
+    expect(blocs).toEqual([{ type: 'paragraphe', texte: 'Selon 2\u202F275 textes, et la loi n°\u00A092/007.' }]);
   });
 
   it('recolle les retours a la ligne simples', () => {
@@ -385,6 +392,76 @@ describe('blocsDeReponse : blocs de code', () => {
 
   it('ne prend pas du code en ligne pour une ouverture', () => {
     expect(blocsDeReponse('```mot```')[0].type).toBe('paragraphe');
+  });
+});
+
+describe('blocsDeReponse : le gras dans la ligne (mode `gras`, chat)', () => {
+  const G = (texte: string) => `${OUVRE_GRAS}${texte}${FERME_GRAS}`;
+
+  it('garde le gras en marques ; l’italique est retiré comme avant', () => {
+    // La forme de l'exemple réel du contrat (§7.3) : le libellé DANS la phrase.
+    expect(blocsDeReponse('**Réponse directe** : selon l’article 35, *en principe*.', { gras: true })).toEqual([
+      { type: 'paragraphe', texte: `${G('Réponse directe')} : selon l’article 35, en principe.` },
+    ]);
+    expect(blocsDeReponse('- un __point__ et ***gras italique***', { gras: true })).toEqual([
+      { type: 'puce', texte: `un ${G('point')} et ${G('gras italique')}` },
+    ]);
+    expect(blocsDeReponse('| Délai | **3 mois** |', { gras: true })[0].lignes).toEqual([['Délai', G('3 mois')]]);
+  });
+
+  it('une ligne en gras tout entière reste un titre, sans marque', () => {
+    expect(blocsDeReponse('**Réponse directe**', { gras: true })).toEqual([{ type: 'titre', texte: 'Réponse directe' }]);
+  });
+
+  it('sans le mode, rien ne change : l’explication d’article reçoit du texte sans marque', () => {
+    expect(blocsDeReponse('**Réponse directe** : oui.')).toEqual([{ type: 'paragraphe', texte: 'Réponse directe : oui.' }]);
+  });
+
+  it('une ligne qui commence et finit par un gras sans en être un seul n’est pas un titre', () => {
+    // Pris pour un titre, « **A** : **B** » laissait « A* : *B ».
+    expect(blocsDeReponse('**Réponse directe** : oui, **sous conditions**')).toEqual([
+      { type: 'paragraphe', texte: 'Réponse directe : oui, sous conditions' },
+    ]);
+    expect(blocsDeReponse('**Réponse directe** : oui, **sous conditions**', { gras: true })).toEqual([
+      { type: 'paragraphe', texte: `${G('Réponse directe')} : oui, ${G('sous conditions')}` },
+    ]);
+  });
+});
+
+describe('insecablesDuTexte', () => {
+  it('lie « n° » et « art. » au numéro qui suit, sans rien changer d’autre', () => {
+    expect(insecablesDuTexte('la loi n° 92/007 et l’art. 35, N° 2016/007')).toBe(
+      'la loi n°\u00A092/007 et l’art.\u00A035, N°\u00A02016/007',
+    );
+    // Même longueur : les marques des citations restent à leur place.
+    const texte = 'selon la loi n° 92/007';
+    expect(insecablesDuTexte(texte)).toHaveLength(texte.length);
+    // Ni « Part. », ni un « n° » collé, ni la fin d'une phrase.
+    expect(insecablesDuTexte('Part. 3, n°92 et le n° ')).toBe('Part. 3, n°92 et le n° ');
+  });
+
+  it('lie « article » à son numéro, la forme qu’impose le prompt (« l’article X du Code Y »)', () => {
+    // « et l’article » finissait une ligne à 390 px, « 312 du Code pénal » ouvrait la suivante.
+    expect(insecablesDuTexte('et l’article 312 du Code pénal')).toBe('et l’article\u00A0312 du Code pénal');
+    expect(insecablesDuTexte("L'article 1er et les articles 35 et 36")).toBe("L'article\u00A01er et les articles\u00A035 et 36");
+    expect(insecablesDuTexte('Article premier, article première')).toBe('Article\u00A0premier, article\u00A0première');
+    // Dans une cellule de tableau, après une cote (capture chat 768 px).
+    expect(insecablesDuTexte('Décret N°2018/9387/CAB/PM, article 3')).toBe('Décret N°2018/9387/CAB/PM, article\u00A03');
+    const texte = 'selon l’article 35 de la loi n° 92/007';
+    expect(insecablesDuTexte(texte)).toHaveLength(texte.length);
+  });
+
+  it('« article » suivi d’un mot, dans un autre mot ou en fin de ligne reste sécable', () => {
+    for (const texte of ['l’article cité', 'l’article premièrement visé', 'une particle 5', 'l’article\n35']) {
+      expect(insecablesDuTexte(texte)).toBe(texte);
+    }
+  });
+
+  it('une citation marquée garde ses marques autour du numéro lié', () => {
+    // Ouverture, indice, puis le passage cité : la marque n'empêche pas le lien.
+    expect(insecablesDuTexte('l’\uE001\uE100article 312 du Code pénal\uE002')).toBe(
+      'l’\uE001\uE100article\u00A0312 du Code pénal\uE002',
+    );
   });
 });
 

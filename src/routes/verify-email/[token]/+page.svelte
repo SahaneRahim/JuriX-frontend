@@ -133,7 +133,7 @@
       <!-- Un seul titre de niveau 1, commun aux trois états : il décrit la page
            et non son issue, pour garder le même repère du début à la fin. -->
       <h1
-        class="mb-6 flex items-center justify-center gap-2 text-xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl"
+        class="mb-6 flex items-center justify-center gap-2 text-xl font-titre font-semibold text-zinc-950 dark:text-white sm:text-2xl court:mb-4 court:text-xl"
       >
         <span
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-100 text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-200 court:hidden"

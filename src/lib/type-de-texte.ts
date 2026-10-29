@@ -51,6 +51,50 @@ export function typeDeTexte(type: string | null | undefined, titre?: string | nu
   return connu ? { ...connu, emphase: false } : { cle: 'badge.text', icone: 'files', emphase: false };
 }
 
+/**
+ * La nature écrite en tête d'un intitulé officiel, sans accents ni casse
+ * (« DECRET N° 2013/300 », « decret n° 2013/034 », « Loi-cadre … »), suivie
+ * d'une espace, d'un tiret ou de rien : « Loisirs » n'est pas une loi, ni
+ * « ordonnance_n_2015_001.pdf » (un nom de fichier) une ordonnance sûre.
+ * « Acte uniforme » prend deux mots.
+ */
+const NATURE_EN_TETE = /^(acte\s+uniforme|loi|decret|ordonnance|arrete|circulaire|instruction|decision)(?=$|[\s\-–])/u;
+
+/** La forme de l'API (`LawType`) de chaque nature lue en tête d'intitulé. */
+const NATURE_DE_L_API: Readonly<Record<string, string>> = {
+  loi: 'loi',
+  decret: 'décret',
+  ordonnance: 'ordonnance',
+  arrete: 'arrêté',
+  circulaire: 'circulaire',
+  instruction: 'instruction',
+  decision: 'décision',
+};
+
+/**
+ * Le type d'un texte lu dans le PREMIER MOT de son intitulé officiel, pour
+ * les listes qui ne reçoivent que le titre : GET /search/suggest (la palette
+ * Ctrl K) ne sert que `id`, `title` et la cote interne, jamais affichée (P2).
+ *
+ * Ce n'est pas une devinette : un acte se nomme lui-même en tête de son
+ * intitulé (« Décret N°2018/9387/CAB/PM du 30 décembre 2018 … »). La palette
+ * étiquetait « Loi » chaque texte, décrets et ordonnances compris : un
+ * libellé fixe, faux pour la plupart du corpus. Un intitulé qui ne commence
+ * par aucune nature connue (« Code civil applicable au Cameroun… », un nom
+ * de fichier) donne « Texte », comme un type inconnu ; la Constitution garde
+ * son badge (`typeDeTexte`).
+ */
+export function typeDuTitre(titre: string | null | undefined): TypeDeTexte {
+  const tete = (titre ?? '')
+    .trim()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase();
+  const m = NATURE_EN_TETE.exec(tete);
+  const nature = m ? (m[1].startsWith('acte') ? 'acte uniforme' : NATURE_DE_L_API[m[1]]) : null;
+  return typeDeTexte(nature, titre);
+}
+
 /** Le badge du guide (§ 4.8), icône comprise (14 px : floue à 12). */
 export const BADGE_DE_TYPE =
   'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium';
