@@ -79,6 +79,16 @@ Le même build est servi une seconde fois sur 4174, avec une API injoignable
 (`API_INTERNE` vers un nom qui ne se résout pas) : `panne-api.spec.ts` y vérifie les 503 du
 rendu serveur, que `page.route` ne peut pas provoquer.
 
+Le serveur de 4173 envoie ses propres appels à l'API (ceux des `load`) à une
+doublure, `tests/e2e/doublure-de-l-api.mjs`, lancée avant lui sur le port 4175
+(`API_INTERNE`). Depuis que `/search` est rendue par le serveur, `page.route`
+ne voit plus sa recherche : les specs enregistrent leurs questions auprès de la
+doublure (`simulerLaRecherche`, `enregistrerLaRecherche` dans
+`tests/e2e/doublures.ts`), qui y répond sans appeler le modèle d'embeddings, et
+relaie tout le reste, tel quel, vers la vraie API. Le port 4175 doit donc être
+libre lui aussi (jamais 4190 : le `fetch` de Node refuse ce « bad port » de
+la norme Fetch).
+
 Sans backend, les tests qui demandent l'API ou ses données sont sautés. Avant un
 commit, lancer la suite backend allumé, avec `E2E_EXIGER_BACKEND=1` : un test
 sauté devient alors un échec, et une suite verte prouve vraiment le rendu
@@ -89,9 +99,10 @@ E2E_EXIGER_BACKEND=1 npm run test:e2e
 ```
 
 Chaque test e2e part d'un navigateur où le profil **citoyen** est déjà choisi
-(`storageState` dans `playwright.config.ts`) : sans cette graine, la question du
-profil masquerait chaque page. Un fichier qui doit partir d'un navigateur vide
-le déclare, comme `persona.spec.ts` :
+(`storageState` dans `playwright.config.ts`) : sans cette graine, le chat
+poserait la question du profil dans le fil à la première question, et la
+question attendrait la réponse au lieu de partir. Un fichier qui doit partir
+d'un navigateur vide le déclare, comme `persona.spec.ts` :
 `test.use({ storageState: { cookies: [], origins: [] } })`.
 
 ## Ce que couvrent les tests
@@ -109,10 +120,10 @@ identifiant absent ou non numérique, le contenu rendu par le serveur, la
 politique `noindex`, l'accessibilité au clavier et au lecteur d'écran
 (balayage axe-core), et la dégradation quand le backend est injoignable.
 
-Le profil a son propre fichier, `persona.spec.ts` : question posée à la première
-visite et jamais sur les routes exclues, choix et refus mémorisés, changement en
-pleine conversation, synchronisation avec le compte, et corps exact des
-requêtes du chat.
+Le profil a son propre fichier, `persona.spec.ts` : question jamais posée à
+l'arrivée, posée dans le fil du chat à la première question, choix et refus
+mémorisés, changement en pleine conversation, synchronisation avec le compte, et
+corps exact des requêtes du chat.
 
 ## Le profil
 
@@ -121,15 +132,17 @@ Le chat répond selon un profil : **citoyen**, **étudiant**, **avocat** ou
 réponse, et les questions suggérées à l'accueil du chat. Sans profil, le chat
 répond en **profil général**, et la requête omet le champ `persona`.
 
-- **La question** est posée à la première visite, dans une fenêtre centrée, sur
-  n'importe quelle page d'entrée, un lien profond compris. Elle ne l'est jamais
-  sur `/login`, `/signup`, `/forgot-password`, `/reset-password/*`,
-  `/verify-email/*`, `/admin*`, sur une page d'erreur, ni pour un robot
-  d'indexation (reconnu à son user agent).
-- **« Ne pas répondre »**, ou Échap, donne le profil général pour la visite. Le
-  refus est gardé dans un cookie de session, `jurix-persona-refus`, que les
-  onglets partagent : la question revient à la visite suivante. Il n'est jamais
-  envoyé au compte.
+- **La question** « Qui êtes-vous ? » n'est plus posée à l'arrivée, sur aucune
+  page (proposition P5) : la fenêtre couvrait l'essentiel d'un téléphone arrivé
+  par un lien partagé, souvent quand la lecture avait commencé. Le chat la pose
+  DANS LE FIL, à la première question d'une conversation, quand aucun profil
+  n'est choisi ni refusé : quatre boutons et « Continuer sans profil ». La
+  question du lecteur attend la réponse, puis part avec le profil choisi. Un
+  choix fait dans l'en-tête répond aussi à la question en attente.
+- **« Continuer sans profil »** donne le profil général pour la visite. Le refus
+  est gardé dans un cookie de session, `jurix-persona-refus`, que les onglets
+  partagent : la question revient à la visite suivante. Il n'est jamais envoyé
+  au compte.
 - **Le choix** est gardé dans le navigateur (`jurix-persona`, localStorage) et,
   pour un utilisateur connecté, sur son compte (`PATCH /auth/me`), qui le suit
   d'un appareil à l'autre :
@@ -144,8 +157,10 @@ répond en **profil général**, et la requête omet le champ `persona`.
   Cette synchronisation appelle `fetch`, pas `apiFetch` : en arrière-plan, elle
   ne doit ni déconnecter ni rediriger qui que ce soit.
 - **Changer de profil** se fait depuis l'en-tête et depuis le chat
-  (« Changer »). Une conversation garde un seul profil : en changer ouvre une
-  nouvelle conversation, et une conversation rouverte continue avec le sien.
+  (« Changer »), dans une fenêtre qui ne s'ouvre qu'à la demande. Une
+  conversation garde un seul profil : en changer ouvre une nouvelle
+  conversation, ce que la fenêtre annonce quand une conversation est en cours,
+  et une conversation rouverte continue avec le sien.
 - **Les suggestions** (`src/lib/suggestions.ts`) existent pour chaque profil et
   chaque langue. Chacune a été vérifiée contre le corpus avec
   `scripts/eval/comparer_mistral.py --dry-run --questions-libres` (dépôt
