@@ -29,6 +29,15 @@
  * typographique (rag_service, `extract_keywords`), et c'est celle que posent
  * les claviers des téléphones.
  *
+ * Quatre questions anglaises reformulées le 29/10, après mesure : « internet »
+ * et « online » tiraient la recherche vers la loi sur la cybercriminalité, qui
+ * ne punit pas l'escroquerie (Code pénal art. 318 au 33e rang), et « unfair
+ * dismissal », « unpaid invoice » et l'immatriculation au RCCM ne ramenaient
+ * l'article qui répond qu'au 6e rang, ou jamais. Reformulées, la recherche
+ * exacte place cet article en tête (Code du travail 35.1, Code pénal 318,
+ * AUSCGIE, AUPSRVE art. 2). Le contrôle de production du chat (API, GET
+ * /controle/chat) rejoue chacune de ces questions.
+ *
  * Seuls des imports de type : le spec e2e importe ce fichier directement.
  */
 
@@ -71,8 +80,8 @@ export const SUGGESTIONS: Record<Language, Record<CleSuggestions, readonly strin
   },
   en: {
     citoyen: [
-      'What compensation is due for unfair dismissal?',
-      'What does the Penal Code say about obtaining money by false pretences on the internet?',
+      'What damages does the Labour Code provide for unfair dismissal?',
+      'How does the Penal Code punish deceiving someone to obtain their money?',
       'What are my rights in police custody?',
       'When can self-defence be invoked?',
     ],
@@ -90,14 +99,14 @@ export const SUGGESTIONS: Record<Language, Record<CleSuggestions, readonly strin
     ],
     entrepreneur: [
       'What tax incentives does the 2025 investment incentives ordinance grant to a new investment?',
-      'How do I register a company in the trade and personal property credit register?',
+      'From when does a company have legal personality under OHADA law?',
       "What are the employer's obligations when hiring under the Labour Code?",
-      'How can I make a customer pay an unpaid invoice?',
+      'How can a business recover an unpaid invoice from a customer under OHADA law?',
     ],
     general: [
-      'What compensation is due for unfair dismissal?',
+      'What damages does the Labour Code provide for unfair dismissal?',
       'What are my rights in police custody?',
-      'What does the Penal Code say about obtaining money by false pretences on the internet?',
+      'How does the Penal Code punish deceiving someone to obtain their money?',
     ],
   },
 };
