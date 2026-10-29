@@ -13,6 +13,27 @@ const API_DES_TESTS = (process.env.VITE_API_URL ?? 'http://localhost:8000').repl
   'http://127.0.0.1:',
 );
 
+// La doublure de l'API cote serveur (tests/e2e/doublure-de-l-api.mjs). /search
+// est rendue par le serveur depuis P8 : ses appels a l'API partent du serveur
+// de test, que `page.route` ne voit pas. Le serveur de :4173 les envoie donc a
+// la doublure (API_INTERNE), qui sert les recherches enregistrees par les
+// specs (`simulerLaRecherche`, tests/e2e/doublures.ts) et relaie tout le
+// reste, tel quel, vers API_DES_TESTS. Sans elle, chaque /search?q=… des specs
+// de mise en page aurait appele le modele d'embeddings, sur des donnees qui
+// changent a chaque reingestion. Le port suit ceux du site (4173, 4174).
+// E2E_DOUBLURE_API la deplace (une adresse avec son port) : tests/e2e/doublures.ts
+// lit la meme variable, avec le meme defaut, pour y enregistrer ses recherches.
+//
+// 4175, et SURTOUT PAS 4190 (premier choix) : 4190 figure parmi les « bad
+// ports » de la norme Fetch, que le `fetch` de Node refuse avant toute
+// connexion (« TypeError: fetch failed (bad port) »). Chaque `load` du serveur
+// de test echouait, toutes les pages rendues par le serveur repondaient 503
+// — la sonde de demarrage du site comprise, qui attendait alors ses 180 s
+// pour rien. Avant de changer ce port, verifier qu'il n'est pas dans cette
+// liste (https://fetch.spec.whatwg.org/#bad-port).
+const DOUBLURE_DE_L_API = (process.env.E2E_DOUBLURE_API ?? 'http://127.0.0.1:4175').replace(/\/+$/, '');
+const PORT_DE_LA_DOUBLURE = new URL(DOUBLURE_DE_L_API).port;
+
 // Chrome de bureau sans sa taille d'ecran (1280x720) : le projet `responsif`
 // fixe les siennes, describe par describe.
 const { viewport: _tailleDeBureau, ...chromeSansTaille } = devices['Desktop Chrome'];
@@ -38,10 +59,12 @@ export default defineConfig({
   ],
   use: {
     baseURL: 'http://localhost:4173',
-    // Un profil deja choisi : sans lui, la question « Qui etes-vous ? »
-    // couvrirait chaque page a la premiere visite, et chaque clic des specs
-    // existants buterait sur elle. « citoyen » garde aussi le corps des
-    // requetes du chat identique a l'ancien `persona: "citoyen"` en dur.
+    // Un profil deja choisi : sans lui, le chat poserait « Qui etes-vous ? »
+    // dans le fil a la premiere question de chaque conversation (P5), et la
+    // question attendrait la reponse au lieu de partir. « citoyen » garde
+    // aussi le corps des requetes du chat identique a l'ancien
+    // `persona: "citoyen"` en dur. La question ne s'ouvre plus a l'arrivee,
+    // sur aucune page : ce profil n'est plus utile qu'au chat.
     // tests/e2e/navigation/persona.spec.ts repart d'un navigateur vide.
     storageState: {
       cookies: [],
@@ -101,6 +124,17 @@ export default defineConfig({
     },
   ],
   webServer: [{
+    // La doublure de l'API cote serveur, lancee AVANT le site, qui lui envoie
+    // ses appels (voir DOUBLURE_DE_L_API en tete de fichier). Un fichier .mjs,
+    // lance par `node` : il ne passe pas par le chargeur TypeScript de
+    // Playwright. La sonde vise son adresse d'etat, qui ne relaie rien.
+    command: `node tests/e2e/doublure-de-l-api.mjs ${PORT_DE_LA_DOUBLURE} ${API_DES_TESTS}`,
+    url: `${DOUBLURE_DE_L_API}/__doublure/etat`,
+    // Jamais de reutilisation, comme pour le site : une doublure d'une autre
+    // session garderait les recherches enregistrees par ses specs.
+    reuseExistingServer: false,
+    timeout: 15000,
+  }, {
     // BUILD DE PRODUCTION, et non serveur de developpement.
     //
     // Vite compile chaque route a la premiere requete : le premier affichage
@@ -127,8 +161,13 @@ export default defineConfig({
     //
     // VITE_API_URL : voir API_DES_TESTS en tete de fichier. Figee dans le code
     // au build, et relue par le serveur de preview.
+    //
+    // API_INTERNE : les appels a l'API que fait le serveur (les `load`) passent
+    // par la doublure, qui ne garde pour elle que les recherches enregistrees
+    // et relaie le reste vers VITE_API_URL. Ceux du navigateur vont toujours
+    // directement a VITE_API_URL, ou `page.route` les intercepte.
     command: 'npm run build && npx vite preview --host 127.0.0.1 --port 4173 --strictPort',
-    env: { VITE_API_URL: API_DES_TESTS },
+    env: { VITE_API_URL: API_DES_TESTS, API_INTERNE: DOUBLURE_DE_L_API },
     url: 'http://localhost:4173',
     // JAMAIS de reutilisation : `reuseExistingServer` acceptait n'importe quel
     // serveur trouve sur le port, y compris un serveur de developpement lance
@@ -145,9 +184,10 @@ export default defineConfig({
     // appels que le serveur fait lui-meme (page.route ne voit que ceux du
     // navigateur), donc de verifier les 503 du rendu serveur et la reecriture
     // de src/hooks.server.ts (tests/e2e/navigation/panne-api.spec.ts).
-    // Demarre apres le premier, build compris : Playwright lance ses serveurs
-    // l'un apres l'autre. La sonde vise un fichier : toutes les pages qui
-    // appellent l'API y repondent 503.
+    // Demarre apres le site de :4173, build compris : Playwright lance ses
+    // serveurs l'un apres l'autre. La sonde vise un fichier : toutes les pages
+    // qui appellent l'API y repondent 503. Pas de doublure ici : la panne est
+    // le sujet.
     command: 'npx vite preview --host 127.0.0.1 --port 4174 --strictPort',
     env: { VITE_API_URL: API_DES_TESTS, API_INTERNE: 'http://api-injoignable.invalid:8000' },
     url: 'http://localhost:4174/favicon.svg',

@@ -87,7 +87,10 @@ test.describe('Explication d’un article', () => {
     await page.goto(`/laws/${lawId}`);
 
     await expect(page.getByTestId('law-explain')).toBeVisible();
-    await expect(page.getByText('Chargement...')).toHaveCount(0);
+    // Les points de suspension en un caractère, comme `common.loading`
+    // depuis la passe typographique du 29/10 : avec trois points, le
+    // contrôle ne trouverait plus jamais rien, et passerait à tort.
+    await expect(page.getByText(/Chargement(\.\.\.|…)/)).toHaveCount(0);
   });
 
   test('la réponse s’affiche sur la page, sans quitter le document', async ({ page }) => {

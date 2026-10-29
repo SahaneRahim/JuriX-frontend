@@ -20,6 +20,7 @@
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
+import { decouperLeTexte } from '../../../src/lib/components/loi/decoupage';
 import { API, exiger, lireListe } from '../doublures';
 
 /**
@@ -57,30 +58,15 @@ interface ArticleLu {
 }
 
 /**
- * Les articles d'un texte, découpés comme le fait la fiche
- * (`parseContent`, src/routes/laws/[id]/+page.svelte) : une ligne « Article
- * N » ouvre un article, une ligne LIVRE, TITRE ou CHAPITRE le ferme, et
- * chaque autre ligne non vide devient un paragraphe de l'article en cours.
+ * Les articles d'un texte, découpés PAR LA FICHE ELLE-MÊME : `decouperLeTexte`
+ * (src/lib/components/loi/decoupage.ts) est le découpage de la page. Une copie
+ * de ses règles vivait ici (« Article N » ouvre un article, LIVRE, TITRE ou
+ * CHAPITRE le ferme) ; P10 les a élargies (« Art. N. », sections, chapitres
+ * collés à leur numéro), et la copie aurait choisi des paragraphes que la page
+ * range sous un intitulé de division.
  */
 function articlesDe(contenu: string): ArticleLu[] {
-  const articles: ArticleLu[] = [];
-  let courant: ArticleLu | null = null;
-  for (const brute of contenu.replace(/<<PAGE:?\s*\d+>>/gi, '').replace(/\r\n/g, '\n').split('\n')) {
-    const ligne = brute.trim();
-    if (!ligne) continue;
-    if (/^(LIVRE|TITRE|CHAPITRE)\s+[IVX0-9]+/i.test(ligne)) {
-      courant = null;
-      continue;
-    }
-    const numero = ligne.match(/^\**\s*Article\s*(\d+)/i)?.[1];
-    if (numero) {
-      courant = { numero, lignes: [] };
-      articles.push(courant);
-    } else {
-      courant?.lignes.push(ligne);
-    }
-  }
-  return articles;
+  return decouperLeTexte(contenu).articles.map(({ numero, lignes }) => ({ numero, lignes }));
 }
 
 interface LoiAOuvrir {

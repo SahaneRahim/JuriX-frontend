@@ -83,13 +83,15 @@ test.describe('Mode comparaison', () => {
     );
 
     await expect(page.getByRole('cell', { name: /Trois ans/ })).toBeVisible();
-    // La puce porte la RÉFÉRENCE de la loi, pas seulement le numéro : quand
-    // trois lois différentes ont un « article 1 », trois puces « Art. 1 »
+    // La puce porte le NOM de la loi, pas seulement le numéro : quand trois
+    // lois différentes ont un « article 1 », trois puces « Art. 1 »
     // identiques pointeraient vers trois documents sans que rien ne les
-    // distingue.
+    // distingue. Son nom, et non sa cote interne (« LOI-2016-017 »), que P2
+    // et P11 retirent de tout écran.
     await expect(
-      page.getByRole('link', { name: 'LOI-2016-017 · art. 33' }),
+      page.getByRole('link', { name: 'Loi portant Code Minier · art. 33' }),
     ).toHaveAttribute('href', '/laws/16?article=33');
+    await expect(page.getByTestId('compare-result')).not.toContainText('LOI-2016-017');
   });
 
   test('le texte de l’article se déplie sous la cellule', async ({ page }) => {
@@ -112,6 +114,9 @@ test.describe('Mode comparaison', () => {
     await expect(page.getByTestId('compare-source-0-a')).toContainText(
       'durée initiale maximale de trois ans',
     );
+    // L'extrait se nomme comme la puce, sans la cote.
+    await expect(page.getByTestId('compare-source-0-a')).toContainText('Loi portant Code Minier — Art. 33');
+    await expect(page.getByTestId('compare-source-0-a')).not.toContainText('LOI-2016-017');
     // Disclosure correctement annoncé aux lecteurs d'écran.
     await expect(page.getByTestId('compare-toggle-0-a')).toHaveAttribute(
       'aria-expanded',

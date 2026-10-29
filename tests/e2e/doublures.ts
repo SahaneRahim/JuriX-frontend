@@ -10,9 +10,11 @@
  * première retouche. Et une spec ne peut pas en importer une autre — ses
  * tests seraient déclarés une seconde fois dans le fichier qui l'importe.
  *
- * Rien n'y atteint le modèle : le chat, la recherche, la comparaison et
- * l'administration sont interceptés (`page.route`) ; seules les pages rendues
- * par le serveur lisent la vraie API, que `page.route` ne voit pas.
+ * Rien n'y atteint le modèle : le chat, la comparaison et l'administration
+ * sont interceptés (`page.route`) ; la recherche, rendue par le serveur depuis
+ * P8, l'est par la doublure de l'API côté serveur (doublure-de-l-api.mjs, voir
+ * `simulerLaRecherche`). Les autres pages rendues par le serveur lisent la
+ * vraie API, que `page.route` ne voit pas.
  */
 
 import { devices, expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
@@ -25,12 +27,15 @@ import type {
   ComparisonResponse,
   ConversationDetail,
   ConversationSummary,
+  FacettesDeRecherche,
   Law,
   LawStatus,
   LawType,
+  ReperesDuTexte,
   SearchResponse,
   SearchResult,
   SourceRef,
+  StatutEnBref,
   User,
 } from '../../src/lib/types';
 
@@ -392,8 +397,53 @@ export async function simulerLeChat(page: Page): Promise<void> {
 
 // --- Recherche -------------------------------------------------------------
 
+/**
+ * Les repères de la nouvelle API pour chaque texte de TEXTES, dans le même
+ * ordre (contrat de l'API, § 1.1 et 1.2) : numéro, objet tiré du titre
+ * officiel, date de l'acte. Un numéro à barres obliques sans espace, des
+ * objets longs, et un Acte uniforme sans numéro ni signature, daté par le
+ * Journal officiel de l'OHADA : la ligne de repères et l'objet de P7 dans
+ * leurs cas les plus chargés.
+ */
+const REPERES_DES_TEXTES: ReperesDuTexte[] = [
+  { numero: '92/007', objet: 'Code du travail', date_signature: '1992-08-14', annee: 1992, date_publication_jo: null },
+  {
+    numero: '2018/9387/CAB/PM',
+    objet:
+      'Modalités d’application de certaines dispositions du Code du travail relatives au licenciement pour motif économique',
+    date_signature: '2018-12-30',
+    annee: 2018,
+    date_publication_jo: null,
+  },
+  {
+    numero: '2020/001',
+    objet: 'Modification de certaines dispositions de la loi de finances de la République du Cameroun pour l’exercice 2020',
+    date_signature: '2020-06-15',
+    annee: 2020,
+    date_publication_jo: null,
+  },
+  {
+    numero: '00000127/MINFI/MINCOMMERCE',
+    objet: 'Modalités de contrôle des prix des produits de grande consommation',
+    date_signature: '2021-03-04',
+    annee: 2021,
+    date_publication_jo: null,
+  },
+  { numero: null, objet: null, date_signature: null, annee: 2014, date_publication_jo: '2014-02-04' },
+  { numero: '2016/007', objet: 'Code pénal', date_signature: '2016-07-12', annee: 2016, date_publication_jo: null },
+];
+
+/** Le statut prouvé le plus long : celui du Code civil (contrat, § 6.2). */
+const STATUT_EN_BREF: StatutEnBref = {
+  abroge: false,
+  textes: 12,
+  natures: { abroge_partiellement: 11, complete: 1 },
+  date_dernier_texte: '2024-12-23',
+};
+
 export const RESULTATS: SearchResult[] = Array.from({ length: 20 }, (_, i): SearchResult => {
   const texte = TEXTES[i % TEXTES.length];
+  const reperes = REPERES_DES_TEXTES[i % TEXTES.length];
   const categorie = CATEGORIES[i % CATEGORIES.length];
   return {
     law_id: 700 + i,
@@ -404,7 +454,10 @@ export const RESULTATS: SearchResult[] = Array.from({ length: 20 }, (_, i): Sear
     status: 'published',
     category_id: categorie.id,
     category_name: categorie.name,
-    publication_date: '1992-08-14',
+    publication_date: reperes.date_signature ?? reperes.date_publication_jo ?? null,
+    ...reperes,
+    // Une pastille de statut sur quatre lignes : « Abrogé en partie par 11 textes et complété par 1 ».
+    statut: i % 4 === 1 ? STATUT_EN_BREF : null,
     relevance_score: 0.95 - i * 0.02,
     match_scope: i % 2 === 0 ? 'body' : 'title',
     // Les articles trouvés s'ajoutent à la carte : la plus haute, et la plus chargée.
@@ -435,23 +488,105 @@ export const RESULTATS: SearchResult[] = Array.from({ length: 20 }, (_, i): Sear
   };
 });
 
-/** Bien plus d'une page : la pagination se montre, avec tous ses numéros. */
+/**
+ * Les effectifs de la recherche affinée (contrat, § 6.2), disjonctifs : leur
+ * présence prouve à la page que tri et filtres ont été appliqués, et fait
+ * paraître les onglets de nature, la colonne des domaines et le tri (P7).
+ * Natures et domaines totalisent 137, le total. Les domaines portent les noms
+ * de la base : la colonne les reconnaît par leur nom
+ * (src/lib/components/listes/domaines.ts), les autres y restent à zéro.
+ */
+export const EFFECTIFS_DE_RECHERCHE: FacettesDeRecherche = {
+  types: [
+    { value: 'décret', count: 61 },
+    { value: 'loi', count: 38 },
+    { value: 'arrêté', count: 21 },
+    { value: 'acte uniforme', count: 9 },
+    { value: 'ordonnance', count: 8 },
+  ],
+  categories: [
+    { id: 4, name: 'Droit du Travail et Sécurité Sociale', count: 52 },
+    { id: 13, name: 'Fonction Publique', count: 31 },
+    { id: 8, name: 'Droit des Affaires, Banque et OHADA', count: 24 },
+    { id: 5, name: 'Finances Publiques et Fiscalité', count: 17 },
+    { id: 2, name: 'Droit Pénal et Procédure Pénale', count: 13 },
+  ],
+  years: [
+    { value: 2021, count: 22 },
+    { value: 2020, count: 19 },
+    { value: 2018, count: 31 },
+    { value: 2016, count: 25 },
+    { value: 2014, count: 9 },
+    { value: 1992, count: 28 },
+    { value: null, count: 3 },
+  ],
+};
+
+/**
+ * Bien plus d'une page : la pagination se montre, avec tous ses numéros. La
+ * forme de la NOUVELLE API (tri, ensemble candidat, effectifs) : celle qui
+ * affiche le plus de choses. La forme de l'ancienne, sans eux, s'obtient en
+ * retirant `sort`, `candidates` et `facets`.
+ */
 export const REPONSE_RECHERCHE: SearchResponse = {
   query: 'travail',
   mode: 'hybrid',
   results: RESULTATS,
   total: 137,
   search_time_ms: 312,
-  filters_applied: null,
+  filters_applied: { status: 'published' },
   direct_navigation: false,
   target_law_id: null,
   target_article: null,
+  sort: 'pertinence',
+  candidates: 137,
+  facets: EFFECTIFS_DE_RECHERCHE,
 };
 
-/** La recherche hybride appelle un modèle d'embeddings : simulée, elle ne coûte rien. */
-export async function simulerLaRecherche(page: Page): Promise<void> {
+/**
+ * La doublure de l'API côté serveur (doublure-de-l-api.mjs), lancée par
+ * playwright.config.ts avant le serveur de test, qui lui envoie ses appels.
+ * Même variable et même défaut que dans playwright.config.ts.
+ */
+// 4175 et non 4190 : `fetch` refuse 4190, un « bad port » de la norme Fetch
+// (voir playwright.config.ts).
+export const DOUBLURE_DE_L_API = (process.env.E2E_DOUBLURE_API ?? 'http://127.0.0.1:4175').replace(/\/+$/, '');
+
+/**
+ * Enregistre auprès de la doublure côté serveur la réponse à ces questions :
+ * /search?q=<question> s'affichera avec elle, au rendu serveur comme en
+ * navigation (`__data.json`), quels que soient filtres, tri et page. Sans
+ * doublure joignable, le test échoue au lieu de lancer une vraie recherche.
+ */
+export async function enregistrerLaRecherche(
+  request: APIRequestContext,
+  requetes: string[],
+  reponse: SearchResponse = REPONSE_RECHERCHE,
+): Promise<void> {
+  const enregistrement = await request
+    .put(`${DOUBLURE_DE_L_API}/__doublure/recherches`, { data: { requetes, reponse }, failOnStatusCode: false })
+    .catch(() => null);
+  expect(
+    enregistrement?.status(),
+    `doublure de l’API injoignable sur ${DOUBLURE_DE_L_API} (playwright.config.ts, webServer)`,
+  ).toBe(204);
+}
+
+/**
+ * La recherche hybride appelle un modèle d'embeddings : simulée, elle ne coûte rien.
+ *
+ * DEUX CÔTÉS DEPUIS P8. /search est rendue par le SERVEUR, dont `page.route`
+ * ne voit pas les appels : la question est enregistrée auprès de la doublure
+ * côté serveur (`enregistrerLaRecherche`). Dans le navigateur restent les
+ * suggestions de la barre de recherche et la liste des domaines.
+ */
+export async function simulerLaRecherche(
+  page: Page,
+  requetes: string[] = [REPONSE_RECHERCHE.query],
+  reponse: SearchResponse = REPONSE_RECHERCHE,
+): Promise<void> {
+  await enregistrerLaRecherche(page.request, requetes, reponse);
   await intercepterLApi(page, (methode, chemin) => {
-    if (chemin === '/search') return { json: REPONSE_RECHERCHE };
     if (chemin === '/search/suggest') return { json: { suggestions: [] } };
     if (chemin === '/categories') return { json: CATEGORIES };
     return undefined;

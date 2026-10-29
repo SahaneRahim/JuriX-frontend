@@ -289,11 +289,13 @@ test.describe('Contenu rendu par le serveur', () => {
     const html = await htmlSansErreur(request, `/categories/${categorie.id}`);
     // Sur le <title> RENDU, et non sur la page entière : les données du `load`
     // sont aussi incrustées dans un <script>, et y trouveraient le nom même si
-    // l'en-tête de la page ne rendait rien. Le rendu serveur est en français,
-    // où le nom est affiché tel qu'en base ($lib/categories).
+    // l'en-tête de la page ne rendait rien. Le rendu serveur est en français :
+    // le titre de l'onglet garde le nom complet, tel qu'en base
+    // (`nomCompletCategorie`), mieux cherché par les moteurs ; seul le titre de
+    // la page prend le nom court de l'accueil (Q2, `nomCategorie`).
     expect(titreServi(html), 'titre de la catégorie absent du HTML servi').toBe(`${categorie.name} — JuriX`);
     // Les textes entiers incrustés dans la page la portaient à 1,6 Mo : le load
-    // serveur n'en envoie plus qu'un extrait.
+    // serveur n'en envoie plus aucun (P11 : repères et objet, par lots de 20).
     expect(html.length, 'HTML de la catégorie trop lourd').toBeLessThan(200_000);
   });
 

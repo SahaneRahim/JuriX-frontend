@@ -151,10 +151,22 @@ test.describe('Annonces dynamiques', () => {
   });
 
   test('/chat annonce les nouveaux messages', async ({ page }) => {
+    // P4 : le fil reste un journal nommé (`role="log"`), mais n'est plus une
+    // région vivante. Annoncer chaque morceau d'une réponse en flux la lisait
+    // mot à mot, et interrompait sans cesse le lecteur d'écran. Une seule
+    // région d'annonce, HORS du fil, dit les étapes (recherche, textes
+    // trouvés, rédaction), puis « Réponse terminée, N articles cités ».
     await page.goto('/chat');
     const journal = page.locator('[role="log"]');
     await expect(journal).toHaveCount(1);
-    await expect(journal).toHaveAttribute('aria-live', 'polite');
+    await expect(journal).toHaveAttribute('aria-live', 'off');
+    const annonces = page.getByTestId('chat-announce');
+    await expect(annonces).toHaveCount(1);
+    await expect(annonces).toHaveAttribute('role', 'status');
+    await expect(annonces).toHaveAttribute('aria-live', 'polite');
+    // Hors du fil : sinon ses annonces seraient tues avec lui (aria-live="off"
+    // et aria-busy pendant la réponse).
+    await expect(journal.getByTestId('chat-announce')).toHaveCount(0);
   });
 });
 

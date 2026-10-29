@@ -10,7 +10,9 @@
  *  - `/search` vidait `results` en posant `errorMessage`, ce qui faisait tomber
  *    le rendu dans la branche « Aucun résultat trouvé », affichée en grand,
  *    tandis que la vraie erreur restait une ligne rouge discrète. L'utilisateur
- *    reformulait sa requête pour une panne de serveur.
+ *    reformulait sa requête pour une panne de serveur. Depuis P8, /search est
+ *    rendue par le SERVEUR : `page.route` ne coupe plus ses appels, et ce cas
+ *    se vérifie sur le serveur à l'API injoignable (panne-api.spec.ts).
  *  - `/chat` fabriquait un message de type `assistant` — donc une bulle de
  *    réponse d'IA — et, sur un 5xx, affichait « Je traite votre question.
  *    Veuillez patienter… », c'est-à-dire une erreur présentée comme un succès
@@ -58,16 +60,6 @@ test.describe('Backend injoignable', () => {
     await expect(page.getByTestId('admin-retry')).toBeVisible();
     // Le symptôme d'origine : la carte « documents » affichait 0 sans rien dire.
     await expect(page.getByTestId('admin-loading')).toHaveCount(0);
-  });
-
-  test("/search affiche l'erreur et non « aucun résultat »", async ({ page }) => {
-    await page.goto('/search?q=loi');
-
-    await expect(page.getByTestId('search-error')).toBeVisible();
-    // Le point qui compte : la panne ne doit PAS se lire comme une recherche
-    // infructueuse, sinon l'utilisateur change sa requête au lieu de réessayer.
-    await expect(page.getByText(/aucun résultat|no results/i)).toHaveCount(0);
-    await expect(page.getByTestId('search-retry')).toBeVisible();
   });
 
   test('/chat ne fabrique pas de réponse d’assistant', async ({ page }) => {

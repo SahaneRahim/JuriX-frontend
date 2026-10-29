@@ -11,9 +11,12 @@
  *   les envoie.
  * - Une conversation rouverte continue avec SON profil ; changer de profil en
  *   pleine conversation en ouvre une nouvelle.
- * - La question est posée à la première visite, jamais sur les pages de
- *   compte ni d'administration. Un choix est gardé ; un refus vaut pour la
- *   visite (cookie de session), nouveaux onglets compris.
+ * - La question « Qui êtes-vous ? » ne s'ouvre plus à l'arrivée, sur aucune
+ *   page (P5) : elle couvrait 678 px sur 800 d'un téléphone arrivé par un lien
+ *   partagé. Le chat la pose dans le fil, à la première question d'une
+ *   conversation, quand aucun profil n'est choisi ni refusé. Un choix est
+ *   gardé ; un refus vaut pour la visite (cookie de session), nouveaux onglets
+ *   compris.
  * - Le profil suit le compte : adopté au démarrage, envoyé à chaque
  *   changement.
  *
@@ -22,10 +25,10 @@
  */
 
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 
 import { SUGGESTIONS } from '../../../src/lib/suggestions';
-import { cliquerJusqualEffet } from '../hydratation';
+import { cliquerJusqualEffet, saisirJusqualEffet } from '../hydratation';
 
 // Ce fichier part d'un navigateur VIDE : la graine commune de
 // playwright.config.ts (un profil citoyen déjà choisi) fausserait ses cas.
@@ -215,28 +218,85 @@ test.describe('Une conversation rouverte garde son profil', () => {
 });
 
 test.describe('La question « Qui êtes-vous ? »', () => {
-  test('posée à la première visite, sur l accueil comme sur une page profonde', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByTestId('persona-dialog')).toHaveAttribute('data-mode', 'accueil');
+  /** Pose une question dans le chat, jusqu'à voir `effet` (l'hydratation peut perdre la première). */
+  async function poser(page: Page, effet: Locator) {
+    await saisirJusqualEffet(page.getByRole('textbox').first(), 'Quelles sont les sanctions ?', effet);
+  }
 
-    await page.goto('/about');
-    await expect(page.getByTestId('persona-dialog')).toBeVisible();
-  });
+  /** La question du profil, posée dans le fil sous la question du lecteur. */
+  const questionDuProfil = (page: Page) => page.getByTestId('chat-profile-question');
 
-  for (const chemin of ['/login', '/signup', '/forgot-password', '/reset-password/jeton-x', '/verify-email/jeton-x', '/admin']) {
-    test(`jamais posée sur ${chemin}`, async ({ page }) => {
+  /** La réponse simulée, arrivée dans le fil. */
+  const reponse = (page: Page) => page.getByRole('log').getByText('voici la réponse');
+
+  async function repondue(page: Page) {
+    await expect(reponse(page)).toBeVisible();
+  }
+
+  /**
+   * Un nouvel onglet qui ouvre une conversation NEUVE : la conversation en
+   * cours, que le chat reprendrait (`jurix-chat-session`), est oubliée. Sans
+   * cela, la question partirait dans la conversation reprise, qui ne demande
+   * jamais le profil, et le test ne prouverait rien de la mémoire du choix.
+   */
+  async function ongletNeuf(context: BrowserContext): Promise<Page> {
+    const onglet = await context.newPage();
+    await onglet.addInitScript(() => {
+      localStorage.removeItem('jurix-chat-session');
+      localStorage.removeItem('jurix-chat-persona');
+    });
+    return onglet;
+  }
+
+  // P5 : plus de boîte à l'arrivée, nulle part, pages de compte et
+  // d'administration comprises (où elle n'était déjà jamais posée). Le chat
+  // lui-même ne demande rien tant qu'aucune question n'est posée.
+  for (const chemin of [
+    '/',
+    '/about',
+    '/chat',
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password/jeton-x',
+    '/verify-email/jeton-x',
+    '/admin',
+  ]) {
+    test(`jamais posée à l’arrivée sur ${chemin}`, async ({ page }) => {
       await page.goto(chemin);
       await page.waitForLoadState('networkidle');
 
       await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+      await expect(questionDuProfil(page)).toHaveCount(0);
     });
   }
 
   for (const theme of ['light', 'dark']) {
-    test(`accessible, ouverte, en thème ${theme}`, async ({ page }) => {
+    test(`posée dans le fil, accessible, en thème ${theme}`, async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('jurix-theme', t), theme);
-      await page.goto('/');
-      await expect(page.getByTestId('persona-dialog')).toBeVisible();
+      const corps = await repondre(page);
+      await page.goto('/chat');
+      await poser(page, questionDuProfil(page));
+      // La question attend son profil : rien n'est parti, et l'envoi reste
+      // fermé tant que le lecteur n'a pas répondu.
+      expect(corps).toHaveLength(0);
+      await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+
+      const resultats = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      const graves = resultats.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+
+      expect(graves, graves.map((v) => `${v.id} — ${v.nodes.length} noeud(s)`).join('\n')).toEqual([]);
+    });
+
+    test(`la boîte « Changer de profil », ouverte à la demande, accessible en thème ${theme}`, async ({ page }) => {
+      await page.addInitScript((t) => localStorage.setItem('jurix-theme', t), theme);
+      await page.goto('/about');
+      await cliquerJusqualEffet(
+        page.getByTestId('persona-toggle'),
+        page.locator('[data-testid="persona-dialog"][data-mode="changement"]'),
+      );
 
       const resultats = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -247,53 +307,77 @@ test.describe('La question « Qui êtes-vous ? »', () => {
     });
   }
 
-  test('un choix est gardé : rechargement et nouvel onglet', async ({ page, context }) => {
-    await page.goto('/');
-    await page.getByTestId('persona-choice-entrepreneur').click();
-    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+  test('un choix est gardé : la question part avec lui, et ne revient pas dans un nouvel onglet', async ({ page, context }) => {
+    const corps = await repondre(page);
+    await page.goto('/chat');
+    await poser(page, questionDuProfil(page));
+    await page.getByTestId('chat-profile-entrepreneur').click();
 
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+    await repondue(page);
+    expect(corps[0].persona).toBe('entrepreneur');
+    // Le focus quitte le bouton disparu pour la réponse choisie, pas le haut de page.
+    await expect(page.getByTestId('chat-profile-chosen')).toBeFocused();
 
-    const autre = await context.newPage();
-    await autre.goto('/about');
-    await autre.waitForLoadState('networkidle');
-    await expect(autre.getByTestId('persona-dialog')).toHaveCount(0);
+    // Une conversation neuve, dans un nouvel onglet : le profil choisi vaut
+    // pour elle aussi, sans redemander.
+    const autre = await ongletNeuf(context);
+    const corpsAutre = await repondre(autre);
+    await autre.goto('/chat');
+    // Sans question du profil : la question part aussitôt.
+    await poser(autre, reponse(autre));
+    await expect(questionDuProfil(autre)).toHaveCount(0);
+    expect(corpsAutre[0].persona).toBe('entrepreneur');
     expect(await autre.evaluate(() => localStorage.getItem('jurix-persona'))).toBe('entrepreneur');
   });
 
   test('un refus vaut pour la visite, nouveaux onglets compris, et revient à la suivante', async ({ page, context, browser, baseURL }) => {
-    await page.goto('/');
-    await page.getByTestId('persona-skip').click();
-    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
+    const corps = await repondre(page);
+    await page.goto('/chat');
+    await poser(page, page.getByTestId('chat-profile-skip'));
+    await page.getByTestId('chat-profile-skip').click();
+
+    await repondue(page);
+    expect('persona' in corps[0]).toBe(false);
     expect(await page.evaluate(() => localStorage.getItem('jurix-persona'))).toBeNull();
 
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
-
-    // Même visite, nouvel onglet : le cookie de session est partagé. /about et
-    // non /laws : sans backend, /laws répond 503, et la page d'erreur ne pose
-    // jamais la question, quel que soit le cookie.
-    const onglet = await context.newPage();
-    expect((await onglet.goto('/about'))?.status()).toBe(200);
-    await onglet.waitForLoadState('networkidle');
-    await expect(onglet.getByTestId('persona-dialog')).toHaveCount(0);
+    // Même visite, nouvel onglet, conversation neuve : le cookie de session
+    // est partagé, la question ne revient pas et la suivante part en profil
+    // général.
+    const onglet = await ongletNeuf(context);
+    const corpsOnglet = await repondre(onglet);
+    await onglet.goto('/chat');
+    await poser(onglet, reponse(onglet));
+    await expect(questionDuProfil(onglet)).toHaveCount(0);
+    expect('persona' in corpsOnglet[0]).toBe(false);
 
     // Visite suivante : nouveau navigateur, la question revient.
     const suivante = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
     const nouvelle = await suivante.newPage();
-    await nouvelle.goto('/');
-    await expect(nouvelle.getByTestId('persona-dialog')).toBeVisible();
+    await repondre(nouvelle);
+    await nouvelle.goto('/chat');
+    await poser(nouvelle, questionDuProfil(nouvelle));
     await suivante.close();
   });
 
-  test('Échap vaut « Ne pas répondre », et la première tabulation atteint le lien d évitement', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByTestId('persona-dialog')).toBeVisible();
+  test('un profil choisi par l’en-tête répond aussi à la question du fil', async ({ page }) => {
+    const corps = await repondre(page);
+    await page.goto('/chat');
+    await poser(page, questionDuProfil(page));
 
-    await page.keyboard.press('Escape');
+    await cliquerJusqualEffet(page.getByTestId('persona-toggle'), page.getByTestId('persona-choice-avocat'));
+    await page.getByTestId('persona-choice-avocat').click();
+
+    await repondue(page);
+    expect(corps).toHaveLength(1);
+    expect(corps[0].persona).toBe('avocat');
+    // La question en attente n'est pas effacée par le changement de profil.
+    await expect(page.getByRole('log')).toContainText('Quelles sont les sanctions ?');
+  });
+
+  test('à l’arrivée, rien ne couvre la page : la première tabulation atteint le lien d’évitement', async ({ page }) => {
+    // /about et non / : sans backend, l'accueil répond 503.
+    await page.goto('/about');
+    await page.waitForLoadState('networkidle');
     await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
 
     await page.keyboard.press('Tab');
@@ -327,6 +411,8 @@ test.describe('Changer de profil', () => {
     expect(await page.evaluate(() => localStorage.getItem('jurix-chat-session'))).toBe('sid-profil');
 
     await page.getByTestId('persona-toggle').click();
+    // P4 : la boîte prévient avant d'effacer la conversation affichée.
+    await expect(page.getByTestId('persona-new-conversation')).toBeVisible();
     await page.getByTestId('persona-choice-avocat').click();
 
     await expect(page.getByTestId('chat-persona')).toHaveAttribute('data-persona', 'avocat');

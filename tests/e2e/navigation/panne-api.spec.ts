@@ -34,6 +34,24 @@ test.describe('Rendu serveur, API injoignable', () => {
     });
   }
 
+  test('/search affiche l’erreur et non « aucun résultat », sans JavaScript', async ({ request }) => {
+    // Rendue par le serveur depuis P8, et JAMAIS mise en cache : la page
+    // garde son état d'erreur (200), avec sa barre de recherche, plutôt que la
+    // page d'erreur du site. Le point qui compte : la panne ne se lit pas
+    // comme une recherche infructueuse, sinon le lecteur change sa requête au
+    // lieu de réessayer.
+    const res = await request.get(`${EN_PANNE}/search?q=loi`, { failOnStatusCode: false });
+    expect(res.status()).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('data-testid="search-error"');
+    expect(html).not.toMatch(/aucun résultat|aucun texte ne contient/i);
+    // « Réessayer » est un lien vers la même recherche : il marche avant le
+    // JavaScript.
+    const lien = html.match(/<a[^>]*data-testid="search-retry"[^>]*>/)?.[0] ?? '';
+    expect(lien, 'lien Réessayer absent').not.toBe('');
+    expect(lien).toMatch(/href="\/search\?q=loi"/);
+  });
+
   test('les pages sans API restent en 200', async ({ request }) => {
     for (const chemin of ['/about', '/robots.txt', '/login']) {
       const res = await request.get(`${EN_PANNE}${chemin}`, { failOnStatusCode: false });
@@ -56,14 +74,24 @@ test.describe('Rendu serveur, API injoignable', () => {
 });
 
 test.describe('Navigation dans le navigateur, API coupée', () => {
+  test('/search affiche l’erreur et sa reprise, jamais « aucun résultat »', async ({ page }) => {
+    await page.goto(`${EN_PANNE}/search?q=loi`);
+
+    await expect(page.getByTestId('search-error')).toBeVisible();
+    await expect(page.getByText(/aucun résultat|aucun texte ne contient|no results|no text contains/i)).toHaveCount(0);
+    await expect(page.getByTestId('search-retry')).toBeVisible();
+    // La barre de recherche reste là : le lecteur peut réessayer ou reformuler.
+    await expect(page.locator('#contenu form[role="search"]')).toBeVisible();
+  });
+
   test('une liste ouverte depuis le menu affiche la page d’erreur et sa reprise', async ({ page }) => {
     // Les `load` des pages publiques tournent sur le serveur : seul le serveur
     // de :4174, dont l'API est injoignable, peut les faire échouer pendant une
     // navigation. page.route ne verrait rien.
     //
-    // Profil déjà choisi : le storageState de playwright.config.ts ne vaut que
-    // pour :4173, et la question du profil rendrait la page inerte.
-    await page.addInitScript(() => localStorage.setItem('jurix-persona', 'citoyen'));
+    // Aucun profil posé (le storageState de playwright.config.ts ne vaut que
+    // pour :4173) : depuis P5, la question du profil ne s'ouvre plus à
+    // l'arrivée, et rien ne rend la page inerte.
     await page.goto(`${EN_PANNE}/about`);
     // Attendre que Svelte ait pris la main : un clic parti avant ferait une
     // navigation complète, rendue par le serveur, au lieu d'une requête de

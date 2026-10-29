@@ -135,11 +135,13 @@ Les deux partagent les doublures de `doublures.ts` (aussi lues par
 
 ### Stockage de départ : un profil déjà choisi
 
-À la première visite, le site demande le profil de l'utilisateur dans une
-fenêtre modale qui rend le reste de la page inerte. Pour que les tests ne la
-rencontrent pas à chaque page, `playwright.config.ts` démarre chaque test avec
-`jurix-persona=citoyen` dans le localStorage (`use.storageState`). Les requêtes
-du chat portent donc `persona: "citoyen"`, comme avant l'arrivée des profils.
+Sans profil choisi ni refusé, le chat pose « Qui êtes-vous ? » dans le fil, à
+la première question d'une conversation, et la question attend la réponse
+avant de partir (P5 ; la fenêtre qui s'ouvrait à l'arrivée sur chaque page a
+disparu). Pour que les specs du chat n'y butent pas, `playwright.config.ts`
+démarre chaque test avec `jurix-persona=citoyen` dans le localStorage
+(`use.storageState`). Les requêtes du chat portent donc `persona: "citoyen"`,
+comme avant l'arrivée des profils.
 
 Un fichier qui doit partir d'un navigateur vide — c'est le cas de
 `persona.spec.ts` — le déclare en tête :
@@ -148,9 +150,38 @@ Un fichier qui doit partir d'un navigateur vide — c'est le cas de
 test.use({ storageState: { cookies: [], origins: [] } });
 ```
 
-Le refus de la question (« Ne pas répondre ») vit dans un cookie de session,
-`jurix-persona-refus` : un test le pose avec `context.addCookies`, et un
-nouveau contexte (`browser.newContext`) simule la visite suivante.
+Le refus de la question (« Continuer sans profil ») vit dans un cookie de
+session, `jurix-persona-refus` : un test le pose avec `context.addCookies`, et
+un nouveau contexte (`browser.newContext`) simule la visite suivante.
+
+### La recherche, rendue par le serveur : la doublure de l'API
+
+Depuis P8, `/search` est rendue par le serveur : son `load` interroge l'API
+depuis Node, et `page.route` ne voit pas cet appel. Le serveur de test (4173)
+envoie donc ses appels à l'API à une doublure, `doublure-de-l-api.mjs`, que
+`playwright.config.ts` lance avant lui sur le port 4175 (`API_INTERNE` ; jamais
+4190, un « bad port » que le `fetch` de Node refuse) :
+
+- une recherche dont la question a été enregistrée par la spec reçoit la
+  réponse enregistrée, sans appel au modèle d'embeddings ;
+- tout le reste part tel quel vers la vraie API.
+
+```typescript
+import { simulerLaRecherche, enregistrerLaRecherche } from '../doublures';
+
+// Page de résultats simulée (REPONSE_RECHERCHE, 137 textes, forme de la
+// nouvelle API) et appels du navigateur interceptés (suggestions, domaines) :
+await simulerLaRecherche(page);
+await page.goto('/search?q=travail');
+
+// Seulement le côté serveur, pour un formulaire qui part vers /search :
+await enregistrerLaRecherche(page.request, ['bail commercial']);
+```
+
+Une question non enregistrée reste une vraie recherche (`link-integrity`,
+`accessibilite`). Les pannes du rendu serveur, recherche comprise, se
+vérifient sur le serveur de 4174, dont l'API est injoignable
+(`panne-api.spec.ts`).
 
 ## ✍️ Écrire des Tests
 

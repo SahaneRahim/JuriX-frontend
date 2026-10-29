@@ -168,7 +168,7 @@ test.describe('Trouver la réinitialisation', () => {
     await page.getByTestId('forgot-submit').click();
 
     await expect(page.getByTestId('forgot-error')).toBeVisible();
-    await expect(page.getByTestId('forgot-error')).toContainText(/adresse email valide|valid email address/i);
+    await expect(page.getByTestId('forgot-error')).toContainText(/adresse e-mail valide|valid email address/i);
     await expect(page.getByTestId('forgot-email')).toHaveAttribute('aria-invalid', 'true');
     expect(appels, 'un appel est parti malgré la vérification locale').toBe(0);
   });
@@ -182,7 +182,7 @@ test.describe('Trouver la réinitialisation', () => {
     await page.getByTestId('forgot-email').fill('rahim@jurix.cm');
     await page.getByTestId('forgot-submit').click();
 
-    await expect(page.getByTestId('forgot-error')).toContainText(/adresse email valide|valid email address/i);
+    await expect(page.getByTestId('forgot-error')).toContainText(/adresse e-mail valide|valid email address/i);
     await expect(page.getByTestId('forgot-email')).toBeVisible();
   });
 

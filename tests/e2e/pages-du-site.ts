@@ -21,6 +21,8 @@
  * vraie API, jamais du code : un jeu figé pourrit à la première réingestion.
  */
 
+import fs from 'node:fs';
+
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 import type { Category } from '../../src/lib/types';
@@ -95,12 +97,27 @@ async function categorieFournie(request: APIRequestContext): Promise<number | nu
   return premiere?.id ?? null;
 }
 
-/** Le premier article publié du blog, s'il en existe un. */
+/**
+ * Le premier article publié du blog : celui de l'API, sinon le premier des
+ * articles statiques ($lib/data/blog), que la page sert quand l'API ne connaît
+ * pas l'article.
+ *
+ * POURQUOI LE REPLI. Aucune API d'aujourd'hui (origin/main, feat/ux-api) n'a
+ * de route /blog : sans repli, les quatorze tests de /blog/[slug]
+ * (monochrome, redimensionnement) étaient toujours sautés, alors que la page
+ * est servie en production, avec ses articles statiques. Le slug est lu dans
+ * le fichier source : le module importe $lib/stores/language, que la spec ne
+ * sait pas résoudre (même procédé que monochrome.spec.ts pour language.ts).
+ */
 async function articleDuBlog(request: APIRequestContext): Promise<string | null> {
   const reponse = await request.get(`${API}/api/v1/blog`, { failOnStatusCode: false }).catch(() => null);
-  if (!reponse?.ok()) return null;
-  const articles = (await reponse.json().catch(() => [])) as { slug?: string }[];
-  return Array.isArray(articles) ? (articles.find((a) => a.slug)?.slug ?? null) : null;
+  if (reponse?.ok()) {
+    const articles = (await reponse.json().catch(() => [])) as { slug?: string }[];
+    const slug = Array.isArray(articles) ? articles.find((a) => a.slug)?.slug : undefined;
+    if (slug) return slug;
+  }
+  const source = fs.readFileSync(new URL('../../src/lib/data/blog.ts', import.meta.url), 'utf8');
+  return /\bslug:\s*'([^']+)'/.exec(source)?.[1] ?? null;
 }
 
 /** Une adresse qu'aucune route ne sert : la page d'erreur du site, en 404. */
@@ -171,8 +188,9 @@ export const PAGES: PageDuSite[] = [
       return `/categories/${id}`;
     },
     principal: titre,
-    // Le champ qui filtre les textes de la catégorie.
-    action: (page) => contenu(page).locator('input[type="text"]').first(),
+    // Le champ qui cherche dans les textes du domaine : un formulaire GET vers
+    // /search, le domaine en champ caché (P8), et non plus un filtre local.
+    action: (page) => contenu(page).locator('input[type="text"][name="q"]').first(),
   },
   {
     nom: '/search?q=travail',
@@ -298,8 +316,10 @@ export const PAGES: PageDuSite[] = [
       return ADRESSE_INCONNUE;
     },
     principal: titre,
-    // Les destinations de la navigation, reprises par la page d'erreur.
-    action: (page) => page.getByTestId('error-page').locator('nav a').first(),
+    // « Retour à l'accueil », l'action principale de la page. Les liens de
+    // navigation repris sous la recherche sont masqués à partir de lg, où
+    // l'en-tête affiche les mêmes juste au-dessus (+error.svelte).
+    action: (page) => page.getByTestId('error-home'),
   },
   {
     nom: '/admin',

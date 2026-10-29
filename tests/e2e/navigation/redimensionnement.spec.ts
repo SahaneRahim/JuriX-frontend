@@ -916,6 +916,13 @@ interface CibleMesuree {
  * par son <label> : c'est lui qu'on touche. Un lien pris dans une phrase
  * (affiché en ligne, entouré de texte, ou dans un texte rendu `prose`) suit
  * la phrase : il est exempté.
+ *
+ * LE LIEN ÉTENDU (Q3 A, liste des domaines de l'accueil) : le lien, en ligne
+ * et non positionné, ne porte que le nom du domaine (20 px de haut), mais son
+ * ::after, en `inset-0`, couvre toute la ligne de la liste (64 px), son bloc
+ * conteneur étant le premier ancêtre positionné. C'est cette ligne qu'on
+ * touche : elle est mesurée. Seul un pseudo-élément aux quatre bords posés
+ * compte ainsi, pour qu'un filet décoratif ne grandisse pas une cible.
  */
 function mesurerLesCibles(minimum: number): CibleMesuree[] {
   const SELECTEUR =
@@ -964,20 +971,36 @@ function mesurerLesCibles(minimum: number): CibleMesuree[] {
     return tout.length > lui.length;
   };
 
+  /** Le premier ancêtre positionné : le bloc conteneur d'un pseudo-élément absolu d'un élément statique. */
+  const ancetrePositionne = (el: Element): Element | null => {
+    for (let n = el.parentElement; n; n = n.parentElement) {
+      if (getComputedStyle(n).position !== 'static') return n;
+    }
+    return null;
+  };
+
   const taille = (el: Element) => {
     const b = el.getBoundingClientRect();
     let [g, h, d, bas] = [b.left, b.top, b.right, b.bottom];
     const s = getComputedStyle(el);
-    if (s.position !== 'static' && s.display !== 'inline') {
-      const cg = b.left + parseFloat(s.borderLeftWidth);
-      const ch = b.top + parseFloat(s.borderTopWidth);
-      const cd = b.right - parseFloat(s.borderRightWidth);
-      const cb = b.bottom - parseFloat(s.borderBottomWidth);
+    // Bloc conteneur des pseudo-éléments absolus : l'élément s'il est
+    // positionné (hors élément en ligne, au bloc conteneur particulier), sinon
+    // son premier ancêtre positionné (le lien étendu, voir plus haut).
+    const statique = s.position === 'static';
+    const conteneur = !statique && s.display !== 'inline' ? el : statique ? ancetrePositionne(el) : null;
+    if (conteneur) {
+      const bc = conteneur.getBoundingClientRect();
+      const sc = getComputedStyle(conteneur);
+      const cg = bc.left + parseFloat(sc.borderLeftWidth);
+      const ch = bc.top + parseFloat(sc.borderTopWidth);
+      const cd = bc.right - parseFloat(sc.borderRightWidth);
+      const cb = bc.bottom - parseFloat(sc.borderBottomWidth);
       for (const pseudo of ['::before', '::after']) {
         const p = getComputedStyle(el, pseudo);
         if (p.content === 'none' || p.content === 'normal' || p.display === 'none' || p.position !== 'absolute') continue;
         const val = (v: string) => (v === 'auto' ? null : parseFloat(v));
         const [top, right, bottom, left] = [val(p.top), val(p.right), val(p.bottom), val(p.left)];
+        if (conteneur !== el && [top, right, bottom, left].some((v) => v === null)) continue;
         const w = parseFloat(p.width);
         const hh = parseFloat(p.height);
         const pg = left !== null ? cg + left : right !== null && !Number.isNaN(w) ? cd - right - w : cg;

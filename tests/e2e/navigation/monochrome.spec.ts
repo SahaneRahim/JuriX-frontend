@@ -636,7 +636,9 @@ async function ouvrirLaPalette(page: Page): Promise<void> {
   const loupe = visible(page.getByTestId('site-header').getByRole('button', { name: /^Recherche et actions rapides/ }));
   await cliquerJusqualEffet(loupe, palette);
   await palette.getByRole('textbox').fill('travail');
-  await expect(palette.getByText(SUGGESTIONS[0].title)).toBeVisible();
+  // « Loi n° 92/007 », comme les listes : la palette n'écrit plus l'intitulé
+  // brut de la base (« Loi N°92/007 », CommandPalette.svelte).
+  await expect(palette.getByText(SUGGESTIONS[0].title.replace(/N°\s*/, 'n° '))).toBeVisible();
 }
 
 const ETATS_OUVERTS: EtatOuvert[] = [
@@ -670,13 +672,17 @@ const ETATS_OUVERTS: EtatOuvert[] = [
   { nom: 'accueil--palette', taille: TELEPHONE, ouvrir: ouvrirLaPalette },
   { nom: 'accueil--palette', taille: BUREAU, ouvrir: ouvrirLaPalette },
   {
-    // Sans profil enregistré, la question « Qui êtes-vous ? » s'ouvre seule.
-    nom: 'about--choix-du-profil-premiere-visite',
+    // Sans profil enregistré, la question « Qui êtes-vous ? » se pose DANS LE
+    // FIL, à la première question (P5) : elle ne s'ouvre plus seule à
+    // l'arrivée. Ses quatre boutons et « Continuer sans profil ».
+    nom: 'chat--question-du-profil',
     taille: TELEPHONE,
     ouvrir: async (page) => {
       await page.addInitScript(() => localStorage.removeItem('jurix-persona'));
-      await ouvrirAuServeur(page, '/about');
-      await expect(page.getByTestId('persona-dialog')).toBeVisible();
+      await simulerLeChat(page);
+      await page.goto('/chat');
+      await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-profile-question'));
+      await expect(page.getByTestId('persona-dialog')).toHaveCount(0);
     },
   },
   {
@@ -738,6 +744,11 @@ const ETATS_OUVERTS: EtatOuvert[] = [
     // Le panneau des filtres, replié sous lg, avec une catégorie cochée : le
     // fond d'une case cochée est la couleur de son texte (module des
     // formulaires), un bleu par défaut s'y verrait.
+    //
+    // P7 : la colonne montre les quatorze domaines, ceux à zéro résultat
+    // désactivés ; la case cochée est donc la première ACTIVE. Cocher relance
+    // la recherche (P8, navigation vers ?categorie=…), que la doublure côté
+    // serveur sert encore : la colonne reste ouverte, la case cochée.
     nom: 'search--filtres',
     taille: TELEPHONE,
     ouvrir: async (page) => {
@@ -745,8 +756,18 @@ const ETATS_OUVERTS: EtatOuvert[] = [
       await page.goto('/search?q=travail');
       await expect(page.getByTestId('search-status')).toContainText(String(REPONSE_RECHERCHE.total));
       const panneau = page.locator('#filtres-recherche');
-      await cliquerJusqualEffet(page.getByTestId('search-filters-toggle'), panneau);
-      await panneau.locator('input[type="checkbox"]').first().check();
+      // `aria-expanded` vrai, et non le panneau visible : la page arrive rendue
+      // par le serveur, et avant l'hydratation le lien ouvre déjà le panneau
+      // par son ancre (`:target`), sans que cocher relance la recherche.
+      await cliquerJusqualEffet(
+        page.getByTestId('search-filters-toggle'),
+        page.locator('[data-testid="search-filters-toggle"][aria-expanded="true"]'),
+      );
+      await expect(panneau).toBeVisible();
+      const caseActive = panneau.locator('input[type="checkbox"]:enabled').first();
+      await caseActive.check();
+      await expect(page).toHaveURL(/[?&]categorie=\d+/);
+      await expect(caseActive).toBeChecked();
     },
   },
   {
@@ -823,7 +844,9 @@ const ETATS_OUVERTS: EtatOuvert[] = [
       await expect(visible(page.getByText(ARTICLES_DU_BLOG_ADMIN[0].title))).toBeVisible();
       await cliquerJusqualEffet(
         page.locator('main').getByRole('button', { name: /Générer un article IA/ }),
-        page.getByRole('heading', { name: 'Générateur d\'article automatique' }),
+        // Apostrophe typographique, comme l'écrit l'interface depuis les
+        // corrections r2 de language.ts (`admin.blog.generatorTitle`).
+        page.getByRole('heading', { name: 'Générateur d’article automatique' }),
       );
     },
   },
@@ -837,7 +860,7 @@ const ETATS_OUVERTS: EtatOuvert[] = [
       await expect(visible(page.getByText(ARTICLES_DU_BLOG_ADMIN[0].title))).toBeVisible();
       await cliquerJusqualEffet(
         visible(page.getByRole('button', { name: 'Modifier', exact: true })),
-        page.getByRole('dialog', { name: 'Modifier l\'article' }),
+        page.getByRole('dialog', { name: 'Modifier l’article' }), // `admin.blog.editTitle`
       );
     },
   },
