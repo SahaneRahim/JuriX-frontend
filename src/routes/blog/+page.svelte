@@ -7,11 +7,22 @@
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { ICONE_DOMAINE_INCONNU, iconeCategorie } from "$lib/categories";
-  import { BLOG_POSTS, cleRubrique, nomRubrique, type BlogPost } from "$lib/data/blog";
+  import {
+    BLOG_POSTS,
+    citationsNonVerifiees,
+    cleRubrique,
+    insecables,
+    nomRubrique,
+    texteAffiche,
+    type BlogPost,
+  } from "$lib/data/blog";
   import { formatDate } from "$lib/format";
   import type { NomIcone } from "$lib/icones";
   import { language, tr, type Language } from "$lib/stores/language";
 
+  // Les articles de l'API et ceux de la rédaction, déjà réunis par le
+  // chargeur (+page.server.ts, `avecLesArticlesDeLaRedaction`). Le repli sur
+  // ceux de la rédaction reste pour des données vides.
   export let data: { posts?: BlogPost[] } = {};
   $: posts = data?.posts && data.posts.length > 0 ? data.posts : BLOG_POSTS;
 
@@ -29,8 +40,15 @@
     ? posts
     : posts.filter((p: BlogPost) => p.category === selectedCategory);
 
-  $: featuredPost = filteredPosts[0];
-  $: otherPosts = filteredPosts.slice(1);
+  // À la une : le plus récent des articles dont toutes les citations sont
+  // vérifiées. POURQUOI (revue croisée du 29/10) : un article publié avant la
+  // vérification des citations (26/10, lignes 1 à 3 de jurix_dev) est plus
+  // récent que ceux de la rédaction, et la carte la plus voyante du blog
+  // aurait mis en avant son résumé, écrit par le modèle et jamais confronté
+  // aux textes. Il reste listé, à sa date, avec son étiquette. Sans article
+  // vérifié (filtre d'une rubrique qui n'a que celui-là), le plus récent.
+  $: featuredPost = filteredPosts.find((p: BlogPost) => citationsNonVerifiees(p) === 0) ?? filteredPosts[0];
+  $: otherPosts = filteredPosts.filter((p: BlogPost) => p !== featuredPost);
 
   // La date suit la langue de l'interface, par la mise en forme commune du
   // site ($lib/format) : `formattedDate`, préparée par +page.ts, est écrite en
@@ -72,27 +90,17 @@
     return ICONES_DES_RUBRIQUES.find((r) => r.mots.some((mot) => mots.includes(mot)))?.icone ?? ICONE_DOMAINE_INCONNU;
   }
 
-  // Typographie française, posée à l'affichage. Les articles viennent de
-  // l'API, et les chaînes de l'interface, avec des espaces ordinaires devant
-  // « ? ! : ; », autour des guillemets et dans les nombres : le navigateur
-  // pouvait couper la ligne entre un mot et sa ponctuation (le « ? » du titre
-  // à la une tombait seul sur une troisième ligne) ou au milieu d'un nombre
-  // (« 43 / 000 »). L'espace fine insécable (U+202F) les soude. Seules les
-  // espaces déjà présentes changent : une phrase anglaise (« dispute? ») reste
-  // telle quelle. Les métadonnées (MetaSeo) gardent le texte d'origine. Même
-  // fonction dans blog/[slug] : sa place serait $lib/format.ts.
-  function insecables(texte: string | null | undefined): string {
-    return (texte ?? "")
-      .replace(/[ \u00A0]+(?=[?!:;»])/g, "\u202F")
-      .replace(/«[ \u00A0]+/g, "«\u202F")
-      .replace(/(\d)[ \u00A0](?=\d{3}(?!\d))/g, "$1\u202F")
-      // Inversion du sujet (« a-t-il », « peut-on ») : trait d'union
-      // insécable (U+2011). Le navigateur coupait la ligne après « a- », et
-      // « t-il » ouvrait la ligne suivante (titre de l'article à 1 440 px,
-      // dans sa colonne de 768 px).
-      .replace(/-t-(il|elle|on|ils|elles)(?![\p{L}])/gu, "\u2011t\u2011$1")
-      .replace(/(\p{L})-(il|elle|on|ils|elles|je|tu|nous|vous)(?![\p{L}])/gu, "$1\u2011$2");
-  }
+  // Typographie française et Markdown résiduel du modèle : `insecables` et
+  // `texteAffiche` de $lib/data/blog, partagées avec la page de l'article et
+  // l'aperçu de l'administration (la fonction était recopiée ici).
+
+  /**
+   * L'adresse d'un article. Le slug est encodé : un slug à caractères
+   * spéciaux (« Coupure d'eau : bailleur/locataire ? #droits », que l'API
+   * d'origine enregistrait tel quel) cassait le lien. L'API du contrat du
+   * 29/10 normalise toujours le slug ; l'encodage reste la défense du lien.
+   */
+  const adresseDeLArticle = (post: BlogPost) => `/blog/${encodeURIComponent(post.slug)}`;
 
   /**
    * Le lien d'une carte (Q3 A, comme la liste des domaines de l'accueil) :
@@ -225,6 +233,17 @@
                     <Icone nom="bot" class="text-sm" />{$tr("blog.badge.ai")}
                   </span>
                 {/if}
+                <!-- Des citations non vérifiées (voir `featuredPost`) : dit
+                     dès la carte, avant d'ouvrir l'article. Tirets, comme
+                     les cartes de ces citations sur la page de l'article. -->
+                {#if citationsNonVerifiees(featuredPost) > 0}
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-zinc-200 border border-dashed border-white/50"
+                    data-testid="blog-carte-non-verifiee"
+                  >
+                    <Icone nom="triangle-alert" class="text-sm" />{$tr("blog.badge.unverified")}
+                  </span>
+                {/if}
                 <!-- Date et durée en Inter, chiffres alignés (Q5 A : la
                      chasse fixe ne garde que les touches). Séparées par le
                      point médian des repères des listes (P11) et de
@@ -237,7 +256,7 @@
 
               <div class="flex items-start justify-between gap-4">
                 <h2 class="text-2xl/tight sm:text-3xl/tight font-bold tracking-tight text-white group-hover:text-zinc-300 transition-colors">
-                  <a href="/blog/{featuredPost.slug}" class={LIEN_ETENDU}>{insecables(featuredPost.title)}</a>
+                  <a href={adresseDeLArticle(featuredPost)} class={LIEN_ETENDU}>{texteAffiche(featuredPost.title)}</a>
                 </h2>
                 <Icone
                   nom="arrow-right"
@@ -246,7 +265,7 @@
               </div>
 
               <p class="max-w-[34em] text-zinc-400 text-base sm:text-lg leading-relaxed line-clamp-3 font-normal">
-                {insecables(featuredPost.excerpt)}
+                {texteAffiche(featuredPost.excerpt)}
               </p>
             </div>
 
@@ -311,6 +330,14 @@
                         <Icone nom="bot" class="text-sm" />{$tr("blog.badge.ai")}
                       </span>
                     {/if}
+                    {#if citationsNonVerifiees(post) > 0}
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 border border-dashed border-zinc-400 dark:border-zinc-500"
+                        data-testid="blog-carte-non-verifiee"
+                      >
+                        <Icone nom="triangle-alert" class="text-sm" />{$tr("blog.badge.unverified")}
+                      </span>
+                    {/if}
                   </span>
                   <span class="tabular-nums text-zinc-500 dark:text-zinc-400">
                     {datePubliee(post, $language.current)}&nbsp;· {post.readingTime} {$tr("blog.reading")}
@@ -319,7 +346,7 @@
 
                 <div class="mt-3 flex items-start justify-between gap-3">
                   <h3 class="text-lg sm:text-xl font-bold text-zinc-950 dark:text-white leading-snug">
-                    <a href="/blog/{post.slug}" class={LIEN_ETENDU}>{insecables(post.title)}</a>
+                    <a href={adresseDeLArticle(post)} class={LIEN_ETENDU}>{texteAffiche(post.title)}</a>
                   </h3>
                   <Icone
                     nom="arrow-right"
@@ -330,7 +357,7 @@
                 <!-- 14 px à toutes les largeurs : le texte courant passait à
                      12 px sur téléphone, l'écran où il se lit le moins bien. -->
                 <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed font-normal">
-                  {insecables(post.excerpt)}
+                  {texteAffiche(post.excerpt)}
                 </p>
               </li>
             {/each}

@@ -2,20 +2,13 @@
   import { page } from "$app/stores";
   import Icone from "$lib/components/Icone.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
-  import { urlCanonique } from "$lib/seo";
+  import { descriptionDepuis, urlCanonique } from "$lib/seo";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
-  import {
-    adresseDeCitation,
-    articleDeCitation,
-    nomRubrique,
-    referenceAffichable,
-    titreDeCitation,
-    type BlogCitation,
-    type BlogPost,
-  } from "$lib/data/blog";
+  import { insecables, nomRubrique, sansMarkdown, texteAffiche, type BlogPost } from "$lib/data/blog";
   import { formatDate } from "$lib/format";
   import { language, tr } from "$lib/stores/language";
+  import CorpsDeLArticle from "../CorpsDeLArticle.svelte";
 
   export let data: { post: BlogPost };
   $: post = data.post;
@@ -43,38 +36,16 @@
   }
 
   // La date suit la langue de l'interface, par la mise en forme commune du
-  // site ($lib/format) : `formattedDate`, préparée par +page.ts, est écrite en
-  // français (« fr-FR » en dur) et le restait dans l'interface anglaise.
+  // site ($lib/format) : `formattedDate` est écrite en français (« fr-FR » en
+  // dur) et le restait dans l'interface anglaise.
   $: datePubliee = post.date ? formatDate(post.date, $language.current) : $tr("blog.recently");
-
-  // Typographie française, posée à l'affichage. L'article vient de l'API, et
-  // les chaînes de l'interface, avec des espaces ordinaires devant « ? ! : ; »,
-  // autour des guillemets et dans les nombres : le navigateur coupait la ligne
-  // entre un mot et sa ponctuation (« …ou le courant / ? » dans le titre à
-  // 740 px, « une « / voie de fait » » dans les règles). L'espace fine
-  // insécable (U+202F) les soude. Seules les espaces déjà présentes changent :
-  // une phrase anglaise (« situation? ») reste telle quelle. Les métadonnées
-  // (MetaSeo) et le message de partage gardent le texte d'origine. Même
-  // fonction dans blog/+page.svelte : sa place serait $lib/format.ts.
-  function insecables(texte: string | null | undefined): string {
-    return (texte ?? "")
-      .replace(/[ \u00A0]+(?=[?!:;»])/g, "\u202F")
-      .replace(/«[ \u00A0]+/g, "«\u202F")
-      .replace(/(\d)[ \u00A0](?=\d{3}(?!\d))/g, "$1\u202F")
-      // Inversion du sujet (« a-t-il », « peut-on ») : trait d'union
-      // insécable (U+2011). Le navigateur coupait la ligne après « a- », et
-      // « t-il » ouvrait la ligne suivante (titre de l'article à 1 440 px,
-      // dans sa colonne de 768 px).
-      .replace(/-t-(il|elle|on|ils|elles)(?![\p{L}])/gu, "\u2011t\u2011$1")
-      .replace(/(\p{L})-(il|elle|on|ils|elles|je|tu|nous|vous)(?![\p{L}])/gu, "$1\u2011$2");
-  }
 
   let lienCopie = false;
   let minuterieCopie: ReturnType<typeof setTimeout>;
 
   function copierLien() {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(urlActuelle);
       lienCopie = true;
       clearTimeout(minuterieCopie);
       minuterieCopie = setTimeout(() => {
@@ -83,12 +54,24 @@
     }
   }
 
-  $: urlActuelle = typeof window !== "undefined" ? window.location.href : `https://jurix.cm/blog/${post.slug}`;
-  $: messagePartage = encodeURIComponent(`${post.title}\n\n${$tr("blog.shareMessage")}\n${urlActuelle}`);
+  // L'adresse partagée est celle de la page, lue dans la requête : connue dès
+  // le rendu serveur. Elle était `https://jurix.cm/blog/…`, un domaine écrit
+  // en dur nulle part ailleurs dans le code, jusqu'à l'hydratation : un
+  // partage fait avant (téléphone lent) ou un robot recevait ce domaine.
+  // Sans requête ni fragment (`urlCanonique`), comme la canonique.
+  $: urlActuelle = urlCanonique($page.url);
+  // Titre sans Markdown résiduel du modèle (« ** ») : le message de partage
+  // est du texte brut.
+  $: titrePartage = sansMarkdown(post.title);
+  $: messagePartage = encodeURIComponent(`${titrePartage}\n\n${$tr("blog.shareMessage")}\n${urlActuelle}`);
   $: urlWhatsApp = `https://api.whatsapp.com/send?text=${messagePartage}`;
-  $: urlTwitter = `https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(urlActuelle)}`;
+  $: urlTwitter = `https://twitter.com/intent/tweet?text=${encodeURIComponent(titrePartage)}&url=${encodeURIComponent(urlActuelle)}`;
   $: urlLinkedIn = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlActuelle)}`;
-  $: urlChatAvecQuestion = `/chat?q=${encodeURIComponent(post.suggestedChatQuestion)}`;
+  // Sans question suggérée, le bouton mène au chat vide : « /chat?q= » y
+  // posait une question vide.
+  $: urlChatAvecQuestion = post.suggestedChatQuestion
+    ? `/chat?q=${encodeURIComponent(post.suggestedChatQuestion)}`
+    : "/chat";
 
   /**
    * Titre en serif (Literata, Q5) seulement pour un article écrit ou relu par
@@ -100,41 +83,19 @@
   $: classesDuTitre = post.reluPar
     ? "font-titre font-semibold"
     : "font-bold tracking-tight";
-
-  /**
-   * Ce qu'une carte de citation affiche : son intitulé (sans cote), et ses
-   * repères, « Article 299 · Code pénal (loi n° 2016/007) ». La cote interne
-   * (« PRC-4722 »), que le générateur met dans `reference` et dans l'intitulé
-   * par défaut (« Article 35.1 - PRC-4722 »), n'apparaît nulle part (P2).
-   * Sans intitulé, la citation se nomme par son article.
-   */
-  function vueDeCitation(citation: BlogCitation, t: (cle: string) => string) {
-    const numero = articleDeCitation(citation);
-    const article = numero ? `${t("blog.article")} ${numero}` : t("blog.legalExcerpt");
-    const titre = titreDeCitation(citation) || article;
-    // Espace insécable avant le point, comme les repères des listes (P11) :
-    // à la coupure, le point finit la ligne au lieu d'ouvrir la suivante.
-    const reperes = [titre === article ? "" : article, referenceAffichable(citation) ?? ""]
-      .filter(Boolean)
-      .join("\u00a0· ");
-    return { titre, reperes, adresse: adresseDeCitation(citation) };
-  }
-
-  /**
-   * Le lien d'une carte de citation (Q3 A, comme les cartes de /blog et la
-   * liste des domaines de l'accueil) : posé sur l'intitulé, étendu à la carte
-   * par son `::after`, contour de focus autour de la carte. Il remplace le
-   * pied « Consulter le texte complet de la loi → », répété sur chaque carte,
-   * et vise l'ARTICLE cité (`?article=N`, P2), non le début du texte.
-   */
-  const LIEN_ETENDU =
-    "after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-zinc-950 dark:focus-visible:after:outline-white";
 </script>
 
+<!-- Description par le helper du site (`descriptionDepuis`, 155 caractères au
+     plus, Markdown retiré) : pour un article de l'API, c'était tout le résumé
+     (507 caractères mesurés). `article` et non `website` : c'est un document,
+     comme une fiche de loi. Le titre ne porte plus « Décryptage juridique » :
+     le titre d'un article du modèle va jusqu'à 100 caractères, et le suffixe
+     poussait « JuriX » hors de l'onglet et du résultat de recherche. -->
 <MetaSeo
-  titre={`${post.title} — ${$tr("blog.metaSuffix")}`}
-  description={post.excerpt}
+  titre={sansMarkdown(post.title)}
+  description={descriptionDepuis(post.excerpt)}
   canonique={urlCanonique($page.url)}
+  type="article"
 />
 
 <SiteHeader />
@@ -214,13 +175,13 @@
              restait qu'un pixel entre le jambage du « g » et les accents de
              la ligne suivante. -->
         <h1 class="text-3xl/tight sm:text-4xl/tight text-balance {classesDuTitre} text-zinc-950 dark:text-white">
-          {insecables(post.title)}
+          {texteAffiche(post.title)}
         </h1>
 
         <!-- Chapô, seulement s'il dit autre chose que l'article (`chapo`). -->
         {#if chapo}
           <p class="max-w-[34em] text-lg sm:text-xl text-zinc-600 dark:text-zinc-400 leading-relaxed font-normal">
-            {insecables(chapo)}
+            {texteAffiche(chapo)}
           </p>
         {/if}
 
@@ -296,160 +257,11 @@
         </div>
       </header>
 
-      <!-- BLOC 1 : L'Actualité en 2 minutes (Le contexte).
-           Surtitre du guide (§ 4.2, comme « Corpus juridique officiel » à
-           l'accueil), et non plus en gras noir : il annonçait le bloc plus
-           fort que son texte. Sur cet encart gris, zinc-600 et non zinc-500
-           (4,5:1 manqué de peu sur zinc-100, guide § 3).
-           En sombre, l'encart prend zinc-800 à 70 % : posé sur la page et non
-           dans une carte, le zinc-800/50 des blocs internes y rendrait
-           exactement le zinc-900 des cartes, et la hiérarchie s'aplatissait
-           comme avant. À 70 %, il répond au zinc-100/70 du thème clair.
-           Bordure fine sur les quatre côtés et rayon des cartes, comme
-           l'encart « Ce que cela change » plus bas (recette « bloc » du
-           guide, § 4.1) : la barre gauche pleine de 4 px, noire, aux angles
-           gauches carrés, n'existait nulle part ailleurs ; c'était l'ancienne
-           barre bleue recolorée.
-           Icône des titres alignée sur la PREMIÈRE ligne (`items-start`) :
-           centrée (`items-center`), elle tombait entre les deux lignes d'un
-           titre replié au téléphone.
-           Surtitre en Inter, dans sa casse (Q5 A : deux voix au plus) : en
-           capitales à chasse fixe espacées, le motif « à éviter », il
-           tenait sur deux lignes à 390 px. 14 px sur une ligne de 20 :
-           `mt-px` garde l'icône de 18 px au milieu de la première ligne. -->
-      <section class="bg-zinc-100/70 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700/60 rounded-2xl p-6 sm:p-8 space-y-3">
-        <div class="flex items-start gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-          <Icone nom="newspaper" class="mt-px text-lg" />
-          <span>{$tr("blog.contextTitle")}</span>
-        </div>
-        <p class="max-w-[34em] text-base sm:text-lg text-zinc-800 dark:text-zinc-200 leading-relaxed font-normal">
-          {insecables(post.context)}
-        </p>
-      </section>
-
-      <!-- BLOC 2 : Ce que dit la loi — L'Analyse du Bot -->
-      <section class="space-y-8">
-        <div class="space-y-3">
-          <!-- Même surtitre que le bloc 1, en Inter ; zinc-500 sur le fond
-               de page (4,6:1). -->
-          <div class="flex items-start gap-2 text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-            <Icone nom="gavel" class="mt-px text-lg" />
-            <span>{$tr("blog.lawTitle")}</span>
-          </div>
-          <!-- Titre de section du guide (§ 4.2) : gras, et non extra-gras. -->
-          <h2 class="text-2xl sm:text-3xl font-bold text-zinc-950 dark:text-white tracking-tight">
-            {$tr("blog.explanationTitle")}
-          </h2>
-          <p class="max-w-[34em] text-base sm:text-lg text-zinc-600 dark:text-zinc-300 leading-relaxed font-normal">
-            {insecables(post.botAnalysis.summary)}
-          </p>
-        </div>
-
-        <!-- Points clés à retenir. Les trois titres de ce bloc (règles, textes
-             de loi, ce que cela change) portent une icône de 20 px (text-xl) :
-             elles faisaient 18, 24 et 24 px pour des titres de 18 à 20 px.
-             La puce « • » est dans la boîte de ligne du texte, sans marge :
-             le `mt-0.5` la descendait de 2 px sous le milieu de la hauteur
-             d'x (mesuré en Inter, à 14 et 16 px).
-             Icônes des titres sur la première ligne (`items-start`, voir le
-             bloc 1) : 20 px, descendues de 2 px sur une ligne de 24 (16 px)
-             et de 4 sur une ligne de 28 (18 et 20 px), elles restent au
-             milieu de la première ligne quand le titre se replie. -->
-        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 space-y-4 shadow-sm dark:shadow-none">
-          <h3 class="text-base sm:text-lg font-bold text-zinc-950 dark:text-white flex items-start gap-2">
-            <Icone nom="check" class="mt-0.5 sm:mt-1 text-xl text-zinc-950 dark:text-zinc-100" />
-            <span>{$tr("blog.keyPoints")}</span>
-          </h3>
-          <ul class="max-w-[34em] space-y-3">
-            {#each post.botAnalysis.keyPoints as point, i (i)}
-              <li class="flex items-start gap-3 text-zinc-700 dark:text-zinc-300 text-sm sm:text-base leading-relaxed">
-                <span class="text-zinc-950 dark:text-zinc-100 font-bold" aria-hidden="true">•</span>
-                <span>{insecables(point)}</span>
-              </li>
-            {/each}
-          </ul>
-        </div>
-
-        <!-- Textes et articles de lois cités -->
-        {#if post.botAnalysis.citations.length > 0}
-          <div class="space-y-4">
-            <h3 class="text-lg sm:text-xl font-bold text-zinc-950 dark:text-white flex items-start gap-2">
-              <Icone nom="file-text" class="mt-1 text-xl text-zinc-950 dark:text-zinc-100" />
-              <span>{$tr("blog.citationsTitle")}</span>
-            </h3>
-
-            <!-- Une liste de cartes (Q3 A) : l'intitulé de chaque citation est
-                 son lien, étendu à la carte (`LIEN_ETENDU`) ; une flèche
-                 décorative dit l'action. Repères en Inter, sans la cote
-                 interne (`vueDeCitation`, P2). L'extrait vérifié mot pour mot
-                 dans la base (articles de la rédaction) est dans la police du
-                 texte officiel (Q5) ; celui qu'écrit le modèle reste en Inter.
-                 Sans texte sûr (`adresse` nulle), la carte n'est pas un lien. -->
-            <ul class="grid grid-cols-1 gap-4">
-              {#each post.botAnalysis.citations as citation, i (i)}
-                {@const vue = vueDeCitation(citation, $tr)}
-                <li
-                  class="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 sm:p-6 space-y-2 shadow-sm dark:shadow-none {vue.adresse
-                    ? 'transition-colors hover:border-zinc-950 dark:hover:border-zinc-400'
-                    : ''}"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <h4 class="coupe-mots font-bold text-zinc-950 dark:text-white text-base">
-                      {#if vue.adresse}
-                        <a href={vue.adresse} aria-describedby={vue.reperes ? `citation-${i}-reperes` : undefined} class={LIEN_ETENDU}
-                          >{insecables(vue.titre)}</a
-                        >
-                      {:else}
-                        {insecables(vue.titre)}
-                      {/if}
-                    </h4>
-                    {#if vue.adresse}
-                      <Icone
-                        nom="arrow-right"
-                        class="mt-0.5 shrink-0 text-lg text-zinc-500 dark:text-zinc-400 transition-colors group-hover:text-zinc-950 dark:group-hover:text-white"
-                      />
-                    {/if}
-                  </div>
-
-                  <!-- `coupe-mots` : un nom de texte sans espace où passer à
-                       la ligne sur un écran étroit. -->
-                  {#if vue.reperes}
-                    <p id="citation-{i}-reperes" class="coupe-mots text-xs text-zinc-500 dark:text-zinc-400">
-                      {vue.reperes}
-                    </p>
-                  {/if}
-
-                  <!-- Mesure de lecture de l'article (34em) : sur toute la
-                       largeur de la carte, la citation comptait 115 à 130
-                       caractères par ligne, la plus longue mesure de la page. -->
-                  {#if citation.excerpt}
-                    <blockquote
-                      class="max-w-[34em] pt-1 text-sm text-zinc-600 dark:text-zinc-400 pl-4 border-l-2 border-zinc-300 dark:border-zinc-700 leading-relaxed font-normal {citation.verifie
-                        ? 'font-texte'
-                        : 'italic'}"
-                    >
-                      {insecables(`« ${citation.excerpt} »`)}
-                    </blockquote>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-
-        <!-- Ce que cela change pour vous. Encart teinté : en sombre, zinc-800
-             à 70 % et la bordure des blocs internes (guide § 4.1), pour qu'il
-             se distingue des cartes zinc-900 qui l'entourent (voir le bloc 1). -->
-        <div class="bg-zinc-100/70 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700/60 rounded-2xl p-6 sm:p-8 space-y-2">
-          <h3 class="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-100 flex items-start gap-2">
-            <Icone nom="sparkles" class="mt-0.5 sm:mt-1 text-xl text-zinc-950 dark:text-zinc-100" />
-            <span>{$tr("blog.impactTitle")}</span>
-          </h3>
-          <p class="max-w-[34em] text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed font-normal">
-            {insecables(post.botAnalysis.citizenImpact)}
-          </p>
-        </div>
-      </section>
+      <!-- Blocs 1 et 2 : le contexte, l'analyse (résumé, points clés,
+           textes cités) et ce que cela change. Un seul rendu, partagé avec
+           l'aperçu de l'administration (CorpsDeLArticle) : ce que relit
+           l'administrateur est ce que lit le public. -->
+      <CorpsDeLArticle {post} />
 
       <!-- BLOC 3 : Action Virale & Assistant IA. Bandeau toujours sombre : ses
            boutons ont les couleurs du mode sombre dans les deux thèmes, et un

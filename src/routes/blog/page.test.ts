@@ -1,6 +1,7 @@
 import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BLOG_POSTS, type BlogPost } from '$lib/data/blog';
+import { BLOG_POSTS, articleDepuisLApi, avecLesArticlesDeLaRedaction, type BlogPost } from '$lib/data/blog';
+import { ARTICLE_ANCIEN, ECRIT_PAR_LE_MODELE } from '$lib/data/blog-anciens-de-test';
 import Page from './+page.svelte';
 
 /**
@@ -95,5 +96,56 @@ describe('/blog', () => {
       expect(carte.children).toHaveLength(3);
       expect(carte.children[0].classList.contains('self-start')).toBe(true);
     }
+  });
+});
+
+describe('/blog : revue du 29/10', () => {
+  it('une adresse à caractères spéciaux est encodée ; le Markdown du modèle ne s’affiche pas', () => {
+    const special: BlogPost = {
+      ...BLOG_POSTS[0],
+      slug: 'Coupure d’eau : bailleur/locataire ? #droits',
+      title: '**Coupure** d’eau',
+      excerpt: 'Le *bailleur* ne peut pas (PRC-4722).',
+      genereParIA: true,
+    };
+    const { container } = render(Page, { props: { data: { posts: [special, ...BLOG_POSTS] } } });
+    const lien = container.querySelector<HTMLAnchorElement>('section[aria-label="Article à la une"] h2 a')!;
+    expect(lien.getAttribute('href')).toBe(`/blog/${encodeURIComponent(special.slug)}`);
+    expect(lien.textContent).toBe('Coupure d’eau');
+    expect(container.textContent).not.toContain('*');
+    expect(container.textContent).not.toMatch(/PRC-\d/);
+  });
+});
+
+describe('/blog : article publié avant le contrat (revue croisée du 29/10)', () => {
+  // La ligne 1 de jurix_dev, du 26/10 : plus récente que les articles de la
+  // rédaction, elle prenait la carte « À la une ». Depuis le 30/10, le
+  // chargement de la liste ne la donne plus à la page (chargement.test.ts :
+  // seuls les articles publiables sont listés) ; ces tests gardent la défense
+  // de la page elle-même, si une telle donnée l'atteignait.
+  const ancien = articleDepuisLApi(ARTICLE_ANCIEN)!;
+
+  it('il n’est pas à la une ; il reste listé, étiqueté « Citations non vérifiées »', () => {
+    const posts = avecLesArticlesDeLaRedaction([ancien]);
+    expect(posts[0].slug).toBe(ancien.slug);
+    const { container } = render(Page, { props: { data: { posts } } });
+
+    const une = container.querySelector('section[aria-label="Article à la une"]')!;
+    expect(une.querySelector('h2 a')?.getAttribute('href')).toBe(`/blog/${BLOG_POSTS[0].slug}`);
+    expect(une.querySelector('[data-testid="blog-carte-non-verifiee"]')).toBeNull();
+
+    const carte = container.querySelector(`a[href="/blog/${ancien.slug}"]`)!.closest('li')!;
+    expect(carte.querySelector('[data-testid="blog-carte-non-verifiee"]')).toHaveTextContent('Citations non vérifiées');
+    // Les articles de la rédaction n'ont pas l'étiquette.
+    expect(container.querySelectorAll('[data-testid="blog-carte-non-verifiee"]')).toHaveLength(1);
+    // Ses citations écrites par le modèle ne sont ni affichées ni dans les données.
+    for (const ecrit of ECRIT_PAR_LE_MODELE) expect(container.textContent, ecrit).not.toContain(ecrit);
+  });
+
+  it('seul dans sa rubrique, il est à la une, avec son étiquette', () => {
+    const { container } = render(Page, { props: { data: { posts: [ancien] } } });
+    const une = container.querySelector('section[aria-label="Article à la une"]')!;
+    expect(une.querySelector('h2 a')?.getAttribute('href')).toBe(`/blog/${ancien.slug}`);
+    expect(une.querySelector('[data-testid="blog-carte-non-verifiee"]')).toHaveTextContent('Citations non vérifiées');
   });
 });
