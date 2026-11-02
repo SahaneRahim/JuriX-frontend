@@ -129,7 +129,7 @@
    * (`hoverOnlyWhenSupported`, tailwind.config.js).
    */
   const LIGNE =
-    "group relative flex min-h-16 items-center gap-4 bg-white px-4 py-2.5 transition-colors hover:bg-zinc-50 active:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800/60 dark:active:bg-zinc-800 sm:min-h-[72px] sm:py-3.5 court:min-h-16 court:py-2.5";
+    "group relative flex min-h-16 items-center gap-4 bg-white px-4 py-2.5 transition-all duration-200 hover:bg-zinc-50 active:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800/60 dark:active:bg-zinc-800 sm:min-h-[72px] sm:py-3.5 court:min-h-16 court:py-2.5 motion-safe:active:scale-[0.995]";
 
   /**
    * Le lien d'une ligne : posé sur le NOM seul (h3 > a), son `::after` couvre
@@ -149,11 +149,12 @@
     "after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:-outline-offset-4 focus-visible:after:outline-zinc-950 dark:focus-visible:after:outline-white";
 
   /** Icône du domaine : 20 px, sans tuile, en gris secondaire (Q2 A). */
-  const ICONE = "text-xl shrink-0 text-zinc-500 dark:text-zinc-400";
+  const ICONE =
+    "text-xl shrink-0 text-zinc-500 dark:text-zinc-400 transition-all duration-200 motion-safe:group-hover:scale-110 motion-safe:group-hover:text-zinc-950 dark:motion-safe:group-hover:text-white";
 
   /** Chevron décoratif : le lien est déjà nommé, il ne dit rien de plus. */
   const CHEVRON =
-    "text-base shrink-0 text-zinc-400 transition-colors group-hover:text-zinc-950 dark:text-zinc-500 dark:group-hover:text-white";
+    "text-base shrink-0 text-zinc-400 transition-all duration-200 group-hover:text-zinc-950 dark:text-zinc-500 dark:group-hover:text-white motion-safe:group-hover:translate-x-1";
 </script>
 
 <MetaSeo
@@ -190,10 +191,10 @@
          zinc-950 et bordure zinc-500 : en zinc-900 bordé de zinc-800, la barre
          se perdait dans la page. -->
     <div
-      class="relative bg-white dark:bg-zinc-950 rounded-2xl shadow-xl shadow-zinc-200/60 dark:shadow-none flex items-center gap-2 p-2 sm:p-2.5 border border-zinc-200 dark:border-zinc-500 focus-within:border-zinc-950 dark:focus-within:border-zinc-200 focus-within:ring-1 focus-within:ring-zinc-950 dark:focus-within:ring-zinc-200 transition-all duration-200"
+      class="group/search relative bg-white dark:bg-zinc-950 rounded-2xl shadow-xl shadow-zinc-200/60 dark:shadow-none flex items-center gap-2 p-2 sm:p-2.5 border border-zinc-200 dark:border-zinc-500 focus-within:border-zinc-950 dark:focus-within:border-zinc-200 focus-within:ring-2 focus-within:ring-zinc-950/10 dark:focus-within:ring-white/10 focus-within:shadow-[0_12px_32px_rgba(0,0,0,0.08)] dark:focus-within:shadow-[0_12px_32px_rgba(255,255,255,0.04)] transition-all duration-300"
     >
-      <div class="shrink-0 pl-3 sm:pl-4 text-zinc-400 dark:text-zinc-500">
-        <Icone nom="search" class="text-xl sm:text-2xl" />
+      <div class="shrink-0 pl-3 sm:pl-4 text-zinc-400 dark:text-zinc-500 transition-colors duration-200 group-focus-within/search:text-zinc-950 dark:group-focus-within/search:text-zinc-100">
+        <Icone nom="search" class="text-xl sm:text-2xl transition-transform duration-200 group-focus-within/search:scale-105" />
       </div>
 
       <!--
@@ -231,10 +232,11 @@
       <button
         type="submit"
         aria-label={$tr("search.button")}
-        class="shrink-0 inline-flex min-h-11 min-w-11 items-center justify-center bg-zinc-950 hover:bg-black dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm transition-all shadow-sm dark:shadow-none motion-safe:active:scale-95"
+        class="group/btn shrink-0 inline-flex min-h-11 min-w-11 items-center justify-center gap-2 bg-zinc-950 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-zinc-950/20 dark:hover:shadow-white/20 motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-95"
       >
-        <Icone nom="arrow-right" class="text-2xl sm:hidden" />
+        <Icone nom="arrow-right" class="text-2xl sm:hidden transition-transform duration-200 group-hover/btn:translate-x-0.5" />
         <span class="hidden sm:inline">{$tr("search.button")}</span>
+        <Icone nom="arrow-right" class="hidden sm:inline-block text-base transition-transform duration-200 group-hover/btn:translate-x-1" />
       </button>
     </div>
   </form>

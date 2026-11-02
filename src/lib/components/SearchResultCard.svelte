@@ -46,7 +46,7 @@
      la liste), survol en zinc-50. `relative` : le lien du titre s'étend à
      toute la ligne par son ::after (Q3 A, comme les cartes de l'accueil). -->
 <li
-  class="relative bg-white px-4 py-4 transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/40 sm:px-5"
+  class="group/item relative bg-white px-4 py-4 transition-all duration-200 hover:bg-zinc-50/80 hover:shadow-sm dark:bg-zinc-900 dark:hover:bg-zinc-800/40 sm:px-5"
 >
   <!-- Repères en 13 puis 14 px, zinc-600 (7,7:1 sur blanc ; zinc-400 en
        sombre, 6,9:1 sur zinc-900). -->
@@ -62,7 +62,7 @@
   <h2 class="mt-1 coupe-mots text-base font-semibold leading-snug text-zinc-950 dark:text-white sm:text-lg">
     <a
       href="/laws/{resultat.id}"
-      class="-my-3 block py-3 after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-zinc-950 dark:focus-visible:after:ring-white"
+      class="-my-3 block py-3 after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-zinc-950 dark:focus-visible:after:ring-white transition-colors duration-150"
       >{#if reference}<span class="sr-only">{reference}, </span>{/if}{intitule}</a
     >
   </h2>
@@ -105,7 +105,7 @@
       {#each resultat.articles as numero (numero)}
         <a
           href={adresseDeLArticle(resultat.id, numero)}
-          class="relative z-10 inline-flex min-h-9 items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 text-xs font-medium text-zinc-700 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:border-zinc-950 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white dark:hover:text-white"
+          class="relative z-10 inline-flex min-h-9 items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 text-xs font-medium text-zinc-700 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:border-zinc-950 hover:text-zinc-950 hover:shadow-xs motion-safe:hover:scale-105 motion-safe:active:scale-95 transition-all duration-150 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white dark:hover:text-white"
         >
           <Icone nom="section" class="text-sm" />
           {remplir($tr("search.articleChip"), { n: numero })}

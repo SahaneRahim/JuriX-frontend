@@ -344,11 +344,11 @@
       on:click={ouvrirLaPalette}
       on:keydown={retenirEspace}
       on:keyup={ouvrirAuRelachement}
-      class="inline-flex h-9 min-w-9 shrink-0 items-center justify-center gap-2 rounded-xl px-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
+      class="group inline-flex h-9 min-w-9 shrink-0 items-center justify-center gap-2 rounded-xl px-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-all duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-95"
     >
-      <Icone nom="search" class="text-lg" />
+      <Icone nom="search" class="text-lg transition-transform duration-150 motion-safe:group-hover:scale-110" />
       <span class="hidden 2xl:inline">{$tr("nav.search")}</span>
-      <kbd class="hidden 2xl:inline whitespace-nowrap px-1.5 py-0.5 font-mono text-[10px] font-semibold bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-zinc-600 dark:text-zinc-400">Ctrl K</kbd>
+      <kbd class="hidden 2xl:inline whitespace-nowrap px-1.5 py-0.5 font-mono text-[10px] font-semibold bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-zinc-600 dark:text-zinc-400 transition-colors group-hover:border-zinc-300 dark:group-hover:border-zinc-600">Ctrl K</kbd>
     </a>
 
     <!-- Langue : la langue active en noir et en demi-gras, l'autre en
@@ -360,7 +360,7 @@
         on:click={() => switchLanguage("fr")}
         data-testid="lang-fr"
         aria-label="{$tr('a11y.switchTo')} français"
-        class="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm transition-colors {$language.current ===
+        class="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm transition-all duration-150 motion-safe:active:scale-95 {$language.current ===
         'fr'
           ? 'font-semibold text-zinc-950 dark:text-white'
           : 'font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}"
@@ -371,7 +371,7 @@
         on:click={() => switchLanguage("en")}
         data-testid="lang-en"
         aria-label="{$tr('a11y.switchTo')} English"
-        class="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm transition-colors {$language.current ===
+        class="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm transition-all duration-150 motion-safe:active:scale-95 {$language.current ===
         'en'
           ? 'font-semibold text-zinc-950 dark:text-white'
           : 'font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}"
@@ -382,15 +382,15 @@
     <button
       on:click={themeStore.toggle}
       data-testid="theme-toggle"
-      class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
+      class="group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-all duration-150 motion-safe:hover:scale-105 motion-safe:active:scale-90"
       aria-label={$tr("a11y.toggleTheme")}
     >
       <!-- Les deux icônes, alternées en CSS par la classe `dark` que pose
            app.html avant le premier affichage. Le serveur ne connaît pas le
            thème choisi (localStorage) : un {#if} sur le store dessinait la lune,
            puis la remplaçait par le soleil à l'hydratation. -->
-      <Icone nom="moon" class="text-lg dark:hidden" />
-      <Icone nom="sun" class="text-lg hidden dark:inline-block" />
+      <Icone nom="moon" class="text-lg dark:hidden transition-transform duration-300 motion-safe:group-hover:rotate-12 motion-safe:group-hover:scale-110" />
+      <Icone nom="sun" class="text-lg hidden dark:inline-block transition-transform duration-300 motion-safe:group-hover:rotate-45 motion-safe:group-hover:scale-110" />
     </button>
 
     <!-- Le profil, avec un libellé visible : son icône seule (une personne
@@ -403,9 +403,9 @@
       aria-haspopup="dialog"
       aria-label={libelleDuProfil}
       title={libelleDuProfil}
-      class="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
+      class="group inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-all duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-95"
     >
-      <Icone nom={PERSONA_ICONE[$personaStore.persona ?? "general"]} class="text-lg" />
+      <Icone nom={PERSONA_ICONE[$personaStore.persona ?? "general"]} class="text-lg transition-transform duration-200 motion-safe:group-hover:scale-110" />
       <span class="2xl:hidden">{$tr("persona.chatLabel")}</span>
       <span class="hidden 2xl:inline">{nomDuProfil}</span>
     </button>
@@ -433,7 +433,7 @@
                secondaire (bordé), comme dans le panneau mobile : à côté de
                « Se déconnecter », deux boutons pleins se disputaient l'œil. -->
           <a
-            class="inline-flex shrink-0 items-center px-2 min-[1800px]:px-5 py-2 rounded-xl font-semibold text-sm transition-colors whitespace-nowrap border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white"
+            class="inline-flex shrink-0 items-center px-2 min-[1800px]:px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 whitespace-nowrap border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-95"
             href="/admin"
             aria-label={$tr("nav.admin")}
             title={$tr("nav.admin")}
@@ -460,7 +460,7 @@
         <button
           on:click={logout}
           data-testid="logout"
-          class="shrink-0 px-3 xl:px-4 2xl:px-5 py-2 rounded-xl font-semibold text-sm transition-colors shadow-sm dark:shadow-none whitespace-nowrap bg-zinc-950 text-white hover:bg-black dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+          class="shrink-0 px-3 xl:px-4 2xl:px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 shadow-sm hover:shadow-md hover:shadow-zinc-950/20 dark:shadow-none whitespace-nowrap bg-zinc-950 text-white hover:bg-black dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-95"
           >{$tr("nav.logout")}</button
         >
       {:else}
@@ -471,7 +471,7 @@
              36 px de haut, bordure comprise, comme les boutons voisins. -->
         <a
           aria-current={surLaConnexion ? "page" : undefined}
-          class="shrink-0 px-3 xl:px-4 2xl:px-5 py-2 rounded-xl font-semibold text-sm transition-colors whitespace-nowrap {surLaConnexion
+          class="shrink-0 px-3 xl:px-4 2xl:px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 whitespace-nowrap motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-95 {surLaConnexion
             ? 'text-zinc-950 dark:text-white'
             : 'text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}"
           href="/login">{$tr("nav.login")}</a
@@ -479,7 +479,7 @@
         <a
           data-testid="nav-signup"
           aria-current={surLInscription ? "page" : undefined}
-          class="inline-flex h-9 shrink-0 items-center rounded-xl border px-3 xl:px-4 2xl:px-5 text-sm font-semibold transition-colors whitespace-nowrap {couleursInscription}"
+          class="inline-flex h-9 shrink-0 items-center rounded-xl border px-3 xl:px-4 2xl:px-5 text-sm font-semibold transition-all duration-150 whitespace-nowrap motion-safe:hover:-translate-y-0.5 hover:shadow-sm motion-safe:active:scale-95 {couleursInscription}"
           href="/signup">{$tr("nav.signup")}</a
         >
       {/if}
