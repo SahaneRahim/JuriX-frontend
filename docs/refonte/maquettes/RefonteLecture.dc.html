@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Refonte · Lecture d’un texte</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500;600&family=Inter:wght@400;500;600;700;800&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.jx{--bg:#FAFAFA;--hd:#FFFFFF;--card:#FFFFFF;--tx:#09090B;--tx1:#3F3F46;--tx2:#52525B;--tx3:#71717A;--bd:#E4E4E7;--bd2:#D4D4D8;--fill:#F4F4F5;--fill2:#FAFAFA;--hl:#D4D4D8;--ink:#09090B;--inkt:#FFFFFF;--ph:#A1A1AA;--sheet:0 1px 2px rgba(9,9,11,.05),0 18px 40px -22px rgba(9,9,11,.22);--ease:cubic-bezier(.22,1,.36,1);position:relative;min-height:1040px;background:var(--bg);color:var(--tx);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:clip;transition:background-color .3s,color .3s}
+.jx[data-theme=dark]{--bg:#09090B;--hd:#09090B;--card:#18181B;--tx:#F4F4F5;--tx1:#D4D4D8;--tx2:#A1A1AA;--tx3:#A1A1AA;--bd:#27272A;--bd2:#3F3F46;--fill:#27272A;--fill2:rgba(39,39,42,.5);--hl:#52525B;--ink:#FFFFFF;--inkt:#09090B;--ph:#71717A;--sheet:0 1px 2px rgba(0,0,0,.4),0 18px 40px -22px rgba(0,0,0,.8)}
+.jx *,.jx *::before,.jx *::after{box-sizing:border-box}
+:where(.jx a){color:inherit;text-decoration:none}
+:where(.jx button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:where(.jx h1,.jx h2,.jx h3,.jx p,.jx ul,.jx ol,.jx i,.jx b){margin:0;padding:0}
+:where(.jx ul,.jx ol){list-style:none}
+:where(.jx i){font-style:normal}
+.jx :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.i{width:1em;height:1em;flex-shrink:0;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mono{font-family:'Geist Mono',ui-monospace,monospace;font-weight:500}
+
+/* ——— en-tête ——— */
+.hd{position:relative;z-index:5;display:flex;align-items:center;gap:32px;height:64px;padding:0 48px;background:var(--hd);border-bottom:1px solid var(--bd);transition:background-color .3s,border-color .3s}
+.logo{display:flex;align-items:center;gap:10px;border-radius:12px}
+.tile{width:36px;height:36px;border-radius:12px;background:var(--ink);color:var(--inkt);display:flex;align-items:center;justify-content:center;font-size:18px;transition:transform .25s var(--ease),background-color .3s}
+.logo:hover .tile{transform:scale(1.06)}
+.wm{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em}
+.nav{display:flex;align-items:center;gap:28px;font-size:14px;line-height:20px;font-weight:500;color:var(--tx3)}
+.nav a{position:relative;padding:6px 0;transition:color .2s}
+.nav a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+.nav a:hover{color:var(--ink)}
+.nav a:hover::after{transform:scaleX(1)}
+.act{margin-left:auto;display:flex;align-items:center;gap:4px}
+.bi{height:36px;min-width:36px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border-radius:12px;font-size:14px;font-weight:500;color:var(--tx3);white-space:nowrap;transition:background-color .2s,color .2s}
+.bi:hover{background:var(--fill);color:var(--ink)}
+.bi .i{font-size:18px;transition:transform .35s var(--ease)}
+.bi:hover .tg{transform:rotate(22deg)}
+.lang{display:flex;align-items:center}
+.lb.on{font-weight:600;color:var(--ink)}
+.sep{width:1px;height:14px;background:var(--bd2)}
+.vr{width:1px;height:20px;background:var(--bd);margin:0 6px}
+.lnk{padding:8px 16px;font-size:14px;font-weight:600;color:var(--tx3);transition:color .2s}
+.lnk:hover{color:var(--ink)}
+.cta{height:36px;display:inline-flex;align-items:center;padding:0 18px;border-radius:12px;font-size:14px;font-weight:600;background:var(--ink);color:var(--inkt);transition:opacity .2s,transform .2s var(--ease)}
+.cta:hover{opacity:.88}
+.cta:active{transform:scale(.96)}
+.moon{display:inline-block}.sun{display:none}
+.jx[data-theme=dark] .moon{display:none}
+.jx[data-theme=dark] .sun{display:inline-block}
+.menu{display:none}
+.mnu{display:none}
+
+/* balance : le fléau pivote, les plateaux restent à l'horizontale */
+.bal .bm{transform-box:view-box;transform-origin:12px 5px;animation:bm 1.9s var(--ease) .35s both}
+.bal .pl{transform-box:view-box;transform-origin:5px 7px;animation:pn 1.9s var(--ease) .35s both}
+.bal .pr{transform-box:view-box;transform-origin:19px 7px;animation:pn 1.9s var(--ease) .35s both}
+.bal.wt .bm{animation:bm 1.5s ease-in-out infinite}
+.bal.wt .pl,.bal.wt .pr{animation:pn 1.5s ease-in-out infinite}
+@keyframes bm{0%{transform:rotate(0)}18%{transform:rotate(-11deg)}42%{transform:rotate(7deg)}66%{transform:rotate(-3.5deg)}84%{transform:rotate(1.4deg)}100%{transform:rotate(0)}}
+@keyframes pn{0%{transform:rotate(0)}18%{transform:rotate(11deg)}42%{transform:rotate(-7deg)}66%{transform:rotate(3.5deg)}84%{transform:rotate(-1.4deg)}100%{transform:rotate(0)}}
+
+/* ——— en-tête du texte ——— */
+.main{position:relative;width:100%;max-width:1320px;margin:0 auto;padding:28px 48px 80px}
+.bc{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--tx3);animation:fade .5s ease both}
+.bc a{transition:color .2s}
+.bc a:hover{color:var(--ink)}
+.bc .i{font-size:12px}
+.bc [aria-current]{color:var(--tx)}
+.th{margin-top:24px}
+.h1{max-width:900px;margin-top:0;font-family:'Literata','Noto Serif',Georgia,serif;font-optical-sizing:auto;font-variation-settings:"opsz" 72;font-weight:600;font-size:clamp(1.75rem,3vw + .5rem,2.5rem);line-height:1.18;text-wrap:balance;animation:rise .8s var(--ease) .1s both}
+.st0{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:20px;font-size:14px;line-height:20px;color:var(--tx1);animation:rise .6s var(--ease) .35s both}
+.stp{position:relative;display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 10px;border:1px dashed var(--bd2);border-radius:999px;font-size:13px;font-weight:600;color:var(--tx);animation:stampb .7s cubic-bezier(.3,1.5,.5,1) .8s both}
+.stp .i{font-size:15px}
+.stp::after{content:"";position:absolute;inset:-6px;border-radius:999px;border:2px solid var(--tx3);opacity:0;animation:ring .9s ease-out 1.1s forwards}
+@keyframes stampb{0%{opacity:0;transform:translateY(-16px) scale(1.5) rotate(-6deg)}60%{opacity:1;transform:translateY(0) scale(.94) rotate(1deg)}80%{transform:scale(1.04)}100%{transform:none}}
+@keyframes ring{0%{opacity:.7;transform:scale(.6)}100%{opacity:0;transform:scale(1.5)}}
+.st0 a{text-decoration:underline;text-underline-offset:3px;transition:color .2s}
+.st0 a:hover{color:var(--ink)}
+@keyframes sweep{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* ——— lecture ——— */
+.grid{display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px;align-items:start;margin-top:48px;padding-top:36px;border-top:1px solid var(--bd);transition:border-color .3s}
+.toc{position:sticky;top:24px;animation:fade .6s ease .4s both}
+.toch{margin-bottom:8px;font-size:13px;line-height:18px;font-weight:700}
+.tocs{display:flex;align-items:center;height:36px;font-size:14px;color:var(--tx2);transition:color .2s}
+.tocs:hover{color:var(--ink)}
+.sec{margin:10px 0 8px;font-size:13px;line-height:18px;font-weight:600;color:var(--tx)}
+.sec span{display:block;margin-top:2px;font-weight:400;color:var(--tx3)}
+.tocl{position:relative;margin-left:4px;border-left:1px solid var(--bd)}
+.tind{position:absolute;left:-1px;top:0;width:2px;height:40px;background:var(--ink);transition:transform .5s cubic-bezier(.34,1.3,.5,1)}
+.ti{position:relative;display:flex;align-items:center;width:100%;height:40px;padding:0 16px;font-size:14px;color:var(--tx2);text-align:left;border-radius:0 8px 8px 0;transition:color .2s,background-color .25s}
+.ti:hover{color:var(--ink);background:var(--fill2)}
+.ti.sel{color:var(--ink);font-weight:600;background:var(--fill)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 280px;column-gap:56px;align-items:start}
+.read{min-width:0}
+.eb{margin-bottom:8px;font-size:13px;line-height:18px;color:var(--tx3)}
+.arth{margin-bottom:20px;font-family:'Literata','Noto Serif',Georgia,serif;font-optical-sizing:auto;font-variation-settings:"opsz" 72;font-weight:600;font-size:32px;line-height:1.2}
+.body{font-family:'Literata','Noto Serif',Georgia,serif;font-variation-settings:"opsz" 16;font-weight:400;font-size:19px;line-height:1.8;color:var(--tx);max-width:34em}
+.ph0{margin-top:12px;font-family:'Literata','Noto Serif',Georgia,serif;font-size:17px;line-height:1.7;color:var(--tx2)}
+.art{animation:fade .5s ease both}
+.art.nA{animation:tnA .55s var(--ease) both}
+.art.nB{animation:tnB .55s var(--ease) both}
+.art.pA{animation:tpA .55s var(--ease) both}
+.art.pB{animation:tpB .55s var(--ease) both}
+@keyframes tnA{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
+@keyframes tnB{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
+@keyframes tpA{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
+@keyframes tpB{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
+.hl{color:inherit;background-color:transparent;background-image:linear-gradient(var(--hl),var(--hl)),linear-gradient(var(--ink),var(--ink));background-repeat:no-repeat;background-position:0 92%,0 100%;background-size:100% .42em,100% 2px;animation:hl .9s var(--ease) backwards;animation-delay:var(--d,1000ms)}
+@keyframes hl{from{background-size:0 .42em,0 2px}}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin:28px 0 12px}
+.ab{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid var(--bd2);border-radius:12px;background:var(--card);font-size:14px;font-weight:600;color:var(--tx1);transition:border-color .2s,color .2s,transform .15s var(--ease),background-color .3s}
+.ab:hover{border-color:var(--ink);color:var(--ink)}
+.ab:active{transform:scale(.97)}
+.ab .i{font-size:16px}
+.ab .ok{animation:pop .45s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes pop{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:none}}
+.foi{font-size:13px;line-height:18px;color:var(--tx3)}
+.pn{display:flex;justify-content:space-between;gap:12px;margin-top:36px;padding-top:20px;border-top:1px solid var(--bd)}
+.pnb{display:inline-flex;align-items:center;gap:12px;min-height:52px;padding:0 16px;border-radius:12px;font-size:14px;font-weight:600;color:var(--tx1);text-align:left;transition:background-color .2s,color .2s}
+.pnb:hover{background:var(--fill);color:var(--ink)}
+.pnb .i{font-size:18px;transition:transform .35s var(--ease)}
+.pnb.p:hover .i{transform:translateX(-4px)}
+.pnb.n:hover .i{transform:translateX(4px)}
+.pnb small{display:block;font-size:12px;line-height:16px;font-weight:400;color:var(--tx3)}
+.pnb.n{text-align:right}
+
+/* ——— la marge : l'explication de l'IA, reliée au passage ——— */
+.rail{position:relative;padding-top:var(--pt,64px);transition:padding-top .5s var(--ease)}
+.note{position:relative;padding:18px;border:1px solid var(--bd);border-radius:18px;background:var(--card);box-shadow:var(--sheet);animation:rise .7s var(--ease) .9s both;transition:background-color .3s,border-color .3s}
+.note::before{content:"";position:absolute;left:-44px;top:28px;width:44px;height:1px;background:var(--bd2);transform-origin:left;animation:sweep .7s var(--ease) 1.2s both;transition:background-color .3s}
+.note::after{content:"";position:absolute;left:-48px;top:24px;width:9px;height:9px;border-radius:50%;background:var(--ink);animation:pop .4s cubic-bezier(.3,1.6,.5,1) 1.8s both}
+.note.live::before{background:var(--ink)}
+.nh{display:flex;align-items:center;gap:8px;font-size:14px;line-height:20px;font-weight:700}
+.nh .i{font-size:16px}
+.nd{margin-top:8px;font-size:13px;line-height:20px;color:var(--tx2)}
+.nl{display:grid;gap:4px;margin:10px 0 14px;font-size:13px;line-height:19px;color:var(--tx2)}
+.nl b{font-weight:600;color:var(--tx)}
+.pbtn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:12px;background:var(--ink);color:var(--inkt);font-size:13px;font-weight:600;transition:opacity .2s,transform .15s var(--ease)}
+.pbtn:hover{opacity:.9}
+.pbtn:active{transform:scale(.96)}
+.pbtn .i{font-size:15px;transition:transform .4s var(--ease)}
+.pbtn:hover .i{transform:rotate(18deg) scale(1.15)}
+.wait{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;font-weight:500;color:var(--tx);animation:fade .3s ease both}
+.wait .bal{font-size:22px}
+.ln{height:10px;border-radius:5px;background:linear-gradient(90deg,var(--fill) 0%,var(--bd) 50%,var(--fill) 100%);background-size:200% 100%;animation:shim 1.3s linear infinite}
+.skl{display:grid;gap:8px;margin-top:12px}
+@keyframes shim{from{background-position:100% 0}to{background-position:-100% 0}}
+.out{display:grid;gap:12px;margin-top:12px}
+.out p{font-size:14px;line-height:1.6;color:var(--tx1)}
+.out strong{font-weight:600;color:var(--tx)}
+.out .s{animation:blurin .8s var(--ease) both}
+.out .s2{animation-delay:.5s}
+@keyframes blurin{from{opacity:0;filter:blur(6px);transform:translateY(6px)}to{opacity:1;filter:none;transform:none}}
+.aiw{margin-top:12px;font-size:12px;line-height:17px;color:var(--tx2)}
+.ask{display:flex;width:fit-content;align-items:center;gap:8px;min-height:44px;margin-top:6px;font-size:13px;font-weight:600;color:var(--tx1);transition:color .2s}
+.ask:hover{color:var(--ink)}
+.ask .i{font-size:16px;transition:transform .35s var(--ease)}
+.ask:hover .i{transform:translateY(-2px)}
+.regen{display:inline-flex;align-items:center;gap:8px;min-height:40px;margin-top:4px;font-size:13px;font-weight:600;color:var(--tx2);transition:color .2s}
+.regen:hover{color:var(--ink)}
+.regen .i{font-size:15px;transition:transform .6s var(--ease)}
+.regen:hover .i{transform:rotate(-360deg)}
+
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (max-width:1279px){
+.row{grid-template-columns:minmax(0,1fr)}
+.rail{padding-top:28px}
+.note{max-width:34em}
+.note::before,.note::after{display:none}
+}
+@media (max-width:1023px){
+.hd{padding:0 24px}
+.nav,.hide-md{display:none}
+.menu{display:inline-flex}
+.mnu{position:absolute;left:0;right:0;top:100%;z-index:6;display:grid;gap:2px;padding:8px 16px 16px;background:var(--hd);border-bottom:1px solid var(--bd);opacity:0;visibility:hidden;transform:translateY(-8px);transition:transform .35s var(--ease),opacity .25s,visibility 0s .35s}
+.mnu.on{opacity:1;visibility:visible;transform:none;transition:transform .35s var(--ease),opacity .25s}
+.mnu a{display:flex;align-items:center;min-height:48px;padding:0 10px;border-radius:12px;font-size:16px;font-weight:600;transition:background-color .2s}
+.mnu a:hover{background:var(--fill)}
+.mnu .lg{display:flex;align-items:center;gap:4px;min-height:48px;padding:0 10px;font-size:14px;color:var(--tx2)}
+.mnu .lg button{min-width:44px;min-height:44px;border-radius:12px;font-weight:600}
+.mnu .lg button.on{color:var(--ink)}
+.main{padding:20px 24px 56px}
+.grid{grid-template-columns:minmax(0,1fr);gap:20px;margin-top:32px;padding-top:24px}
+.toc{position:static}
+.toch,.tocs,.sec{display:none}
+.tocl{display:flex;gap:8px;margin:0;border:0;overflow-x:auto;padding:2px;scrollbar-width:none}
+.tind{display:none}
+.ti{width:auto;min-width:72px;height:44px;flex-shrink:0;justify-content:center;padding:0 16px;border:1px solid var(--bd2);border-radius:12px}
+.ti.sel{background:var(--ink);border-color:var(--ink);color:var(--inkt)}
+.note{max-width:none}
+}
+@media (pointer:coarse){
+.bi{height:44px;min-width:44px}
+.ab,.pbtn{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+.jx *,.jx *::before,.jx *::after{animation:none !important;transition:none !important}
+}
+</style>
+</helmet>
+
+<div class="jx" data-theme="{{theme}}" onKeyDown="{{onKey}}">
+<sc-if value="{{on}}">
+<div class="pg">
+
+<header class="hd">
+<a class="logo" href="RefonteAccueil.dc.html" aria-label="JuriX, accueil">
+<span class="tile"><svg class="i bal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg></span>
+<span class="wm">JuriX</span>
+</a>
+<nav class="nav" aria-label="Navigation principale">
+<a href="RefonteAssistant.dc.html">Assistant IA</a>
+<a href="RefonteAccueil.dc.html">Parcourir</a>
+<a href="Comparer.dc.html">Comparer</a>
+<a href="RefonteAccueil.dc.html">Blog</a>
+</nav>
+<div class="act">
+<div class="lang hide-md"><button class="bi lb on" aria-label="Passer en français">FR</button><span class="sep"></span><button class="bi lb" aria-label="Switch to English">EN</button></div>
+<button class="bi" aria-label="Changer de thème" onClick="{{toggleTheme}}"><svg class="i tg moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg><svg class="i tg sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
+<span class="vr hide-md"></span>
+<a class="lnk hide-md" href="#lecture">Se connecter</a>
+<a class="cta hide-md" href="#lecture">Créer un compte</a>
+<button class="bi menu" aria-label="Ouvrir le menu" aria-expanded="{{menuOpen}}" aria-controls="menu" onClick="{{toggleMenu}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></button>
+</div>
+<div class="mnu {{menuCls}}" id="menu"><a href="RefonteAssistant.dc.html">Assistant IA</a><a href="RefonteAccueil.dc.html">Parcourir</a><a href="Comparer.dc.html">Comparer</a><a href="RefonteAccueil.dc.html">Blog</a><a href="#lecture">Se connecter</a><a href="#lecture">Créer un compte</a><div class="lg" role="group" aria-label="Langue">Langue <button class="on" aria-label="Passer en français">FR</button><button aria-label="Switch to English">EN</button></div></div>
+</header>
+
+<main class="main" id="lecture">
+<nav class="bc mono" aria-label="Fil d’Ariane">
+<a href="RefonteAccueil.dc.html">Parcourir</a>
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+<a href="RefonteAccueil.dc.html">Travail et sécurité sociale</a>
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+<span aria-current="page">Code du travail</span>
+</nav>
+
+<header class="th">
+<h1 class="h1">Loi n°&nbsp;92/007 du 14&nbsp;août&nbsp;1992 portant Code du travail</h1>
+<div class="st0">
+<span class="stp"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/></svg>Version d’origine, non consolidée</span>
+<span>Aucune modification relevée par JuriX au 14&nbsp;oct.&nbsp;2026. Ce relevé peut être incomplet.</span>
+<a href="#lecture">Signaler</a>
+</div>
+</header>
+
+<div class="grid">
+
+<aside class="toc" aria-label="Table des matières">
+<h2 class="toch">Table des matières</h2>
+<a class="tocs" href="#lecture">Début du texte</a>
+<p class="sec">Section&nbsp;III&nbsp;: De la suspension et de la résiliation du contrat de travail<span>4 articles</span></p>
+<div class="tocl">
+<span class="tind" style="transform: translateY({{indY}}px)"></span>
+<button class="ti {{c35}}" aria-current="{{a35}}" onClick="{{go35}}">Art.&nbsp;35</button>
+<button class="ti {{c36}}" aria-current="{{a36}}" onClick="{{go36}}">Art.&nbsp;36</button>
+<button class="ti {{c37}}" aria-current="{{a37}}" onClick="{{go37}}">Art.&nbsp;37</button>
+<button class="ti {{c38}}" aria-current="{{a38}}" onClick="{{go38}}">Art.&nbsp;38</button>
+</div>
+</aside>
+
+<div class="row">
+<section class="read" aria-label="Article">
+<div class="art {{artCls}}">
+<p class="eb">Section&nbsp;III&nbsp;: De la suspension et de la résiliation du contrat de travail</p>
+<h2 class="arth">{{artLabel}}</h2>
+<sc-if value="{{is35}}"><p class="body">(1) Pendant la durée du préavis, l’employeur et le travailleur sont tenus au respect de toutes les <mark class="hl key" style="--d:900ms">obligations réciproques</mark> qui leur incombent.</p><p class="ph0">[Suite de l’article, à reprendre du corpus]</p></sc-if>
+<sc-if value="{{is36}}"><p class="ph0">[Texte de l’article 36, à reprendre du corpus]</p></sc-if>
+<sc-if value="{{is37}}"><p class="body">(1) En cas de rupture de contrat à durée indéterminée du fait de l’employeur, <mark class="hl sub" style="--d:1100ms">hormis le cas de faute lourde</mark>, <mark class="hl key" style="--d:900ms">le travailleur ayant accompli dans l’entreprise une durée de service continue au moins égale à deux (2) ans, a droit à une indemnité de licenciement distincte de celle du préavis</mark>.</p><p class="ph0">[Suite de l’article, à reprendre du corpus]</p></sc-if>
+<sc-if value="{{is38}}"><p class="ph0">[Texte de l’article 38, à reprendre du corpus]</p></sc-if>
+</div>
+
+<div class="acts">
+<button class="ab" onClick="{{copyRef}}">
+<sc-if value="{{refOk}}"><svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+<sc-if value="{{refNot}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></sc-if>
+<span>{{refLabel}}</span>
+</button>
+<button class="ab" onClick="{{copyLink}}">
+<sc-if value="{{linkOk}}"><svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+<sc-if value="{{linkNot}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></sc-if>
+<span>{{linkLabel}}</span>
+</button>
+</div>
+<p class="foi">Seul le texte publié au Journal officiel fait foi.</p>
+
+<nav class="pn" aria-label="Articles voisins">
+<sc-if value="{{hasPrev}}"><button class="pnb p" onClick="{{goPrev}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg><span>Précédent<small>{{prevLabel}}</small></span></button></sc-if>
+<sc-if value="{{noPrev}}"><span></span></sc-if>
+<sc-if value="{{hasNext}}"><button class="pnb n" onClick="{{goNext}}"><span>Suivant<small>{{nextLabel}}</small></span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button></sc-if>
+</nav>
+</section>
+
+<aside class="rail" aria-label="Note de l’assistant" style="--pt: {{railPt}}px">
+<sc-if value="{{hasAi}}">
+<div class="note {{liveCls}}">
+<h3 class="nh"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>Explication simplifiée (IA)</h3>
+
+<sc-if value="{{aiIdle}}">
+<p class="nd">Demandez à l’assistant d’expliquer cet article en langage courant, à partir de son texte et de son document d’origine. Vous obtiendrez&nbsp;:</p>
+<ul class="nl">
+<li><b>Contenu clé&nbsp;:</b> Le résumé des points importants de l’article.</li>
+<li><b>Implications&nbsp;:</b> Ce que cela signifie concrètement pour vous.</li>
+</ul>
+<button class="pbtn" onClick="{{explain}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>Expliquer l’article</button>
+</sc-if>
+
+<sc-if value="{{aiLoading}}">
+<div class="wait" role="status"><svg class="i bal wt" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg>Explication en cours…</div>
+<div class="skl" aria-hidden="true"><div class="ln" style="width:40%"></div><div class="ln" style="width:94%"></div><div class="ln" style="width:72%"></div></div>
+</sc-if>
+
+<sc-if value="{{aiDone}}">
+<div class="out">
+<sc-if value="{{is37}}">
+<p class="s"><strong>Contenu clé&nbsp;:</strong> Après au moins deux ans de service continu dans l’entreprise, le travailleur dont le contrat à durée indéterminée est rompu par l’employeur a droit à une indemnité de licenciement, distincte de celle du préavis. La faute lourde est exclue.</p>
+<p class="s s2"><strong>Implications&nbsp;:</strong> Vous êtes concerné si votre contrat est à durée indéterminée, si l’employeur y met fin et si vous avez au moins deux ans de service continu.</p>
+</sc-if>
+<sc-if value="{{is35}}">
+<p class="s"><strong>Contenu clé&nbsp;:</strong> Pendant le préavis, l’employeur et le travailleur restent tenus de leurs obligations réciproques.</p>
+<p class="s s2"><strong>Implications&nbsp;:</strong> Tant que le préavis court, chacun doit continuer à respecter ses engagements envers l’autre.</p>
+</sc-if>
+</div>
+<p class="aiw">Réponse générée par une IA. Vérifiez-la dans le texte de l’article.</p>
+<button class="regen" onClick="{{explain}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Régénérer</button>
+</sc-if>
+<a class="ask" href="RefonteAssistant.dc.html"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>Poser une question sur cet article</a>
+</div>
+</sc-if>
+</aside>
+</div>
+
+</div>
+</main>
+
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Apparence"},"$preview":{"width":1440,"height":1040}}'>
+const ARTS = [35, 36, 37, 38];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { on: true, art: 37, dir: 'n', flip: false, copied: '', ai: 'idle', pt: 64, menu: false, theme: null };
+    this.timers = [];
+    this.ct = 0;
+    this.at = 0;
+  }
+  componentDidMount() {
+    this.rs = () => this.measure();
+    window.addEventListener('resize', this.rs);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.measure());
+    this.later(() => this.measure(), 80);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.rs);
+    this.stop();
+  }
+  later(fn, ms) { this.timers.push(setTimeout(fn, ms)); }
+  // le trait de la marge vise le passage cité : on mesure sa position dans la rangée
+  measure() {
+    const hl = document.querySelector('.hl.key');
+    const row = document.querySelector('.row');
+    if (!hl || !row) return;
+    const wide = typeof matchMedia === 'function' && matchMedia('(min-width:1280px)').matches;
+    const pt = wide ? Math.max(0, Math.round(hl.getBoundingClientRect().top - row.getBoundingClientRect().top + 17 - 28)) : 28;
+    if (Math.abs(pt - this.state.pt) > 1) this.setState({ pt });
+  }
+
+  stop() {
+    this.timers.forEach((id) => clearTimeout(id));
+    this.timers = [];
+    clearTimeout(this.ct);
+    clearTimeout(this.at);
+  }
+  go(n) {
+    if (n === this.state.art) return;
+    clearTimeout(this.at);
+    this.setState({ art: n, dir: n > this.state.art ? 'n' : 'p', flip: !this.state.flip, ai: 'idle' });
+    this.later(() => this.measure(), 90);
+  }
+  copy(what) {
+    this.setState({ copied: what });
+    clearTimeout(this.ct);
+    this.ct = setTimeout(() => this.setState({ copied: '' }), 1900);
+  }
+  explain() {
+    this.setState({ ai: 'loading' });
+    clearTimeout(this.at);
+    this.at = setTimeout(() => this.setState({ ai: 'done' }), 1500);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = s.theme || this.props.theme || 'light';
+    const i = ARTS.indexOf(s.art);
+    const hasAi = s.art === 35 || s.art === 37;
+    return {
+      on: s.on,
+      theme,
+      indY: i * 40,
+      c35: s.art === 35 ? 'sel' : '', c36: s.art === 36 ? 'sel' : '', c37: s.art === 37 ? 'sel' : '', c38: s.art === 38 ? 'sel' : '',
+      is35: s.art === 35, is36: s.art === 36, is37: s.art === 37, is38: s.art === 38,
+      artLabel: 'Article ' + s.art,
+      artCls: (s.dir === 'n' ? 'n' : 'p') + (s.flip ? 'A' : 'B'),
+      go35: () => this.go(35), go36: () => this.go(36), go37: () => this.go(37), go38: () => this.go(38),
+      goPrev: () => this.go(ARTS[Math.max(0, i - 1)]),
+      goNext: () => this.go(ARTS[Math.min(ARTS.length - 1, i + 1)]),
+      hasPrev: i > 0, noPrev: i === 0,
+      hasNext: i < ARTS.length - 1,
+      prevLabel: i > 0 ? 'Article ' + ARTS[i - 1] : '',
+      nextLabel: i < ARTS.length - 1 ? 'Article ' + ARTS[i + 1] : '',
+      refOk: s.copied === 'ref', refNot: s.copied !== 'ref', refLabel: s.copied === 'ref' ? 'Référence copiée' : 'Copier la référence',
+      linkOk: s.copied === 'link', linkNot: s.copied !== 'link', linkLabel: s.copied === 'link' ? 'Lien copié' : 'Copier le lien',
+      copyRef: () => this.copy('ref'),
+      copyLink: () => this.copy('link'),
+      a35: s.art === 35, a36: s.art === 36, a37: s.art === 37, a38: s.art === 38,
+      railPt: s.pt,
+      onKey: (e) => { if (e && e.key === 'Escape' && s.menu) this.setState({ menu: false }); },
+      menuOpen: s.menu, menuCls: s.menu ? 'on' : '',
+      toggleMenu: () => this.setState({ menu: !s.menu }),
+      hasAi,
+      liveCls: s.ai === 'done' ? 'live' : '',
+      aiIdle: s.ai === 'idle', aiLoading: s.ai === 'loading', aiDone: s.ai === 'done',
+      explain: () => this.explain(),
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

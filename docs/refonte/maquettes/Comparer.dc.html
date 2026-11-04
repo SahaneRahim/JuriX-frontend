@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Comparer deux régimes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500;600&family=Inter:wght@400;500;600;700;800&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.jx{--bg:#FAFAFA;--hd:#FFFFFF;--card:#FFFFFF;--field:#FFFFFF;--tx:#09090B;--tx1:#3F3F46;--tx2:#52525B;--tx3:#71717A;--bd:#E4E4E7;--bd2:#D4D4D8;--bdf:#D4D4D8;--fill:#F4F4F5;--fill2:#FAFAFA;--ink:#09090B;--inkt:#FFFFFF;--ph:#A1A1AA;--ease:cubic-bezier(.22,1,.36,1);position:relative;min-height:1140px;background:var(--bg);color:var(--tx);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:clip;transition:background-color .3s,color .3s}
+.jx[data-theme=dark]{--bg:#09090B;--hd:#09090B;--card:#18181B;--field:#09090B;--tx:#F4F4F5;--tx1:#D4D4D8;--tx2:#A1A1AA;--tx3:#A1A1AA;--bd:#27272A;--bd2:#3F3F46;--bdf:#71717A;--fill:#27272A;--fill2:rgba(39,39,42,.6);--ink:#FFFFFF;--inkt:#09090B;--ph:#71717A}
+.jx *,.jx *::before,.jx *::after{box-sizing:border-box}
+:where(.jx a){color:inherit;text-decoration:none}
+:where(.jx button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:where(.jx h1,.jx h2,.jx p,.jx ul,.jx blockquote){margin:0;padding:0}
+.jx :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.i{width:1em;height:1em;flex-shrink:0;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ——— en-tête ——— */
+.hd{position:relative;z-index:5;display:flex;align-items:center;gap:24px;padding:16px 48px;background:var(--hd);border-bottom:1px solid var(--bd);transition:background-color .3s,border-color .3s}
+.logo{display:flex;align-items:center;gap:10px;border-radius:12px}
+.tile{width:36px;height:36px;border-radius:12px;background:var(--ink);color:var(--inkt);display:flex;align-items:center;justify-content:center;font-size:18px;transition:transform .25s var(--ease),background-color .3s}
+.logo:hover .tile{transform:scale(1.06)}
+.wm{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em}
+.nav{display:flex;align-items:center;gap:24px;margin-left:8px;font-size:14px;line-height:20px;font-weight:500;color:var(--tx3)}
+.nav a{position:relative;padding:6px 0;transition:color .2s}
+.nav a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+.nav a:hover{color:var(--ink)}
+.nav a:hover::after{transform:scaleX(1)}
+.nav a[aria-current]{color:var(--ink);font-weight:600}
+.nav a[aria-current]::after{transform:scaleX(1);animation:sweep .7s var(--ease) .3s both}
+.act{margin-left:auto;display:flex;align-items:center;gap:4px}
+.bi{height:36px;min-width:36px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border-radius:12px;font-size:14px;font-weight:500;color:var(--tx3);white-space:nowrap;transition:background-color .2s,color .2s}
+.bi:hover{background:var(--fill);color:var(--ink)}
+.bi .i{font-size:18px;transition:transform .35s var(--ease)}
+.bi:hover .tg{transform:rotate(22deg)}
+.lang{display:flex;align-items:center}
+.lb.on{font-weight:600;color:var(--ink)}
+.sep{width:1px;height:14px;background:var(--bd2)}
+.vr{width:1px;height:20px;background:var(--bd);margin:0 6px}
+.lnk{padding:8px 20px;font-size:14px;font-weight:600;color:var(--tx3);transition:color .2s}
+.lnk:hover{color:var(--ink)}
+.cta{height:36px;display:inline-flex;align-items:center;padding:0 20px;border-radius:12px;font-size:14px;font-weight:600;background:var(--ink);color:var(--inkt);transition:opacity .2s,transform .2s var(--ease)}
+.cta:hover{opacity:.88}
+.cta:active{transform:scale(.96)}
+.moon{display:inline-block}.sun{display:none}
+.jx[data-theme=dark] .moon{display:none}
+.jx[data-theme=dark] .sun{display:inline-block}
+.menu{display:none}
+
+/* balance de l'icône */
+.bal .bm{transform-box:view-box;transform-origin:12px 5px;animation:bm 1.9s var(--ease) .35s both}
+.bal .pl{transform-box:view-box;transform-origin:5px 7px;animation:pn 1.9s var(--ease) .35s both}
+.bal .pr{transform-box:view-box;transform-origin:19px 7px;animation:pn 1.9s var(--ease) .35s both}
+.logo:hover .bal .bm{animation:bm2 1.5s var(--ease) both}
+.logo:hover .bal .pl,.logo:hover .bal .pr{animation:pn2 1.5s var(--ease) both}
+.bal.wt .bm{animation:bm 1.5s ease-in-out infinite}
+.bal.wt .pl,.bal.wt .pr{animation:pn 1.5s ease-in-out infinite}
+@keyframes bm{0%{transform:rotate(0)}18%{transform:rotate(-11deg)}42%{transform:rotate(7deg)}66%{transform:rotate(-3.5deg)}84%{transform:rotate(1.4deg)}100%{transform:rotate(0)}}
+@keyframes bm2{0%{transform:rotate(0)}18%{transform:rotate(-11deg)}42%{transform:rotate(7deg)}66%{transform:rotate(-3.5deg)}84%{transform:rotate(1.4deg)}100%{transform:rotate(0)}}
+@keyframes pn{0%{transform:rotate(0)}18%{transform:rotate(11deg)}42%{transform:rotate(-7deg)}66%{transform:rotate(3.5deg)}84%{transform:rotate(-1.4deg)}100%{transform:rotate(0)}}
+@keyframes pn2{0%{transform:rotate(0)}18%{transform:rotate(11deg)}42%{transform:rotate(-7deg)}66%{transform:rotate(3.5deg)}84%{transform:rotate(-1.4deg)}100%{transform:rotate(0)}}
+
+/* ——— page ——— */
+.main{position:relative;width:100%;max-width:78rem;margin:0 auto;padding:40px 48px 72px}
+.h1c{margin:0 0 8px;font-size:36px;line-height:40px;font-weight:700;letter-spacing:-.025em;animation:rise .7s var(--ease) both}
+.sub{max-width:640px;font-size:16px;line-height:24px;color:var(--tx2);animation:rise .7s var(--ease) .1s both}
+
+/* ——— la balance ——— */
+.rig{position:relative;width:100%;max-width:1152px;height:312px;margin:24px auto 0}
+.post{position:absolute;left:50%;top:48px;bottom:40px;width:2px;margin-left:-1px;background:var(--ink);transform-origin:top;animation:grow .8s var(--ease) .2s both}
+.pivot{position:absolute;left:50%;top:48px;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 4px var(--bg);animation:fade .4s ease .3s both;transition:box-shadow .3s}
+.beamw{position:absolute;left:15%;right:15%;top:48px;height:0;transform-origin:50% 50%;animation:growx .9s var(--ease) .25s both}
+.beam{position:absolute;left:0;right:0;top:-2px;height:4px;border-radius:4px;background:var(--ink);transform-origin:50% 50%}
+.beam.w{animation:cw 2.4s ease-in-out infinite}
+.beam.s{animation:cs 1.4s var(--ease) both}
+.end{position:absolute;top:2px;width:0;height:0}
+.end.l{left:0}
+.end.r{right:0}
+.swing{position:absolute;left:0;top:0;transform-origin:0 0}
+.beam.w .swing{animation:cwc 2.4s ease-in-out infinite}
+.beam.s .swing{animation:csc 1.4s var(--ease) both}
+.chain{position:absolute;left:-1px;top:0;width:2px;height:56px;background:var(--tx3);transform-origin:top;animation:grow .7s var(--ease) .9s both}
+.card{position:absolute;left:-170px;top:56px;width:340px;padding:14px 16px 16px;background:var(--card);border:1px solid var(--bd);border-radius:16px;box-shadow:0 10px 15px -3px rgba(0,0,0,.06),0 4px 6px -4px rgba(0,0,0,.05);animation:drop .8s var(--ease) 1s both;transition:border-color .3s,background-color .3s,box-shadow .3s}
+.card.pulse{border-color:var(--ink)}
+.lab{display:block;margin-bottom:6px;font-size:12px;line-height:16px;font-weight:600;color:var(--tx2)}
+.fld{position:relative;height:44px}
+.inp{width:100%;height:44px;min-width:0;border:1px solid var(--bdf);border-radius:12px;background:var(--field);padding:0 12px;font:inherit;font-size:16px;line-height:24px;color:var(--tx);outline:0;transition:border-color .2s,box-shadow .2s,background-color .3s}
+.inp::placeholder{color:var(--ph)}
+.inp.hide::placeholder{color:transparent}
+.inp:focus{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.inp:focus-visible{outline:none}
+.ty{position:absolute;left:13px;right:13px;top:10px;font-size:16px;line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.inp:not(:placeholder-shown)~.ty{opacity:0}
+.caret{display:inline-block;width:2px;height:1.15em;margin-left:1px;vertical-align:-.2em;background:var(--tx);animation:caret 1s steps(1) infinite}
+.caret.off{display:none}
+@keyframes caret{50%{opacity:0}}
+.base{position:absolute;left:50%;bottom:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px}
+.cmpb{min-height:48px;min-width:176px;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:0 28px;border-radius:14px;background:var(--ink);color:var(--inkt);font-size:15px;font-weight:600;white-space:nowrap;animation:drop .7s var(--ease) .6s both;transition:opacity .2s,transform .18s var(--ease),background-color .3s}
+.cmpb:hover{opacity:.9}
+.cmpb.press{transform:scale(.94)}
+.cmpb .i{font-size:20px}
+@keyframes grow{from{transform:scaleY(0)}to{transform:none}}
+@keyframes growx{from{transform:scaleX(0)}to{transform:none}}
+@keyframes drop{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+/* en attente : le fléau hésite, les plateaux restent à l'horizontale */
+@keyframes cw{0%,100%{transform:rotate(0)}20%{transform:rotate(-4.5deg)}45%{transform:rotate(3.6deg)}70%{transform:rotate(-2deg)}}
+@keyframes cwc{0%,100%{transform:rotate(0)}20%{transform:rotate(4.5deg)}45%{transform:rotate(-3.6deg)}70%{transform:rotate(2deg)}}
+/* résultat : il se stabilise à l'équilibre */
+@keyframes cs{0%{transform:rotate(-3.2deg)}30%{transform:rotate(2.2deg)}55%{transform:rotate(-1.1deg)}80%{transform:rotate(.4deg)}100%{transform:rotate(0)}}
+@keyframes csc{0%{transform:rotate(3.2deg)}30%{transform:rotate(-2.2deg)}55%{transform:rotate(1.1deg)}80%{transform:rotate(-.4deg)}100%{transform:rotate(0)}}
+
+/* ——— grille sourcée ——— */
+.res{margin-top:36px}
+.gr{display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr) minmax(0,1fr);gap:1px;overflow:hidden;background:var(--bd);border:1px solid var(--bd);border-radius:16px}
+.gh{padding:12px 16px;background:var(--fill);font-size:14px;line-height:20px;font-weight:600;transition:background-color .3s;animation:fade .5s ease both}
+.gc{padding:16px;background:var(--card);font-size:14px;line-height:22px;color:var(--tx1);animation:rise .7s var(--ease) both;animation-delay:calc(var(--r) * 160ms + 150ms);transition:background-color .3s}
+.gc.k{font-weight:600;color:var(--tx);animation-name:fade}
+.gc.fa{animation-name:fromL}
+.gc.fb{animation-name:fromR}
+.na{color:var(--tx3)}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border:1px solid var(--bd2);border-radius:999px;font-size:12px;font-weight:500;color:var(--tx1);transition:border-color .2s,color .2s}
+.chip:hover{border-color:var(--ink);color:var(--ink)}
+.vt{display:inline-flex;align-items:center;gap:4px;min-height:28px;font-size:12px;font-weight:600;color:var(--tx2);transition:color .2s}
+.vt:hover{color:var(--ink)}
+.vt .i{font-size:14px;transition:transform .45s var(--ease)}
+.vt.op .i{transform:rotate(180deg)}
+.xp{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s var(--ease)}
+.xp.op{grid-template-rows:1fr}
+.xp>div{min-height:0;overflow:hidden}
+.quote{margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--fill);font-family:'Literata','Noto Serif',Georgia,serif;font-variation-settings:"opsz" 16;font-size:15px;line-height:1.65;color:var(--tx)}
+.note{display:flex;align-items:flex-start;gap:8px;margin-top:16px;font-size:13px;line-height:18px;color:var(--tx3);animation:fade .6s ease 1.2s both}
+.note .i{margin-top:1px;font-size:15px}
+@keyframes fromL{from{opacity:0;transform:translateX(-48px)}to{opacity:1;transform:none}}
+@keyframes fromR{from{opacity:0;transform:translateX(48px)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes sweep{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+@media (max-width:1023px){
+.hd{padding:12px 24px}
+.nav,.hide-md{display:none}
+.menu{display:inline-flex}
+.main{padding:28px 24px 56px}
+.card{width:300px;left:-150px}
+.gr{grid-template-columns:minmax(0,1fr)}
+.gh.h0{display:none}
+}
+@media (max-width:640px){
+.hd{padding:12px 16px}
+.main{padding:20px 16px 40px}
+.h1c{font-size:28px;line-height:34px}
+.rig{height:auto;display:grid;gap:16px;margin-top:16px}
+.post,.pivot,.beamw,.base{position:static;transform:none;margin:0}
+.post,.pivot,.chain{display:none}
+.beamw,.beam,.end,.swing{position:static;height:auto;width:auto;animation:none !important}
+.card{position:static;width:100%}
+.cmpb{width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+.jx *,.jx *::before,.jx *::after{animation:none !important;transition:none !important}
+}
+</style>
+</helmet>
+
+<div class="jx" data-theme="{{theme}}">
+<sc-if value="{{on}}">
+<div class="pg">
+
+<header class="hd">
+<a class="logo" href="Main.dc.html" aria-label="JuriX, accueil">
+<span class="tile"><svg class="i bal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg></span>
+<span class="wm">JuriX</span>
+</a>
+<nav class="nav" aria-label="Navigation principale">
+<a href="Main.dc.html">Accueil</a>
+<a href="#comparaison">Documents</a>
+<a href="#comparaison">Blog</a>
+<a href="Recherche.dc.html">Recherche</a>
+<a href="#comparaison" aria-current="page">Comparer</a>
+<a href="#comparaison">À propos</a>
+</nav>
+<div class="act">
+<a class="bi hide-md" href="Recherche.dc.html" aria-label="Rechercher, raccourci Ctrl K"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></a>
+<div class="lang hide-md"><button class="bi lb on" aria-label="Passer en français">FR</button><span class="sep"></span><button class="bi lb" aria-label="Switch to English">EN</button></div>
+<button class="bi" aria-label="Changer de thème" onClick="{{toggleTheme}}"><svg class="i tg moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg><svg class="i tg sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
+<button class="bi hide-md"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Profil</button>
+<span class="vr hide-md"></span>
+<a class="lnk hide-md" href="#comparaison">Se connecter</a>
+<a class="cta hide-md" href="#comparaison">Créer un compte</a>
+<button class="bi menu" aria-label="Ouvrir le menu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></button>
+</div>
+</header>
+
+<main class="main" id="comparaison">
+<h1 class="h1c">Comparer deux régimes</h1>
+<p class="sub">Deux recherches distinctes dans le corpus, une grille sourcée article par article.</p>
+
+<div class="rig">
+<div class="post"></div>
+<div class="pivot"></div>
+<div class="beamw">
+<div class="beam {{beamCls}}">
+
+<div class="end l"><div class="swing">
+<span class="chain"></span>
+<div class="card {{pulseCls}}">
+<label class="lab" for="sa">Premier sujet</label>
+<div class="fld"><input id="sa" class="inp {{hideA}}" type="text" placeholder="permis de recherche minière" autocomplete="off"><span class="ty" aria-hidden="true">{{tA}}<i class="caret {{caretA}}"></i></span></div>
+</div>
+</div></div>
+
+<div class="end r"><div class="swing">
+<span class="chain"></span>
+<div class="card {{pulseCls}}">
+<label class="lab" for="sb">Second sujet</label>
+<div class="fld"><input id="sb" class="inp {{hideB}}" type="text" placeholder="permis d’exploitation minière" autocomplete="off"><span class="ty" aria-hidden="true">{{tB}}<i class="caret {{caretB}}"></i></span></div>
+</div>
+</div></div>
+
+</div>
+</div>
+
+<div class="base">
+<button class="cmpb {{pressCls}}" role="{{btnRole}}">
+<sc-if value="{{isWeighing}}"><svg class="i bal wt" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg></sc-if>
+<span>{{btnLabel}}</span>
+</button>
+</div>
+</div>
+
+<sc-if value="{{isDone}}">
+<section class="res" aria-label="Résultat de la comparaison">
+<div class="gr">
+<div class="gh h0">Critère</div>
+<div class="gh" style="animation-delay:.05s">préavis</div>
+<div class="gh" style="animation-delay:.05s">indemnité de licenciement</div>
+
+<div class="gc k" style="--r:0">Ce que dit le texte</div>
+<div class="gc fa" style="--r:0">
+<p>Pendant le préavis, l’employeur et le travailleur restent tenus de leurs obligations réciproques.</p>
+<div class="meta"><a class="chip" href="Texte.dc.html">Art. 35 — Code du travail</a><button class="vt {{opA0}}" onClick="{{tgA0}}">{{lblA0}}<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+<div class="xp {{opA0}}"><div><blockquote class="quote">(1) Pendant la durée du préavis, l’employeur et le travailleur sont tenus au respect de toutes les obligations réciproques qui leur incombent.</blockquote></div></div>
+</div>
+<div class="gc fb" style="--r:0">
+<p>Le travailleur licencié a droit à une indemnité de licenciement, distincte de celle du préavis.</p>
+<div class="meta"><a class="chip" href="Texte.dc.html">Art. 37 — Code du travail</a><button class="vt {{opB0}}" onClick="{{tgB0}}">{{lblB0}}<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+<div class="xp {{opB0}}"><div><blockquote class="quote">(1) En cas de rupture de contrat à durée indéterminée du fait de l’employeur, hormis le cas de faute lourde, le travailleur ayant accompli dans l’entreprise une durée de service continue au moins égale à deux (2) ans, a droit à une indemnité de licenciement distincte de celle du préavis.</blockquote></div></div>
+</div>
+
+<div class="gc k" style="--r:1">Condition d’ancienneté</div>
+<div class="gc fa" style="--r:1"><p class="na">Non précisée dans les articles consultés.</p></div>
+<div class="gc fb" style="--r:1">
+<p>Au moins deux (2) ans de service continu dans l’entreprise.</p>
+<div class="meta"><a class="chip" href="Texte.dc.html">Art. 37 — Code du travail</a><button class="vt {{opB1}}" onClick="{{tgB1}}">{{lblB1}}<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+<div class="xp {{opB1}}"><div><blockquote class="quote">(1) En cas de rupture de contrat à durée indéterminée du fait de l’employeur, hormis le cas de faute lourde, le travailleur ayant accompli dans l’entreprise une durée de service continue au moins égale à deux (2) ans, a droit à une indemnité de licenciement distincte de celle du préavis.</blockquote></div></div>
+</div>
+
+<div class="gc k" style="--r:2">Cas exclu</div>
+<div class="gc fa" style="--r:2"><p class="na">Non précisé dans les articles consultés.</p></div>
+<div class="gc fb" style="--r:2">
+<p>Le cas de faute lourde.</p>
+<div class="meta"><a class="chip" href="Texte.dc.html">Art. 37 — Code du travail</a><button class="vt {{opB2}}" onClick="{{tgB2}}">{{lblB2}}<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+<div class="xp {{opB2}}"><div><blockquote class="quote">(1) En cas de rupture de contrat à durée indéterminée du fait de l’employeur, hormis le cas de faute lourde, le travailleur ayant accompli dans l’entreprise une durée de service continue au moins égale à deux (2) ans, a droit à une indemnité de licenciement distincte de celle du préavis.</blockquote></div></div>
+</div>
+</div>
+<p class="note"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>Grille générée par une IA à partir des seuls articles cités. Dépliez le texte pour vérifier chaque cellule.</p>
+</section>
+</sc-if>
+</main>
+
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Apparence"},"$preview":{"width":1440,"height":1140}}'>
+const A = 'préavis';
+const B = 'indemnité de licenciement';
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { on: true, stage: 0, tA: '', tB: '', typing: '', pressed: false, open: {}, theme: null };
+    this.timers = [];
+    this.tt = 0;
+  }
+  componentDidMount() { this.boot(); }
+  componentWillUnmount() { this.stop(); }
+
+  stop() {
+    this.timers.forEach((id) => clearTimeout(id));
+    this.timers = [];
+    clearTimeout(this.tt);
+  }
+  later(fn, ms) { this.timers.push(setTimeout(fn, ms)); }
+
+  typeInto(key, text, speed, done) {
+    let i = 0;
+    const step = () => {
+      i += 1;
+      this.setState({ [key]: text.slice(0, i), typing: key });
+      if (i < text.length) { this.tt = setTimeout(step, speed + Math.random() * 40); } else { done(); }
+    };
+    step();
+  }
+  boot() {
+    this.stop();
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { this.setState({ stage: 2, tA: A, tB: B, typing: '', pressed: false, open: {} }); return; }
+    this.setState({ stage: 0, tA: '', tB: '', typing: '', pressed: false, open: {} });
+    this.later(() => {
+      this.typeInto('tA', A, 80, () => {
+        this.later(() => {
+          this.typeInto('tB', B, 45, () => {
+            this.setState({ typing: '' });
+            this.later(() => this.setState({ pressed: true }), 420);
+            this.later(() => this.setState({ pressed: false, stage: 1 }), 600);
+            this.later(() => this.setState({ stage: 2 }), 3300);
+          });
+        }, 350);
+      });
+    }, 2100);
+  }
+  toggle(k) {
+    const open = { ...this.state.open };
+    open[k] = !open[k];
+    this.setState({ open });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = s.theme || this.props.theme || 'light';
+    const o = s.open;
+    const lbl = (k) => (o[k] ? 'Masquer le texte' : 'Voir le texte');
+    const op = (k) => (o[k] ? 'op' : '');
+    return {
+      on: s.on,
+      theme,
+      tA: s.tA, tB: s.tB,
+      hideA: s.tA ? 'hide' : '', hideB: s.tB ? 'hide' : '',
+      caretA: s.typing === 'tA' ? '' : 'off',
+      caretB: s.typing === 'tB' ? '' : 'off',
+      beamCls: s.stage === 1 ? 'w' : (s.stage === 2 ? 's' : ''),
+      pulseCls: s.stage === 1 ? 'pulse' : '',
+      pressCls: s.pressed ? 'press' : '',
+      isWeighing: s.stage === 1,
+      isDone: s.stage === 2,
+      btnLabel: s.stage === 1 ? 'Comparaison en cours…' : 'Comparer',
+      btnRole: s.stage === 1 ? 'status' : 'button',
+      opA0: op('a0'), opB0: op('b0'), opB1: op('b1'), opB2: op('b2'),
+      lblA0: lbl('a0'), lblB0: lbl('b0'), lblB1: lbl('b1'), lblB2: lbl('b2'),
+      tgA0: () => this.toggle('a0'), tgB0: () => this.toggle('b0'), tgB1: () => this.toggle('b1'), tgB2: () => this.toggle('b2'),
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

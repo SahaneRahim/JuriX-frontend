@@ -96,6 +96,12 @@ export default ts.config(
       'dist/',
       'node_modules/',
       'package-lock.json',
+      // POURQUOI : docs/ porte le dossier de passation de la refonte
+      // (docs/refonte/), dont outils/harness/ : les scripts Node qui rejouent
+      // les maquettes, copiés tels quels. Ce n'est pas du code du site ; le
+      // linter y relevait 20 erreurs (require, globales de Node) qui
+      // masquaient l'état réel de src/, sans erreur.
+      'docs/',
     ],
   },
 );

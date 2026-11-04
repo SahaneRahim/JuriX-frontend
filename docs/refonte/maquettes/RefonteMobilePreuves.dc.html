@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Refonte · Assistant mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500;600&family=Inter:wght@400;500;600;700;800&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.jx{--bg:#FAFAFA;--hd:#FFFFFF;--card:#FFFFFF;--field:#FFFFFF;--tx:#09090B;--tx1:#3F3F46;--tx2:#52525B;--tx3:#71717A;--bd:#E4E4E7;--bd2:#D4D4D8;--fill:#F4F4F5;--fill2:#F7F7F8;--hl:#D4D4D8;--ink:#09090B;--inkt:#FFFFFF;--ph:#A1A1AA;--phx:#71717A;--off:#E4E4E7;--offt:#A1A1AA;--dim:rgba(9,9,11,.38);--sheet:0 1px 2px rgba(9,9,11,.05),0 18px 40px -22px rgba(9,9,11,.22);--ease:cubic-bezier(.22,1,.36,1);position:relative;display:flex;flex-direction:column;height:100vh;min-height:720px;overflow:hidden;background:var(--bg);color:var(--tx);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;transition:background-color .3s,color .3s}
+.jx[data-theme=dark]{--bg:#09090B;--hd:#09090B;--card:#18181B;--field:#121215;--tx:#F4F4F5;--tx1:#D4D4D8;--tx2:#A1A1AA;--tx3:#A1A1AA;--bd:#27272A;--bd2:#3F3F46;--fill:#27272A;--fill2:#0F0F12;--hl:#52525B;--ink:#FFFFFF;--inkt:#09090B;--ph:#71717A;--phx:#A1A1AA;--off:#27272A;--offt:#71717A;--dim:rgba(0,0,0,.6);--sheet:0 1px 2px rgba(0,0,0,.4),0 18px 40px -22px rgba(0,0,0,.8)}
+.jx *,.jx *::before,.jx *::after{box-sizing:border-box}
+.jx:focus{outline:none}
+:where(.jx a){color:inherit;text-decoration:none}
+:where(.jx button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:where(.jx h1,.jx h2,.jx p,.jx ul,.jx ol,.jx kbd){margin:0;padding:0}
+:where(.jx ul,.jx ol){list-style:none}
+.jx :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.i{width:1em;height:1em;flex-shrink:0;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mono{font-family:'Geist Mono',ui-monospace,monospace;font-weight:500}
+
+/* ——— en-tête ——— */
+.hd{position:relative;z-index:5;flex-shrink:0;display:flex;align-items:center;gap:32px;height:64px;padding:0 48px;background:var(--hd);border-bottom:1px solid var(--bd);transition:background-color .3s,border-color .3s}
+.logo{display:flex;align-items:center;gap:10px;border-radius:12px}
+.tile{width:36px;height:36px;border-radius:12px;background:var(--ink);color:var(--inkt);display:flex;align-items:center;justify-content:center;font-size:18px;transition:transform .25s var(--ease),background-color .3s}
+.logo:hover .tile{transform:scale(1.06)}
+.wm{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em}
+.nav{display:flex;align-items:center;gap:28px;font-size:14px;line-height:20px;font-weight:500;color:var(--tx3)}
+.nav a{position:relative;padding:6px 0;transition:color .2s}
+.nav a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+.nav a:hover{color:var(--ink)}
+.nav a:hover::after{transform:scaleX(1)}
+.nav a[aria-current]{color:var(--ink);font-weight:600}
+.nav a[aria-current]::after{transform:scaleX(1)}
+.act{margin-left:auto;display:flex;align-items:center;gap:4px}
+.bi{height:36px;min-width:36px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border-radius:12px;font-size:14px;font-weight:500;color:var(--tx3);white-space:nowrap;transition:background-color .2s,color .2s}
+.bi:hover{background:var(--fill);color:var(--ink)}
+.bi .i{font-size:18px;transition:transform .35s var(--ease)}
+.bi:hover .tg{transform:rotate(22deg)}
+.lang{display:flex;align-items:center}
+.lb.on{font-weight:600;color:var(--ink)}
+.sep{width:1px;height:14px;background:var(--bd2)}
+.vr{width:1px;height:20px;background:var(--bd);margin:0 6px}
+.lnk{padding:8px 16px;font-size:14px;font-weight:600;color:var(--tx3);transition:color .2s}
+.lnk:hover{color:var(--ink)}
+.cta{height:36px;display:inline-flex;align-items:center;padding:0 18px;border-radius:12px;font-size:14px;font-weight:600;background:var(--ink);color:var(--inkt);transition:opacity .2s,transform .2s var(--ease)}
+.cta:hover{opacity:.88}
+.cta:active{transform:scale(.96)}
+.moon{display:inline-block}.sun{display:none}
+.jx[data-theme=dark] .moon{display:none}
+.jx[data-theme=dark] .sun{display:inline-block}
+.menu{display:none}
+.mnu{display:none}
+
+/* balance : le fléau pivote, les plateaux restent à l'horizontale */
+.bal .bm{transform-box:view-box;transform-origin:12px 5px;animation:bm 1.9s var(--ease) .35s both}
+.bal .pl{transform-box:view-box;transform-origin:5px 7px;animation:pn 1.9s var(--ease) .35s both}
+.bal .pr{transform-box:view-box;transform-origin:19px 7px;animation:pn 1.9s var(--ease) .35s both}
+.bal.still .bm,.bal.still .pl,.bal.still .pr{animation:none}
+.bal.wt .bm{animation:bm 1.5s ease-in-out infinite}
+.bal.wt .pl,.bal.wt .pr{animation:pn 1.5s ease-in-out infinite}
+@keyframes bm{0%{transform:rotate(0)}18%{transform:rotate(-11deg)}42%{transform:rotate(7deg)}66%{transform:rotate(-3.5deg)}84%{transform:rotate(1.4deg)}100%{transform:rotate(0)}}
+@keyframes pn{0%{transform:rotate(0)}18%{transform:rotate(11deg)}42%{transform:rotate(-7deg)}66%{transform:rotate(3.5deg)}84%{transform:rotate(-1.4deg)}100%{transform:rotate(0)}}
+
+/* ——— l'écran partagé ——— */
+.split{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 520px}
+.left{display:flex;flex-direction:column;min-height:0;min-width:0}
+.bar{flex-shrink:0;display:flex;align-items:center;gap:10px;width:100%;max-width:760px;margin:0 auto;padding:16px 40px 8px;animation:fade .5s ease both}
+.chipw{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:1px solid var(--bd);border-radius:999px;background:var(--card);font-size:13px;font-weight:600;color:var(--tx1);transition:border-color .2s,color .2s,background-color .3s}
+.chipw:hover{border-color:var(--ink);color:var(--ink)}
+.chipw .i{font-size:15px}
+.sp{flex:1}
+.nw{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border-radius:10px;font-size:13px;font-weight:600;color:var(--tx2);transition:background-color .2s,color .2s}
+.nw:hover{background:var(--fill);color:var(--ink)}
+.nw .i{font-size:15px;transition:transform .35s var(--ease)}
+.nw:hover .i{transform:rotate(90deg)}
+.msgs{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 40px 8px;display:flex;flex-direction:column;gap:22px;overflow:hidden}
+.wl{display:flex;flex-direction:column;gap:18px;max-height:640px;overflow:hidden;opacity:1;transition:max-height .7s var(--ease),opacity .35s ease,margin .7s var(--ease)}
+.wl.gone{max-height:0;opacity:0;margin-top:-22px;pointer-events:none}
+.who{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;line-height:18px;font-weight:700}
+.who .i{font-size:18px}
+.say{font-size:16px;line-height:1.65;color:var(--tx1)}
+.b1{animation:rise .6s var(--ease) .15s both}
+.b2{animation:fade .5s ease 1s both}
+.sgl{display:grid;gap:8px}
+.sgb{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:10px 16px;border:1px solid var(--bd);border-radius:14px;background:var(--card);font-size:14px;line-height:20px;text-align:left;color:var(--tx1);animation:pop .5s var(--ease) both;animation-delay:calc(1.1s + var(--i) * 90ms);transition:border-color .2s,color .2s,background-color .3s,transform .25s var(--ease)}
+.sgb span{flex:1}
+.sgb .i{font-size:16px;color:var(--ph);transition:transform .35s var(--ease),color .2s}
+.sgb:hover{border-color:var(--ink);color:var(--ink);transform:translateX(3px)}
+.sgb:hover .i{transform:translate(3px,-3px);color:var(--ink)}
+.ub{align-self:flex-end;max-width:80%;padding:12px 18px;border-radius:18px;border-bottom-right-radius:6px;background:var(--ink);color:var(--inkt);font-size:16px;line-height:1.55;box-shadow:0 1px 2px rgba(0,0,0,.08);animation:send .6s cubic-bezier(.3,1.25,.5,1) both}
+@keyframes send{from{opacity:0;transform:translateY(80px) scale(.92)}to{opacity:1;transform:none}}
+.steps{display:grid;gap:10px;font-size:14px}
+.stp{display:flex;align-items:flex-start;gap:8px;animation:rise .45s var(--ease) both}
+.stp .i{margin-top:2px;font-size:16px}
+.stp.now{font-weight:500;color:var(--tx)}
+.stp.done{color:var(--tx2)}
+.stp.done .i{color:var(--ink)}
+.ck path{stroke-dasharray:24;stroke-dashoffset:0;animation:draw .45s ease-out both}
+@keyframes draw{from{stroke-dashoffset:24}}
+.ans{display:grid;gap:12px}
+.ans .s{animation:blurin .8s var(--ease) both}
+.ans .s1{animation-delay:.1s}.ans .s2{animation-delay:.5s}.ans .s3{animation-delay:1.7s}
+.ans strong{font-weight:700;color:var(--tx)}
+@keyframes blurin{from{opacity:0;filter:blur(6px);transform:translateY(6px)}to{opacity:1;filter:none;transform:none}}
+.cit{position:relative;display:inline-block;margin:0 2px;padding:0 10px;border:1px solid var(--bd2);border-radius:999px;background:var(--card);font-size:12px;line-height:24px;font-weight:600;white-space:nowrap;color:var(--tx);vertical-align:1px;animation:popc .5s cubic-bezier(.3,1.6,.5,1) both;transition:border-color .2s,background-color .25s,color .25s}
+.cit::after{content:"";position:absolute;inset:-8px -4px}
+.cit:hover{border-color:var(--ink)}
+.cit.on{background:var(--ink);border-color:var(--ink);color:var(--inkt)}
+.c1{animation-delay:1.1s}.c2{animation-delay:1.45s}.c3{animation-delay:2.3s}
+@keyframes popc{0%{opacity:0;transform:translateY(6px) scale(.6)}100%{opacity:1;transform:none}}
+@keyframes pop{0%{opacity:0;transform:translateY(8px) scale(.97)}100%{opacity:1;transform:none}}
+
+/* ——— saisie ——— */
+.cmp{flex-shrink:0;width:100%;max-width:760px;margin:0 auto;padding:8px 40px 18px}
+.cbox{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 18px;border:1px solid var(--bd2);border-radius:18px;background:var(--field);box-shadow:var(--sheet);transition:border-color .2s,background-color .3s}
+.cbox:focus-within{border-color:var(--ink)}
+.cfield{position:relative;flex:1;min-width:0}
+.cinp{display:block;width:100%;min-width:0;height:44px;border:0;outline:0;background:transparent;padding:0;font:inherit;font-size:16px;line-height:24px;color:var(--tx)}
+.cinp::placeholder{color:var(--phx)}
+.cinp.hide::placeholder{color:transparent}
+.cinp:focus-visible{outline:none}
+.ctyped{position:absolute;left:0;right:0;top:10px;font-size:16px;line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.cinp:not(:placeholder-shown)~.ctyped{opacity:0}
+.caret{display:inline-block;width:2px;height:1.15em;margin-left:1px;vertical-align:-.2em;background:var(--tx);animation:caret 1s steps(1) infinite}
+.caret.off{display:none}
+@keyframes caret{50%{opacity:0}}
+.snd{width:44px;height:44px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border-radius:13px;background:var(--off);color:var(--offt);font-size:20px;transition:background-color .3s,color .3s,transform .18s var(--ease)}
+.snd.on{background:var(--ink);color:var(--inkt)}
+.snd.press{transform:scale(.88)}
+.snd .i{transition:transform .35s var(--ease)}
+.snd.press .i{transform:translateY(-3px)}
+.disc{margin-top:10px;font-size:12px;line-height:1.4;text-align:center;color:var(--tx2)}
+
+/* ——— les articles cités ——— */
+.proofs:focus{outline:none}
+.proofs{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--bd);background:var(--fill2);transition:background-color .3s,border-color .3s}
+.ph{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:20px 24px 14px}
+.ph h2{font-size:15px;line-height:22px;font-weight:700}
+.ph .n{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--ink);color:var(--inkt);font-size:12px;font-weight:700;animation:pop .45s cubic-bezier(.3,1.6,.5,1) both}
+.xclose{display:none;width:44px;height:44px;margin:-8px -10px -8px auto;align-items:center;justify-content:center;border-radius:12px;font-size:20px;color:var(--tx2);transition:background-color .2s,color .2s}
+.xclose:hover{background:var(--fill);color:var(--ink)}
+.pbody{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 24px 20px;overflow-y:auto;overscroll-behavior:contain}
+.pbody>*{flex-shrink:0}
+.pfoot{flex-shrink:0;padding:12px 24px 16px;border-top:1px solid var(--bd);font-size:12px;line-height:17px;color:var(--tx2);transition:border-color .3s}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding-bottom:60px;text-align:center;animation:fade .6s ease both}
+.stack{position:relative;width:150px;height:104px}
+.stack i{position:absolute;left:0;right:0;border:1px solid var(--bd2);border-radius:14px;background:var(--card);transition:background-color .3s}
+.stack i:nth-child(1){top:0;height:92px;transform:scale(.88);opacity:.5;animation:brA 3.6s ease-in-out infinite}
+.stack i:nth-child(2){top:8px;height:92px;transform:scale(.94);opacity:.75;animation:brB 3.6s ease-in-out .15s infinite}
+.stack i:nth-child(3){top:16px;height:88px;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:0 18px;animation:brC 3.6s ease-in-out .3s infinite}
+.stack b{display:block;height:6px;border-radius:3px;background:var(--bd)}
+@keyframes brA{0%,100%{transform:translateY(0) scale(.88)}50%{transform:translateY(-4px) scale(.88)}}
+@keyframes brB{0%,100%{transform:translateY(0) scale(.94)}50%{transform:translateY(-3px) scale(.94)}}
+@keyframes brC{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.empty p{max-width:260px;font-size:14px;line-height:21px;color:var(--tx2)}
+.sheet{position:relative;border:1px solid var(--bd);border-radius:18px;background:var(--card);box-shadow:0 1px 2px rgba(9,9,11,.04);animation:sin .65s var(--ease) both;animation-delay:calc(var(--i) * 150ms);transition:box-shadow .45s var(--ease),border-color .3s,background-color .3s}
+.sheet.sel{border-color:var(--bd2);box-shadow:var(--sheet)}
+@keyframes sin{from{opacity:0;transform:translateX(44px)}to{opacity:1;transform:none}}
+.sh{display:block;width:100%;padding:16px 18px;border-radius:18px;text-align:left}
+.ref{font-size:12px;line-height:16px;color:var(--tx3)}
+.art{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;font-size:16px;line-height:22px;font-weight:600}
+.art .i{font-size:16px;color:var(--ph);transition:transform .45s var(--ease),color .2s}
+.sheet.sel .art .i{transform:rotate(180deg);color:var(--ink)}
+.sh:hover .art .i{color:var(--ink)}
+.chp{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:3px 10px 3px 8px;border-radius:999px;background:var(--fill);font-size:12px;line-height:16px;font-weight:500;color:var(--tx1);transition:background-color .3s}
+.chp .i{font-size:13px}
+.sheet.sel .chp{display:none}
+.body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .55s var(--ease)}
+.sheet.sel .body{grid-template-rows:1fr}
+.body>div{min-height:0;overflow:hidden}
+.stt{display:flex;gap:8px;align-items:flex-start;margin:0 18px;padding:9px 12px;border-radius:12px;background:var(--fill);font-size:12px;line-height:17px;color:var(--tx1);transition:background-color .3s}
+.stt .i{margin-top:1px;font-size:14px}
+.sheet.sel .stt .i{animation:stamp .7s cubic-bezier(.3,1.5,.5,1) .35s both}
+@keyframes stamp{0%{opacity:0;transform:translateY(-14px) scale(1.9) rotate(-16deg)}60%{opacity:1;transform:translateY(0) scale(.88) rotate(3deg)}80%{transform:scale(1.07) rotate(-1deg)}100%{transform:none}}
+.txt{margin:14px 18px 0;font-family:'Literata','Noto Serif',Georgia,serif;font-variation-settings:"opsz" 16;font-size:16px;line-height:1.75;color:var(--tx)}
+.ps{background-image:linear-gradient(var(--hl),var(--hl)),linear-gradient(var(--ink),var(--ink));background-repeat:no-repeat;background-position:0 92%,0 100%;background-size:0 .42em,0 2px;transition:background-size .8s var(--ease)}
+.ps.on{background-size:100% .42em,100% 2px}
+.leg{margin:10px 18px 0;font-size:12px;line-height:17px;color:var(--tx2)}
+.sacts{display:flex;flex-wrap:wrap;gap:8px;padding:14px 18px 18px}
+.sa{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;border:1px solid var(--bd2);border-radius:10px;font-size:13px;font-weight:600;color:var(--tx1);transition:border-color .2s,color .2s}
+.sa:hover{border-color:var(--ink);color:var(--ink)}
+.sa .i{font-size:15px}
+.sa .ok{animation:popc .45s cubic-bezier(.3,1.6,.5,1) both}
+.skl{height:84px;padding:18px;border:1px solid var(--bd);border-radius:18px;background:var(--card);display:grid;gap:12px;align-content:center;animation:fade .3s ease both}
+.ln{height:10px;border-radius:5px;background:linear-gradient(90deg,var(--fill) 0%,var(--bd) 50%,var(--fill) 100%);background-size:200% 100%;animation:shim 1.3s linear infinite}
+@keyframes shim{from{background-position:100% 0}to{background-position:-100% 0}}
+
+/* barre « articles cités » et voile : seulement quand le panneau devient une feuille */
+.peekb{display:none}
+.veil{display:none}
+
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (max-width:1023px){
+.hd{padding:0 24px}
+.nav,.hide-md{display:none}
+.menu{display:inline-flex}
+.mnu{position:absolute;left:0;right:0;top:100%;z-index:6;display:grid;gap:2px;padding:8px 16px 16px;background:var(--hd);border-bottom:1px solid var(--bd);opacity:0;visibility:hidden;transform:translateY(-8px);transition:transform .35s var(--ease),opacity .25s,visibility 0s .35s}
+.mnu.on{opacity:1;visibility:visible;transform:none;transition:transform .35s var(--ease),opacity .25s}
+.mnu a{display:flex;align-items:center;min-height:48px;padding:0 10px;border-radius:12px;font-size:16px;font-weight:600;transition:background-color .2s}
+.mnu a:hover{background:var(--fill)}
+.mnu .lg{display:flex;align-items:center;gap:4px;min-height:48px;padding:0 10px;font-size:14px;color:var(--tx2)}
+.mnu .lg button{min-width:44px;min-height:44px;border-radius:12px;font-weight:600}
+.mnu .lg button.on{color:var(--ink)}
+.split{grid-template-columns:minmax(0,1fr)}
+.bar,.msgs,.cmp{padding-left:20px;padding-right:20px}
+.msgs{overflow-y:auto;overscroll-behavior:contain;transition:padding-bottom .5s var(--ease)}
+.left.sheeted .msgs{padding-bottom:min(72vh,560px)}
+.proofs{position:fixed;left:0;right:0;bottom:0;z-index:11;height:min(72vh,560px);border:1px solid var(--bd);border-bottom:0;border-radius:24px 24px 0 0;background:var(--card);box-shadow:0 -20px 50px -20px rgba(9,9,11,.35);transform:translateY(100%);visibility:hidden;transition:transform .6s var(--ease),visibility 0s .6s,background-color .3s}
+.proofs.open{transform:none;visibility:visible;transition:transform .6s var(--ease),background-color .3s}
+.xclose{display:inline-flex}
+.veil{position:fixed;inset:0;z-index:10;display:block;background:var(--dim);opacity:0;pointer-events:none;transition:opacity .45s ease}
+.veil.on{opacity:1;pointer-events:auto}
+.peekb.on{display:flex;align-items:center;gap:10px;min-height:48px;margin:0 20px 8px;padding:0 16px;border:1px solid var(--bd);border-radius:14px;background:var(--card);font-size:14px;font-weight:600;transition:border-color .2s,background-color .3s}
+.peekb .n{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--ink);color:var(--inkt);font-size:12px;font-weight:700}
+.peekb .i{margin-left:auto;font-size:18px;color:var(--ph)}
+}
+@media (pointer:coarse){
+.bi{height:44px;min-width:44px}
+.lnk,.cta,.chipw,.nw{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+.jx *,.jx *::before,.jx *::after{animation:none !important;transition:none !important}
+.caret{display:none}
+}
+</style>
+</helmet>
+
+<div class="jx" data-theme="{{theme}}" tabindex="-1" onKeyDown="{{onKey}}">
+<sc-if value="{{on}}">
+
+<header class="hd">
+<a class="logo" href="RefonteAccueil.dc.html" aria-label="JuriX, accueil">
+<span class="tile"><svg class="i bal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg></span>
+<span class="wm">JuriX</span>
+</a>
+<nav class="nav" aria-label="Navigation principale">
+<a href="RefonteAssistant.dc.html" aria-current="page">Assistant IA</a>
+<a href="RefonteAccueil.dc.html">Parcourir</a>
+<a href="Comparer.dc.html">Comparer</a>
+<a href="RefonteAccueil.dc.html">Blog</a>
+</nav>
+<div class="act">
+<div class="lang hide-md"><button class="bi lb on" aria-label="Passer en français">FR</button><span class="sep"></span><button class="bi lb" aria-label="Switch to English">EN</button></div>
+<button class="bi" aria-label="Changer de thème" onClick="{{toggleTheme}}"><svg class="i tg moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg><svg class="i tg sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
+<span class="vr hide-md"></span>
+<a class="lnk hide-md" href="#chat">Se connecter</a>
+<a class="cta hide-md" href="#chat">Créer un compte</a>
+<button class="bi menu" aria-label="Ouvrir le menu" aria-expanded="{{menuOpen}}" aria-controls="menu" onClick="{{toggleMenu}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></button>
+</div>
+<div class="mnu {{menuCls}}" id="menu"><a href="RefonteAssistant.dc.html">Assistant IA</a><a href="RefonteAccueil.dc.html">Parcourir</a><a href="Comparer.dc.html">Comparer</a><a href="RefonteAccueil.dc.html">Blog</a><a href="#chat">Se connecter</a><a href="#chat">Créer un compte</a><div class="lg" role="group" aria-label="Langue">Langue <button class="on" aria-label="Passer en français">FR</button><button aria-label="Switch to English">EN</button></div></div>
+</header>
+
+<main class="split" id="chat">
+
+<section class="left {{leftCls}}" aria-label="Conversation">
+<div class="bar">
+<button class="chipw" aria-label="Changer de profil, actuel : citoyen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Citoyen</button>
+<span class="sp"></span>
+<button class="nw" onClick="{{replay}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nouvelle conversation</button>
+</div>
+
+<div class="msgs">
+<div class="wl {{goneCls}}">
+<div class="b1"><p class="who"><svg class="i bal still" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg>JuriX</p>
+<p class="say">Bonjour, je suis JuriX, votre assistant juridique. Je suis là pour vous aider. Quelle est votre question&nbsp;?</p></div>
+<p class="say b2">Chaque réponse cite ses articles&nbsp;: touchez-les pour lire le texte officiel. N’écrivez ni nom ni numéro de téléphone.</p>
+<div class="sgl">
+<button class="sgb" style="--i:0"><span>Quelles indemnités en cas de licenciement abusif&nbsp;?</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
+<button class="sgb" style="--i:1"><span>Que risque l’auteur d’une escroquerie sur internet&nbsp;?</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
+<button class="sgb" style="--i:2"><span>Quels sont mes droits en garde à vue&nbsp;?</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
+</div>
+</div>
+
+<sc-if value="{{sent}}"><div class="ub">Quelles indemnités en cas de licenciement&nbsp;?</div></sc-if>
+
+<sc-if value="{{showProg}}">
+<div role="status">
+<p class="who"><svg class="i bal still" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg>JuriX</p>
+<ol class="steps">
+<sc-if value="{{p1a}}"><li class="stp now"><svg class="i bal wt" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg><span>Recherche dans les textes…</span></li></sc-if>
+<sc-if value="{{p1d}}"><li class="stp done" style="animation:none"><svg class="i ck" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Recherche dans les textes…</span></li></sc-if>
+<sc-if value="{{p2}}"><li class="stp done" style="animation-delay:.15s"><svg class="i ck" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>2 articles trouvés&nbsp;: Code du travail</span></li></sc-if>
+<sc-if value="{{p3}}"><li class="stp now" style="animation-delay:.3s"><svg class="i bal wt" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg><span>Rédaction de la réponse…</span></li></sc-if>
+</ol>
+</div>
+</sc-if>
+
+<sc-if value="{{showAns}}">
+<div>
+<p class="who"><svg class="i bal still" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg>JuriX</p>
+<div class="ans say">
+<p class="s s1"><strong>Réponse directe</strong></p>
+<p class="s s2">Si votre contrat à durée indéterminée est rompu par l’employeur et que vous comptez au moins deux ans de service continu dans l’entreprise, vous avez droit à une indemnité de licenciement, distincte de celle du préavis <button id="cit1" class="cit c1 {{k37a}}" aria-label="Article 37 du Code du travail : voir le passage" onClick="{{pick37a}}">Art.&nbsp;37 · Code du travail</button>. Ce droit ne s’applique pas en cas de faute lourde <button id="cit2" class="cit c2 {{k37b}}" aria-label="Article 37 : voir le passage sur la faute lourde" onClick="{{pick37b}}">Art.&nbsp;37</button>.</p>
+<p class="s s3">Pendant le préavis, l’employeur et le travailleur restent tenus de leurs obligations réciproques <button id="cit3" class="cit c3 {{k35}}" aria-label="Article 35 du Code du travail : voir le passage" onClick="{{pick35}}">Art.&nbsp;35 · Code du travail</button>.</p>
+</div>
+</div>
+</sc-if>
+</div>
+
+<button id="peek" class="peekb {{peekCls}}" aria-expanded="{{sheet}}" aria-controls="cites" onClick="{{openSheet}}"><span class="n">2</span>Articles cités<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
+
+<div class="cmp">
+<div class="cbox">
+<div class="cfield">
+<input class="cinp {{hideCls}}" type="text" placeholder="Posez votre question juridique…" autocomplete="off" aria-label="Votre question">
+<span class="ctyped" aria-hidden="true">{{typed}}<i class="caret {{caretCls}}"></i></span>
+</div>
+<button class="snd {{sndCls}}" aria-label="Poser la question"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
+</div>
+<p class="disc">Information juridique générale, pas un avis sur votre cas. Vérifiez l’article cité avant d’agir.</p>
+</div>
+</section>
+
+<button class="veil {{veilCls}}" tabindex="-1" aria-label="Fermer les articles cités" onClick="{{closeSheet}}"></button>
+
+<aside class="proofs {{sheetCls}}" id="cites" aria-label="Articles cités" role="{{sheetRole}}" aria-modal="{{sheetModal}}" tabindex="-1">
+<div class="ph"><h2>Articles cités</h2>
+<sc-if value="{{pReady}}"><span class="n" aria-label="2 articles cités">2</span></sc-if>
+<button class="xclose" aria-label="Fermer les articles cités" onClick="{{closeSheet}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+</div>
+<div class="pbody">
+
+<sc-if value="{{pEmpty}}">
+<div class="empty">
+<div class="stack" aria-hidden="true"><i></i><i></i><i><b style="width:70%"></b><b></b><b style="width:55%"></b></i></div>
+<p>Les articles cités apparaîtront ici, avec leur statut.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{pSearch}}">
+<div class="skl" aria-hidden="true"><div class="ln" style="width:42%"></div><div class="ln" style="width:78%"></div></div>
+<div class="skl" aria-hidden="true" style="animation-delay:.12s"><div class="ln" style="width:36%"></div><div class="ln" style="width:64%"></div></div>
+</sc-if>
+
+<sc-if value="{{pReady}}">
+<article class="sheet {{s37}}" style="--i:0">
+<button class="sh" onClick="{{pick37}}" aria-expanded="{{x37}}">
+<p class="ref mono">Loi n°&nbsp;92/007 · 14&nbsp;août&nbsp;1992</p>
+<span class="art"><span>Art.&nbsp;37 — Code du travail</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+<span class="chp"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/></svg>Origine, non consolidée</span>
+</button>
+<div class="body"><div>
+<p class="stt"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/></svg><span><b>Version d’origine, non consolidée.</b> Aucune modification relevée par JuriX au 14&nbsp;oct.&nbsp;2026.</span></p>
+<p class="txt">(1) En cas de rupture de contrat à durée indéterminée du fait de l’employeur, <span class="ps {{p37b}}">hormis le cas de faute lourde</span>, <span class="ps {{p37a}}">le travailleur ayant accompli dans l’entreprise une durée de service continue au moins égale à deux (2) ans, a droit à une indemnité de licenciement distincte de celle du préavis</span>.</p>
+<p class="leg">Souligné&nbsp;: le passage le plus proche de la phrase de la réponse. Extrait&nbsp;: la suite est dans le texte intégral.</p>
+<div class="sacts"><a class="sa" href="Texte.dc.html">Lire dans le texte intégral<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a><button class="sa" onClick="{{copyRef}}">
+<sc-if value="{{refCopied}}"><svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+<sc-if value="{{notRefCopied}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></sc-if>
+<span>{{refLabel}}</span></button></div>
+</div></div>
+</article>
+
+<article class="sheet {{s35}}" style="--i:1">
+<button class="sh" onClick="{{pick35b}}" aria-expanded="{{x35}}">
+<p class="ref mono">Loi n°&nbsp;92/007 · 14&nbsp;août&nbsp;1992</p>
+<span class="art"><span>Art.&nbsp;35 — Code du travail</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+<span class="chp"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/></svg>Origine, non consolidée</span>
+</button>
+<div class="body"><div>
+<p class="stt"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/></svg><span><b>Version d’origine, non consolidée.</b> Aucune modification relevée par JuriX au 14&nbsp;oct.&nbsp;2026.</span></p>
+<p class="txt">(1) Pendant la durée du préavis, l’employeur et le travailleur sont tenus au respect de toutes les <span class="ps {{p35}}">obligations réciproques</span> qui leur incombent.</p>
+<p class="leg">Souligné&nbsp;: le passage le plus proche de la phrase de la réponse. Extrait&nbsp;: la suite est dans le texte intégral.</p>
+<div class="sacts"><a class="sa" href="Texte.dc.html">Lire dans le texte intégral<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a><button class="sa" onClick="{{copyRef}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span>Copier la référence</span></button></div>
+</div></div>
+</article>
+</sc-if>
+
+</div>
+<p class="pfoot">Seul le texte publié au Journal officiel fait foi.</p>
+</aside>
+
+</main>
+
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Apparence"},"$preview":{"width":390,"height":844}}'>
+const Q = 'Quelles indemnités en cas de licenciement ?';
+const AUTO_SHEET = true;  // planche mobile : la feuille s'ouvre d'elle-même pour la présentation
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { on: true, stage: 0, typed: '', pressed: false, sel: 37, passage: 'a', sheet: false, refCopied: false, menu: false, theme: null };
+    this.timers = [];
+    this.tt = 0;
+    this.rt = 0;
+  }
+  componentDidMount() { this.boot(); }
+  componentWillUnmount() { this.stop(); }
+
+  stop() {
+    this.timers.forEach((id) => clearTimeout(id));
+    this.timers = [];
+    clearTimeout(this.tt);
+    clearTimeout(this.rt);
+  }
+  later(fn, ms) { this.timers.push(setTimeout(fn, ms)); }
+
+  boot() {
+    this.stop();
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { this.setState({ stage: 3, typed: '', pressed: false, sel: 37, passage: 'a', sheet: AUTO_SHEET }); if (AUTO_SHEET) this.reveal(); return; }
+    this.setState({ stage: 0, typed: '', pressed: false, sel: 37, passage: 'a' });
+    let i = 0;
+    const type = () => {
+      i += 1;
+      this.setState({ typed: Q.slice(0, i) });
+      if (i < Q.length) {
+        this.tt = setTimeout(type, 45 + Math.random() * 40);
+      } else {
+        this.later(() => this.setState({ pressed: true }), 380);
+        this.later(() => this.setState({ pressed: false, typed: '', stage: 1 }), 560);
+        this.later(() => this.setState({ stage: 2 }), 1700);
+        this.later(() => this.setState({ stage: 3 }), 3900);
+        if (AUTO_SHEET) this.later(() => { this.setState({ sheet: true }); this.reveal(); }, 5000);
+      }
+    };
+    this.tt = setTimeout(type, 2900);
+  }
+  narrow() { return typeof matchMedia === 'function' && matchMedia('(max-width:1023px)').matches; }
+  pick(sel, passage, el) {
+    this.setState({ sel, passage: passage || this.state.passage });
+    this.openSheet(el);
+  }
+  openSheet(el) {
+    if (!this.narrow()) return;
+    if (!this.state.sheet) this.opener = (el && el.id) || (document.activeElement && document.activeElement.id) || null;
+    this.setState({ sheet: true });
+    this.later(() => {
+      const c = document.querySelector('#cites .xclose');
+      if (c) c.focus({ preventScroll: true });
+    }, 60);
+    this.reveal();
+  }
+  // la phrase citée reste visible au-dessus de la feuille
+  reveal() {
+    this.later(() => {
+      const m = document.querySelector('.msgs');
+      const sh = document.getElementById('cites');
+      const c = document.querySelector('.cit.on') || document.querySelector('.cit');
+      if (!m || !sh || !c || !this.narrow()) return;
+      const delta = c.getBoundingClientRect().bottom + 20 - (innerHeight - sh.getBoundingClientRect().height);
+      if (delta > 0 && m.scrollBy) m.scrollBy({ top: delta, behavior: 'smooth' });
+    }, 140);
+  }
+  closeSheet() {
+    if (!this.state.sheet) return;
+    this.setState({ sheet: false });
+    const o = this.opener;
+    this.opener = null;
+    this.later(() => { const n = o && document.getElementById(o); if (n) n.focus({ preventScroll: true }); }, 60);
+  }
+  keys(e) {
+    if (!e) return;
+    if (e.key === 'Escape') {
+      if (this.state.sheet) this.closeSheet();
+      else if (this.state.menu) this.setState({ menu: false });
+      return;
+    }
+    if (e.key === 'Tab' && this.state.sheet && this.narrow()) {
+      const box = document.getElementById('cites');
+      if (!box) return;
+      const f = [...box.querySelectorAll('button,a[href]')].filter((n) => n.getClientRects().length > 0);
+      if (!f.length) return;
+      const a = document.activeElement;
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (!box.contains(a)) { e.preventDefault(); first.focus({ preventScroll: true }); }
+      else if (e.shiftKey && a === first) { e.preventDefault(); last.focus({ preventScroll: true }); }
+      else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus({ preventScroll: true }); }
+    }
+  }
+  copyRef() {
+    this.setState({ refCopied: true });
+    clearTimeout(this.rt);
+    this.rt = setTimeout(() => this.setState({ refCopied: false }), 1800);
+  }
+  replay() {
+    this.stop();
+    this.opener = null;
+    this.setState({ on: false, sheet: false, menu: false });
+    this.later(() => { this.setState({ on: true }); this.boot(); }, 80);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = s.theme || this.props.theme || 'light';
+    const st = s.stage;
+    const has = s.typed.length > 0;
+    const open = st >= 3;
+    const on37 = open && s.sel === 37;
+    return {
+      on: s.on,
+      theme,
+      typed: s.typed,
+      goneCls: st >= 1 ? 'gone' : '',
+      sent: st >= 1,
+      showProg: st === 1 || st === 2,
+      p1a: st === 1, p1d: st === 2, p2: st === 2, p3: st === 2,
+      showAns: st >= 3,
+      hideCls: has ? 'hide' : '',
+      caretCls: st === 0 && has && !s.pressed ? '' : 'off',
+      sndCls: (has ? 'on' : '') + (s.pressed ? ' press' : ''),
+      pEmpty: st === 0,
+      pSearch: st === 1,
+      pReady: st >= 2,
+      s37: on37 ? 'sel' : '',
+      s35: open && s.sel === 35 ? 'sel' : '',
+      x37: on37,
+      x35: open && s.sel === 35,
+      k37a: on37 && s.passage === 'a' ? 'on' : '',
+      k37b: on37 && s.passage === 'b' ? 'on' : '',
+      k35: open && s.sel === 35 ? 'on' : '',
+      p37a: on37 && s.passage === 'a' ? 'on' : '',
+      p37b: on37 && s.passage === 'b' ? 'on' : '',
+      p35: open && s.sel === 35 ? 'on' : '',
+      pick37a: (e) => this.pick(37, 'a', e && e.currentTarget),
+      pick37b: (e) => this.pick(37, 'b', e && e.currentTarget),
+      pick35: (e) => this.pick(35, null, e && e.currentTarget),
+      pick37: () => this.setState({ sel: 37 }),
+      pick35b: () => this.setState({ sel: 35 }),
+      sheet: s.sheet,
+      sheetCls: s.sheet ? 'open' : '',
+      sheetRole: s.sheet && this.narrow() ? 'dialog' : undefined,
+      sheetModal: s.sheet && this.narrow() ? 'true' : undefined,
+      onKey: (e) => this.keys(e),
+      leftCls: s.sheet ? 'sheeted' : '',
+      veilCls: s.sheet ? 'on' : '',
+      peekCls: st >= 2 && !s.sheet ? 'on' : '',
+      openSheet: (e) => this.openSheet(e && e.currentTarget),
+      closeSheet: () => this.closeSheet(),
+      refCopied: s.refCopied, notRefCopied: !s.refCopied,
+      refLabel: s.refCopied ? 'Référence copiée' : 'Copier la référence',
+      copyRef: () => this.copyRef(),
+      menuOpen: s.menu, menuCls: s.menu ? 'on' : '',
+      toggleMenu: () => this.setState({ menu: !s.menu }),
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+      replay: () => this.replay(),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Lecture d’un texte</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500;600&family=Inter:wght@400;500;600;700;800&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.jx{--bg:#FAFAFA;--hd:#FFFFFF;--card:#FFFFFF;--tx:#09090B;--tx1:#3F3F46;--tx2:#52525B;--tx3:#71717A;--bd:#E4E4E7;--bd2:#D4D4D8;--fill:#F4F4F5;--fill2:#FAFAFA;--hl:#D4D4D8;--ink:#09090B;--inkt:#FFFFFF;--ph:#A1A1AA;--ease:cubic-bezier(.22,1,.36,1);position:relative;min-height:1260px;background:var(--bg);color:var(--tx);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:clip;transition:background-color .3s,color .3s}
+.jx[data-theme=dark]{--bg:#09090B;--hd:#09090B;--card:#18181B;--tx:#F4F4F5;--tx1:#D4D4D8;--tx2:#A1A1AA;--tx3:#A1A1AA;--bd:#27272A;--bd2:#3F3F46;--fill:#27272A;--fill2:rgba(39,39,42,.6);--hl:#52525B;--ink:#FFFFFF;--inkt:#09090B;--ph:#71717A}
+.jx *,.jx *::before,.jx *::after{box-sizing:border-box}
+:where(.jx a){color:inherit;text-decoration:none}
+:where(.jx button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:where(.jx h1,.jx h2,.jx p,.jx ul){margin:0;padding:0}
+:where(.jx ul){list-style:none}
+.jx :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.i{width:1em;height:1em;flex-shrink:0;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ——— en-tête ——— */
+.hd{position:relative;z-index:5;display:flex;align-items:center;gap:24px;padding:16px 48px;background:var(--hd);border-bottom:1px solid var(--bd);transition:background-color .3s,border-color .3s}
+.logo{display:flex;align-items:center;gap:10px;border-radius:12px}
+.tile{width:36px;height:36px;border-radius:12px;background:var(--ink);color:var(--inkt);display:flex;align-items:center;justify-content:center;font-size:18px;transition:transform .25s var(--ease),background-color .3s}
+.logo:hover .tile{transform:scale(1.06)}
+.wm{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em}
+.nav{display:flex;align-items:center;gap:24px;margin-left:8px;font-size:14px;line-height:20px;font-weight:500;color:var(--tx3)}
+.nav a{position:relative;padding:6px 0;transition:color .2s}
+.nav a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+.nav a:hover{color:var(--ink)}
+.nav a:hover::after{transform:scaleX(1)}
+.nav a[aria-current]{color:var(--ink);font-weight:600}
+.nav a[aria-current]::after{transform:scaleX(1);animation:sweep .7s var(--ease) .3s both}
+.act{margin-left:auto;display:flex;align-items:center;gap:4px}
+.bi{height:36px;min-width:36px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border-radius:12px;font-size:14px;font-weight:500;color:var(--tx3);white-space:nowrap;transition:background-color .2s,color .2s}
+.bi:hover{background:var(--fill);color:var(--ink)}
+.bi .i{font-size:18px;transition:transform .35s var(--ease)}
+.bi:hover .tg{transform:rotate(22deg)}
+.lang{display:flex;align-items:center}
+.lb.on{font-weight:600;color:var(--ink)}
+.sep{width:1px;height:14px;background:var(--bd2)}
+.vr{width:1px;height:20px;background:var(--bd);margin:0 6px}
+.lnk{padding:8px 20px;font-size:14px;font-weight:600;color:var(--tx3);transition:color .2s}
+.lnk:hover{color:var(--ink)}
+.cta{height:36px;display:inline-flex;align-items:center;padding:0 20px;border-radius:12px;font-size:14px;font-weight:600;background:var(--ink);color:var(--inkt);transition:opacity .2s,transform .2s var(--ease)}
+.cta:hover{opacity:.88}
+.cta:active{transform:scale(.96)}
+.moon{display:inline-block}.sun{display:none}
+.jx[data-theme=dark] .moon{display:none}
+.jx[data-theme=dark] .sun{display:inline-block}
+.menu{display:none}
+
+/* balance : le fléau pivote, les plateaux restent à l'horizontale */
+.bal .bm{transform-box:view-box;transform-origin:12px 5px;animation:bm 1.9s var(--ease) .35s both}
+.bal .pl{transform-box:view-box;transform-origin:5px 7px;animation:pn 1.9s var(--ease) .35s both}
+.bal .pr{transform-box:view-box;transform-origin:19px 7px;animation:pn 1.9s var(--ease) .35s both}
+.logo:hover .bal .bm{animation:bm2 1.5s var(--ease) both}
+.logo:hover .bal .pl,.logo:hover .bal .pr{animation:pn2 1.5s var(--ease) both}
+.bal.wt .bm{animation:bm 1.5s ease-in-out infinite}
+.bal.wt .pl,.bal.wt .pr{animation:pn 1.5s ease-in-out infinite}
+@keyframes bm{0%{transform:rotate(0)}18%{transform:rotate(-11deg)}42%{transform:rotate(7deg)}66%{transform:rotate(-3.5deg)}84%{transform:rotate(1.4deg)}100%{transform:rotate(0)}}
+@keyframes bm2{0%{transform:rotate(0)}18%{transform:rotate(-11deg)}42%{transform:rotate(7deg)}66%{transform:rotate(-3.5deg)}84%{transform:rotate(1.4deg)}100%{transform:rotate(0)}}
+@keyframes pn{0%{transform:rotate(0)}18%{transform:rotate(11deg)}42%{transform:rotate(-7deg)}66%{transform:rotate(3.5deg)}84%{transform:rotate(-1.4deg)}100%{transform:rotate(0)}}
+@keyframes pn2{0%{transform:rotate(0)}18%{transform:rotate(11deg)}42%{transform:rotate(-7deg)}66%{transform:rotate(3.5deg)}84%{transform:rotate(-1.4deg)}100%{transform:rotate(0)}}
+
+/* ——— en-tête du texte ——— */
+.main{position:relative;width:100%;max-width:78rem;margin:0 auto;padding:24px 48px 72px}
+.bc{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;line-height:20px;color:var(--tx3);animation:fade .5s ease both}
+.bc a{transition:color .2s}
+.bc a:hover{color:var(--ink)}
+.bc .i{font-size:14px}
+.bc [aria-current]{color:var(--tx);font-weight:500}
+.th{max-width:860px;margin:20px 0 32px}
+.rep{font-size:14px;line-height:20px;font-weight:500;color:var(--tx2);animation:rise .6s var(--ease) both}
+.h1t{margin:8px 0 20px;font-family:'Literata','Noto Serif',Georgia,serif;font-optical-sizing:auto;font-variation-settings:"opsz" 72;font-weight:600;font-size:clamp(1.75rem,3vw + .5rem,2.5rem);line-height:1.2;text-wrap:balance;animation:rise .8s var(--ease) .1s both}
+.st0{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:12px;background:var(--fill);color:var(--tx1);font-size:14px;line-height:20px;animation:rise .6s var(--ease) .35s both;transition:background-color .3s}
+.st0 strong{font-weight:600;color:var(--tx)}
+.st0 a{text-decoration:underline;text-underline-offset:3px;transition:color .2s}
+.st0 a:hover{color:var(--ink)}
+.stamp{position:relative;flex-shrink:0;margin-top:2px;font-size:16px;color:var(--tx2);animation:stamp .75s cubic-bezier(.3,1.5,.5,1) .8s both}
+.stamp::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid var(--tx3);opacity:0;animation:ring .9s ease-out 1.15s both}
+@keyframes stamp{0%{opacity:0;transform:translateY(-18px) scale(2) rotate(-18deg)}60%{opacity:1;transform:translateY(0) scale(.88) rotate(3deg)}80%{transform:scale(1.07) rotate(-1deg)}100%{transform:none}}
+@keyframes ring{0%{opacity:.8;transform:scale(.3)}100%{opacity:0;transform:scale(2.4)}}
+
+/* ——— mise en page de lecture ——— */
+.grid{display:grid;grid-template-columns:minmax(0,288px) minmax(0,1fr);gap:48px;align-items:start}
+.toc{position:sticky;top:24px;animation:fade .6s ease .4s both}
+.toch{margin-bottom:8px;font-size:14px;line-height:20px;font-weight:600}
+.tocs{display:flex;align-items:center;height:40px;font-size:14px;color:var(--tx2);transition:color .2s}
+.tocs:hover{color:var(--ink)}
+.sec{margin:12px 0 8px;font-size:13px;line-height:18px;font-weight:600;color:var(--tx)}
+.sec span{display:block;margin-top:2px;font-weight:400;color:var(--tx3)}
+.tocl{position:relative;margin-left:4px;border-left:1px solid var(--bd)}
+.tind{position:absolute;left:-1px;top:0;width:2px;height:40px;background:var(--ink);transition:transform .5s cubic-bezier(.34,1.3,.5,1)}
+.ti{position:relative;display:flex;align-items:center;width:100%;height:40px;padding:0 16px;font-size:14px;color:var(--tx2);text-align:left;border-radius:0 8px 8px 0;transition:color .2s,background-color .25s}
+.ti:hover{color:var(--ink);background:var(--fill2)}
+.ti.sel{color:var(--ink);font-weight:600;background:var(--fill)}
+.read{min-width:0;max-width:760px}
+.eb{margin-bottom:8px;font-size:13px;line-height:18px;color:var(--tx3)}
+.arth{margin:0 0 20px;font-family:'Literata','Noto Serif',Georgia,serif;font-optical-sizing:auto;font-variation-settings:"opsz" 72;font-weight:600;font-size:30px;line-height:1.2}
+.body{font-family:'Literata','Noto Serif',Georgia,serif;font-variation-settings:"opsz" 16;font-weight:400;font-size:18px;line-height:1.75;color:var(--tx)}
+.ph0{font-family:'Literata','Noto Serif',Georgia,serif;font-size:18px;line-height:1.75;color:var(--tx3)}
+.art{animation:fade .5s ease both}
+.art.nA{animation:tnA .55s var(--ease) both}
+.art.nB{animation:tnB .55s var(--ease) both}
+.art.pA{animation:tpA .55s var(--ease) both}
+.art.pB{animation:tpB .55s var(--ease) both}
+@keyframes tnA{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
+@keyframes tnB{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
+@keyframes tpA{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
+@keyframes tpB{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
+.hl{background-image:linear-gradient(var(--hl),var(--hl));background-repeat:no-repeat;background-position:0 92%;background-size:100% .42em;animation:hl .9s var(--ease) both;animation-delay:var(--d,900ms)}
+@keyframes hl{from{background-size:0 .42em}to{background-size:100% .42em}}
+
+/* ——— actions ——— */
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin:28px 0 12px}
+.ab{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid var(--bd2);border-radius:12px;background:var(--card);font-size:14px;font-weight:600;color:var(--tx1);transition:border-color .2s,color .2s,transform .15s var(--ease),background-color .3s}
+.ab:hover{border-color:var(--ink);color:var(--ink)}
+.ab:active{transform:scale(.97)}
+.ab .i{font-size:16px}
+.ab .ok{animation:pop .45s cubic-bezier(.3,1.6,.5,1) both}
+.foi{font-size:13px;line-height:18px;color:var(--tx3)}
+@keyframes pop{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:none}}
+
+/* ——— explication de l'IA ——— */
+.ai{margin-top:28px;padding:20px;border:1px solid var(--bd);border-radius:16px;background:var(--card);transition:background-color .3s,border-color .3s}
+.aih{display:flex;align-items:center;gap:10px;font-size:16px;line-height:24px;font-weight:600}
+.aih .i{font-size:18px}
+.aid{margin-top:10px;font-size:14px;line-height:1.6;color:var(--tx2)}
+.ail{display:grid;gap:6px;margin:10px 0 16px;font-size:14px;line-height:1.5;color:var(--tx2)}
+.ail strong{font-weight:600;color:var(--tx)}
+.pbtn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:12px;background:var(--ink);color:var(--inkt);font-size:14px;font-weight:600;transition:opacity .2s,transform .15s var(--ease)}
+.pbtn:hover{opacity:.9}
+.pbtn:active{transform:scale(.96)}
+.pbtn .i{font-size:16px;transition:transform .4s var(--ease)}
+.pbtn:hover .i{transform:rotate(18deg) scale(1.15)}
+.wait{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:14px;font-weight:500;color:var(--tx);animation:fade .3s ease both}
+.wait .bal{font-size:24px}
+.ln{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--fill) 0%,var(--bd) 50%,var(--fill) 100%);background-size:200% 100%;animation:shim 1.3s linear infinite}
+.skl{display:grid;gap:10px;margin-top:14px}
+@keyframes shim{from{background-position:100% 0}to{background-position:-100% 0}}
+.out{display:grid;gap:14px;margin-top:14px}
+.out p{font-size:15px;line-height:1.65;color:var(--tx1)}
+.out strong{font-weight:600;color:var(--tx)}
+.out .s{animation:blurin .8s var(--ease) both}
+.out .s2{animation-delay:.5s}
+@keyframes blurin{from{opacity:0;filter:blur(6px);transform:translateY(6px)}to{opacity:1;filter:none;transform:none}}
+.regen{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin-top:4px;font-size:14px;font-weight:600;color:var(--tx2);transition:color .2s}
+.regen:hover{color:var(--ink)}
+.regen .i{font-size:16px;transition:transform .6s var(--ease)}
+.regen:hover .i{transform:rotate(-360deg)}
+
+/* ——— précédent / suivant ——— */
+.pn{display:flex;justify-content:space-between;gap:12px;margin-top:36px;padding-top:20px;border-top:1px solid var(--bd)}
+.pnb{display:inline-flex;align-items:center;gap:12px;min-height:52px;padding:0 16px;border-radius:12px;font-size:14px;font-weight:600;color:var(--tx1);text-align:left;transition:background-color .2s,color .2s}
+.pnb:hover{background:var(--fill);color:var(--ink)}
+.pnb .i{font-size:18px;transition:transform .35s var(--ease)}
+.pnb.p:hover .i{transform:translateX(-4px)}
+.pnb.n:hover .i{transform:translateX(4px)}
+.pnb small{display:block;font-size:12px;line-height:16px;font-weight:400;color:var(--tx3)}
+.pnb.n{text-align:right}
+
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes sweep{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+@media (max-width:1023px){
+.hd{padding:12px 24px}
+.nav,.hide-md{display:none}
+.menu{display:inline-flex}
+.main{padding:20px 24px 56px}
+.grid{grid-template-columns:minmax(0,1fr);gap:24px}
+.toc{position:static}
+}
+@media (max-width:640px){
+.hd{padding:12px 16px}
+.main{padding:16px 16px 40px}
+.arth{font-size:26px}
+.body{font-size:17px}
+}
+@media (prefers-reduced-motion:reduce){
+.jx *,.jx *::before,.jx *::after{animation:none !important;transition:none !important}
+}
+</style>
+</helmet>
+
+<div class="jx" data-theme="{{theme}}">
+<sc-if value="{{on}}">
+<div class="pg">
+
+<header class="hd">
+<a class="logo" href="Main.dc.html" aria-label="JuriX, accueil">
+<span class="tile"><svg class="i bal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg></span>
+<span class="wm">JuriX</span>
+</a>
+<nav class="nav" aria-label="Navigation principale">
+<a href="Main.dc.html">Accueil</a>
+<a href="#lecture" aria-current="page">Documents</a>
+<a href="#lecture">Blog</a>
+<a href="Recherche.dc.html">Recherche</a>
+<a href="Comparer.dc.html">Comparer</a>
+<a href="#lecture">À propos</a>
+</nav>
+<div class="act">
+<a class="bi hide-md" href="Recherche.dc.html" aria-label="Rechercher, raccourci Ctrl K"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></a>
+<div class="lang hide-md"><button class="bi lb on" aria-label="Passer en français">FR</button><span class="sep"></span><button class="bi lb" aria-label="Switch to English">EN</button></div>
+<button class="bi" aria-label="Changer de thème" onClick="{{toggleTheme}}"><svg class="i tg moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg><svg class="i tg sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
+<button class="bi hide-md"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Profil</button>
+<span class="vr hide-md"></span>
+<a class="lnk hide-md" href="#lecture">Se connecter</a>
+<a class="cta hide-md" href="#lecture">Créer un compte</a>
+<button class="bi menu" aria-label="Ouvrir le menu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></button>
+</div>
+</header>
+
+<main class="main" id="lecture">
+<nav class="bc" aria-label="Fil d’Ariane">
+<a href="#lecture">Documents</a>
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+<a href="#lecture">Travail et sécurité sociale</a>
+<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+<span aria-current="page">Code du travail</span>
+</nav>
+
+<header class="th">
+<p class="rep">Loi n°&nbsp;92/007 · 14&nbsp;août&nbsp;1992</p>
+<h1 class="h1t">Loi N°92/007 du 14 août 1992 portant Code du travail</h1>
+<div class="st0">
+<span class="stamp"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/></svg></span>
+<p><strong>Version d’origine, non consolidée.</strong> Aucune modification relevée par JuriX au 14&nbsp;oct.&nbsp;2026. <a href="#lecture">Signaler</a></p>
+</div>
+</header>
+
+<div class="grid">
+
+<aside class="toc" aria-label="Table des matières">
+<h2 class="toch">Table des matières</h2>
+<a class="tocs" href="#lecture">Début du texte</a>
+<p class="sec">Section III : De la suspension et de la résiliation du contrat de travail<span>4 articles</span></p>
+<div class="tocl">
+<span class="tind" style="transform: translateY({{indY}}px)"></span>
+<button class="ti {{c35}}" onClick="{{go35}}">Art. 35</button>
+<button class="ti {{c36}}" onClick="{{go36}}">Art. 36</button>
+<button class="ti {{c37}}" onClick="{{go37}}">Art. 37</button>
+<button class="ti {{c38}}" onClick="{{go38}}">Art. 38</button>
+</div>
+</aside>
+
+<section class="read" aria-label="Article">
+<div class="art {{artCls}}">
+<p class="eb">Section III : De la suspension et de la résiliation du contrat de travail</p>
+<h2 class="arth">{{artLabel}}</h2>
+<sc-if value="{{is35}}"><p class="body">(1) Pendant la durée du préavis, l’employeur et le travailleur sont tenus au respect de toutes les obligations réciproques qui leur incombent.</p></sc-if>
+<sc-if value="{{is36}}"><p class="ph0">[Texte de l’article 36, à reprendre du corpus]</p></sc-if>
+<sc-if value="{{is37}}"><p class="body">(1) En cas de rupture de contrat à durée indéterminée du fait de l’employeur, hormis le cas de faute lourde, le travailleur ayant accompli dans l’entreprise une durée de service continue au moins égale à deux (2) ans, a droit à une <span class="hl" style="--d:1000ms">indemnité de licenciement</span> distincte de celle du préavis.</p></sc-if>
+<sc-if value="{{is38}}"><p class="ph0">[Texte de l’article 38, à reprendre du corpus]</p></sc-if>
+</div>
+
+<div class="acts">
+<button class="ab" onClick="{{copy}}">
+<sc-if value="{{copied}}"><svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+<sc-if value="{{notCopied}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></sc-if>
+<span>{{copyLabel}}</span>
+</button>
+<button class="ab"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>Partager</button>
+</div>
+<p class="foi">Seul le texte publié au Journal officiel fait foi.</p>
+
+<sc-if value="{{hasAi}}">
+<div class="ai">
+<h3 class="aih" style="margin:0"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>Explication simplifiée (IA)</h3>
+
+<sc-if value="{{aiIdle}}">
+<p class="aid">Demandez à l’assistant d’expliquer cet article en langage courant, à partir de son texte et de son document d’origine. Vous obtiendrez&nbsp;:</p>
+<ul class="ail">
+<li><strong>Contenu clé&nbsp;:</strong> Le résumé des points importants de l’article.</li>
+<li><strong>Implications&nbsp;:</strong> Ce que cela signifie concrètement pour vous.</li>
+</ul>
+<button class="pbtn" onClick="{{explain}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>Expliquer l’article</button>
+</sc-if>
+
+<sc-if value="{{aiLoading}}">
+<div class="wait" role="status"><svg class="i bal wt" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M7 21h10"/><g class="bm"><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><g class="pl"><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/></g><g class="pr"><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/></g></g></svg>Explication en cours…</div>
+<div class="skl" aria-hidden="true"><div class="ln" style="width:38%"></div><div class="ln" style="width:92%"></div><div class="ln" style="width:70%"></div></div>
+</sc-if>
+
+<sc-if value="{{aiDone}}">
+<div class="out">
+<sc-if value="{{is37}}">
+<p class="s"><strong>Contenu clé&nbsp;:</strong> Après au moins deux ans de service continu dans l’entreprise, le travailleur dont le contrat à durée indéterminée est rompu par l’employeur a droit à une indemnité de licenciement, distincte de celle du préavis. La faute lourde est exclue.</p>
+<p class="s s2"><strong>Implications&nbsp;:</strong> Vous êtes concerné si votre contrat est à durée indéterminée, si l’employeur y met fin et si vous avez au moins deux ans de service continu.</p>
+</sc-if>
+<sc-if value="{{is35}}">
+<p class="s"><strong>Contenu clé&nbsp;:</strong> Pendant le préavis, l’employeur et le travailleur restent tenus de leurs obligations réciproques.</p>
+<p class="s s2"><strong>Implications&nbsp;:</strong> Tant que le préavis court, chacun doit continuer à respecter ses engagements envers l’autre.</p>
+</sc-if>
+</div>
+<button class="regen" onClick="{{explain}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Régénérer</button>
+</sc-if>
+</div>
+</sc-if>
+
+<nav class="pn" aria-label="Articles voisins">
+<sc-if value="{{hasPrev}}"><button class="pnb p" onClick="{{goPrev}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg><span>Précédent<small>{{prevLabel}}</small></span></button></sc-if>
+<sc-if value="{{noPrev}}"><span></span></sc-if>
+<sc-if value="{{hasNext}}"><button class="pnb n" onClick="{{goNext}}"><span>Suivant<small>{{nextLabel}}</small></span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button></sc-if>
+</nav>
+</section>
+
+</div>
+</main>
+
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Apparence"},"$preview":{"width":1440,"height":1260}}'>
+const ARTS = [35, 36, 37, 38];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { on: true, art: 37, dir: 'n', flip: false, copied: false, ai: 'idle', theme: null };
+    this.timers = [];
+    this.ct = 0;
+    this.at = 0;
+  }
+  componentWillUnmount() { this.stop(); }
+
+  stop() {
+    this.timers.forEach((id) => clearTimeout(id));
+    this.timers = [];
+    clearTimeout(this.ct);
+    clearTimeout(this.at);
+  }
+  go(n) {
+    if (n === this.state.art) return;
+    clearTimeout(this.at);
+    this.setState({ art: n, dir: n > this.state.art ? 'n' : 'p', flip: !this.state.flip, ai: 'idle' });
+  }
+  copy() {
+    this.setState({ copied: true });
+    clearTimeout(this.ct);
+    this.ct = setTimeout(() => this.setState({ copied: false }), 1900);
+  }
+  explain() {
+    this.setState({ ai: 'loading' });
+    clearTimeout(this.at);
+    this.at = setTimeout(() => this.setState({ ai: 'done' }), 1500);
+  }
+  replay() {
+    this.stop();
+    this.setState({ on: false });
+    this.timers.push(setTimeout(() => this.setState({ on: true, art: 37, ai: 'idle', copied: false }), 80));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = s.theme || this.props.theme || 'light';
+    const i = ARTS.indexOf(s.art);
+    const hasAi = s.art === 35 || s.art === 37;
+    return {
+      on: s.on,
+      theme,
+      indY: i * 40,
+      c35: s.art === 35 ? 'sel' : '', c36: s.art === 36 ? 'sel' : '', c37: s.art === 37 ? 'sel' : '', c38: s.art === 38 ? 'sel' : '',
+      is35: s.art === 35, is36: s.art === 36, is37: s.art === 37, is38: s.art === 38,
+      artLabel: 'Article ' + s.art,
+      artCls: (s.dir === 'n' ? 'n' : 'p') + (s.flip ? 'A' : 'B'),
+      go35: () => this.go(35), go36: () => this.go(36), go37: () => this.go(37), go38: () => this.go(38),
+      goPrev: () => this.go(ARTS[Math.max(0, i - 1)]),
+      goNext: () => this.go(ARTS[Math.min(ARTS.length - 1, i + 1)]),
+      hasPrev: i > 0, noPrev: i === 0,
+      hasNext: i < ARTS.length - 1,
+      prevLabel: i > 0 ? 'Article ' + ARTS[i - 1] : '',
+      nextLabel: i < ARTS.length - 1 ? 'Article ' + ARTS[i + 1] : '',
+      copied: s.copied, notCopied: !s.copied,
+      copyLabel: s.copied ? 'Lien copié' : 'Copier le lien',
+      copy: () => this.copy(),
+      hasAi,
+      aiIdle: s.ai === 'idle', aiLoading: s.ai === 'loading', aiDone: s.ai === 'done',
+      explain: () => this.explain(),
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+    };
+  }
+}
+</script>
+</body>
+</html>
