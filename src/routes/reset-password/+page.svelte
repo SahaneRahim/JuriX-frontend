@@ -18,7 +18,6 @@
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { tr } from "$lib/stores/language";
-  import "../../app.css";
 </script>
 
 <MetaSeo titre={$tr("lien.usedTitle")} indexable={false} />

@@ -45,6 +45,7 @@
   import { get } from "svelte/store";
   import { onMount, tick } from "svelte";
   import { prefersReducedMotion } from "svelte/motion";
+  import { duree } from "$lib/mouvement";
   import { fade } from "svelte/transition";
   import { formatHeure } from "$lib/format";
   import { blocsDeReponse, type Bloc } from "$lib/texte";
@@ -277,12 +278,6 @@
 
   /** Dernière question envoyée, pour que « Réessayer » ait quelque chose à renvoyer. */
   let lastQuestion = "";
-
-  /**
-   * Durée d'une transition, nulle quand le système demande moins de
-   * mouvement ; même règle que le layout (main)/+layout.svelte.
-   */
-  const duree = (ms: number) => (prefersReducedMotion.current ? 0 : ms);
 
   /**
    * Blocs d'un message, avec ses citations marquées (P3), calculés une fois

@@ -29,7 +29,7 @@
    * la vue à l'ouverture : la légende ne promet plus un gras invisible.
    */
   import { onDestroy, onMount, tick } from "svelte";
-  import { prefersReducedMotion } from "svelte/motion";
+  import { duree } from "$lib/mouvement";
   import { fade, fly } from "svelte/transition";
   import { adresseDeLArticle, sansMarqueursDePage } from "$lib/api-publique";
   import Icone from "$lib/components/Icone.svelte";
@@ -69,7 +69,6 @@
   $: t = $tr;
   $: langue = $language.current;
 
-  const duree = (ms: number) => (prefersReducedMotion.current ? 0 : ms);
   const idTitre = `apercu-titre-${Math.random().toString(36).slice(2, 8)}`;
   /** Entre l'intitulé et le statut, quand ils se suivent sur un écran court. */
   const SEPARATEUR_DU_STATUT = " · ";

@@ -8,7 +8,7 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { language, tr } from "$lib/stores/language";
   import { onDestroy } from "svelte";
-  import { prefersReducedMotion } from "svelte/motion";
+  import { duree } from "$lib/mouvement";
   import { fade, fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
 
@@ -94,13 +94,6 @@
    */
   const TITRE_ANGLAIS_AU_TELEPHONE = "max-sm:text-[length:clamp(1.5rem,100cqi/11.2,2.25rem)]";
   $: tailleDuTitreAuTelephone = $language.current === "en" ? TITRE_ANGLAIS_AU_TELEPHONE : "";
-
-  /**
-   * Durée d'une transition, nulle quand le système demande moins de
-   * mouvement. Lue au moment où la transition démarre : un réglage changé en
-   * cours de visite est suivi sans recharger la page.
-   */
-  const duree = (ms: number) => (prefersReducedMotion.current ? 0 : ms);
 
   /**
    * Bouton flottant retiré tant que le haut de l'accueil est à l'écran.

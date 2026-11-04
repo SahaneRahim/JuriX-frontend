@@ -21,7 +21,6 @@
   import { authStore } from "$lib/stores/auth";
   import { reconcilierPersonaALaConnexion } from "$lib/persona-compte";
   import { tr } from "$lib/stores/language";
-  import "../../app.css";
 
   let fullName = "";
   let email = "";

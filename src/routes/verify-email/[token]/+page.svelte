@@ -23,7 +23,6 @@
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { tr } from "$lib/stores/language";
-  import "../../../app.css";
 
   /** Les trois écrans s'excluent : un seul est monté à la fois. */
   let etat: "encours" | "reussi" | "echoue" = "encours";

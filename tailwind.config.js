@@ -78,7 +78,21 @@ export default {
       boxShadow: {
         'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
         'card': '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025)',
-      }
+        // L'ombre des cartes POSÉES de la refonte (champ unique, panneau des
+        // articles cités, liste de résultats, note de lecture) : un filet
+        // proche et une ombre longue et douce, plus profonde que `card`.
+        // Encre zinc-950 en clair, noir en sombre (A3 § 1, `--sheet`) : aucune
+        // teinte, comme le reste du site.
+        'feuille': '0 1px 2px rgba(9, 9, 11, 0.05), 0 18px 40px -22px rgba(9, 9, 11, 0.22)',
+        'feuille-sombre': '0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.8)',
+      },
+      // La courbe commune des arrivées et des changements d'état de la
+      // refonte (A2 § 1, décision X2) : `ease-jx`. Même valeur que la
+      // variable --mv-courbe (src/lib/mouvement.css) et que COURBE
+      // (src/lib/mouvement.ts).
+      transitionTimingFunction: {
+        jx: 'cubic-bezier(.22,1,.36,1)',
+      },
     },
   },
   plugins: [

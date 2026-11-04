@@ -1,0 +1,599 @@
+/*
+ * Le mouvement de JuriX (refonte A) : les gestes et les micro-interactions de
+ * docs/refonte/annexes/A2-mouvement.md, en un seul module.
+ *
+ * POURQUOI UN SEUL MODULE, IMPORTÉ PAR LE LAYOUT RACINE. Cinq copies de la
+ * même courbe et des mêmes @keyframes dériveraient d'un écran à l'autre. Il
+ * est importé par src/routes/+layout.svelte juste après app.css, et non par un
+ * @import dans app.css : une règle @import n'y serait valide qu'avant toute
+ * autre règle, et app.css commence par des @font-face. Les deux feuilles ne
+ * font qu'un fichier au build, app.css d'abord : aucune autre page n'importe
+ * app.css (src/lib/mouvement.test.ts le vérifie).
+ *
+ * POURQUOI TOUT EST SOUS « no-preference ». Les @keyframes, les animations et
+ * les transitions sont déclarés dans @media (prefers-reduced-motion:
+ * no-preference), et là seulement. Un animation-name sans @keyframes ne fait
+ * rien : en mouvement réduit, rien ne bouge, par construction. La règle
+ * globale des maquettes (`.jx * { animation: none !important }`) coupait
+ * trop large : elle n'est pas reprise (A2 § 2.1, décision D8). Hors du bloc ne
+ * restent que des réglages qui ne bougent rien : la géométrie de la balance,
+ * les états finals, les variables.
+ *
+ * POURQUOI LE PRÉFIXE mv-. Ce fichier est chargé APRÈS app.css : un
+ * @keyframes spin, pulse, ping ou bounce remplacerait celui des utilitaires
+ * animate-spin ou animate-pulse de Tailwind, qu'emploient la palette,
+ * SearchBar, StatusBadge et l'administration. Les gestes d'icône s'appellent
+ * donc mv-icone-spin, mv-icone-flip…
+ *
+ * POURQUOI LE STYLE STATIQUE EST L'ÉTAT FINAL. Sans JavaScript, avant
+ * l'hydratation et en mouvement réduit, aucune animation ne joue : un élément
+ * « caché au repos, révélé par l'animation » resterait caché. Les entrées
+ * s'écrivent donc en fill-mode backwards et leurs @keyframes n'ont pas de
+ * « to » : l'animation part d'un état de départ et s'efface devant le style
+ * réel de l'élément, survol compris (`both` figerait la dernière image et
+ * neutraliserait un :hover qui change le transform : A2 § 2.2). Seul le
+ * curseur de l'exemple tapé, purement décoratif, n'existe qu'en mouvement.
+ *
+ * POURQUOI :where() SUR LES RÈGLES STATIQUES. Ce fichier n'est dans aucune
+ * couche de Tailwind : à poids égal, une règle d'ici l'emporterait sur un
+ * utilitaire posé sur le même élément (`hidden` sur un bloc à dérouler,
+ * `absolute` sur une pastille). Sous :where(), sa spécificité tombe à zéro et
+ * l'utilitaire gagne toujours, comme pour `.icone` (app.css, couche
+ * components) et le thème sombre (`:where(.dark)`).
+ *
+ * Délais : variable --d (style="--d: 90ms" sur l'élément animé), 0 par
+ * défaut, sauf le tampon (0,35 s) et la pastille de statut (0,8 s), qui
+ * posent leur propre valeur. Une valeur posée sur un parent descend aux
+ * enfants (variable héritée) : la poser sur l'élément animé lui-même. Aucun
+ * délai ne dépasse 1 s (décision D9) ; le titre et le champ de l'accueil n'en
+ * ont pas.
+ */
+
+:root {
+  /* La courbe commune des arrivées et des changements d'état (décision X2).
+     Elle existe aussi en jeton Tailwind (`ease-jx`) et en constante
+     JavaScript (COURBE, src/lib/mouvement.ts). */
+  --mv-courbe: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Les deux seules exceptions (A2 § 1) : le ressort de la citation et des
+     petites confirmations, et celui du tampon. */
+  --mv-ressort: cubic-bezier(0.3, 1.6, 0.5, 1);
+  --mv-tampon: cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+/* ---------------------------------------------------------------------------
+ * La balance (A2 § 3.1, composant BalanceAnimee.svelte). Géométrie seule :
+ * les points de pivot du fléau et des plateaux, dans le repère de la grille
+ * de 24 de Lucide. Ils ne bougent rien par eux-mêmes.
+ * ------------------------------------------------------------------------- */
+
+:where(.mv-balance__fleau) {
+  transform-box: view-box;
+  transform-origin: 12px 5px;
+}
+
+:where(.mv-balance__plateau-g) {
+  transform-box: view-box;
+  transform-origin: 5px 7px;
+}
+
+:where(.mv-balance__plateau-d) {
+  transform-box: view-box;
+  transform-origin: 19px 7px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Surligner (A2 § 3.2) : le passage cité, dans le texte officiel. Fond de
+ * marqueur ET soulignement de 2 px de l'encre : le fond seul (1,5:1 sur
+ * blanc) ne porterait pas le sens. Élément <mark>, état final au repos.
+ * ------------------------------------------------------------------------- */
+
+:where(.mv-surligne) {
+  color: inherit;
+  background-color: transparent;
+  background-image: linear-gradient(#d4d4d8, #d4d4d8), linear-gradient(#09090b, #09090b); /* zinc-300, zinc-950 */
+  background-repeat: no-repeat;
+  background-position: 0 92%, 0 100%;
+  background-size: 100% 0.42em, 100% 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+:where(.dark .mv-surligne) {
+  background-image: linear-gradient(#52525b, #52525b), linear-gradient(#ffffff, #ffffff); /* zinc-600, blanc */
+}
+
+/* Les mots cherchés d'un résultat (A2 § 3.2) : gras et trait fin de l'encre,
+   sans fond (décision du dépôt, commentaire de SearchResultCard.svelte). */
+:where(.mv-souligne) {
+  background-image: linear-gradient(#09090b, #09090b); /* zinc-950 */
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+:where(.dark .mv-souligne) {
+  background-image: linear-gradient(#ffffff, #ffffff);
+}
+
+/* Contraste élevé (Windows) : le navigateur retire les dégradés et laisse
+   le fond transparent ; le passage cité n'aurait plus aucune marque. Les
+   couleurs système du surlignage la rendent, à leur place. */
+@media (forced-colors: active) {
+  :where(.mv-surligne) {
+    background-color: Mark;
+    color: MarkText;
+  }
+
+  :where(.mv-souligne) {
+    text-decoration: underline 2px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Dérouler (A2 § 3.8) : plier et déplier en place, hauteur automatique, sans
+ * mesure en JavaScript. Les états (replié, ouvert) sont statiques ; seule la
+ * transition est dans le bloc de mouvement.
+ * ------------------------------------------------------------------------- */
+
+:where(.mv-derouler) {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+
+:where(.mv-derouler.mv-ouvert) {
+  grid-template-rows: 1fr;
+}
+
+:where(.mv-derouler > *) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+:where(.mv-ouvert .mv-chevron) {
+  transform: rotate(180deg);
+}
+
+/* ---------------------------------------------------------------------------
+ * Squelette (A2 § 4) : les barres d'attente. Le fond est statique ; le
+ * reflet qui glisse est dans le bloc de mouvement. En sombre, le reflet
+ * passe à zinc-700 : les jetons des maquettes (fond et filet, tous deux
+ * zinc-800 en sombre) donnaient un reflet invisible.
+ * ------------------------------------------------------------------------- */
+
+:where(.mv-squelette) {
+  background-image: linear-gradient(90deg, #f4f4f5, #e4e4e7, #f4f4f5); /* zinc-100, zinc-200 */
+  background-size: 200% 100%;
+}
+
+:where(.dark .mv-squelette) {
+  background-image: linear-gradient(90deg, #27272a, #3f3f46, #27272a); /* zinc-800, zinc-700 */
+}
+
+/* ---------------------------------------------------------------------------
+ * Délais propres : le tampon et la pastille de statut partent après un
+ * temps. Posés sur l'élément même, ils ne reprennent pas un --d hérité d'un
+ * parent animé ; style="--d: …" sur l'élément les remplace.
+ * ------------------------------------------------------------------------- */
+
+:where(.mv-tamponner) {
+  --d: 0.35s;
+}
+
+:where(.mv-tamponner-pastille) {
+  --d: 0.8s;
+}
+
+/* ---------------------------------------------------------------------------
+ * Curseur de l'exemple tapé (A2 § 4) : décoratif, absent en mouvement réduit
+ * (aucun clignotement, aucun trait figé qui passerait pour une saisie).
+ * ------------------------------------------------------------------------- */
+
+:where(.mv-curseur) {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* -------------------------------------------------------------------------
+   * Peser : la balance. Introduction du logo (une fois, 1,9 s, après 0,35 s)
+   * et attente réelle de l'IA (en boucle tant que l'attente dure).
+   * ----------------------------------------------------------------------- */
+  .mv-balance--intro .mv-balance__fleau {
+    animation: mv-balance-fleau 1.9s var(--mv-courbe) 0.35s backwards;
+  }
+
+  .mv-balance--intro .mv-balance__plateau-g,
+  .mv-balance--intro .mv-balance__plateau-d {
+    animation: mv-balance-plateau 1.9s var(--mv-courbe) 0.35s backwards;
+  }
+
+  .mv-balance--attente .mv-balance__fleau {
+    animation: mv-balance-fleau 1.5s ease-in-out infinite;
+  }
+
+  .mv-balance--attente .mv-balance__plateau-g,
+  .mv-balance--attente .mv-balance__plateau-d {
+    animation: mv-balance-plateau 1.5s ease-in-out infinite;
+  }
+
+  /* Le fléau pivote, les plateaux contre-pivotent : ils restent à
+     l'horizontale. Les deux finissent à 0 : l'état de repos est droit. */
+  @keyframes mv-balance-fleau {
+    0% { transform: rotate(0); }
+    18% { transform: rotate(-11deg); }
+    42% { transform: rotate(7deg); }
+    66% { transform: rotate(-3.5deg); }
+    84% { transform: rotate(1.4deg); }
+    100% { transform: rotate(0); }
+  }
+
+  @keyframes mv-balance-plateau {
+    0% { transform: rotate(0); }
+    18% { transform: rotate(11deg); }
+    42% { transform: rotate(-7deg); }
+    66% { transform: rotate(3.5deg); }
+    84% { transform: rotate(-1.4deg); }
+    100% { transform: rotate(0); }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Surligner : le marqueur et le trait se dessinent de gauche à droite.
+   * Souligner : le trait seul, sous les mots cherchés d'un résultat.
+   * ----------------------------------------------------------------------- */
+  .mv-surligner {
+    animation: mv-surligner 0.9s var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-surligner {
+    from { background-size: 0 0.42em, 0 2px; }
+  }
+
+  .mv-souligner {
+    animation: mv-souligner 0.8s var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-souligner {
+    from { background-size: 0 2px; }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Tamponner (A2 § 3.3) : un statut se pose une fois, jamais en boucle.
+   * L'icône (panneau des articles cités) ; la pastille entière et son onde
+   * (page de lecture). Délais par défaut sous 1 s (D9).
+   * ----------------------------------------------------------------------- */
+  .mv-tamponner {
+    animation: mv-tamponner 0.7s var(--mv-tampon) var(--d) backwards;
+  }
+
+  @keyframes mv-tamponner {
+    0% { opacity: 0; transform: translateY(-14px) scale(1.9) rotate(-16deg); }
+    60% { opacity: 1; transform: translateY(0) scale(0.88) rotate(3deg); }
+    80% { transform: scale(1.07) rotate(-1deg); }
+  }
+
+  .mv-tamponner-pastille {
+    position: relative;
+    animation: mv-tamponner-pastille 0.7s var(--mv-tampon) var(--d) backwards;
+  }
+
+  @keyframes mv-tamponner-pastille {
+    0% { opacity: 0; transform: translateY(-16px) scale(1.5) rotate(-6deg); }
+    60% { opacity: 1; transform: translateY(0) scale(0.94) rotate(1deg); }
+    80% { transform: scale(1.04); }
+  }
+
+  /* L'onde, 0,15 s après la pastille et jamais au-delà de 1 s (D9). Elle est
+     invisible au repos (opacité 0) : ni `backwards`, qui la montrerait
+     pendant son délai, ni `forwards` (A2 § 2.2), qui garderait après la fin
+     une boîte agrandie de moitié (une pastille longue dépassait alors l'écran
+     d'un téléphone de 320 px) ; le mode par défaut rend, avant comme après,
+     le style statique, invisible. Tout entière dans ce bloc : en mouvement
+     réduit, le pseudo-élément n'existe pas. */
+  .mv-tamponner-pastille::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 9999px;
+    border: 2px solid #71717a; /* zinc-500 */
+    opacity: 0;
+    pointer-events: none;
+    animation: mv-tamponner-bague 0.9s ease-out min(calc(var(--d) + 0.15s), 1s);
+  }
+
+  .dark .mv-tamponner-pastille::after {
+    border-color: #a1a1aa; /* zinc-400 : le texte tertiaire en sombre (A3 § 1) */
+  }
+
+  @keyframes mv-tamponner-bague {
+    0% { opacity: 0.7; transform: scale(0.6); }
+    100% { opacity: 0; transform: scale(1.5); }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Citer (A2 § 3.4) : la puce d'un article se pose à côté de sa phrase.
+   * Ressort (léger dépassement) : le geste dit un impact. Sur un élément en
+   * ligne (la puce reste un <a> en ligne, décision C1), le transform est sans
+   * effet : seule l'opacité joue.
+   * ----------------------------------------------------------------------- */
+  .mv-citer {
+    animation: mv-citer 0.5s var(--mv-ressort) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-citer {
+    from { opacity: 0; transform: translateY(6px) scale(0.6); }
+  }
+
+  /* Petites confirmations (« Référence copiée », coche, pastille du nombre). */
+  .mv-ressort {
+    animation: mv-ressort 0.45s var(--mv-ressort) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-ressort {
+    from { opacity: 0; transform: scale(0.4); }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Écrire (A2 § 3.5) : la réponse de l'IA arrive du flou au net, bloc par
+   * bloc ; jamais lettre à lettre.
+   * ----------------------------------------------------------------------- */
+  .mv-ecrire {
+    animation: mv-ecrire 0.8s var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-ecrire {
+    from { opacity: 0; filter: blur(6px); transform: translateY(6px); }
+  }
+
+  /* Le titre de l'accueil, mot à mot (masque + translation). Production :
+     aucun délai initial, 30 ms entre les mots (--i = rang du mot), 0,45 s,
+     transform seulement (LCP : A2 § 2.4 et § 3.5). Le masque (overflow) est
+     dans le composant : il ne bouge rien. */
+  .mv-mot {
+    display: inline-block;
+    animation: mv-mot 0.45s var(--mv-courbe) calc(var(--i, 0) * 30ms) backwards;
+  }
+
+  @keyframes mv-mot {
+    from { transform: translateY(112%); }
+  }
+
+  /* La bulle de la question envoyée monte (A2 § 4, « Envoi »), en courbe
+     commune (X2 : la maquette avait un léger dépassement). */
+  .mv-envoyer {
+    animation: mv-envoyer 0.6s var(--mv-courbe) backwards;
+  }
+
+  @keyframes mv-envoyer {
+    from { opacity: 0; transform: translateY(80px) scale(0.92); }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Feuilleter (A2 § 3.6) : passer d'un article à l'autre, dans le sens de la
+   * lecture. Deux noms identiques par sens, alternés à chaque navigation :
+   * CSS ne rejoue pas une animation dont on remet le même nom, et {#key}
+   * détruirait le titre qui reçoit le focus (page de lecture).
+   * ----------------------------------------------------------------------- */
+  .mv-feuilleter-suivant-a {
+    animation: mv-feuilleter-suivant-a 0.55s var(--mv-courbe) backwards;
+  }
+
+  .mv-feuilleter-suivant-b {
+    animation: mv-feuilleter-suivant-b 0.55s var(--mv-courbe) backwards;
+  }
+
+  .mv-feuilleter-precedent-a {
+    animation: mv-feuilleter-precedent-a 0.55s var(--mv-courbe) backwards;
+  }
+
+  .mv-feuilleter-precedent-b {
+    animation: mv-feuilleter-precedent-b 0.55s var(--mv-courbe) backwards;
+  }
+
+  @keyframes mv-feuilleter-suivant-a {
+    from { opacity: 0; transform: translateX(36px); }
+  }
+
+  @keyframes mv-feuilleter-suivant-b {
+    from { opacity: 0; transform: translateX(36px); }
+  }
+
+  @keyframes mv-feuilleter-precedent-a {
+    from { opacity: 0; transform: translateX(-36px); }
+  }
+
+  @keyframes mv-feuilleter-precedent-b {
+    from { opacity: 0; transform: translateX(-36px); }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Dérouler : la transition de hauteur, et le chevron qui tourne.
+   * ----------------------------------------------------------------------- */
+  .mv-derouler {
+    transition: grid-template-rows 0.55s var(--mv-courbe);
+  }
+
+  .mv-chevron {
+    transition: transform 0.5s var(--mv-courbe);
+  }
+
+  /* -------------------------------------------------------------------------
+   * Tracer : le trait qui relie la note de lecture à son passage (A2 § 4),
+   * dessiné depuis le passage ; délai sous 1 s (D9 : la maquette disait
+   * 1,2 s).
+   * ----------------------------------------------------------------------- */
+  .mv-tracer {
+    transform-origin: left;
+    animation: mv-tracer 0.7s var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-tracer {
+    from { transform: scaleX(0); }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Micro-interactions (A2 § 4).
+   * ----------------------------------------------------------------------- */
+
+  /* Apparition des blocs secondaires (tuiles, lignes, cartes) : délai initial
+     nul, échelonnement par --d. Durée réglable par --mv-duree. */
+  .mv-monter {
+    animation: mv-monter var(--mv-duree, 0.6s) var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-monter {
+    from { opacity: 0; transform: translateY(14px); }
+  }
+
+  .mv-fondre {
+    animation: mv-fondre var(--mv-duree, 0.3s) var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-fondre {
+    from { opacity: 0; }
+  }
+
+  /* Carte d'article du panneau « Articles cités » : entrée par la droite. */
+  .mv-carte {
+    animation: mv-carte 0.65s var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-carte {
+    from { opacity: 0; transform: translateX(44px); }
+  }
+
+  /* Coche d'une étape finie qui se trace. Le pointillé de 24 unités couvre la
+     coche de Lucide (moins de 24 unités) : réservé aux tracés courts, un tracé
+     plus long resterait pointillé pendant le mouvement. Il n'existe que
+     pendant le mouvement : en mouvement réduit, la coche est pleine. */
+  .mv-dessiner {
+    stroke-dasharray: 24;
+    animation: mv-dessiner 0.45s var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @keyframes mv-dessiner {
+    from { stroke-dashoffset: 24; }
+  }
+
+  .mv-squelette {
+    animation: mv-squelette 1.3s linear infinite;
+  }
+
+  @keyframes mv-squelette {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+
+  .mv-curseur {
+    display: inline-block;
+    animation: mv-curseur 1s steps(1) infinite;
+  }
+
+  @keyframes mv-curseur {
+    50% { opacity: 0; }
+  }
+
+  /* -------------------------------------------------------------------------
+   * Gestes d'icône des tuiles de domaines (A2 § 4) : au survol d'une tuile
+   * (.mv-geste), son icône (.mv-geste__icone) joue un geste court qui dit
+   * quelque chose de son domaine (la balance pèse pour le civil, le marteau
+   * frappe pour le pénal…). Seulement pour un appareil qui survole vraiment :
+   * sur un écran tactile, l'appui ne doit pas laisser l'icône à mi-geste. Les
+   * gestes partent et finissent au repos (0 % et 100 %) : aucun fill-mode.
+   * Courbe commune pour tous (X2), retournements compris. Noms des gestes :
+   * ceux de A2 § 2.5 et des maquettes (mv-icone-spin, mv-icone-flip…).
+   * ----------------------------------------------------------------------- */
+  @media (hover: hover) {
+    .mv-geste:hover .mv-geste__icone {
+      animation-duration: 0.8s;
+      animation-timing-function: var(--mv-courbe);
+    }
+
+    .mv-geste--hop:hover .mv-geste__icone { animation-name: mv-icone-hop; }
+    .mv-geste--tap:hover .mv-geste__icone { animation-name: mv-icone-tap; transform-origin: 22% 82%; }
+    .mv-geste--tilt:hover .mv-geste__icone { animation-name: mv-icone-tilt; transform-origin: 50% 90%; }
+    .mv-geste--press:hover .mv-geste__icone { animation-name: mv-icone-press; }
+    .mv-geste--swing:hover .mv-geste__icone { animation-name: mv-icone-swing; transform-origin: 50% 8%; }
+    .mv-geste--sway:hover .mv-geste__icone { animation-name: mv-icone-sway; transform-origin: 15% 90%; }
+    .mv-geste--spin:hover .mv-geste__icone { animation-name: mv-icone-spin; }
+    .mv-geste--flip:hover .mv-geste__icone { animation-name: mv-icone-flip; }
+    .mv-geste--beat:hover .mv-geste__icone { animation-name: mv-icone-beat; }
+    .mv-geste--weigh:hover .mv-geste__icone { animation-name: mv-icone-weigh; }
+  }
+
+  /* hop : le geste par défaut */
+  @keyframes mv-icone-hop {
+    0%, 100% { transform: none; }
+    35% { transform: translateY(-4px); }
+    65% { transform: translateY(0); }
+    82% { transform: translateY(-1.5px); }
+  }
+
+  /* tap : le marteau (pénal) */
+  @keyframes mv-icone-tap {
+    0%, 100% { transform: none; }
+    28% { transform: rotate(-24deg); }
+    52% { transform: rotate(9deg); }
+    74% { transform: rotate(-3deg); }
+  }
+
+  /* tilt : le casque (travail) */
+  @keyframes mv-icone-tilt {
+    0%, 100% { transform: none; }
+    30% { transform: rotate(-12deg); }
+    60% { transform: rotate(7deg); }
+    80% { transform: rotate(-2deg); }
+  }
+
+  /* press : le tampon (administration) */
+  @keyframes mv-icone-press {
+    0%, 100% { transform: none; }
+    30% { transform: translateY(-4px); }
+    55% { transform: translateY(2px) scaleY(0.94); }
+    75% { transform: translateY(0); }
+  }
+
+  /* swing : le badge suspendu (fonction publique) */
+  @keyframes mv-icone-swing {
+    0%, 100% { transform: none; }
+    25% { transform: rotate(14deg); }
+    50% { transform: rotate(-9deg); }
+    75% { transform: rotate(4deg); }
+  }
+
+  /* sway : la feuille (environnement) */
+  @keyframes mv-icone-sway {
+    0%, 100% { transform: none; }
+    30% { transform: rotate(-14deg); }
+    60% { transform: rotate(9deg); }
+    80% { transform: rotate(-3deg); }
+  }
+
+  /* spin : le globe (traités) */
+  @keyframes mv-icone-spin {
+    from { transform: rotate(0); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* flip : les pièces (finances) */
+  @keyframes mv-icone-flip {
+    from { transform: perspective(80px) rotateY(0); }
+    to { transform: perspective(80px) rotateY(360deg); }
+  }
+
+  /* beat : le cœur (santé) */
+  @keyframes mv-icone-beat {
+    0%, 100% { transform: none; }
+    20% { transform: scale(1.22); }
+    40% { transform: scale(1); }
+    60% { transform: scale(1.14); }
+  }
+
+  /* weigh : la balance (civil) */
+  @keyframes mv-icone-weigh {
+    0%, 100% { transform: none; }
+    22% { transform: rotate(-12deg); }
+    48% { transform: rotate(8deg); }
+    72% { transform: rotate(-3deg); }
+  }
+}

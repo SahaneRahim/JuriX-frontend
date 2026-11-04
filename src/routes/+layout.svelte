@@ -25,7 +25,19 @@
   // (font-display: optional) et prechargee par src/hooks.server.ts. Les icones
   // ne sont pas une police mais des SVG Lucide (src/lib/icones.ts), inscrits
   // dans la page : rien a telecharger, rien d'invisible en attendant.
+  //
+  // ICI SEULEMENT. Toute page herite de ce layout : un second import de
+  // app.css (les pages de compte et l'administration en avaient un) en
+  // faisait une feuille partagee, que SvelteKit sert APRES celle du layout.
+  // Le mouvement passait alors avant app.css en production, et chaque page
+  // chargeait une feuille bloquante de plus. src/lib/mouvement.test.ts
+  // verifie qu'aucun autre fichier ne l'importe.
   import "../app.css";
+  // POURQUOI ICI, APRES app.css : le mouvement de la refonte (gestes,
+  // balance, apparitions) est un module partage, charge une fois pour tout le
+  // site ; un @import dans app.css n'y serait valide qu'avant ses @font-face.
+  // Tout y est garde par prefers-reduced-motion (src/lib/mouvement.css).
+  import "$lib/mouvement.css";
 
   /**
    * La boîte « Changer de profil » vit ICI : c'est le seul layout qui couvre

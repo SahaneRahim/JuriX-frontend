@@ -7,7 +7,6 @@
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import { authStore } from "$lib/stores/auth";
   import { tr } from "$lib/stores/language";
-  import "../../app.css";
 
   /**
    * Titre de l'onglet, dérivé du chemin.
