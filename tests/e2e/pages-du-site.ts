@@ -316,9 +316,10 @@ export const PAGES: PageDuSite[] = [
       return ADRESSE_INCONNUE;
     },
     principal: titre,
-    // « Retour à l'accueil », l'action principale de la page. Les liens de
-    // navigation repris sous la recherche sont masqués à partir de lg, où
-    // l'en-tête affiche les mêmes juste au-dessus (+error.svelte).
+    // « Retour à l'accueil », l'action principale de la page. Sous la
+    // recherche, les autres destinations du site : à partir de lg, celles que
+    // la barre de l'en-tête affiche juste au-dessus y sont masquées ;
+    // « Recherche » et « À propos », qu'elle n'a plus, restent (+error.svelte).
     action: (page) => page.getByTestId('error-home'),
   },
   {

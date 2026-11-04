@@ -18,6 +18,9 @@
  *    plus à 360 px, sans badge.
  *  - Restes r3 n° 3 et 42 : la navigation de l'en-tête suit le logo, et le
  *    contenu de l'accueil s'aligne sur lui.
+ *  - Refonte A, E2 : l'introduction du logo ne rejoue pas à la navigation
+ *    interne, ni à l'aller-retour entre l'accueil et l'assistant sur un
+ *    téléphone, réseau lent compris.
  *
  * DONNÉES. L'accueil est rendu par le serveur, dont `page.route` ne voit pas
  * les appels : il lit la vraie API, et chaque test est sauté quand elle est
@@ -32,7 +35,7 @@
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { AGENT_MOBILE, attendreLeRepos, enregistrerLaRecherche, ouvrirAuServeur, visible } from '../doublures';
+import { AGENT_MOBILE, attendreLeRepos, enregistrerLaRecherche, exiger, ouvrirAuServeur, visible } from '../doublures';
 import { cliquerJusqualEffet } from '../hydratation';
 
 const TELEPHONE = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: AGENT_MOBILE };
@@ -335,4 +338,93 @@ test.describe('En-tête et marges (restes r3)', () => {
       });
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Refonte A, E2 : l'introduction du logo, une fois par chargement du document
+// ---------------------------------------------------------------------------
+
+/**
+ * Les animations en cours dans la balance du logo de l'en-tête, par leur nom.
+ * Une animation dans son délai (0,35 s) en fait déjà partie.
+ */
+const animationsDuLogo = (page: Page): Promise<string[]> =>
+  page.evaluate(() => {
+    const balance = document.querySelector('[data-testid="site-logo"] svg');
+    if (!balance) return ['pas de balance'];
+    return document
+      .getAnimations()
+      .filter((animation) => {
+        const cible = (animation.effect as KeyframeEffect | null)?.target;
+        return cible instanceof Node && balance.contains(cible);
+      })
+      .map((animation) => (animation as CSSAnimation).animationName);
+  });
+
+/**
+ * Accueil → assistant (par le menu du site) → retour arrière, puis assistant
+ * → accueil (par le menu du chat) : à chaque retour sur l'accueil, le logo
+ * est de nouveau affiché, et rien ne doit y jouer. Contrôlé dès que le logo
+ * se montre : une introduction rejouée y serait en cours pendant 2,25 s.
+ */
+async function allerRetourParLAssistant(page: Page): Promise<void> {
+  await cliquerJusqualEffet(page.getByTestId('nav-mobile-toggle'), page.getByTestId('nav-mobile-panel'));
+  await page.locator('[data-testid=nav-mobile-panel] a[href="/chat"]').click();
+  await page.waitForURL((adresse) => adresse.pathname === '/chat');
+  await expect(page.getByTestId('site-logo')).toBeHidden();
+  await page.goBack();
+  await page.waitForURL((adresse) => adresse.pathname === '/');
+  await expect(page.getByTestId('site-logo')).toBeVisible();
+  expect(await animationsDuLogo(page), 'retour arrière sur l’accueil').toEqual([]);
+
+  await page.goForward();
+  await page.waitForURL((adresse) => adresse.pathname === '/chat');
+  await cliquerJusqualEffet(page.getByTestId('chat-menu-toggle'), page.getByTestId('chat-menu'));
+  await page.locator('#chat-menu a[href="/"]').click();
+  await page.waitForURL((adresse) => adresse.pathname === '/');
+  await expect(page.getByTestId('site-logo')).toBeVisible();
+  expect(await animationsDuLogo(page), '« Accueil » du menu du chat').toEqual([]);
+}
+
+test.describe('Logo de l’en-tête : une introduction par chargement (refonte A, E2)', () => {
+  // Sous lg : l'en-tête du layout (main), commun à / et à /chat, n'est pas
+  // recréé entre les deux pages ; sur /chat, il est seulement masqué, et une
+  // animation CSS repart chaque fois que son élément sort de `display: none`.
+  // La balance pesait donc de nouveau à chaque retour sur l'accueil
+  // (BalanceAnimee.svelte, `introTerminee`).
+  test.use(TELEPHONE);
+
+  test('l’aller-retour entre l’accueil et l’assistant ne rejoue pas l’introduction', async ({ page }) => {
+    await ouvrirAuServeur(page, '/');
+    await attendreLHydratation(page);
+    // L'introduction du chargement joue, puis s'arrête (2,25 s).
+    await expect.poll(() => animationsDuLogo(page), { timeout: 5_000 }).toEqual([]);
+    await allerRetourParLAssistant(page);
+  });
+
+  test('ni quand le JavaScript arrive après la fin de l’introduction (réseau lent)', async ({ page }) => {
+    // L'introduction part avec le HTML du serveur, sans attendre le
+    // JavaScript. Sur un réseau lent, elle est finie quand le composant est
+    // monté : sa fin est passée avant tout écouteur, et c'est le montage qui
+    // doit la constater. Les scripts de la page sont retenus jusqu'à la fin
+    // de l'introduction, puis rendus : aucune durée à deviner.
+    let rendreLesScripts!: () => void;
+    const scriptsRendus = new Promise<void>((fin) => (rendreLesScripts = fin));
+    await page.route('**/_app/immutable/**/*.js', async (route) => {
+      await scriptsRendus;
+      await route.continue();
+    });
+    // Sans attendre l'événement `load`, que les scripts retenus bloquent.
+    const statut = (await page.goto('/', { waitUntil: 'commit' }))?.status() ?? 0;
+    exiger(statut !== 503, '/ : API indisponible (503)');
+    expect(statut, '/ : statut').toBeLessThan(400);
+    await page.waitForSelector('[data-testid="site-logo"] svg', { state: 'attached' });
+    // L'introduction joue sans JavaScript, puis s'arrête.
+    await expect.poll(() => animationsDuLogo(page), { timeout: 5_000 }).not.toEqual([]);
+    await expect.poll(() => animationsDuLogo(page), { timeout: 5_000 }).toEqual([]);
+    rendreLesScripts();
+    await attendreLHydratation(page);
+    expect(await animationsDuLogo(page), 'au montage').toEqual([]);
+    await allerRetourParLAssistant(page);
+  });
 });

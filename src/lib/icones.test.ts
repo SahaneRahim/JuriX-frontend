@@ -241,7 +241,10 @@ describe('noms d’icônes employés dans src', () => {
     // Un contrôle qui ne lirait plus rien (chemin changé, motif cassé)
     // passerait le test suivant sans rien vérifier.
     expect(EMPLOIS.size).toBeGreaterThan(50);
-    expect(EMPLOIS.get('scale')).toContain(join('lib', 'components', 'SiteHeader.svelte'));
+    // Le logo du pied de page : celui de l'en-tête est devenu la balance
+    // animée (BalanceAnimee, bâtie sur `elementsIcone('scale')`), qui
+    // n'écrit pas `nom="scale"`.
+    expect(EMPLOIS.get('scale')).toContain(join('lib', 'components', 'SiteFooter.svelte'));
     expect(EMPLOIS.get('archive')).toContain(join('lib', 'components', 'StatusBadge.svelte'));
     expect(EMPLOIS.get('zap')).toContain(join('routes', 'admin', '+page.svelte'));
     expect(EMPLOIS.get('user-round-group')).toContain(join('lib', 'categories.ts'));

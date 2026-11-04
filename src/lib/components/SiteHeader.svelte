@@ -9,14 +9,19 @@
    * pas un seul `<a>`. En parallèle, `/search` recopiait le header à la main,
    * et les deux copies avaient divergé.
    *
-   * Les liens viennent de `$lib/nav`, source unique lue aussi par le pied de
-   * page et par le test `tests/e2e/navigation/link-integrity.spec.ts`.
+   * Les liens viennent de `$lib/nav` : `NAV_LINKS`, les quatre liens de la
+   * refonte A (barre et panneau du menu), et `LIEN_ACCUEIL`, que porte le
+   * logo. Le pied de page et le menu du chat lisent la liste complète
+   * (`FOOTER_LINKS`) ; le test `tests/e2e/navigation/link-integrity.spec.ts`
+   * vérifie les deux.
    */
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
+  import BalanceAnimee from "$lib/components/BalanceAnimee.svelte";
   import Icone from "$lib/components/Icone.svelte";
-  import { NAV_LINKS } from "$lib/nav";
+  import { duree } from "$lib/mouvement";
+  import { LIEN_ACCUEIL, NAV_LINKS, PAGES_DE_COMPTE } from "$lib/nav";
   import { authStore } from "$lib/stores/auth";
   import { language, switchLanguage, tr } from "$lib/stores/language";
   import { themeStore } from "$lib/stores/theme";
@@ -27,8 +32,8 @@
     ouvrirChoixPersona,
     personaStore,
   } from "$lib/stores/persona";
-  import { prefersReducedMotion } from "svelte/motion";
-  import { slide } from "svelte/transition";
+  import { quintOut } from "svelte/easing";
+  import { fly } from "svelte/transition";
 
   // Plus de prop `variant` : l'en-tête a la même surface sur toutes les pages
   // (voir le commentaire de <header>). `transparent` servait au groupe (main),
@@ -111,9 +116,55 @@
   // « Créer un compte » y devient un bouton secondaire bordé (guide § 4.4) :
   // plein, il disputait l'œil à ce bouton (en sombre, les deux seuls grands
   // blocs blancs de l'écran), et poussait même, sur /login, vers l'action
-  // inverse de celle de la page.
-  const PAGES_DE_COMPTE = ["/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"];
+  // inverse de celle de la page. La liste vit dans $lib/nav : la barre
+  // d'onglets du bas de la refonte (décision H6) la lira aussi.
   $: surUnePageDeCompte = PAGES_DE_COMPTE.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  /**
+   * Le soulignement des liens de navigation (A2 § 4) : un trait de 2 px à
+   * l'encre qui se déroule depuis la gauche au survol et au focus clavier, et
+   * déjà tracé sous le lien de la page courante.
+   *
+   * POURQUOI SOUS LE LIBELLÉ, ET NON AU BAS DU LIEN. Sous xl, le lien fait
+   * 44 px de haut (cible au doigt) : un trait posé au bas du `<a>` flotterait
+   * à une douzaine de pixels sous le texte. Il est le `::before` d'un
+   * `<span>` qui n'enveloppe que le libellé, 6 px sous sa ligne, comme dans
+   * les maquettes ; le `<a>` garde son `::after` invisible (`data-libelle`,
+   * largeur du demi-gras réservée), et son texte, donc son nom accessible,
+   * reste le libellé seul. Le survol et le focus sont ceux du lien (`group`),
+   * pas du `<span>`.
+   *
+   * POURQUOI `motion-safe:` SUR LA DURÉE ET LA COURBE AUSSI. Tailwind écrit
+   * `motion-safe:…transition-transform` dans un bloc @media placé APRÈS les
+   * utilitaires sans variante, avec sa durée (150 ms) et sa courbe par
+   * défaut : un `duration-[350ms]` ou un `ease-jx` sans variante, écrit plus
+   * haut dans la feuille, perdrait contre elles. Les trois réglages sont donc
+   * dans la même variante. En mouvement réduit, le trait paraît ou disparaît
+   * d'un coup, sans transition.
+   *
+   * POURQUOI `forced-colors:` (contraste élevé de Windows). Le trait est un
+   * fond, et ce mode remplace tout fond par la couleur de la page : le trait
+   * disparaissait, et la page courante ne se distinguait plus que par la
+   * graisse. `CanvasText`, couleur système (celle du texte), est gardée par le
+   * mode. `!` : sans lui, `dark:before:bg-white`, plus spécifique
+   * (`:is(.dark *)`), l'emporterait en sombre.
+   */
+  const SOULIGNEMENT =
+    "relative before:absolute before:inset-x-0 before:-bottom-1.5 before:h-0.5 before:origin-left before:rounded-full before:bg-zinc-950 dark:before:bg-white forced-colors:before:!bg-[CanvasText] motion-safe:before:transition-transform motion-safe:before:duration-[350ms] motion-safe:before:ease-jx";
+  /** Le trait de la page courante : tracé, sans attendre le survol. */
+  const SOULIGNEMENT_COURANT = "before:scale-x-100";
+  /** Le trait des autres liens : replié, déroulé au survol ou au focus clavier du lien. */
+  const SOULIGNEMENT_AU_SURVOL = "before:scale-x-0 group-hover:before:scale-x-100 group-focus-visible:before:scale-x-100";
+
+  /**
+   * Les icônes du thème tournent de 22° au survol du bouton (A2 § 4), en
+   * 350 ms sur la courbe commune. La rotation elle-même est sous
+   * `motion-safe:` comme la transition (même raison que pour le
+   * soulignement) : en mouvement réduit, l'icône reste droite, au lieu de
+   * basculer d'un coup.
+   */
+  const ICONE_DU_THEME =
+    "motion-safe:transition-transform motion-safe:duration-[350ms] motion-safe:ease-jx motion-safe:group-hover:rotate-[22deg]";
 
   // Couleurs de « Créer un compte », dans la barre comme dans le menu. Les
   // trois états ont la même bordure d'1 px (transparente sur le bouton
@@ -136,10 +187,29 @@
   // Fermer le panneau après une navigation, sinon il masque la page d'arrivée.
   afterNavigate(() => (mobileOpen = false));
 
+  /** Le panneau, quand il est ouvert, et ses deux bascules (le menu sous lg, les réglages de lg à xl). */
+  let panneau: HTMLDivElement | null = null;
+  let boutonMenu: HTMLButtonElement;
+  let boutonReglages: HTMLButtonElement;
+
   // Le garde est dans le gestionnaire et non autour de <svelte:window> : Svelte
   // exige que cet élément soit à la racine du composant, jamais dans un bloc.
+  //
+  // POURQUOI LE FOCUS REVIENT À LA BASCULE. Le panneau est monté par {#if} :
+  // le fermer retire du document l'élément qui avait le focus (un lien, le
+  // profil, la langue…), et le focus tombait sur <body> : le clavier perdait
+  // sa place (la tabulation suivante sautait dans le contenu de la page), et
+  // un lecteur d'écran n'annonçait rien (WCAG 2.4.3). Le focus revient donc
+  // au bouton qui ouvre le panneau, celui des deux qui est affiché (l'autre
+  // est en `display: none`, sans boîte). Il est déplacé AVANT que le panneau
+  // ne quitte le document : Svelte ne le retire qu'après ce gestionnaire. Le
+  // focus hors du panneau (sur le bouton lui-même, dans la page), Échap ferme
+  // sans le déplacer.
   function onKeydown(event: KeyboardEvent) {
-    if (mobileOpen && event.key === "Escape") mobileOpen = false;
+    if (!mobileOpen || event.key !== "Escape") return;
+    const focusDansLePanneau = panneau?.contains(document.activeElement) ?? false;
+    mobileOpen = false;
+    if (focusDansLePanneau) [boutonMenu, boutonReglages].find((bouton) => bouton?.getClientRects().length)?.focus();
   }
 
   $: nomDuProfil = $personaStore.persona
@@ -171,8 +241,10 @@
     réglages et le compte.
   - De lg à xl : les liens rejoignent la barre, les réglages et le compte
     restent dans le menu. À 1 024 px, la barre laissait 750 px vides entre
-    le logo et la loupe ; les six liens (470 px en français) y tiennent avec
-    plus de 200 px de chaque côté. La barre COMPLÈTE, elle, n'y tient pas :
+    le logo et la loupe ; les quatre liens de la refonte (320 px en
+    français, 301 en anglais, mesurés le 2026-11-04) y tiennent à 32 px du
+    logo, et laissent près de 400 px avant la loupe. Les six liens d'avant
+    (470 px) y tenaient aussi. La barre COMPLÈTE, elle, n'y tient pas :
     1 023 px de contenu en français pour 928 disponibles, « Créer un compte »
     coupé et la page qui glissait de côté (mesuré le 2026-10-28,
     tests/e2e/navigation/redimensionnement.spec.ts). Le bouton du menu y
@@ -222,9 +294,23 @@
   Marges latérales : 16 px, 24 px à partir de sm, 48 px à partir de lg, et au
   moins la zone sûre (encoche d'un iPhone en paysage, `viewport-fit=cover`).
 
-  Écran court (`court:`, téléphone en paysage) : 8 px au-dessus et au-dessous
-  des boutons de 44 px, et non les 16 px de sm. La barre en prenait 77 sur
-  360 : sur les pages de compte, le bouton d'envoi tombait sous l'écran.
+  Hauteur. Sous lg, la barre fait 56 px, filet compris (`min-h-14`, boîte
+  bordure comprise), comme la barre mobile des maquettes de la refonte : les
+  boutons de 44 px y gardent 5,5 px de part et d'autre. Elle faisait 69 px,
+  puis 77 à partir de sm (12, puis 16 px autour des boutons, filet compris) :
+  13 à 21 px rendus à la page sur un téléphone ou une tablette. Téléphone en
+  paysage compris : 56 px, c'est déjà moins que les 61 px qu'y prenait la
+  barre réduite de l'écran court.
+  À partir de lg, la hauteur du bureau ne change pas (16 px autour des
+  boutons) : le décalage collant du sommaire de lecture (`lg:top-24`) en
+  dépend, et la maquette de bureau (64 px) sera examinée avec lui.
+  Écran court à partir de lg (`lg:court:`, 500 px de haut au plus : fenêtre
+  de bureau basse, écran partagé) : 8 px au lieu de 16 autour des boutons,
+  61 px au lieu de 77 de lg à xl. La variante est née sur le téléphone en
+  paysage (77 px sur 360 : sur les pages de compte, le bouton d'envoi tombait
+  sous l'écran) ; ce téléphone est passé sous lg, où la barre de 56 px
+  suffit. Elle ne joue plus que pour une fenêtre large et basse, où la même
+  place manque.
 
   Surface : la même sur toutes les pages, fond blanc (fond de page en sombre)
   et filet zinc-200 (zinc-800) en bas, comme le pied du site (SiteFooter)
@@ -236,7 +322,7 @@
 -->
 <header
   data-testid="site-header"
-  class="relative z-50 flex w-full items-center justify-between gap-4 border-b border-zinc-200 bg-white py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] dark:border-zinc-800 dark:bg-background-dark sm:py-4 sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] lg:justify-start lg:gap-6 lg:px-12 court:py-2
+  class="relative z-50 flex min-h-14 w-full items-center justify-between gap-4 border-b border-zinc-200 bg-white pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] dark:border-zinc-800 dark:bg-background-dark sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] lg:min-h-0 lg:justify-start lg:gap-6 lg:px-12 lg:py-4 lg:court:py-2
     {sticky ? 'sticky top-0' : ''}"
 >
   <!-- Logo. Le lien n'occupe que le logo, et non toute la colonne : étiré
@@ -244,13 +330,25 @@
        l'accueil. 44 px de haut sous xl, comme les boutons voisins (la tuile
        seule n'en fait que 36) ; sans effet sur la hauteur de la barre, que
        ces boutons fixent déjà. À partir de lg, le bloc prend la largeur du
-       logo seulement : les liens le suivent. -->
+       logo seulement : les liens le suivent.
+       Le logo est le lien d'accueil : « Accueil » a quitté la navigation
+       (décision H3), et c'est lui qui porte `aria-current="page"` sur
+       l'accueil, que plus aucun lien ne signalait sinon.
+       La balance pèse une fois au chargement du document
+       (`BalanceAnimee`, `intro` : 1,9 s), jamais au survol ni à la
+       navigation suivante (décision D7, A2 § 2.3) ; au survol, seule la
+       tuile grossit. Le logo du pied de page reste une icône fixe. -->
   <div class="flex flex-1 items-center lg:flex-none">
-    <a href="/" data-testid="site-logo" class="flex min-h-11 items-center gap-2.5 rounded-xl group xl:min-h-0">
+    <a
+      href={LIEN_ACCUEIL.href}
+      data-testid="site-logo"
+      aria-current={LIEN_ACCUEIL.isActive(pathname) ? "page" : undefined}
+      class="flex min-h-11 items-center gap-2.5 rounded-xl group xl:min-h-0"
+    >
       <div
         class="bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 w-9 h-9 rounded-xl flex items-center justify-center shadow-sm dark:shadow-none motion-safe:group-hover:scale-105 transition-transform duration-200"
       >
-        <Icone nom="scale" class="text-lg" />
+        <BalanceAnimee etat="intro" class="text-lg" />
       </div>
       <span class="text-xl font-extrabold tracking-tight text-zinc-950 dark:text-white"
         >JuriX</span
@@ -258,10 +356,13 @@
     </a>
   </div>
 
-  <!-- Navigation (à partir de lg). « Accueil » n'y est plus retiré sous xl :
-       la barre a la place, et sans lui, aucun lien ne portait l'état actif
-       sur l'accueil. Liens de 44 px de haut jusqu'à xl, comme les boutons
-       voisins : une tablette en paysage s'en sert au doigt. -->
+  <!-- Navigation (à partir de lg) : les quatre liens de la refonte
+       (« Assistant IA », « Parcourir », « Comparer », « Blog » ; décision
+       H3). « Accueil » n'y est plus : le logo, juste avant, mène à l'accueil
+       et y porte l'état actif. « Recherche » et « À propos » restent
+       atteignables par la loupe et par le pied de page. Liens de 44 px de
+       haut jusqu'à xl, comme les boutons voisins : une tablette en paysage
+       s'en sert au doigt. -->
   <nav
     class="hidden shrink-0 lg:ml-2 lg:flex items-center gap-6 2xl:gap-7 min-[1800px]:gap-8 text-sm font-medium text-secondary-text-light dark:text-secondary-text-dark"
   >
@@ -269,7 +370,8 @@
       <!-- L'état actif n'était signalé QUE par la couleur : invisible aux
            lecteurs d'écran, et invisible tout court pour qui ne distinguait
            pas le bleu d'alors du gris environnant. `aria-current` le dit aux
-           premiers ; la graisse, en plus du noir, le montre aux seconds.
+           premiers ; la graisse et le trait déjà tracé, en plus du noir, le
+           montrent aux seconds.
            Chaque lien réserve la largeur de son libellé en demi-gras : un
            `::after` sans hauteur le recopie depuis `data-libelle`, et la
            colonne flex prend la largeur du plus large des deux, où elle
@@ -277,16 +379,20 @@
            4 px, et ses voisins glissaient d'autant à chaque navigation
            (« Blog » à 351 px sur l'accueil, à 355 sur /laws). Invisible
            (`visibility: hidden`), la copie ne compte ni dans le nom
-           accessible ni dans le texte du lien. -->
+           accessible ni dans le texte du lien. Le trait est sur le
+           `<span>` du libellé (`SOULIGNEMENT`, plus haut). -->
       <a
         aria-current={lien.isActive(pathname) ? "page" : undefined}
         data-libelle={$tr(lien.key)}
-        class="flex min-h-11 flex-col items-center justify-center whitespace-nowrap transition-colors after:invisible after:h-0 after:overflow-hidden after:font-semibold after:content-[attr(data-libelle)] hover:text-zinc-950 dark:hover:text-white xl:min-h-0 {lien.isActive(
+        class="group flex min-h-11 flex-col items-center justify-center whitespace-nowrap transition-colors after:invisible after:h-0 after:overflow-hidden after:font-semibold after:content-[attr(data-libelle)] hover:text-zinc-950 dark:hover:text-white xl:min-h-0 {lien.isActive(
           pathname,
         )
           ? 'text-zinc-950 dark:text-white font-semibold'
           : 'text-zinc-500 dark:text-zinc-400'}"
-        href={lien.href}>{$tr(lien.key)}</a
+        href={lien.href}
+        ><span class="{SOULIGNEMENT} {lien.isActive(pathname) ? SOULIGNEMENT_COURANT : SOULIGNEMENT_AU_SURVOL}"
+          >{$tr(lien.key)}</span
+        ></a
       >
     {/each}
   </nav>
@@ -388,9 +494,10 @@
       <!-- Les deux icônes, alternées en CSS par la classe `dark` que pose
            app.html avant le premier affichage. Le serveur ne connaît pas le
            thème choisi (localStorage) : un {#if} sur le store dessinait la lune,
-           puis la remplaçait par le soleil à l'hydratation. -->
-      <Icone nom="moon" class="text-lg dark:hidden transition-transform duration-300 motion-safe:group-hover:rotate-12 motion-safe:group-hover:scale-110" />
-      <Icone nom="sun" class="text-lg hidden dark:inline-block transition-transform duration-300 motion-safe:group-hover:rotate-45 motion-safe:group-hover:scale-110" />
+           puis la remplaçait par le soleil à l'hydratation. Au survol, elles
+           tournent de 22° (`ICONE_DU_THEME`). -->
+      <Icone nom="moon" class="text-lg dark:hidden {ICONE_DU_THEME}" />
+      <Icone nom="sun" class="text-lg hidden dark:inline-block {ICONE_DU_THEME}" />
     </button>
 
     <!-- Le profil, avec un libellé visible : son icône seule (une personne
@@ -510,6 +617,7 @@
       <Icone nom="search" class="text-2xl" />
     </a>
     <button
+      bind:this={boutonMenu}
       on:click={() => (mobileOpen = !mobileOpen)}
       data-testid="nav-mobile-toggle"
       aria-expanded={mobileOpen}
@@ -520,6 +628,7 @@
       <Icone nom={mobileOpen ? "x" : "menu"} class="text-2xl" />
     </button>
     <button
+      bind:this={boutonReglages}
       on:click={() => (mobileOpen = !mobileOpen)}
       data-testid="nav-reglages-toggle"
       aria-expanded={mobileOpen}
@@ -538,69 +647,58 @@
   reprend donc ces quatre familles de contrôles, pas seulement les liens.
 
   z-50 : au-dessus du bouton flottant de l'assistant (z-40), qui recouvrait
-  « Créer un compte » sur un téléphone en paysage. Il s'ouvre en glissant
-  (sauf mouvement réduit) et se ferme d'un coup : après une navigation, la
-  page d'arrivée s'affiche sans attendre qu'il se replie.
+  « Créer un compte » sur un téléphone en paysage.
+
+  Monté par {#if} : absent du HTML du serveur tant qu'il est fermé, rien
+  n'y est focalisable fermé. À l'ouverture, il descend de 8 px en
+  apparaissant (`fly`, 350 ms, A2 § 4 ; rien en mouvement réduit, `duree`),
+  sur la courbe commune des arrivées : `quintOut` est la fonction dont
+  `cubic-bezier(.22,1,.36,1)` (COURBE, $lib/mouvement) est le tracé usuel,
+  et une transition Svelte prend une fonction, pas une courbe CSS. La
+  maquette le garde dans la page, caché par une `visibility` retardée : sans
+  objet ici, il n'existe pas fermé. Il se ferme d'un coup : après une
+  navigation, la page d'arrivée s'affiche sans attendre qu'il se replie.
 
   De lg à xl, les liens sont dans la barre : le panneau ne garde que les
   réglages et le compte, sans le filet qui les séparait des liens.
 -->
 {#if mobileOpen}
   <div
+    bind:this={panneau}
     id="site-nav-mobile"
     data-testid="nav-mobile-panel"
     class="xl:hidden relative z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-background-dark py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] lg:px-12"
-    in:slide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
+    in:fly={{ y: -8, duration: duree(350), easing: quintOut }}
   >
+    <!-- Les liens de la barre, sous lg : 48 px de haut, en 16 px demi-gras
+         (maquettes de la refonte). Tous en demi-gras, la page courante se
+         distingue par l'encre et par le trait déjà tracé sous son libellé,
+         comme dans la barre du bureau, et non par la seule couleur. -->
     <nav class="flex flex-col lg:hidden">
       {#each NAV_LINKS as lien (lien.href)}
         <a
           href={lien.href}
           aria-current={lien.isActive(pathname) ? "page" : undefined}
-          class="-mx-2 flex min-h-11 items-center rounded-xl px-2 py-3 text-base transition-colors active:bg-zinc-100 dark:active:bg-zinc-800/60 {lien.isActive(
+          class="group -mx-2 flex min-h-12 items-center rounded-xl px-2 text-base font-semibold transition-colors active:bg-zinc-100 dark:active:bg-zinc-800/60 {lien.isActive(
             pathname,
           )
-            ? 'font-semibold text-zinc-950 dark:text-white'
-            : 'font-medium text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}">{$tr(lien.key)}</a
+            ? 'text-zinc-950 dark:text-white'
+            : 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white'}"
+          ><span class="{SOULIGNEMENT} {lien.isActive(pathname) ? SOULIGNEMENT_COURANT : SOULIGNEMENT_AU_SURVOL}"
+            >{$tr(lien.key)}</span
+          ></a
         >
       {/each}
     </nav>
 
     <!--
-      Deux rangées et non une : réglages, puis compte. Sur une seule ligne,
-      FR, EN, thème, profil, « Se connecter » et « Créer un compte » faisaient
-      environ 350 px, contre 312 disponibles à 360 px : la page glissait de
-      côté et le dernier bouton était coupé.
+      Trois rangées et non une : réglages, compte, puis la langue. Sur une
+      seule ligne, FR, EN, thème, profil, « Se connecter » et « Créer un
+      compte » faisaient environ 350 px, contre 312 disponibles à 360 px : la
+      page glissait de côté et le dernier bouton était coupé.
     -->
     <div class="mt-3 flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800 lg:mt-0 lg:border-t-0 lg:pt-0">
       <div class="flex flex-wrap items-center gap-2">
-        <button
-          on:click={() => switchLanguage("fr")}
-          data-testid="lang-fr-mobile"
-          aria-label="{$tr('a11y.switchTo')} français"
-          class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {$language.current ===
-          'fr'
-            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
-            : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">FR</button
-        >
-        <button
-          on:click={() => switchLanguage("en")}
-          data-testid="lang-en-mobile"
-          aria-label="{$tr('a11y.switchTo')} English"
-          class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {$language.current ===
-          'en'
-            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
-            : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">EN</button
-        >
-        <button
-          on:click={themeStore.toggle}
-          data-testid="theme-toggle-mobile"
-          aria-label={$tr("a11y.toggleTheme")}
-          class="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
-        >
-          <Icone nom="moon" class="text-xl dark:hidden" />
-          <Icone nom="sun" class="text-xl hidden dark:inline-block" />
-        </button>
         <!-- « Profil » visible, comme sur le bureau : l'icône seule (une
              personne pour « Citoyen »), posée juste au-dessus de « Se
              connecter », passait ici aussi pour le bouton du compte.
@@ -615,6 +713,21 @@
         >
           <Icone nom={PERSONA_ICONE[$personaStore.persona ?? "general"]} class="text-xl" />
           <span>{$tr("persona.chatLabel")}</span>
+        </button>
+        <!-- Le thème reste dans le panneau (décision D15). La maquette mobile
+             le met dans la barre ; mais la barre n'a de bouton du thème qu'à
+             partir de xl : l'y déplacer demanderait de traiter aussi le
+             palier lg–xl, sans laisser deux `theme-toggle-mobile` dans la
+             page. Ses icônes tournent au survol, comme celles du bureau
+             (`ICONE_DU_THEME`). -->
+        <button
+          on:click={themeStore.toggle}
+          data-testid="theme-toggle-mobile"
+          aria-label={$tr("a11y.toggleTheme")}
+          class="group ml-auto inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
+        >
+          <Icone nom="moon" class="text-xl dark:hidden {ICONE_DU_THEME}" />
+          <Icone nom="sun" class="text-xl hidden dark:inline-block {ICONE_DU_THEME}" />
         </button>
       </div>
 
@@ -648,7 +761,8 @@
         <!-- Comme sur le bureau : la page courante porte `aria-current`, en
              bouton bordé au contour noir ; sur une page de compte, « Créer un
              compte » n'est plus un second bouton plein au-dessus de celui de
-             la carte (`couleursInscription`). -->
+             la carte (`couleursInscription`). Les maquettes les dessinent en
+             liens de 48 px : les boutons bordés restent, à valider à l'œil. -->
         <div class="grid grid-cols-2 gap-2">
           <a
             href="/login"
@@ -667,6 +781,36 @@
           >
         </div>
       {/if}
+
+      <!-- La ligne « Langue » (maquettes de la refonte) : la rangée FR / EN,
+           sous son libellé visible, en dernier, comme dans les maquettes.
+           Le groupe prend ce libellé pour nom : un lecteur d'écran entend
+           « Langue » avant les deux boutons, qui gardent leur nom
+           (« Passer en français », « Passer en English »). Boutons de 44 px ;
+           la langue active, pleine. -->
+      <div role="group" aria-labelledby="site-nav-langue" class="flex items-center gap-2">
+        <span id="site-nav-langue" class="mr-1 text-sm font-medium text-zinc-600 dark:text-zinc-400"
+          >{$tr("entete.langue")}</span
+        >
+        <button
+          on:click={() => switchLanguage("fr")}
+          data-testid="lang-fr-mobile"
+          aria-label="{$tr('a11y.switchTo')} français"
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {$language.current ===
+          'fr'
+            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
+            : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">FR</button
+        >
+        <button
+          on:click={() => switchLanguage("en")}
+          data-testid="lang-en-mobile"
+          aria-label="{$tr('a11y.switchTo')} English"
+          class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {$language.current ===
+          'en'
+            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
+            : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">EN</button
+        >
+      </div>
     </div>
   </div>
 {/if}

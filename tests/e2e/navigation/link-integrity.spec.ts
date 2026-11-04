@@ -18,7 +18,7 @@
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { cliquerJusqualEffet } from '../hydratation';
-import { NAV_LINKS } from '../../../src/lib/nav';
+import { FOOTER_LINKS, NAV_LINKS } from '../../../src/lib/nav';
 
 const API = process.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -171,6 +171,101 @@ test.describe('Intégrité des liens', () => {
         `${lien.href} absent du header`,
       ).toBeAttached();
     }
+    // La liste complète (refonte A, décision H3) : « Recherche » et « À
+    // propos » ont quitté l'en-tête, le pied de page les garde. Chacun de ses
+    // liens répond et y figure ; l'accueil aussi, par le logo du pied de page.
+    // La boucle précédente, recopiée, échouerait sur « À propos », absent de
+    // l'en-tête.
+    for (const lien of FOOTER_LINKS) {
+      const res = await page.request.get(lien.href, { failOnStatusCode: false });
+      expect(
+        await lienMort(page.request, res.status(), lien.href, 'FOOTER_LINKS'),
+        `${lien.href} depuis FOOTER_LINKS`,
+      ).toBe(false);
+      await expect(
+        page.locator(`[data-testid=site-footer] a[href="${lien.href}"]`).first(),
+        `${lien.href} absent du pied de page`,
+      ).toBeAttached();
+    }
+    // La liste du pied de page est privée de l'accueil (décision H7,
+    // SiteFooter.svelte) : son logo y mène déjà. Un seul lien vers `/`, le
+    // logo, et pas de lien texte « Accueil » en plus des six autres.
+    await expect(page.locator('[data-testid=site-footer] a[href="/"]'), 'liens vers / du pied de page').toHaveCount(1);
+    await expect(page.locator('[data-testid=site-footer] nav a'), 'liens de la liste du pied de page').toHaveCount(
+      FOOTER_LINKS.length - 1,
+    );
+  });
+
+  test('à 390 px, le menu mène à l’assistant, et Échap le referme', async ({ page }) => {
+    // La demande d'origine du projet : « Assistant IA » ouvre le chat, à
+    // toutes les largeurs. Sous lg, la barre ne montre que le logo, la loupe
+    // et le bouton du menu : le lien est dans le panneau.
+    await page.setViewportSize({ width: 390, height: 844 });
+    // /about et non / : la page ne lit pas l'API, le test ne dépend pas d'elle.
+    await page.goto('/about');
+    const bascule = page.getByTestId('nav-mobile-toggle');
+    const panneau = page.getByTestId('nav-mobile-panel');
+    await cliquerJusqualEffet(bascule, panneau);
+    const lien = page.locator('[data-testid=nav-mobile-panel] a[href="/chat"]');
+    await expect(lien).toBeVisible();
+    await expect(lien).toHaveAccessibleName('Assistant IA');
+
+    // Échap le referme, et le bouton le dit. Le focus était sur un lien du
+    // panneau, qui sort du document avec lui : il revient au bouton du menu,
+    // au lieu de tomber sur <body> (la tabulation suivante sautait dans le
+    // contenu de la page).
+    await lien.focus();
+    await page.keyboard.press('Escape');
+    await expect(panneau).toHaveCount(0);
+    await expect(bascule).toHaveAttribute('aria-expanded', 'false');
+    await expect(bascule).toBeFocused();
+
+    await bascule.click();
+    await expect(lien).toBeVisible();
+    await lien.click();
+    await expect(page).toHaveURL(/\/chat$/);
+    // La page du chat, et le panneau refermé par la navigation.
+    await expect(page.getByRole('log')).toBeVisible();
+    await expect(panneau).toHaveCount(0);
+  });
+
+  test('la page d’erreur garde « Recherche » et « À propos », que l’en-tête n’a plus', async ({ page }) => {
+    // Son pied de page n'a pas de liens (`navigation={false}`) : la liste
+    // sous la recherche est la seule sortie vers ces deux pages, sorties de
+    // l'en-tête (décision H3). À partir de lg, elle ne répète pas les quatre
+    // liens que la barre affiche juste au-dessus ; en dessous, elle les garde
+    // tous, à portée sans ouvrir le menu. Une adresse inconnue : sans l'API.
+    const autres = FOOTER_LINKS.map((lien) => lien.href).filter((href) => href !== '/');
+    const cas: [number, string[]][] = [
+      [1280, ['/search', '/about']],
+      [390, autres],
+    ];
+    for (const [largeur, attendus] of cas) {
+      await page.setViewportSize({ width: largeur, height: 800 });
+      const statut = (await page.goto('/page-qui-n-existe-pas-verification'))?.status();
+      expect(statut, `${largeur} px : statut`).toBe(404);
+      const affiches = await page
+        .getByTestId('error-page')
+        .locator('nav a')
+        .evaluateAll((liens) => liens.filter((a) => a.getClientRects().length > 0).map((a) => a.getAttribute('href')));
+      expect(affiches, `${largeur} px : liens affichés sous la recherche`).toEqual(attendus);
+    }
+  });
+
+  test('à 1 100 px, Échap depuis le menu des réglages rend le focus à son bouton', async ({ page }) => {
+    // De lg à xl, le même panneau ne garde que les réglages et le compte, et
+    // s'ouvre par un autre bouton (`nav-reglages-toggle`) : c'est à lui, le
+    // seul des deux affiché, que le focus revient.
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.goto('/about');
+    const bascule = page.getByTestId('nav-reglages-toggle');
+    const panneau = page.getByTestId('nav-mobile-panel');
+    await cliquerJusqualEffet(bascule, panneau);
+    await page.getByTestId('persona-toggle-mobile').focus();
+    await page.keyboard.press('Escape');
+    await expect(panneau).toHaveCount(0);
+    await expect(bascule).toHaveAttribute('aria-expanded', 'false');
+    await expect(bascule).toBeFocused();
   });
 });
 

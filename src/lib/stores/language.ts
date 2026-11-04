@@ -434,6 +434,11 @@ export const translations = {
     'nav.blog': 'Blog',
     'nav.search': 'Recherche',
     'nav.compare': 'Comparer',
+    // Les liens de l'en-tête de la refonte A (src/lib/nav.ts, décision H3).
+    // `nav.chat` dit la même chose que `mode.chat` : une clé distincte, parce
+    // que chaque lien du manifeste porte la sienne.
+    'nav.chat': 'Assistant IA',
+    'nav.parcourir': 'Parcourir',
     'compare.title': 'Comparer deux régimes',
     'compare.subtitle': 'Deux recherches distinctes dans le corpus, une grille sourcée article par article.',
     'compare.subjectA': 'Premier sujet',
@@ -950,6 +955,8 @@ export const translations = {
     'accueil.domaines.tousSansChiffre': 'Lois, décrets, arrêtés et autres textes officiels',
     'accueil.domaines.vide': 'Aucun texte pour l’instant',
     'entete.pageDeRecherche': 'Ouvrir la page de recherche',
+    // La ligne FR / EN du panneau du menu mobile (SiteHeader.svelte).
+    'entete.langue': 'Langue',
 
     // Page d'un texte (P1, P2, P10, Q5). Le statut ne dit que ce que le relevé
     // prouve, jamais « En vigueur » ; la date est celle de l'acte, et l'ajout
@@ -1615,6 +1622,10 @@ export const translations = {
     'nav.blog': 'Blog',
     'nav.search': 'Search',
     'nav.compare': 'Compare',
+    // Header links of redesign A (src/lib/nav.ts): `nav.chat` says the same
+    // as `mode.chat`.
+    'nav.chat': 'AI Assistant',
+    'nav.parcourir': 'Browse',
     'compare.title': 'Compare two regimes',
     'compare.subtitle': 'Two separate searches in the corpus, a grid sourced article by article.',
     'compare.subjectA': 'First subject',
@@ -2059,6 +2070,7 @@ export const translations = {
     'accueil.domaines.tousSansChiffre': 'Laws, decrees, orders and other official texts',
     'accueil.domaines.vide': 'No texts yet',
     'entete.pageDeRecherche': 'Open the search page',
+    'entete.langue': 'Language',
 
     // Law page (P1, P2, P10, Q5).
     'loi.retour': 'Back',

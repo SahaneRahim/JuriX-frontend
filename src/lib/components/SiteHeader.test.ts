@@ -1,6 +1,6 @@
-import { fireEvent, render } from '@testing-library/svelte';
+import { fireEvent, render, within } from '@testing-library/svelte';
 import { flushSync, mount, unmount } from 'svelte';
-import { get } from 'svelte/store';
+import { get, type Writable } from 'svelte/store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -16,9 +16,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$app/environment', () => ({ browser: true, building: false, dev: false, version: 'test' }));
 vi.mock('$app/navigation', () => ({ afterNavigate: () => {}, goto: async () => {} }));
 vi.mock('$app/stores', async () => {
-  const { readable } = await import('svelte/store');
+  const { writable } = await import('svelte/store');
   return {
-    page: readable({ url: new URL('http://site/'), route: { id: '/(main)' }, params: {}, data: {}, error: null }),
+    page: writable({ url: new URL('http://site/'), route: { id: '/(main)' }, params: {}, data: {}, error: null }),
   };
 });
 
@@ -33,8 +33,23 @@ Element.prototype.animate = vi.fn(() => ({
 
 const { default: SiteHeader } = await import('./SiteHeader.svelte');
 const { closeCommandPalette, commandPaletteOpen } = await import('$lib/stores/commandPalette');
+const { page } = await import('$app/stores');
 
-afterEach(() => closeCommandPalette());
+/** Ouvre l'en-tête sur `chemin` : la page courante, dont il dérive l'état actif. */
+function allerSur(chemin: string) {
+  (page as unknown as Writable<unknown>).set({
+    url: new URL(chemin, 'http://site'),
+    route: { id: null },
+    params: {},
+    data: {},
+    error: null,
+  });
+}
+
+afterEach(() => {
+  closeCommandPalette();
+  allerSur('/');
+});
 
 /** Les deux loupes (bureau, puis téléphone) : les éléments qui portent l'icône de recherche et ouvrent une boîte. */
 function loupesDe(container: HTMLElement): HTMLElement[] {
@@ -55,16 +70,15 @@ describe('SiteHeader monté', () => {
     // Le rôle de bouton, que les tests e2e cherchent (monochrome.spec.ts).
     expect(getAllByRole('button', { name: /^Recherche et actions rapides/ })).toEqual(loupes);
     // Toujours le lien du rendu serveur, sans préchargement de /search : le
-    // clic n'y mène plus. Le lien « Recherche » de la navigation, lui, reste
-    // un lien ordinaire.
+    // clic n'y mène plus.
     for (const loupe of loupes) {
       expect(loupe.tagName).toBe('A');
       expect(loupe.getAttribute('href')).toBe('/search');
       expect(loupe.getAttribute('data-sveltekit-preload-data')).toBe('off');
     }
-    const lienDeNavigation = container.querySelector('nav a[href="/search"]');
-    expect(lienDeNavigation?.getAttribute('role')).toBeNull();
-    expect(lienDeNavigation?.getAttribute('aria-label')).toBeNull();
+    // La navigation n'a plus de lien « Recherche » (refonte A, décision H3) :
+    // les loupes sont les seuls accès à /search de l'en-tête.
+    expect(container.querySelector('nav a[href="/search"]')).toBeNull();
   });
 
   it('ouvre la palette au clic sur chacune des loupes, sans suivre le lien', async () => {
@@ -164,9 +178,10 @@ describe('SiteHeader monté', () => {
     // glissaient de 3 à 4 px d'une page à l'autre. La copie en demi-gras est
     // un `::after` invisible : le texte du lien, et donc son nom, restent le
     // libellé seul.
-    const { container } = render(SiteHeader);
+    const { container, getByTestId } = render(SiteHeader);
     const liens = [...container.querySelectorAll('[data-testid="site-header"] nav a')];
-    expect(liens.length).toBeGreaterThan(4);
+    // Les quatre liens de la refonte A (décision H3).
+    expect(liens).toHaveLength(4);
     for (const lien of liens) {
       const libelle = lien.textContent?.trim();
       expect(lien.getAttribute('data-libelle'), lien.getAttribute('href') ?? '').toBe(libelle);
@@ -174,10 +189,13 @@ describe('SiteHeader monté', () => {
         expect(lien.classList.contains(classe), `${libelle} : ${classe}`).toBe(true);
       }
     }
-    // L'accueil, page courante du test : demi-gras et `aria-current`.
-    const accueil = liens.find((lien) => lien.getAttribute('href') === '/');
-    expect(accueil?.getAttribute('aria-current')).toBe('page');
-    expect(accueil?.classList.contains('font-semibold')).toBe(true);
+    // L'accueil, page courante du test : « Accueil » a quitté la navigation,
+    // c'est le logo, lien d'accueil, qui porte `aria-current` ; aucun lien de
+    // la navigation n'est actif.
+    expect(getByTestId('site-logo').getAttribute('href')).toBe('/');
+    expect(getByTestId('site-logo').getAttribute('aria-current')).toBe('page');
+    expect(liens.filter((lien) => lien.hasAttribute('aria-current'))).toEqual([]);
+    expect(liens.filter((lien) => lien.classList.contains('font-semibold'))).toEqual([]);
   });
 
   it('dans le menu mobile, le profil a son libellé visible, comme au bureau', async () => {
@@ -189,5 +207,128 @@ describe('SiteHeader monté', () => {
     // Le libellé visible est dans le nom accessible (WCAG 2.5.3).
     expect(profil.getAttribute('aria-label')).toMatch(/^Changer de profil \(actuel/);
     expect(profil.getAttribute('aria-label')?.toLowerCase()).toContain('profil');
+  });
+
+  it('ouvre l’assistant depuis la barre : « Assistant IA », lien vers /chat', () => {
+    // La demande d'origine du projet : le bouton « Assistant IA » ouvre le
+    // chat. Un lien, et non un bouton : il marche avant l'hydratation.
+    const { getByTestId } = render(SiteHeader);
+    const barre = getByTestId('site-header').querySelector('nav') as HTMLElement;
+    expect(within(barre).getByRole('link', { name: 'Assistant IA' }).getAttribute('href')).toBe('/chat');
+  });
+
+  it('ouvre aussi l’assistant depuis le menu mobile, qu’Échap referme', async () => {
+    const { getByTestId, queryByTestId } = render(SiteHeader);
+    const bascule = getByTestId('nav-mobile-toggle');
+    expect(bascule.getAttribute('aria-expanded')).toBe('false');
+    // Fermé, le panneau n'est pas dans la page : rien n'y est focalisable.
+    expect(queryByTestId('nav-mobile-panel')).toBeNull();
+
+    await fireEvent.click(bascule);
+    expect(bascule.getAttribute('aria-expanded')).toBe('true');
+    const panneau = getByTestId('nav-mobile-panel');
+    expect(within(panneau).getByRole('link', { name: 'Assistant IA' }).getAttribute('href')).toBe('/chat');
+
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    expect(bascule.getAttribute('aria-expanded')).toBe('false');
+    expect(queryByTestId('nav-mobile-panel')).toBeNull();
+  });
+
+  it('Échap depuis le panneau rend le focus au bouton du menu, et non à <body>', async () => {
+    // Le panneau est monté par {#if} : le refermer retire du document le lien
+    // qui avait le focus, et le focus tombait sur <body> (le clavier perdait
+    // sa place, WCAG 2.4.3). jsdom ne met rien en page :
+    // le bouton du menu est dit affiché (une boîte), comme sous lg, et celui
+    // des réglages ne l'est pas.
+    const { container, getByTestId, queryByTestId } = render(SiteHeader);
+    const bascule = getByTestId('nav-mobile-toggle');
+    vi.spyOn(bascule, 'getClientRects').mockReturnValue([{ width: 44, height: 44 }] as unknown as DOMRectList);
+    await fireEvent.click(bascule);
+    const lien = within(getByTestId('nav-mobile-panel')).getByRole('link', { name: 'Assistant IA' });
+    lien.focus();
+    expect(document.activeElement).toBe(lien);
+
+    await fireEvent.keyDown(lien, { key: 'Escape' });
+    expect(queryByTestId('nav-mobile-panel')).toBeNull();
+    expect(bascule.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(bascule);
+
+    // Le focus hors du panneau (ici, la loupe), Échap le laisse où il est.
+    await fireEvent.click(bascule);
+    const loupe = loupesDe(container)[1];
+    loupe.focus();
+    await fireEvent.keyDown(loupe, { key: 'Escape' });
+    expect(queryByTestId('nav-mobile-panel')).toBeNull();
+    expect(document.activeElement).toBe(loupe);
+  });
+
+  it('range FR et EN dans la ligne « Langue » du menu mobile, nommée par son libellé', async () => {
+    const { getByTestId } = render(SiteHeader);
+    await fireEvent.click(getByTestId('nav-mobile-toggle'));
+    const langue = within(getByTestId('nav-mobile-panel')).getByRole('group', { name: 'Langue' });
+    expect(within(langue).getAllByRole('button').map((b) => b.getAttribute('data-testid'))).toEqual([
+      'lang-fr-mobile',
+      'lang-en-mobile',
+    ]);
+    // Le thème reste dans le panneau (décision D15), hors de la ligne de la langue.
+    expect(langue.contains(getByTestId('theme-toggle-mobile'))).toBe(false);
+  });
+
+  it('sur une page de la navigation, son lien est le lien courant, et le logo ne l’est plus', async () => {
+    // Une catégorie est rangée sous « Parcourir » (/laws), comme dans le fil
+    // d'Ariane d'un texte.
+    allerSur('/categories/13');
+    const { container, getByTestId } = render(SiteHeader);
+    const courants = [...container.querySelectorAll('[data-testid="site-header"] nav a[aria-current="page"]')];
+    expect(courants.map((lien) => lien.getAttribute('href'))).toEqual(['/laws']);
+    // L'encre et le demi-gras, plus le trait déjà tracé sous le libellé : pas
+    // la couleur seule.
+    expect(courants[0].classList.contains('font-semibold')).toBe(true);
+    expect(courants[0].querySelector('span')?.classList.contains('before:scale-x-100')).toBe(true);
+    expect(getByTestId('site-logo').hasAttribute('aria-current')).toBe(false);
+    // Dans le menu mobile aussi.
+    await fireEvent.click(getByTestId('nav-mobile-toggle'));
+    const panneau = getByTestId('nav-mobile-panel');
+    expect([...panneau.querySelectorAll('a[aria-current="page"]')].map((lien) => lien.getAttribute('href'))).toEqual([
+      '/laws',
+    ]);
+  });
+
+  it('souligne les autres liens au survol ET au focus clavier du lien, sous le libellé', () => {
+    // Le trait est le `::before` du <span> du libellé : posé au bas du lien,
+    // haut de 44 px sous xl, il flotterait loin du texte. Le survol et le
+    // focus sont ceux du lien (`group`), pas du <span>.
+    const { container } = render(SiteHeader);
+    for (const lien of container.querySelectorAll('[data-testid="site-header"] nav a')) {
+      expect(lien.classList.contains('group')).toBe(true);
+      const libelle = lien.querySelector(':scope > span');
+      expect(libelle?.textContent).toBe(lien.textContent);
+      for (const classe of [
+        'relative',
+        'before:h-0.5',
+        'before:origin-left',
+        'before:scale-x-0',
+        'group-hover:before:scale-x-100',
+        'group-focus-visible:before:scale-x-100',
+        'motion-safe:before:transition-transform',
+        // Contraste élevé de Windows : le fond du trait y devient celui de la
+        // page, sauf en couleur système.
+        'forced-colors:before:!bg-[CanvasText]',
+      ]) {
+        expect(libelle?.classList.contains(classe), `${lien.textContent} : ${classe}`).toBe(true);
+      }
+    }
+  });
+
+  it('porte la balance animée dans la tuile du logo, et non l’icône fixe', () => {
+    const { getByTestId } = render(SiteHeader);
+    const logo = getByTestId('site-logo');
+    const balance = logo.querySelector('svg.mv-balance');
+    expect(balance).not.toBeNull();
+    expect(balance?.getAttribute('aria-hidden')).toBe('true');
+    // Une seule balance : celle de BalanceAnimee (le registre la dessine à plat).
+    expect(logo.querySelectorAll('svg')).toHaveLength(1);
+    // Le nom accessible du lien reste « JuriX ».
+    expect(logo.textContent?.trim()).toBe('JuriX');
   });
 });

@@ -6,7 +6,7 @@
     lireSessionChat,
   } from "$lib/chat-session";
   import { piegerFocus } from "$lib/actions/pieger-focus";
-  import { NAV_LINKS } from "$lib/nav";
+  import { FOOTER_LINKS } from "$lib/nav";
   import {
     changerPersona,
     lectureDuCompteEnCours,
@@ -1928,7 +1928,14 @@
       <!-- Dans le flux, comme le menu mobile de l'en-tête : la conversation
            rétrécit le temps qu'il est ouvert, rien ne la recouvre. Le choix
            FR / EN reste ici (P5) : la boîte des profils, qui le portait aussi,
-           ne s'ouvre plus d'elle-même. -->
+           ne s'ouvre plus d'elle-même.
+           Les liens : la liste complète du site (`FOOTER_LINKS`), et non les
+           quatre de l'en-tête (décision H3) : sous lg, ce menu remplace
+           l'en-tête ET le pied de page, que /chat n'a pas ; « Recherche » et
+           « À propos » restent ainsi à portée. Sept liens sur deux colonnes :
+           le dernier (« À propos ») prend la rangée entière plutôt que d'y
+           rester seul. « Assistant IA » est la page affichée : `aria-current`
+           et le demi-gras le disent, comme dans l'en-tête. -->
       {#if menuOuvert}
         <nav
           id="chat-menu"
@@ -1937,12 +1944,16 @@
           class="border-t border-zinc-200 px-2 py-2 dark:border-zinc-800 lg:hidden"
         >
           <ul class="grid grid-cols-2 gap-1">
-            {#each NAV_LINKS as lien (lien.href)}
-              <li>
+            {#each FOOTER_LINKS as lien (lien.href)}
+              <li class="last:col-span-2">
                 <a
                   href={lien.href}
-                  class="flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
-                  >{t(lien.key)}</a
+                  aria-current={lien.isActive("/chat") ? "page" : undefined}
+                  class="flex min-h-11 items-center rounded-xl px-3 text-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:hover:bg-zinc-800 dark:hover:text-white {lien.isActive(
+                    '/chat',
+                  )
+                    ? 'font-semibold text-zinc-950 dark:text-white'
+                    : 'font-medium text-zinc-700 dark:text-zinc-300'}">{t(lien.key)}</a
                 >
               </li>
             {/each}

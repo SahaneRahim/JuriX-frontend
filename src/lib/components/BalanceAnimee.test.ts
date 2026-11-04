@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { elementsIcone } from '$lib/icones';
 import BalanceAnimee from './BalanceAnimee.svelte';
 
@@ -36,6 +36,52 @@ function svg(props: Record<string, unknown> = {}) {
 const tracesDe = (racine: Element, selecteur = ':scope > path') =>
   [...racine.querySelectorAll(selecteur)].map((p) => p.getAttribute('d'));
 
+type Etat = 'repos' | 'intro' | 'attente';
+
+/**
+ * Un document neuf, comme au chargement d'une page : le module de la balance
+ * est relu (`vi.resetModules()`), et avec lui sa mémoire de l'introduction
+ * (`introDejaJouee`), que les montages précédents du fichier ont pu
+ * consommer. `svelte` est relu avec lui, pour monter le composant avec le
+ * même moteur que celui qui l'a compilé. `defaire` démonte tout ce qui a été
+ * monté dans ce document : à appeler en fin de test.
+ */
+async function documentNeuf() {
+  vi.resetModules();
+  const { flushSync, mount, unmount } = await import('svelte');
+  const { default: Balance } = await import('./BalanceAnimee.svelte');
+  /** Les balances encore montées, et leur conteneur. */
+  const montees = new Map<Record<string, unknown>, HTMLElement>();
+  const monter = (etat: Etat) => {
+    const cible = document.body.appendChild(document.createElement('div'));
+    const instance = mount(Balance, { target: cible, props: { etat } });
+    // `mount` diffère les effets, onMount compris : `flushSync` les joue.
+    flushSync();
+    montees.set(instance, cible);
+    const dessin = cible.querySelector('svg');
+    if (!dessin) throw new Error('pas de <svg>');
+    return {
+      dessin,
+      /** Les classes d'état, lues au moment de l'appel. */
+      etats: () => [...dessin.classList].filter((c) => c.startsWith('mv-balance--')),
+      donnee: () => dessin.getAttribute('data-etat'),
+      demonter: () => {
+        unmount(instance);
+        montees.delete(instance);
+        cible.remove();
+      },
+    };
+  };
+  const defaire = () => {
+    for (const [instance, cible] of montees) {
+      unmount(instance);
+      cible.remove();
+    }
+    montees.clear();
+  };
+  return { monter, defaire, flushSync };
+}
+
 describe('BalanceAnimee', () => {
   it('reprend les cinq tracés de `scale` du registre, sans en perdre ni en ajouter', () => {
     const dessin = svg();
@@ -56,12 +102,20 @@ describe('BalanceAnimee', () => {
     expect(tracesDe(fleau!, ':scope > g.mv-balance__plateau-d > path')).toEqual([D.plateauDroit]);
   });
 
-  it.each(['repos', 'intro', 'attente'] as const)("porte la classe de l'état « %s », et elle seule", (etat) => {
-    const dessin = svg({ etat });
-    expect(dessin.classList.contains('mv-balance')).toBe(true);
-    // Une seule animation à la fois : au repos, aucune classe d'animation.
-    expect([...dessin.classList].filter((c) => c.startsWith('mv-balance--'))).toEqual([`mv-balance--${etat}`]);
-    expect(dessin.getAttribute('data-etat')).toBe(etat);
+  it.each(['repos', 'intro', 'attente'] as const)("porte la classe de l'état « %s », et elle seule", async (etat) => {
+    // Dans un document neuf : l'introduction ne joue qu'au premier montage du
+    // document (plus bas), et un test monté avant celui-ci aurait pu la
+    // consommer. Le cas « intro » ne dépend ainsi d'aucun ordre des tests.
+    const { monter, defaire } = await documentNeuf();
+    try {
+      const { dessin } = monter(etat);
+      expect(dessin.classList.contains('mv-balance')).toBe(true);
+      // Une seule animation à la fois : au repos, aucune classe d'animation.
+      expect([...dessin.classList].filter((c) => c.startsWith('mv-balance--'))).toEqual([`mv-balance--${etat}`]);
+      expect(dessin.getAttribute('data-etat')).toBe(etat);
+    } finally {
+      defaire();
+    }
   });
 
   it("dessine dans l'espace de noms SVG, au rendu client comme au serveur", () => {
@@ -103,5 +157,101 @@ describe('BalanceAnimee', () => {
     expect(dessin.hasAttribute('role')).toBe(false);
     expect(dessin.getAttribute('focusable')).toBe('false');
     expect(dessin.querySelector('title')).toBeNull();
+  });
+
+  it("l'introduction ne joue qu'au premier montage", async () => {
+    // L'en-tête, qui porte le logo, est recréé à chaque navigation interne :
+    // sans la mémoire du module (`introDejaJouee`), la balance pèserait à
+    // chaque page. Un module neuf, comme au chargement d'un document : les
+    // tests précédents ont déjà monté la balance, et ce module garde
+    // justement la trace de ce qu'ils ont fait.
+    const { monter, defaire } = await documentNeuf();
+    try {
+      // Une attente ailleurs dans la page ne consomme pas l'introduction.
+      expect(monter('attente').etats()).toEqual(['mv-balance--attente']);
+      // Le premier logo du document pèse.
+      const premier = monter('intro');
+      expect(premier.etats()).toEqual(['mv-balance--intro']);
+      expect(premier.donnee()).toBe('intro');
+      // Navigation interne : l'en-tête est détruit, puis recréé.
+      premier.demonter();
+      const second = monter('intro');
+      expect(second.etats()).toEqual(['mv-balance--repos']);
+      expect(second.donnee()).toBe('repos');
+      expect(monter('intro').etats()).toEqual(['mv-balance--repos']);
+      // L'attente réelle, elle, pèse toujours.
+      expect(monter('attente').etats()).toEqual(['mv-balance--attente']);
+    } finally {
+      defaire();
+    }
+  });
+
+  it("finie ou coupée, l'introduction laisse la balance au repos : l'en-tête masqué sur /chat ne la rejoue pas", async () => {
+    // L'en-tête du layout (main) n'est pas recréé entre / et /chat : sous lg,
+    // il y est seulement masqué, et une animation CSS repart de zéro chaque
+    // fois que son élément sort de `display: none`. Sa fin (`animationend`)
+    // ou sa coupure par le masquage (`animationcancel`) fait donc tomber
+    // l'instance au repos. jsdom n'anime rien : les événements sont émis à la
+    // main, sur le fléau, d'où ils remontent jusqu'au <svg>, comme dans un
+    // navigateur.
+    for (const evenement of ['animationend', 'animationcancel']) {
+      const { monter, defaire, flushSync } = await documentNeuf();
+      try {
+        const logo = monter('intro');
+        expect(logo.etats(), evenement).toEqual(['mv-balance--intro']);
+        logo.dessin.querySelector('.mv-balance__fleau')?.dispatchEvent(new Event(evenement, { bubbles: true }));
+        flushSync();
+        expect(logo.etats(), evenement).toEqual(['mv-balance--repos']);
+        expect(logo.donnee(), evenement).toBe('repos');
+        // Une attente qui s'arrête coupe aussi son animation : ce n'est pas
+        // une introduction, la balance reste dans son état.
+        const attente = monter('attente');
+        attente.dessin.querySelector('.mv-balance__fleau')?.dispatchEvent(new Event(evenement, { bubbles: true }));
+        flushSync();
+        expect(attente.etats(), evenement).toEqual(['mv-balance--attente']);
+      } finally {
+        defaire();
+      }
+    }
+  });
+
+  it("finie avant l'hydratation (réseau lent), l'introduction laisse la balance au repos ; masquée, elle attend", async () => {
+    // Sur un réseau lent, le JavaScript arrive après la fin de
+    // l'introduction, partie sans lui avec le HTML du serveur : son
+    // `animationend` est passé avant tout écouteur. Le montage le constate :
+    // une balance affichée dont le fléau n'a plus d'animation en cours.
+    // jsdom n'anime rien et ne met rien en page : on lui fait dire ce que
+    // verrait un navigateur (des animations en cours ou non, une boîte ou
+    // non).
+    let animations: unknown[] = [];
+    let boites: unknown[] = [];
+    const avant = Object.getOwnPropertyDescriptor(Element.prototype, 'getAnimations');
+    Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => animations });
+    const espion = vi
+      .spyOn(Element.prototype, 'getClientRects')
+      .mockImplementation(() => boites as unknown as DOMRectList);
+    try {
+      const cas = [
+        { quoi: 'affichée, plus rien ne joue : finie', animations: [], boites: [{}], attendu: 'repos' },
+        // Une animation dans son délai (0,35 s) compte déjà parmi celles en cours.
+        { quoi: 'affichée, encore en cours', animations: [{}], boites: [{}], attendu: 'intro' },
+        // Premier chargement sur /chat sous lg : jamais jouée, elle jouera au premier passage sur l'accueil.
+        { quoi: 'masquée, sans boîte', animations: [], boites: [], attendu: 'intro' },
+      ];
+      for (const c of cas) {
+        animations = c.animations;
+        boites = c.boites;
+        const { monter, defaire } = await documentNeuf();
+        try {
+          expect(monter('intro').etats(), c.quoi).toEqual([`mv-balance--${c.attendu}`]);
+        } finally {
+          defaire();
+        }
+      }
+    } finally {
+      espion.mockRestore();
+      if (avant) Object.defineProperty(Element.prototype, 'getAnimations', avant);
+      else delete (Element.prototype as { getAnimations?: unknown }).getAnimations;
+    }
   });
 });

@@ -76,6 +76,7 @@ import {
 } from '../doublures';
 import { cliquerJusqualEffet, saisirJusqualEffet } from '../hydratation';
 import { PAGES, loiAvecArticles, nomDeCapture, ouvrirAuRepos } from '../pages-du-site';
+import { FOOTER_LINKS } from '../../../src/lib/nav';
 
 const DOSSIER_DES_CAPTURES = process.env.CAPTURES_DIR;
 
@@ -722,12 +723,27 @@ const ETATS_OUVERTS: EtatOuvert[] = [
     },
   },
   {
+    // Les liens de tout le site (FOOTER_LINKS, refonte A) : « Assistant IA »,
+    // la page affichée, en demi-gras, et « À propos » sur toute la rangée.
     nom: 'chat--menu',
     taille: TELEPHONE,
     ouvrir: async (page) => {
       await simulerLeChat(page);
       await page.goto('/chat');
       await cliquerJusqualEffet(page.getByTestId('chat-menu-toggle'), page.getByTestId('chat-menu'));
+      await expect(page.getByTestId('chat-menu').getByRole('link')).toHaveCount(FOOTER_LINKS.length);
+      await expect(page.getByTestId('chat-menu').locator('a[aria-current="page"]')).toHaveAttribute('href', '/chat');
+      // Sept liens sur deux colonnes : le dernier va du bord gauche de la
+      // première colonne au bord droit de la seconde, au lieu de rester seul
+      // dans la première (`last:col-span-2`).
+      const cellules = await page
+        .getByTestId('chat-menu')
+        .locator('li')
+        .evaluateAll((lis) => lis.map((li) => li.getBoundingClientRect().toJSON() as DOMRect));
+      const [premiere, seconde] = cellules;
+      const derniere = cellules[cellules.length - 1];
+      expect(Math.abs(derniere.left - premiere.left), 'dernier lien du menu : bord gauche').toBeLessThanOrEqual(1);
+      expect(Math.abs(derniere.right - seconde.right), 'dernier lien du menu : bord droit').toBeLessThanOrEqual(1);
     },
   },
   {

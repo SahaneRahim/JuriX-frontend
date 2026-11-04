@@ -134,8 +134,9 @@
 
   /**
    * Une recherche est en cours (nouvelle requête, filtre, page). Vers /search
-   * sans requête (le lien « Recherche » de l'en-tête), rien n'est cherché : ni
-   * « Recherche en cours… » ni roue.
+   * sans requête (le lien « Recherche » du pied de page ou du menu du chat :
+   * l'en-tête n'en a plus depuis la refonte A, seulement la loupe, qui ouvre
+   * la palette), rien n'est cherché : ni « Recherche en cours… » ni roue.
    */
   $: enCours = versLaRecherche && Boolean(($navigating?.to?.url.searchParams.get("q") ?? "").trim());
 
@@ -150,7 +151,7 @@
    *
    * Le départ est noté pour TOUTE navigation vers /search, requête ou non.
    * Noté seulement quand une recherche partait (`enCours`), il manquait vers
-   * la page sans requête (lien « Recherche » de l'en-tête, retour arrière) :
+   * la page sans requête (lien « Recherche » du pied de page, retour arrière) :
    * un texte écrit avant, jamais envoyé, passait pour une retouche faite en
    * route, et restait dans le champ de « Commencez votre recherche ».
    *

@@ -3,13 +3,24 @@
    * Pied de page du site public.
    *
    * Le pied de page d'origine ne contenait AUCUN lien — seulement le logo et la
-   * mention de droits. Il porte désormais la même liste `NAV_LINKS` que le
-   * header : sur les pages longues (`/laws`, `/laws/[id]`, `/categories/[id]`),
-   * c'est le seul retour disponible une fois le header défilé hors de l'écran.
+   * mention de droits. Il porte désormais la liste complète des liens du site
+   * (`FOOTER_LINKS`) : sur les pages longues (`/laws`, `/laws/[id]`,
+   * `/categories/[id]`), c'est le seul retour disponible une fois le header
+   * défilé hors de l'écran. Depuis la refonte A, l'en-tête n'a plus que quatre
+   * liens (décision H3) : « Recherche » et « À propos » ne restent atteignables
+   * partout que grâce à lui. Rien n'en est retiré (décision H7) : logo, liens
+   * et copyright restent, dans le même style.
    */
   import Icone from "$lib/components/Icone.svelte";
-  import { NAV_LINKS } from "$lib/nav";
+  import { FOOTER_LINKS, LIEN_ACCUEIL } from "$lib/nav";
   import { tr } from "$lib/stores/language";
+
+  /**
+   * Tous les liens sauf l'accueil : le logo, juste avant, y mène déjà (comme
+   * la page d'erreur, qui retire l'accueil de sa liste). Six liens : la grille
+   * de trois colonnes du téléphone en fait deux rangées égales.
+   */
+  const LIENS = FOOTER_LINKS.filter((lien) => lien.href !== LIEN_ACCUEIL.href);
 
   /**
    * À poser sur les pages qui montent le bouton flottant de l'assistant
@@ -93,7 +104,7 @@
          16 px dans la tuile de 32 : la moitié de la tuile, comme celle de
          l'en-tête (18 px dans 36). En 14 px, elle n'était qu'une petite tache
          au centre du carré. -->
-    <a href="/" class="inline-flex min-h-11 shrink-0 items-center gap-2.5 group xl:justify-self-start">
+    <a href={LIEN_ACCUEIL.href} class="inline-flex min-h-11 shrink-0 items-center gap-2.5 group xl:justify-self-start">
       <div
         class="bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm dark:shadow-none motion-safe:group-hover:scale-105 transition-transform"
       >
@@ -110,7 +121,7 @@
          copyright qui passe à la ligne, pas la navigation. -->
     {#if navigation}
       <nav class="grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:items-center sm:justify-center xl:col-start-2">
-        {#each NAV_LINKS as lien (lien.href)}
+        {#each LIENS as lien (lien.href)}
           <a
             href={lien.href}
             class="inline-flex min-h-11 items-center justify-center rounded-lg px-2 sm:px-3 text-xs sm:text-sm text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors"

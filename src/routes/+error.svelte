@@ -15,7 +15,7 @@
   import Icone from "$lib/components/Icone.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
-  import { NAV_LINKS } from "$lib/nav";
+  import { FOOTER_LINKS, LIEN_ACCUEIL, NAV_LINKS } from "$lib/nav";
   import { titreDePage } from "$lib/seo";
   import { tr } from "$lib/stores/language";
 
@@ -27,8 +27,26 @@
   const PRINCIPAL = `${BOUTON} bg-zinc-950 text-white hover:bg-black dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200`;
   const SECONDAIRE = `${BOUTON} border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white`;
 
-  // Les autres destinations, en liens discrets : l'accueil a son bouton.
-  const AUTRES_DESTINATIONS = NAV_LINKS.filter((lien) => lien.href !== "/");
+  /**
+   * Les autres destinations, en liens discrets : l'accueil a son bouton.
+   *
+   * Toutes celles du site, et non les quatre liens de l'en-tête
+   * (`NAV_LINKS`, refonte A, décision H3). « Recherche » et « À propos » ont
+   * quitté l'en-tête : partout ailleurs, le pied de page les garde ; ici, il
+   * n'a pas de liens (`navigation={false}`, plus bas), et sans cette liste
+   * aucune des deux pages ne s'atteindrait plus depuis une erreur. Or une
+   * page en panne (503) est justement celle d'où l'on cherche à joindre
+   * l'équipe (« À propos ») ou à reformuler (« Recherche »).
+   */
+  const AUTRES_DESTINATIONS = FOOTER_LINKS.filter((lien) => lien.href !== LIEN_ACCUEIL.href);
+
+  /**
+   * Celles que la barre de l'en-tête affiche déjà à partir de lg, juste
+   * au-dessus : masquées ici à partir de lg, pour que la liste ne paraisse
+   * pas deux fois. En dessous, l'en-tête les range dans son menu : ici,
+   * elles restent à portée sans l'ouvrir.
+   */
+  const DANS_LA_BARRE = new Set(NAV_LINKS.map((lien) => lien.href));
 
   // Texte indicatif de la recherche : la phrase complète à partir de sm, une
   // phrase courte en dessous, comme la barre de l'accueil. Sous sm, le champ
@@ -166,19 +184,22 @@
       </form>
     {/if}
 
-    <!-- Les autres destinations de la navigation, en liens discrets (même
-         liste : une seule à maintenir). `text-balance` : sur téléphone, les
-         lignes s'équilibrent au lieu de laisser un lien seul en dessous.
+    <!-- Les autres destinations de la navigation, en liens discrets (mêmes
+         listes : rien de plus à maintenir). `text-balance` : sur téléphone,
+         les lignes s'équilibrent au lieu de laisser un lien seul en dessous.
          Le pied de page ne les répète pas ici (`navigation={false}`).
-         `lg:hidden` : à partir de lg, l'en-tête affiche ces mêmes liens juste
-         au-dessus, et la liste paraissait deux fois. En dessous, il les range
-         dans son menu : ici, ils restent à portée sans l'ouvrir. -->
-    <nav class="mt-6 max-w-md text-balance sm:mt-8 court:mt-2 lg:hidden">
+         `lg:hidden` sur les liens de la barre (`DANS_LA_BARRE`) : à partir
+         de lg, l'en-tête les affiche juste au-dessus, et la liste paraissait
+         deux fois ; « Recherche » et « À propos », qu'il n'a plus, restent. -->
+    <nav class="mt-6 max-w-md text-balance sm:mt-8 court:mt-2">
       {#each AUTRES_DESTINATIONS as lien (lien.href)}
         <a
           href={lien.href}
-          class="inline-flex min-h-11 items-center px-3 text-sm font-medium text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors"
-          >{$tr(lien.key)}</a
+          class="inline-flex min-h-11 items-center px-3 text-sm font-medium text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors {DANS_LA_BARRE.has(
+            lien.href,
+          )
+            ? 'lg:hidden'
+            : ''}">{$tr(lien.key)}</a
         >
       {/each}
     </nav>

@@ -23,6 +23,8 @@
  *    longue réponse ; sur téléphone, la page elle-même ne défile pas ;
  *  - /chat, compte connecté : sous 1 024 px, les conversations sont un tiroir
  *    qui s'ouvre, se referme à Échap et au choix d'une conversation ;
+ *  - l'en-tête : 56 px sous lg, sa hauteur de bureau au-dessus ; sous lg, le
+ *    menu ouvert ne fait pas glisser la page, et ses liens font 48 px ;
  *  - accueil en 390×844 : le champ de recherche sans défiler ;
  *  - accueil sur trois téléphones courts (320×568, 360×584, 375×553) : le
  *    bouton flottant de l'assistant ne couvre pas le bouton « Rechercher ».
@@ -81,6 +83,9 @@ import { cliquerJusqualEffet, saisirJusqualEffet } from '../hydratation';
  * en-tête compact et conversations en tiroir ; au-dessus, la colonne fixe.
  */
 const LARGEUR_LG = 1024;
+
+/** Point de rupture `xl` : l'en-tête y passe à la barre complète (SiteHeader.svelte). */
+const LARGEUR_XL = 1280;
 
 interface Taille {
   largeur: number;
@@ -602,6 +607,31 @@ for (const taille of TAILLES) {
       await expect(page.getByRole('log')).toContainText(REPONSE_ROUVERTE);
       await expect(bascule).toHaveAttribute('aria-expanded', 'false');
       await expect(premiere).not.toBeInViewport();
+    });
+
+    // L'en-tête de la refonte A (PASSATION E2, décision H5) : sous lg, la
+    // barre mobile des maquettes, 56 px filet compris, et non plus 69 puis
+    // 77 ; à partir de lg, la hauteur du bureau ne change pas (16 px autour
+    // des boutons de 44 px, puis de 36 px à partir de xl). Sous lg, le menu
+    // ouvert ne fait pas glisser la page, et ses liens se touchent du doigt
+    // (48 px), au-dessus de la ligne « Langue ». /about : sans l'API.
+    test('/about : la barre de l’en-tête, et sous lg le menu ouvert', async ({ page }) => {
+      await page.goto('/about');
+      const hauteur = await page.getByTestId('site-header').evaluate((el) => el.getBoundingClientRect().height);
+      const attendue = taille.largeur < LARGEUR_LG ? 56 : taille.largeur < LARGEUR_XL ? 77 : 69;
+      expect.soft(hauteur, `hauteur de l’en-tête en ${dimensions}`).toBe(attendue);
+      if (taille.largeur >= LARGEUR_LG) return;
+
+      const panneau = page.getByTestId('nav-mobile-panel');
+      await cliquerJusqualEffet(page.getByTestId('nav-mobile-toggle'), panneau);
+      await attendreLeRepos(page);
+      await capturer(page, `menu-${dimensions}`);
+      await verifierSansDebordement(page, '/about, menu du site ouvert');
+      const liens = panneau.locator('nav a');
+      await expect(liens).toHaveCount(4);
+      const hauteurs = await liens.evaluateAll((as) => as.map((a) => Math.round(a.getBoundingClientRect().height)));
+      expect.soft(hauteurs.filter((h) => h < 48), 'liens du menu de moins de 48 px').toEqual([]);
+      await expect(panneau.getByRole('group', { name: 'Langue' })).toBeVisible();
     });
 
     if (taille.largeur === 390 && taille.hauteur === 844) {

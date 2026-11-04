@@ -8,15 +8,30 @@
  * chacune, et le bouton flottant « assistant » pointait vers `/` d'un côté et
  * `/chat` de l'autre.
  *
- * Quatre consommateurs lisent désormais cette liste : la navigation de bureau,
- * le panneau mobile, le pied de page, et le test Playwright
- * `tests/e2e/navigation/link-integrity.spec.ts`. C'est ce dernier point qui
- * compte : la garantie « chaque lien mène quelque part » devient vérifiable au
- * lieu d'être seulement affirmée. Ajouter une entrée ici la fait tester
- * automatiquement ; en ajouter une ailleurs ne la teste pas.
+ * DEUX LISTES DEPUIS LA REFONTE A (décision H3, docs/refonte/PASSATION.md).
+ * L'en-tête ne montre plus que les quatre liens des maquettes ; le reste du
+ * site garde une liste complète :
+ * - `NAV_LINKS`, les quatre liens de l'en-tête (« Assistant IA », « Parcourir »,
+ *   « Comparer », « Blog »), lus par la barre de bureau et le panneau du menu
+ *   mobile ; la page d'erreur s'en sert pour ne pas répéter, à partir de lg,
+ *   ceux que la barre affiche déjà. « Assistant IA » y est obligatoire : c'est
+ *   la demande d'origine du projet (« le bouton Assistant IA doit ouvrir le
+ *   chat »). « Accueil » n'y est plus : le logo est le lien d'accueil, et il
+ *   porte `aria-current="page"` sur l'accueil (SiteHeader.svelte).
+ * - `FOOTER_LINKS`, tous les liens, « Accueil » en tête : ceux d'avant la
+ *   refonte, plus `/chat`. Lue par le pied de page (privée de `/`, que son logo
+ *   porte déjà), par le menu du chat et par la page d'erreur (dont le pied de
+ *   page n'a pas de liens). « Recherche » et « À propos », sortis de
+ *   l'en-tête, restent ainsi atteignables partout : le pied de page est le
+ *   seul retour des pages longues (`/laws`, `/laws/[id]`, `/categories/[id]`)
+ *   une fois l'en-tête défilé hors de l'écran.
  *
- * `/search` figure dans la liste : la page existe depuis longtemps mais n'était
- * atteignable que depuis un lien secondaire de `/laws`.
+ * Le test Playwright `tests/e2e/navigation/link-integrity.spec.ts` parcourt
+ * les deux listes : chaque lien doit répondre, ceux de `NAV_LINKS` être dans
+ * l'en-tête, ceux de `FOOTER_LINKS` dans le pied de page. La garantie « chaque
+ * lien mène quelque part » devient vérifiable au lieu d'être seulement
+ * affirmée. Ajouter une entrée ici la fait tester automatiquement ; en ajouter
+ * une ailleurs ne la teste pas.
  */
 
 export interface NavLink {
@@ -34,17 +49,51 @@ export interface NavLink {
   isActive: (pathname: string) => boolean;
 }
 
+/**
+ * L'accueil. Hors de l'en-tête, où le logo le remplace (et reprend son
+ * prédicat pour `aria-current`) ; en tête de `FOOTER_LINKS`.
+ */
+export const LIEN_ACCUEIL: NavLink = { href: '/', key: 'nav.home', isActive: (p) => p === '/' };
+
 export const NAV_LINKS: readonly NavLink[] = [
-  { href: '/', key: 'nav.home', isActive: (p) => p === '/' },
-  // La page d'une catégorie (/categories/13) est rangée sous « Documents »,
-  // comme dans le fil d'Ariane d'un texte : aucune entrée n'y était active.
+  // « Assistant IA » et non « Chat » : le nom du mode dans tout le site
+  // (`mode.chat`). Sa clé est distincte (`nav.chat`, même texte) : un lien de
+  // ce manifeste porte sa propre clé.
+  { href: '/chat', key: 'nav.chat', isActive: (p) => p.startsWith('/chat') },
+  // « Parcourir » mène à la liste de tous les textes, et non à l'ancre
+  // `/#domaines` de l'accueil (décision H4). La page d'une catégorie
+  // (/categories/13) y est rangée, comme dans le fil d'Ariane d'un texte :
+  // aucune entrée n'y serait active sinon.
   {
     href: '/laws',
-    key: 'nav.documents',
+    key: 'nav.parcourir',
     isActive: (p) => p.startsWith('/laws') || p.startsWith('/categories'),
   },
-  { href: '/blog', key: 'nav.blog', isActive: (p) => p.startsWith('/blog') },
-  { href: '/search', key: 'nav.search', isActive: (p) => p.startsWith('/search') },
   { href: '/compare', key: 'nav.compare', isActive: (p) => p.startsWith('/compare') },
+  { href: '/blog', key: 'nav.blog', isActive: (p) => p.startsWith('/blog') },
+] as const;
+
+export const FOOTER_LINKS: readonly NavLink[] = [
+  LIEN_ACCUEIL,
+  ...NAV_LINKS,
+  // `/search` existe depuis longtemps mais n'était atteignable que depuis un
+  // lien secondaire de `/laws` : le pied de page le garde, en plus de la loupe
+  // (palette Ctrl K) de l'en-tête.
+  { href: '/search', key: 'nav.search', isActive: (p) => p.startsWith('/search') },
   { href: '/about', key: 'nav.about', isActive: (p) => p === '/about' },
+] as const;
+
+/**
+ * Les pages de compte, dont la carte porte déjà le bouton principal de la
+ * page (« Se connecter », « Envoyer le lien »…). L'en-tête y fait de « Créer
+ * un compte » un bouton secondaire ; la barre d'onglets du bas de la refonte
+ * (décision H6) n'y paraîtra pas. Une page de compte est l'une d'elles ou une
+ * de leurs sous-pages (`/reset-password/<jeton>`).
+ */
+export const PAGES_DE_COMPTE: readonly string[] = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
 ] as const;

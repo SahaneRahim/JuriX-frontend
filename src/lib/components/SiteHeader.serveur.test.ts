@@ -33,9 +33,12 @@ const globales = globalThis as Record<string, unknown>;
 const sauvegarde = (['window', 'localStorage', 'sessionStorage'] as const).map((nom) => [nom, globales[nom]] as const);
 for (const [nom] of sauvegarde) delete globales[nom];
 let body = '';
+/** Une seconde requête, servie par le même processus, après la première. */
+let secondeRequete = '';
 try {
   const { default: SiteHeader } = await import('./SiteHeader.svelte');
   body = render(SiteHeader, { props: {} }).body;
+  secondeRequete = render(SiteHeader, { props: {} }).body;
 } finally {
   for (const [nom, valeur] of sauvegarde) globales[nom] = valeur;
 }
@@ -47,8 +50,8 @@ function liensVers(html: string, href: string): string[] {
 
 describe('SiteHeader au rendu serveur', () => {
   it('envoie les deux loupes en liens vers /search, nommés', () => {
-    // La loupe du bureau (xl et plus) et celle du téléphone (sous xl), plus
-    // le lien « Recherche » de la navigation : trois liens vers /search.
+    // La loupe du bureau (xl et plus) et celle du téléphone (sous xl). La
+    // navigation n'a plus de lien « Recherche » (refonte A, décision H3).
     const loupes = liensVers(body, '/search').filter((balise) => balise.includes('aria-label='));
     expect(loupes).toHaveLength(2);
     for (const loupe of loupes) {
@@ -72,6 +75,18 @@ describe('SiteHeader au rendu serveur', () => {
     for (const testid of ['site-header', 'site-logo', 'nav-mobile-toggle', 'nav-reglages-toggle', 'theme-toggle', 'lang-fr', 'lang-en', 'persona-toggle', 'nav-signup']) {
       expect(body, testid).toContain(`data-testid="${testid}"`);
     }
+  });
+
+  it('envoie la balance du logo avec sa classe d’introduction : elle pèse sans attendre le JavaScript', () => {
+    // L'introduction est une animation CSS (src/lib/mouvement.css) : posée
+    // dès le HTML du serveur, elle part au premier affichage, et
+    // l'hydratation n'y touche pas. Le serveur la pose à chaque requête : il
+    // ne garde rien d'une requête à l'autre (BalanceAnimee.svelte).
+    const logoDe = (html: string) => /<a\b[^>]*data-testid="site-logo"[^>]*>[\s\S]*?<\/a>/.exec(html)?.[0] ?? '';
+    expect(logoDe(body)).toMatch(/<svg\b[^>]*class="[^"]*\bmv-balance--intro\b/);
+    expect(logoDe(secondeRequete)).toMatch(/<svg\b[^>]*class="[^"]*\bmv-balance--intro\b/);
+    // Sur l'accueil, le logo est le lien courant (« Accueil » a quitté la navigation).
+    expect(logoDe(body)).toMatch(/<a\b[^>]*aria-current="page"/);
   });
 
   it('aligne la navigation sur le logo, sans grille centrée', () => {
