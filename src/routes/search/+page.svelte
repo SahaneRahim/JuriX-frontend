@@ -20,6 +20,17 @@
    * l'assistant » en tête quand il y a des résultats, et un état « aucun
    * résultat » qui propose des pistes au lieu d'une impasse (dont la même
    * question à l'assistant).
+   *
+   * REFONTE A (E4, maquette RefonteRecherche). La structure ne change pas :
+   * filtres, tri, pagination et « Réinitialiser » restent (décision R1), dans
+   * la colonne commune de 78 rem (R3). Ce qui change : le champ compact, avec
+   * sa bascule vers l'assistant et la balance qui pèse pendant la recherche
+   * (SearchBar, `size="compacte"`, R8) ; la passerelle « Poser « … » à
+   * l'assistant IA » en bouton pointillé (R4) ; les onglets à pastille de
+   * compte ; la liste en carte posée (LISTE_A_FILETS) ; l'arrivée des lignes,
+   * échelonnée et jouée seulement pour une nouvelle requête (R9) ; des
+   * silhouettes de lignes pendant une nouvelle requête (R7). UN SEUL
+   * indicateur d'attente : la balance du champ.
    */
   import { onDestroy, onMount, tick } from "svelte";
   import { afterNavigate, goto, invalidateAll, replaceState } from "$app/navigation";
@@ -29,6 +40,8 @@
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import SearchBar from "$lib/components/SearchBar.svelte";
   import SearchResultCard from "$lib/components/SearchResultCard.svelte";
+  import LigneSquelette from "$lib/components/listes/LigneSquelette.svelte";
+  import { LISTE_A_FILETS } from "$lib/components/listes/classes";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { nomCourtDuDomaine } from "$lib/components/listes/domaines";
@@ -95,16 +108,40 @@
   };
 
   /**
-   * Classes d'un onglet (maquette recherche-p7a) : la recette « filtre à
-   * bascule » du guide (§ 4.7). 16 px de côté tant que la bande défile (sous
-   * lg), 20 à partir de lg comme la maquette en 1440 : à 768 px, les six
-   * onglets tiennent alors sur la rangée, sans défiler.
+   * Classes d'un onglet : la recette « filtre à bascule » du guide (§ 4.7),
+   * au dessin de la refonte (maquette RefonteRecherche) : pilule de 44 px,
+   * 16 px de côté, demi-gras, bordure des contrôles (zinc-300, le `--bd2` de
+   * A3 § 1) sur fond de carte ; l'onglet actif s'inverse (encre pleine).
    */
   const ONGLET =
-    "flex min-h-11 shrink-0 snap-start items-center gap-2 px-4 lg:px-5 py-2.5 rounded-full border text-sm font-medium whitespace-nowrap transition-colors";
+    "flex min-h-11 shrink-0 snap-start items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold whitespace-nowrap transition-colors";
   const ONGLET_ACTIF = "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950";
   const ONGLET_INACTIF =
-    "border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-400 dark:hover:text-white";
+    "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-950 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-400 dark:hover:text-white";
+  /**
+   * Rien de cette nature : bordure en POINTILLÉS, texte tertiaire, sans
+   * survol, comme la maquette. Plus d'opacité réduite : l'onglet se lit (4,8:1)
+   * et le pointillé dit, avec `aria-disabled`, qu'il ne mène nulle part.
+   */
+  const ONGLET_VIDE =
+    "cursor-not-allowed border-dashed border-zinc-300 bg-transparent text-zinc-500 dark:border-zinc-700 dark:text-zinc-400";
+
+  /**
+   * L'effectif dans une pastille ronde de 22 px (maquette). Le compte reste
+   * DANS l'onglet, séparé du nom par un blanc, sans texte caché entre eux :
+   * le nom accessible reste « Lois 7 » (ux-r2.spec.ts : /^Lois\s*7$/).
+   * Sur l'onglet actif (encre), la pastille s'éclaircit de l'encre même ;
+   * sur un onglet vide, son texte passe à zinc-600 (zinc-500 sur zinc-100
+   * n'atteint pas 4,5:1 : A3 § 1).
+   */
+  const PASTILLE =
+    "inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-xs font-bold tabular-nums";
+  const PASTILLE_ACTIVE = "bg-white/20 text-white dark:bg-zinc-950/15 dark:text-zinc-950";
+  const PASTILLE_INACTIVE = "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+  const PASTILLE_VIDE = "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+
+  /** Décalage d'arrivée entre deux onglets (A2 § 1 : 50 ms pour les onglets). */
+  const PAS_DES_ONGLETS_MS = 50;
 
   const LIEN =
     "font-medium text-zinc-950 underline decoration-zinc-400 underline-offset-4 hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-500 dark:hover:decoration-white";
@@ -136,9 +173,47 @@
    * Une recherche est en cours (nouvelle requête, filtre, page). Vers /search
    * sans requête (le lien « Recherche » du pied de page ou du menu du chat :
    * l'en-tête n'en a plus depuis la refonte A, seulement la loupe, qui ouvre
-   * la palette), rien n'est cherché : ni « Recherche en cours… » ni roue.
+   * la palette), rien n'est cherché : ni « Recherche en cours… » ni balance.
    */
-  $: enCours = versLaRecherche && Boolean(($navigating?.to?.url.searchParams.get("q") ?? "").trim());
+  $: requeteEnRoute = ($navigating?.to?.url.searchParams.get("q") ?? "").trim();
+  $: enCours = versLaRecherche && Boolean(requeteEnRoute);
+
+  /**
+   * Une NOUVELLE requête est en route (une autre que celle des résultats
+   * affichés) : les lignes et les onglets de la précédente n'ont plus d'objet
+   * et cèdent la place à des silhouettes (LigneSquelette). POURQUOI PAS POUR
+   * UN ONGLET, UNE CASE, UN TRI OU UNE PAGE (décision R7) : la recherche est
+   * la même, la liste reste à l'écran, atténuée, au lieu de clignoter à
+   * chaque filtre. Dans les deux cas, la balance pèse dans le champ : le
+   * seul indicateur d'attente de la page.
+   */
+  $: nouvelleRecherche = enCours && requeteEnRoute !== p.q;
+
+  /**
+   * L'ARRIVÉE DES LIGNES (décision R9). Les lignes et les onglets montent à
+   * leur arrivée, en léger décalage, au premier affichage et à l'arrivée
+   * d'une NOUVELLE requête seulement : une page, un tri, un onglet ou un
+   * filtre ne rejouent rien (la même recherche, des résultats qu'on parcourt
+   * déjà). `requeteAffichee` est la requête des résultats à l'écran ; `null`
+   * avant le premier affichage, qui monte (rendu serveur compris : sans
+   * JavaScript, l'animation CSS part seule et finit sur l'état lisible).
+   * Le bloc ne dépend que de `data`.
+   *
+   * POURQUOI RIEN AU RETOUR ARRIÈRE (type `popstate`, R6 et R9 : « première
+   * apparition seulement »). Revenir d'un texte lu vers ses résultats recrée
+   * la page : `requeteAffichee` repart de `null`, et vingt lignes déjà vues
+   * remontaient, masquées jusqu'à 400 ms, pendant que le navigateur rend la
+   * position de défilement. `$navigating` se lit ici sans s'abonner : seul
+   * `data` relance ce bloc, et le routeur ne vide le store qu'après le rendu.
+   */
+  let requeteAffichee: string | null = null;
+  let animerLArrivee = true;
+  function noterLaRequeteAffichee(q: string) {
+    const requeteNouvelle = requeteAffichee === null || q !== requeteAffichee;
+    animerLArrivee = requeteNouvelle && $navigating?.type !== "popstate";
+    requeteAffichee = q;
+  }
+  $: noterLaRequeteAffichee(data.parametres.q);
 
   /**
    * Le texte du champ : la requête cherchée, posée à chaque navigation, SAUF
@@ -219,7 +294,7 @@
    * la page se lit en entier.
    *
    * SEULE L'ANNONCE ATTEND, l'écran non. La ligne affichée disait « Recherche
-   * en cours… » pendant ce délai, à chaque arrivée, sans roue ni liste
+   * en cours… » pendant ce délai, à chaque arrivée, sans balance ni liste
    * atténuée, à côté de résultats déjà là : rien ne se cherchait. Elle montre
    * donc le nombre aussitôt (`statutAffiche`), et la région, hors de l'écran,
    * attend (`statutAnnonce`).
@@ -556,13 +631,14 @@
   <main id="contenu" class="flex-grow w-full max-w-[78rem] mx-auto px-4 sm:px-6 lg:px-12 pt-6 pb-8 sm:pt-8 court:pt-2">
     <div class="mb-6 sm:mb-10 court:mb-2">
       <!-- Titre de page en Literata (Q5 A : la serif des titres de page), 600,
-           interlettrage nul, équilibré sur ses lignes ; 24 puis 30 px comme la
-           maquette. `coupe-mots` : la requête est recopiée telle quelle, et
-           une suite sans espace (référence, URL collée) débordait de l'écran.
+           interlettrage nul, équilibré sur ses lignes ; 26 puis 32 px, comme
+           la maquette RefonteRecherche (A3 § 3). `coupe-mots` : la requête est
+           recopiée telle quelle, et une suite sans espace (référence, URL
+           collée) débordait de l'écran.
            Écran court : pour les lecteurs d'écran seulement, la requête est
            dans le champ juste dessous, et chaque ligne compte en 740×360. -->
       <h1
-        class="text-2xl sm:text-3xl font-titre font-semibold leading-[1.2] text-balance coupe-mots text-zinc-950 dark:text-white mb-4 sm:mb-6 court:sr-only"
+        class="text-[26px] sm:text-[32px] font-titre font-semibold leading-[1.2] text-balance coupe-mots text-zinc-950 dark:text-white mb-4 sm:mb-6 court:sr-only"
       >
         {#if p.q}
           {titreDeLaRecherche}
@@ -575,10 +651,12 @@
            JavaScript, et le serveur rend les résultats. Il garde les filtres en
            cours (champs cachés). SearchBar porte aussi les suggestions.
            Texte indicatif court sous sm, celui de la page d'un domaine : la
-           phrase entière était coupée net sous la loupe à 390 px. -->
+           phrase entière était coupée net sous la loupe à 390 px.
+           Refonte A : le champ COMPACT (décision R8), sa bascule vers
+           l'assistant et la balance qui pèse pendant la recherche. -->
       <div class="lg:max-w-3xl">
         <SearchBar
-          size="large"
+          size="compacte"
           bind:value={saisie}
           loading={enCours}
           placeholder={$tr("search.searchLaw")}
@@ -588,17 +666,36 @@
       </div>
 
       <!-- La passerelle vers l'assistant, avec la question déjà écrite (/chat
-           la pré-remplit sans l'envoyer). Lien de la maquette : souligné,
-           44 px de haut au doigt. SEULEMENT AVEC DES RÉSULTATS : dans un état
-           vide, la carte propose déjà « Poser la question à l'assistant »
-           (même adresse), 200 px plus bas ; les deux appels se répétaient, et
-           la maquette de l'état vide (recherche-vide-p7a) n'a que celui de la
-           carte. En panne, l'assistant passe par la même API. -->
-      {#if avecResultats}
-        <p class="mt-3 court:mt-1">
-          <a href={assistant} class="inline-flex min-h-11 items-center gap-2 text-sm {LIEN}">
-            <Icone nom="sparkles" class="text-base" />
-            {$tr("search.askAssistant")}
+           la pré-remplit sans l'envoyer), 44 px de haut au doigt. SEULEMENT
+           AVEC DES RÉSULTATS : dans un état vide, la carte propose déjà
+           « Poser la question à l'assistant » (même adresse), 200 px plus
+           bas ; les deux appels se répétaient, et la maquette de l'état vide
+           (recherche-vide-p7a) n'a que celui de la carte. En panne,
+           l'assistant passe par la même API.
+
+           Refonte A (E4c) : le bouton pointillé de la maquette, « Poser
+           « licenciement » à l'assistant IA », l'étoile de l'IA devant, la
+           flèche qui glisse de 4 px au survol. POURQUOI CE LIBELLÉ (décision
+           R4) : le nom visible EST le nom accessible (WCAG 2.5.3, « label in
+           name ») ; ux-recherche.spec.ts le cherche ainsi. Une longue requête
+           passe à la ligne dans le bouton, sans déborder (`coupe-mots`).
+           Pendant une NOUVELLE requête, elle disparaît : elle nommait la
+           précédente. `preload-data="tap"` : rien ne part vers /chat au
+           simple survol. 22 px au-dessus : la pile de feuilles du champ en
+           prend 14 (sur écran court, la pile n'est pas dessinée). -->
+      {#if avecResultats && !nouvelleRecherche}
+        <p class="mt-[22px] court:mt-1">
+          <a
+            href={assistant}
+            data-sveltekit-preload-data="tap"
+            class="group inline-flex min-h-11 max-w-full items-center gap-2.5 rounded-xl border border-dashed border-zinc-300 py-2 pl-3 pr-3.5 text-sm font-semibold text-zinc-700 transition-colors hover:border-zinc-950 hover:bg-white hover:text-zinc-950 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-white dark:hover:bg-zinc-900 dark:hover:text-white"
+          >
+            <Icone nom="sparkle" class="shrink-0 text-[17px]" />
+            <span class="min-w-0 coupe-mots">{remplir($tr("search.askAssistantQuery"), { q: p.q })}</span>
+            <Icone
+              nom="arrow-right"
+              class="ml-1 shrink-0 text-[17px] motion-safe:transition-transform motion-safe:duration-[350ms] motion-safe:ease-jx motion-safe:group-hover:translate-x-1"
+            />
           </a>
         </p>
       {/if}
@@ -639,8 +736,24 @@
            du site, app.html), six onglets survolés lanceraient six
            recherches ; au toucher ou à l'appui, le préchargement ne part
            qu'avec le clic. Les lignes de résultat, vers /laws/<id> en cache,
-           gardent le survol. -->
-      {#if affiner}
+           gardent le survol.
+
+           Refonte A : l'effectif dans une pastille ronde, l'onglet vide en
+           pointillés ; les onglets montent à leur arrivée, à 50 ms l'un de
+           l'autre (A2 § 1), avec les lignes (`animerLArrivee`). Pendant une
+           NOUVELLE requête, leurs effectifs sont ceux de la précédente : trois
+           silhouettes de même hauteur les remplacent (R7), décoratives. -->
+      {#if nouvelleRecherche && affiner}
+        <div
+          aria-hidden="true"
+          data-testid="search-skeleton-tabs"
+          class="mt-4 flex gap-2 overflow-hidden sm:mt-6 court:mt-1"
+        >
+          <span class="mv-squelette block h-11 w-[84px] shrink-0 rounded-full"></span>
+          <span class="mv-squelette block h-11 w-[92px] shrink-0 rounded-full"></span>
+          <span class="mv-squelette block h-11 w-[108px] shrink-0 rounded-full"></span>
+        </div>
+      {:else if affiner}
         <div
           role="group"
           aria-label={$tr("search.natureGroup")}
@@ -650,26 +763,30 @@
           data-sveltekit-preload-data="tap"
           class="-mx-4 mt-4 flex snap-x scroll-pl-10 gap-2 overflow-x-auto overscroll-x-contain pb-2 pl-4 pr-10 [--fondu-gauche:0px] data-[defilee]:[--fondu-gauche:2.5rem] [--fondus:linear-gradient(to_right,transparent,#000_var(--fondu-gauche),#000_calc(100%_-_2.5rem),transparent)] [-webkit-mask-image:var(--fondus)] [mask-image:var(--fondus)] sm:-mx-6 sm:mt-6 sm:pl-6 lg:mx-0 lg:flex-wrap lg:scroll-pl-0 lg:px-0 lg:[-webkit-mask-image:none] lg:[mask-image:none] court:mt-1 court:flex-nowrap court:scroll-pl-10 court:pr-10 court:[-webkit-mask-image:var(--fondus)] court:[mask-image:var(--fondus)]"
         >
-          {#each ONGLETS as onglet (onglet.cle)}
+          {#each ONGLETS as onglet, i (onglet.cle)}
             {@const actif = p.nature === onglet.nature}
             {@const effectif = onglet.nature ? natures[onglet.nature] : natures.tous}
             {#if effectif === 0 && !actif}
               <!-- Rien de cette nature : l'onglet reste à sa place, inactif,
                    et le dit (`aria-disabled`). -->
-              <span role="link" aria-disabled="true" class="{ONGLET} cursor-not-allowed border-zinc-200 text-zinc-700 opacity-60 dark:border-zinc-800 dark:text-zinc-300">
+              <span
+                role="link"
+                aria-disabled="true"
+                class="{ONGLET} {ONGLET_VIDE} {animerLArrivee ? 'mv-monter' : ''}"
+                style={animerLArrivee ? `--d: ${i * PAS_DES_ONGLETS_MS}ms; --mv-duree: 0.5s` : undefined}
+              >
                 {$tr(onglet.cle)}
-                <span class="tabular-nums text-zinc-500 dark:text-zinc-400">{formatNombre(effectif, langue)}</span>
+                <span class="{PASTILLE} {PASTILLE_VIDE}">{formatNombre(effectif, langue)}</span>
               </span>
             {:else}
               <a
                 href={adresseDeRecherche({ ...p, nature: onglet.nature, page: 1 })}
                 aria-current={actif ? "true" : undefined}
-                class="{ONGLET} {actif ? ONGLET_ACTIF : ONGLET_INACTIF}"
+                class="{ONGLET} {actif ? ONGLET_ACTIF : ONGLET_INACTIF} {animerLArrivee ? 'mv-monter' : ''}"
+                style={animerLArrivee ? `--d: ${i * PAS_DES_ONGLETS_MS}ms; --mv-duree: 0.5s` : undefined}
               >
                 {$tr(onglet.cle)}
-                <span class="tabular-nums {actif ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-500 dark:text-zinc-400'}"
-                  >{formatNombre(effectif, langue)}</span
-                >
+                <span class="{PASTILLE} {actif ? PASTILLE_ACTIVE : PASTILLE_INACTIVE}">{formatNombre(effectif, langue)}</span>
               </a>
             {/if}
           {/each}
@@ -765,7 +882,11 @@
           elle ne dit jamais une panne.
         -->
         {#if !etatSeulementAnnonce}
-          <span aria-hidden="true" class="min-w-[8.5rem] flex-1">{statutAffiche}</span>
+          <!-- Le nombre en demi-gras, à l'encre (maquette : « 2 résultats »
+               à gauche, « Trier par : Pertinence » à droite). -->
+          <span aria-hidden="true" class="min-w-[8.5rem] flex-1 font-semibold text-zinc-950 dark:text-white"
+            >{statutAffiche}</span
+          >
         {/if}
         <span role="status" aria-live="polite" data-testid="search-status" class="sr-only">
           {statutAnnonce}
@@ -787,13 +908,14 @@
                au serveur, ne bouge pas à l'hydratation ; elle est cachée aux
                lecteurs d'écran, qui lisent la liste. La copie porte aussi
                la hauteur : 44 px au doigt, compactée sous un pointeur fin à
-               partir de lg. -->
+               partir de lg. Refonte A (E4d, décision R1) : le tri reste, le
+               choix en demi-gras comme « Pertinence » dans la maquette. -->
           <div class="flex items-center gap-2">
             <span>{$tr("search.sortBy")}</span>
             <span class="relative inline-flex">
               <span
                 aria-hidden="true"
-                class="invisible inline-flex min-h-11 items-center whitespace-nowrap py-2 pl-3 pr-9 text-base font-medium sm:text-sm lg:[@media(pointer:fine)]:min-h-0"
+                class="invisible inline-flex min-h-11 items-center whitespace-nowrap py-2 pl-3 pr-9 text-base font-semibold sm:text-sm lg:[@media(pointer:fine)]:min-h-0"
                 >{libelleDuTri}</span
               >
               <select
@@ -803,7 +925,7 @@
                 aria-label={$tr("a11y.sortBy")}
                 data-testid="search-sort"
                 on:change={changerDeTri}
-                class="absolute inset-0 h-full w-full bg-transparent border-none text-zinc-950 dark:text-white font-medium focus:ring-0 focus-visible:ring-2 focus-visible:ring-zinc-950 dark:focus-visible:ring-white focus-visible:rounded cursor-pointer pl-3 pr-8 text-base sm:text-sm"
+                class="absolute inset-0 h-full w-full bg-transparent border-none text-zinc-950 dark:text-white font-semibold focus:ring-0 focus-visible:ring-2 focus-visible:ring-zinc-950 dark:focus-visible:ring-white focus-visible:rounded cursor-pointer pl-3 pr-8 text-base sm:text-sm"
               >
                 <option value="">{$tr("search.relevance")}</option>
                 <option value="recent">{$tr("search.recentDate")}</option>
@@ -835,7 +957,9 @@
              domaines en 1024×768 derrière un défilement dans le défilement.
              Elle ne colle (à 16 px du haut) que là où elle tient entière
              dans la fenêtre : `collanteSiElleTient` (./colonne.ts) le mesure
-             et pose `data-collante`. Sans JavaScript, elle ne colle pas. -->
+             et pose `data-collante`. Sans JavaScript, elle ne colle pas.
+             Refonte A (E4d, décision R1) : conservée telle quelle, restylée
+             en carte posée (ombre `feuille`, A3 § 4), comme la liste. -->
         <aside class="lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <form
             id="filtres-recherche"
@@ -849,7 +973,7 @@
               ? 'block'
               : hydratee
                 ? 'hidden'
-                : 'hidden target:block'} lg:block bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 sm:p-6 shadow-sm dark:shadow-none lg:data-[collante]:sticky lg:data-[collante]:top-4"
+                : 'hidden target:block'} lg:block bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 sm:p-6 shadow-feuille dark:shadow-feuille-sombre lg:data-[collante]:sticky lg:data-[collante]:top-4"
           >
             <input type="hidden" name="q" value={p.q} />
             {#if p.nature}<input type="hidden" name="nature" value={p.nature} />{/if}
@@ -968,16 +1092,32 @@
 
       <!-- Résultats. min-w-0 : élément de grille, la colonne ne descendait pas
            sous la largeur de son contenu, et une ligne au titre insécable
-           l'élargissait au-delà de l'écran. Atténués pendant une recherche.
+           l'élargissait au-delà de l'écran. Atténués pendant une recherche
+           de la même requête (onglet, case, tri, page) ; remplacés par des
+           silhouettes pendant une nouvelle (`nouvelleRecherche`, R7).
            Sans résultat, la ligne d'état est hors de la grille à partir de lg
            (sr-only) : la carte prend sa rangée, en haut, à côté de la colonne
            de filtres, au lieu de laisser 16 px d'écart au-dessus d'elle. -->
       <div
-        class="min-w-0 transition-opacity motion-reduce:transition-none {enCours ? 'opacity-60' : ''} {affiner
+        class="min-w-0 transition-opacity motion-reduce:transition-none {enCours && !nouvelleRecherche
+          ? 'opacity-60'
+          : ''} {affiner
           ? `lg:col-start-2 ${rienATrier ? 'lg:row-start-1' : 'lg:row-start-2'}`
           : ''}"
         aria-busy={enCours ? "true" : undefined}
       >
+        {#if nouvelleRecherche}
+          <!-- Une NOUVELLE requête est en route : la silhouette de deux lignes,
+               dans la carte de la liste (maquette, état « chargement »).
+               Décorative (`aria-hidden`) : la ligne d'état dit « Recherche en
+               cours… », et la balance du champ pèse. Ni texte, ni cote, ni
+               `title`. Le bouton flottant de l'assistant s'en écarte, comme
+               de la liste. -->
+          <div aria-hidden="true" data-testid="search-skeleton" data-hors-du-bouton class={LISTE_A_FILETS}>
+            <LigneSquelette />
+            <LigneSquelette extrait={false} />
+          </div>
+        {:else}
         {#if rappels.length}
           <div
             class="mb-3 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"
@@ -1004,7 +1144,7 @@
                désormais devant la carte. -->
           <div
             data-hors-du-bouton
-            class="bg-white dark:bg-zinc-900 p-8 sm:p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none text-center"
+            class="bg-white dark:bg-zinc-900 p-8 sm:p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-feuille dark:shadow-feuille-sombre text-center"
           >
             <Icone nom="search" class="text-6xl text-zinc-300 dark:text-zinc-600 mb-4" />
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white mb-2">
@@ -1023,7 +1163,7 @@
             role="alert"
             data-testid="search-error"
             data-hors-du-bouton
-            class="bg-white dark:bg-zinc-900 p-8 sm:p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none text-center"
+            class="bg-white dark:bg-zinc-900 p-8 sm:p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-feuille dark:shadow-feuille-sombre text-center"
           >
             <Icone nom="cloud-off" class="text-6xl text-zinc-400 dark:text-zinc-500 mb-4" />
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white mb-2">
@@ -1040,7 +1180,7 @@
         {:else if pageAuDela}
           <div
             data-hors-du-bouton
-            class="rounded-2xl border border-zinc-200 bg-white p-6 text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-none sm:p-10"
+            class="rounded-2xl border border-zinc-200 bg-white p-6 text-zinc-600 shadow-feuille dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-feuille-sombre sm:p-10"
           >
             <p>{$tr("search.beyondEnd")}</p>
             <a href={adresseDeRecherche({ ...p, page: 1 })} class="mt-3 inline-flex min-h-11 items-center text-sm {LIEN}"
@@ -1054,7 +1194,7 @@
           <div
             data-hors-du-bouton
             data-sveltekit-preload-data="tap"
-            class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:p-10"
+            class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-feuille dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-feuille-sombre sm:p-10"
           >
             <Icone nom="search-x" class="text-4xl text-zinc-500 dark:text-zinc-400 mb-3" />
             {#if videParNature && p.nature}
@@ -1135,21 +1275,22 @@
           <!-- Une liste bordée à filets, une ligne par résultat (P7).
                `role="list"` : Safari ne lit plus comme une liste un <ul> sans
                puces. Le bouton flottant de l'assistant se retire quand elle
-               passe dessous. -->
-          <ul
-            role="list"
-            data-hors-du-bouton
-            class="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800"
-          >
-            {#each data.resultats as resultat (resultat.id)}
-              <SearchResultCard {resultat} />
+               passe dessous. Refonte A : la carte posée commune aux listes
+               (LISTE_A_FILETS) ; chaque ligne connaît son rang, pour arriver
+               en léger décalage (`animerLArrivee`, R9). -->
+          <ul role="list" data-hors-du-bouton class={LISTE_A_FILETS}>
+            {#each data.resultats as resultat, i (resultat.id)}
+              <SearchResultCard {resultat} rang={i} animer={animerLArrivee} />
             {/each}
           </ul>
 
           <!-- Pagination : des liens (sans JavaScript aussi), vers le haut des
                résultats. Carrés de 44 px à toute taille ; trois numéros sous
                sm, la rangée tient dans 288 px. Une flèche sans page où aller
-               reste à sa place, inactive (`aria-disabled`). -->
+               reste à sa place, inactive (`aria-disabled`). Refonte A (E4d,
+               décision R1) : conservée, au dessin des contrôles de la
+               refonte (bordure zinc-300, fond de carte, encre au survol ; la
+               flèche inactive en pointillés, comme un onglet vide). -->
           {#if totalPages > 1}
             <nav
               class="mt-8 flex flex-wrap items-center justify-center gap-1 pt-4 sm:gap-2"
@@ -1162,7 +1303,7 @@
                   href={lienPagePrecedente}
                   data-testid="search-page-prev"
                   aria-label={$tr("pagination.prev")}
-                  class="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                  class="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-300 bg-white text-zinc-600 transition-colors hover:border-zinc-950 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-white dark:hover:text-white"
                 >
                   <Icone nom="chevron-left" class="text-2xl" />
                 </a>
@@ -1172,7 +1313,7 @@
                   aria-disabled="true"
                   aria-label={$tr("pagination.prev")}
                   data-testid="search-page-prev"
-                  class="flex h-11 w-11 cursor-not-allowed items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 opacity-50 dark:border-zinc-800 dark:text-zinc-400"
+                  class="flex h-11 w-11 cursor-not-allowed items-center justify-center rounded-xl border border-dashed border-zinc-300 text-zinc-500 dark:border-zinc-700 dark:text-zinc-400"
                 >
                   <Icone nom="chevron-left" class="text-2xl" />
                 </span>
@@ -1187,8 +1328,8 @@
                     ? 'flex'
                     : 'hidden sm:flex'} h-11 min-w-11 items-center justify-center rounded-xl px-2 font-medium tabular-nums transition-colors {n ===
                   p.page
-                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
-                    : 'border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 hover:text-zinc-950 dark:hover:bg-zinc-800 dark:hover:text-white'}"
+                    ? 'bg-zinc-950 font-semibold text-white dark:bg-white dark:text-zinc-950'
+                    : 'border border-zinc-300 bg-white text-zinc-700 hover:border-zinc-950 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white dark:hover:text-white'}"
                   >{n}</a
                 >
               {/each}
@@ -1198,7 +1339,7 @@
                   href={lienPageSuivante}
                   data-testid="search-page-next"
                   aria-label={$tr("pagination.next")}
-                  class="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                  class="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-300 bg-white text-zinc-600 transition-colors hover:border-zinc-950 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-white dark:hover:text-white"
                 >
                   <Icone nom="chevron-right" class="text-2xl" />
                 </a>
@@ -1208,13 +1349,14 @@
                   aria-disabled="true"
                   aria-label={$tr("pagination.next")}
                   data-testid="search-page-next"
-                  class="flex h-11 w-11 cursor-not-allowed items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 opacity-50 dark:border-zinc-800 dark:text-zinc-400"
+                  class="flex h-11 w-11 cursor-not-allowed items-center justify-center rounded-xl border border-dashed border-zinc-300 text-zinc-500 dark:border-zinc-700 dark:text-zinc-400"
                 >
                   <Icone nom="chevron-right" class="text-2xl" />
                 </span>
               {/if}
             </nav>
           {/if}
+        {/if}
         {/if}
       </div>
     </div>

@@ -10,6 +10,11 @@
  *   ligne ajoutée. Aucune cote interne (« PRC-… ») n'est affichée.
  * - P7 (sur demande seulement, voir plus bas) : la page de résultats arrive
  *   rendue par le serveur.
+ * - Refonte A (E4) : le champ compact et sa bascule vers l'assistant (un lien,
+ *   sans préchargement au survol), la passerelle « Poser « … » à l'assistant
+ *   IA » (nom visible = nom accessible), un SEUL indicateur d'attente (la
+ *   balance du champ) et des silhouettes pendant une nouvelle requête,
+ *   l'arrivée des lignes immobile en mouvement réduit.
  *
  * AUCUN APPEL AU MODÈLE D'EMBEDDINGS PAR DÉFAUT. /search est rendue par le
  * serveur : `page.route` ne voit plus son appel à l'API, et chaque requête
@@ -23,10 +28,24 @@
  * sautées quand elle ne répond pas, échouées avec E2E_EXIGER_BACKEND=1.
  */
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import type { Category } from '../../../src/lib/types';
-import { attendreLeRepos, enregistrerLaRecherche, exiger, lireListe, ouvrirAuServeur } from '../doublures';
+import {
+  attendreLeRepos,
+  enregistrerLaRecherche,
+  exiger,
+  lireListe,
+  ouvrirAuServeur,
+  REPONSE_RECHERCHE,
+} from '../doublures';
+
+/**
+ * Le nom de la passerelle vers l'assistant (clé `search.askAssistantQuery`),
+ * espaces fines insécables comprises : le nom visible du lien, et son nom
+ * accessible (décision R4).
+ */
+const passerelle = (q: string) => `Poser «\u202F${q}\u202F» à l’assistant IA`;
 
 /** Le titre de la page qui remplace /search dans les tests du formulaire. */
 const INTERCEPTEE = 'Recherche interceptée';
@@ -197,10 +216,32 @@ test.describe('Résultats rendus par le serveur (P7, P8)', () => {
     // Le lien du titre mène au texte ; les puces, à l'article.
     await expect(lignes(page).first().locator('h2 a')).toHaveAttribute('href', /^\/laws\/\d+$/);
     await expect(page.locator('#contenu')).not.toContainText(/\bPRC-\d+/);
-    await expect(page.getByRole('link', { name: 'Poser cette question à l’assistant' })).toHaveAttribute(
-      'href',
-      '/chat?q=licenciement',
+    // Refonte A (R4) : le libellé de la maquette, qui EST son nom accessible
+    // (le nom visible doit être contenu dans le nom accessible).
+    const versLAssistant = page.getByRole('link', { name: passerelle('licenciement'), exact: true });
+    await expect(versLAssistant).toHaveAttribute('href', '/chat?q=licenciement');
+    await expect(versLAssistant).toHaveText(passerelle('licenciement'));
+  });
+
+  test('sans JavaScript, la bascule « Assistant IA » mène à l’assistant avec la requête de l’adresse', async ({ page }) => {
+    await page.goto('/search?q=licenciement');
+    const bascule = page.locator('#contenu form[role="search"]').getByRole('group', { name: 'Mode', exact: true });
+    const assistant = bascule.getByRole('link', { name: 'Assistant IA', exact: true });
+    await expect(assistant).toHaveAttribute('href', '/chat?q=licenciement');
+    // « Recherche » est la page où l'on est : aria-current, et non un bouton
+    // à aria-pressed comme dans la maquette (décision R8).
+    const courant = bascule.locator('[aria-current="page"]');
+    await expect(courant).toHaveText('Recherche');
+    await expect(bascule.locator('[aria-pressed]')).toHaveCount(0);
+    await expect(bascule.getByRole('button')).toHaveCount(0);
+    // Les noms « Rechercher » du champ et du bouton d'envoi restent (R4).
+    await expect(page.locator('#contenu').getByRole('combobox', { name: 'Rechercher', exact: true })).toHaveValue(
+      'licenciement',
     );
+    await expect(page.locator('#contenu').getByRole('button', { name: 'Rechercher', exact: true })).toBeVisible();
+
+    await assistant.click();
+    await expect(page).toHaveURL(/\/chat\?q=licenciement$/);
   });
 
   test('sans JavaScript, la colonne de filtres s’ouvre par son ancre (nouvelle API)', async ({ page }) => {
@@ -213,5 +254,139 @@ test.describe('Résultats rendus par le serveur (P7, P8)', () => {
     await bascule.click();
     await expect(page.locator('#filtres-recherche')).toBeVisible();
     await expect(page.getByTestId('search-filters-done')).toHaveAttribute('type', 'submit');
+  });
+});
+
+test.describe('Refonte A : attente, survol et mouvement (E4)', () => {
+  test.beforeEach(async ({ request }) => {
+    await enregistrerLaRecherche(request, ['licenciement', REPONSE_RECHERCHE.query]);
+  });
+
+  /**
+   * La page a repris la main (hydratation) : le bouton « Filtres » ne porte
+   * `aria-expanded` qu'après le montage (+page.svelte, `hydratee`). Avant
+   * elle, Entrée rechargerait la page entière et le routeur ne précharge
+   * rien : ce que ces tests regardent n'existerait pas encore.
+   */
+  async function attendreLHydratation(page: Page) {
+    await attendreLeRepos(page);
+    await expect(page.getByTestId('search-filters-toggle')).toHaveAttribute('aria-expanded', 'false');
+  }
+
+  test('survoler la bascule et la passerelle ne lance aucune requête', async ({ page }) => {
+    await page.goto('/search?q=licenciement');
+    await attendreLHydratation(page);
+    const requetes: string[] = [];
+    page.on('request', (requete) => requetes.push(requete.url()));
+
+    // POURQUOI UNE PAUSE SUR CHAQUE LIEN. Le routeur ne précharge qu'un lien
+    // sur lequel le pointeur s'arrête 20 ms : un mouvement suivant annule le
+    // préchargement en attente, et le test ne verrait rien, même sur un lien
+    // qui précharge au survol (contre-épreuve faite sur un titre de résultat).
+    const survoler = async (lien: Locator) => {
+      await lien.hover();
+      await page.waitForTimeout(400);
+    };
+    const formulaire = page.locator('#contenu form[role="search"]');
+    await survoler(formulaire.getByRole('link', { name: 'Assistant IA', exact: true }));
+    await survoler(page.getByRole('link', { name: passerelle('licenciement'), exact: true }));
+    expect(requetes, 'requêtes lancées par un survol').toEqual([]);
+  });
+
+  test('une nouvelle requête : la balance pèse dans le champ, seule, et des silhouettes tiennent la place des lignes', async ({
+    page,
+  }) => {
+    await page.goto('/search?q=licenciement');
+    await attendreLHydratation(page);
+    await expect(lignes(page).first()).toBeVisible();
+
+    // Les données de la page suivante arrivent par __data.json (navigation
+    // dans le navigateur) : retenues 1,5 s, le temps de regarder l'attente.
+    let liberer: () => void = () => {};
+    const retenue = new Promise<void>((fin) => (liberer = fin));
+    await page.route(
+      (url) => url.pathname === '/search/__data.json',
+      async (route) => {
+        await retenue;
+        await route.continue();
+      },
+    );
+
+    const champ = page.locator('#contenu').getByRole('combobox', { name: 'Rechercher', exact: true });
+    await champ.fill(REPONSE_RECHERCHE.query);
+    await champ.press('Enter');
+
+    const formulaire = page.locator('#contenu form[role="search"]');
+    // Un seul indicateur d'attente, dans le champ : la balance, décorative.
+    await expect(formulaire.locator('svg[data-etat="attente"]')).toBeVisible();
+    await expect(formulaire.locator('svg[data-etat="attente"]')).toHaveAttribute('aria-hidden', 'true');
+    await expect(page.locator('svg[data-etat="attente"]')).toHaveCount(1);
+    await expect(page.locator('[data-icone="loader-circle"]')).toHaveCount(0);
+    // Les lignes de « licenciement » cèdent la place à des silhouettes muettes.
+    const silhouettes = page.getByTestId('search-skeleton');
+    await expect(silhouettes).toBeVisible();
+    await expect(silhouettes).toHaveAttribute('aria-hidden', 'true');
+    await expect(lignes(page)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: passerelle('licenciement'), exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('search-status')).toHaveText('Recherche en cours…');
+    await expect(page.locator('#contenu')).not.toContainText(/\bPRC-\d+/);
+
+    liberer();
+    await expect(page).toHaveURL(new RegExp(`/search\\?q=${REPONSE_RECHERCHE.query}$`));
+    await expect(silhouettes).toHaveCount(0);
+    await expect(lignes(page).first()).toBeVisible();
+    await expect(page.locator('svg[data-etat="attente"]')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: passerelle(REPONSE_RECHERCHE.query), exact: true })).toBeVisible();
+  });
+
+  test('un onglet de la même recherche : ni silhouette ni rejeu de l’arrivée des lignes', async ({ page }) => {
+    await page.goto('/search?q=licenciement');
+    await attendreLHydratation(page);
+    // La doublure répond toujours avec ses effectifs : des onglets absents
+    // seraient une panne de la page, à voir, et non un test à sauter.
+    const onglets = page.getByRole('group', { name: 'Nature du texte' });
+    await onglets.getByRole('link', { name: /^Lois\b/ }).click();
+    await expect(page).toHaveURL(/nature=loi/);
+    await expect(page.getByTestId('search-skeleton')).toHaveCount(0);
+    await expect(lignes(page).first()).toBeVisible();
+    // Même requête : les lignes arrivent sans monter (R9).
+    await expect(page.locator('#contenu ul[role="list"] > li.mv-monter')).toHaveCount(0);
+  });
+
+  test('revenir en arrière sur les résultats ne rejoue pas leur arrivée', async ({ page }) => {
+    await page.goto('/search?q=licenciement');
+    await attendreLHydratation(page);
+    // Le premier affichage, lui, monte : sans cette preuve, l'assertion du
+    // retour passerait aussi sur une page où rien ne monte jamais.
+    await expect(page.locator('#contenu ul[role="list"] > li.mv-monter').first()).toBeAttached();
+
+    await page.getByTestId('site-header').getByRole('link', { name: 'Comparer', exact: true }).click();
+    await expect(page).toHaveURL(/\/compare$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/search\?q=licenciement$/);
+    await expect(lignes(page).first()).toBeVisible();
+    await expect(page.locator('#contenu ul[role="list"] > li.mv-monter')).toHaveCount(0);
+    await expect(page.locator('#contenu .mv-souligner')).toHaveCount(0);
+  });
+
+  test('en mouvement réduit, les lignes sont là, immobiles et lisibles', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/search?q=licenciement');
+    await expect(lignes(page).first()).toBeVisible();
+    const animees = await page.evaluate(
+      () =>
+        document
+          .getAnimations()
+          .filter((a) => {
+            const cible = (a.effect as KeyframeEffect | null)?.target;
+            return cible instanceof Element && Boolean(cible.closest('#contenu'));
+          }).length,
+    );
+    expect(animees, 'animations dans le contenu en mouvement réduit').toBe(0);
+    const premiere = lignes(page).first();
+    await expect(premiere).toHaveCSS('opacity', '1');
+    // Le trait des mots cherchés est l'état final : il reste, sans mouvement.
+    const mot = premiere.locator('strong').first();
+    await expect(mot).toHaveCSS('background-size', '100% 2px');
   });
 });

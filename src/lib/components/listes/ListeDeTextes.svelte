@@ -32,6 +32,7 @@
   import { language, tr } from "$lib/stores/language";
   import type { TriDesTextes } from "$lib/types";
   import LigneDeTexte from "./LigneDeTexte.svelte";
+  import { LISTE_A_FILETS } from "./classes";
   import { adresseDuLot, etatARestaurer, type EtatDeLaListe, type LigneAffichee as Ligne } from "./lots";
   import { cleSelonNombre, formatNombre, remplir } from "./reperes";
 
@@ -246,12 +247,10 @@
 
   <!-- Une liste bordée à filets (maquette domaine-p11a). `role="list"` :
        Safari ne lit plus comme une liste un <ul> sans puces. Le bouton
-       flottant de l'assistant se retire quand elle passe dessous. -->
-  <ul
-    role="list"
-    data-hors-du-bouton
-    class="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800"
-  >
+       flottant de l'assistant se retire quand elle passe dessous. Refonte A :
+       la carte posée commune avec les résultats de /search (LISTE_A_FILETS,
+       ./classes.ts), une seule recette pour les deux. -->
+  <ul role="list" data-hors-du-bouton class={LISTE_A_FILETS}>
     {#each affichees as ligne (ligne.id)}
       <LigneDeTexte {ligne} />
     {/each}

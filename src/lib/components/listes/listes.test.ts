@@ -4,7 +4,9 @@ import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SearchResultCard from '$lib/components/SearchResultCard.svelte';
 import { language, t } from '$lib/stores/language';
+import LigneSquelette from './LigneSquelette.svelte';
 import ListeDeTextes from './ListeDeTextes.svelte';
+import { LISTE_A_FILETS } from './classes';
 import type { LigneAffichee } from './lots';
 import { formatNombre, remplir, type ResultatAffiche } from './reperes';
 
@@ -238,5 +240,73 @@ describe('SearchResultCard', () => {
     expect(avec.container.querySelector('[data-icone="rotate-ccw-clock"]')).not.toBeNull();
     const sans = render(SearchResultCard, { props: { resultat: { ...RESULTAT, statut: null } } });
     expect(sans.container.querySelector('[data-icone="rotate-ccw-clock"]')).toBeNull();
+  });
+
+  // Refonte A (E4a) : le mouvement de la ligne, joué à sa première apparition
+  // seulement, sur un style statique qui est déjà l'état final.
+
+  it('les mots cherchés sont soulignés au repos ; à l’arrivée, le trait se dessine un mot après l’autre', () => {
+    const { container } = render(SearchResultCard, { props: { resultat: RESULTAT, rang: 0, animer: true } });
+    const mots = [...container.querySelectorAll('strong')] as HTMLElement[];
+    // Le trait est l'état final : posé même sans animation.
+    expect(mots.every((m) => m.classList.contains('mv-souligne'))).toBe(true);
+    expect(mots.every((m) => m.classList.contains('mv-souligner'))).toBe(true);
+    expect(mots.map((m) => m.style.getPropertyValue('--d'))).toEqual(['600ms', '800ms']);
+  });
+
+  it('au-delà du cinquième rang, rien ne part après une seconde (R9, D9)', () => {
+    const { container } = render(SearchResultCard, { props: { resultat: RESULTAT, rang: 12, animer: true } });
+    const ligne = container.querySelector('li') as HTMLElement;
+    expect(ligne.style.getPropertyValue('--d')).toBe('400ms');
+    const mots = [...container.querySelectorAll('strong')] as HTMLElement[];
+    expect(mots.map((m) => m.style.getPropertyValue('--d'))).toEqual(['1000ms', '1000ms']);
+  });
+
+  it('la ligne monte à son arrivée, décalée selon son rang ; sans `animer`, rien ne bouge et le trait reste', () => {
+    const arrivee = render(SearchResultCard, { props: { resultat: RESULTAT, rang: 3, animer: true } });
+    const ligne = arrivee.container.querySelector('li') as HTMLElement;
+    expect(ligne.classList.contains('mv-monter')).toBe(true);
+    expect(ligne.style.getPropertyValue('--d')).toBe('240ms');
+
+    const repos = render(SearchResultCard, { props: { resultat: RESULTAT, rang: 3 } });
+    const calme = repos.container.querySelector('li') as HTMLElement;
+    expect(calme.classList.contains('mv-monter')).toBe(false);
+    expect(calme.getAttribute('style')).toBeNull();
+    expect(repos.container.querySelector('.mv-souligner')).toBeNull();
+    expect(repos.container.querySelector('.mv-tamponner')).toBeNull();
+    expect(repos.container.querySelectorAll('strong.mv-souligne')).toHaveLength(2);
+  });
+
+  it('le statut se pose d’un coup de tampon à l’arrivée (R6), sa phrase inchangée (R5)', () => {
+    const repos = render(SearchResultCard, { props: { resultat: RESULTAT } });
+    const phrase = repos.container.querySelector('[data-icone="rotate-ccw-clock"]')?.closest('p')?.textContent;
+    const arrivee = render(SearchResultCard, { props: { resultat: RESULTAT, rang: 0, animer: true } });
+    const icone = arrivee.container.querySelector('[data-icone="rotate-ccw-clock"]') as Element;
+    const tampon = icone.closest('.mv-tamponner') as HTMLElement;
+    expect(tampon).not.toBeNull();
+    expect(tampon.style.getPropertyValue('--d')).toBe('450ms');
+    expect(icone.closest('p')?.textContent).toBe(phrase);
+    // Jamais la mention que l'API ne fournit pas.
+    expect(arrivee.container.textContent).not.toMatch(/Origine, non consolidée/);
+  });
+});
+
+describe('Listes à filets (refonte A)', () => {
+  it('la liste des textes et celle des résultats partagent la même carte posée', () => {
+    const { container } = render(ListeDeTextes, {
+      props: { ...proprietes, lignes: [NOUVELLE], total: 1, suivante: false, tri: null },
+    });
+    expect(container.querySelector('ul[role="list"]')?.getAttribute('class')).toBe(LISTE_A_FILETS);
+    expect(LISTE_A_FILETS).toMatch(/\bshadow-feuille\b/);
+    expect(LISTE_A_FILETS).toMatch(/\brounded-2xl\b/);
+  });
+
+  it('la silhouette d’une ligne n’a ni texte ni lien : elle ne dit rien', () => {
+    const avec = render(LigneSquelette, {});
+    expect(avec.container.textContent?.trim()).toBe('');
+    expect(avec.container.querySelectorAll('.mv-squelette')).toHaveLength(4);
+    expect(avec.container.querySelector('a, button, [tabindex]')).toBeNull();
+    const sans = render(LigneSquelette, { props: { extrait: false } });
+    expect(sans.container.querySelectorAll('.mv-squelette')).toHaveLength(2);
   });
 });

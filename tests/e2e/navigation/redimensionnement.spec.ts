@@ -1033,6 +1033,85 @@ function mesurerLesCibles(minimum: number): CibleMesuree[] {
   return petites;
 }
 
+/**
+ * Le champ compact de /search (refonte A, E4b). Le balayage dit que rien ne
+ * dépasse, et « au doigt » mesure les cibles à 390 px seulement : aucun des
+ * deux ne voit ce qui se joue ailleurs. Sous 640 px, le champ passe sur deux
+ * rangées ; à 320 px, « Assistant IA » se coupait en « Assista… » dans sa
+ * moitié de piste, sans dépasser de rien ; en écran court, la pile de feuilles
+ * ne doit plus prendre de hauteur.
+ */
+test.describe('/search : le champ compact', () => {
+  const parcoursDeLaRecherche = () => {
+    const parcours = PAGES.find((p) => p.nom === '/search?q=travail');
+    if (!parcours) throw new Error('/search?q=travail a quitté tests/e2e/pages-du-site.ts');
+    return parcours;
+  };
+
+  test.describe('en direct', () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
+
+    test('de 1 440 à 320 px : une rangée puis deux, rien de coupé', async ({ page, request }) => {
+      await themeClair(page);
+      await ouvrirAuRepos(parcoursDeLaRecherche(), page, request);
+      const formulaire = page.locator('#contenu form[role="search"]');
+      const champ = formulaire.getByRole('combobox', { name: 'Rechercher', exact: true });
+      const assistant = formulaire.getByRole('link', { name: 'Assistant IA', exact: true });
+      const envoi = formulaire.getByRole('button', { name: 'Rechercher', exact: true });
+
+      for (const largeur of [1440, 1024, 768, 640, 639, 480, 390, 360, 359, 344, 320]) {
+        await redimensionner(page, largeur, hauteurPour(largeur));
+        const ou = `/search à ${largeur} px`;
+        const [c, a, e] = await Promise.all([champ.boundingBox(), assistant.boundingBox(), envoi.boundingBox()]);
+        if (!c || !a || !e) throw new Error(`${ou} : un élément du champ n'a pas de boîte`);
+
+        // Au-dessus de sm, la saisie, la bascule et l'envoi partagent une
+        // rangée ; en dessous, la bascule et l'envoi passent sous la saisie.
+        if (largeur >= 640) expect.soft(a.y, `${ou} : la bascule quitte la rangée de la saisie`).toBeLessThan(c.y + c.height);
+        else expect.soft(a.y, `${ou} : la bascule reste sur la rangée de la saisie`).toBeGreaterThanOrEqual(c.y + c.height);
+        expect.soft(Math.abs(a.y + a.height / 2 - (e.y + e.height / 2)), `${ou} : bascule et envoi décalés`).toBeLessThanOrEqual(1);
+        expect.soft(c.width, `${ou} : la saisie est écrasée (${c.width} px)`).toBeGreaterThanOrEqual(120);
+
+        // Le bouton d'envoi est un carré de 44 px à toute taille.
+        expect.soft([e.width, e.height], `${ou} : bouton d'envoi`).toEqual([44, 44]);
+
+        const coupes = await formulaire
+          .getByRole('group', { name: 'Mode', exact: true })
+          .locator('.truncate')
+          .evaluateAll((libelles) => libelles.filter((l) => l.scrollWidth > l.clientWidth).map((l) => l.textContent));
+        expect.soft(coupes, `${ou} : libellés de la bascule coupés`).toEqual([]);
+      }
+    });
+  });
+
+  test.describe('à 320 px au doigt', () => {
+    test.use(reglages({ largeur: 320, hauteur: 640, telephone: true }));
+
+    test('la bascule et le bouton d’envoi mesurent 44 px au moins', async ({ page, request }) => {
+      await themeClair(page);
+      await ouvrirAuRepos(parcoursDeLaRecherche(), page, request);
+      const petites = await page.evaluate(mesurerLesCibles, CIBLE_MIN);
+      expect(petites.map((c) => `${c.element} : ${c.largeur} × ${c.hauteur} px`)).toEqual([]);
+    });
+  });
+
+  test.describe('en écran court', () => {
+    test.use(reglages({ largeur: 740, hauteur: 360, telephone: true }));
+
+    test('la pile de feuilles disparaît, et la première ligne reste dans l’écran', async ({ page, request }) => {
+      await themeClair(page);
+      await ouvrirAuRepos(parcoursDeLaRecherche(), page, request);
+      const pile = page.locator('#contenu form[role="search"] div.isolate');
+      const affichage = (pseudo: string) => pile.evaluate((el, p) => getComputedStyle(el, p).display, pseudo);
+      expect(await affichage('::before')).toBe('none');
+      expect(await affichage('::after')).toBe('none');
+      // Sans défiler : le champ, la passerelle et les onglets ne doivent pas
+      // pousser tous les résultats sous le bord d'un téléphone en paysage.
+      await expect(page.locator('#contenu ul[role="list"] > li').first()).toBeInViewport();
+    });
+  });
+});
+
 test.describe('390x844 au doigt', () => {
   test.use(reglages({ largeur: 390, hauteur: 844, telephone: true }));
 

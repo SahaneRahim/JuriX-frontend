@@ -18,7 +18,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
-import { attendreLeRepos } from '../doublures';
+import { attendreLeRepos, EFFECTIFS_DE_RECHERCHE, enregistrerLaRecherche, REPONSE_RECHERCHE } from '../doublures';
 import { cliquerJusqualEffet } from '../hydratation';
 
 /**
@@ -267,6 +267,77 @@ test.describe('Balayage axe-core', () => {
         graves,
         graves.map((v) => `${v.id} (${v.impact}) — ${v.nodes.length} noeud(s)`).join('\n'),
       ).toEqual([]);
+    });
+  }
+});
+
+/**
+ * /search dans ses deux états de la refonte A (E4), clair et sombre.
+ *
+ * POURQUOI EN PLUS DU BALAYAGE CI-DESSUS. Celui-ci ouvre la page en clair, au
+ * chargement. Or la refonte y pose ce que seul un contraste mesuré peut
+ * valider : pastilles d'effectif (encre sur encre à 20 % sur l'onglet actif),
+ * onglet vide en pointillés, passerelle, bascule de mode, trait des mots
+ * cherchés. Et les lignes qui montent passent par une opacité partielle, que
+ * axe compterait dans le contraste : `attendreLeRepos` les laisse arriver, on
+ * mesure l'état que l'on lit.
+ *
+ * La doublure, et non la vraie recherche : elle garantit des statuts, des
+ * puces d'articles et un onglet à zéro (la réponse ci-dessous n'a aucun
+ * arrêté), sans lesquels il n'y aurait rien à mesurer. L'attente (silhouettes
+ * `aria-hidden`, balance décorative) est balayée aussi : une nouvelle requête
+ * ne doit laisser aucun nom ni contraste en défaut.
+ */
+test.describe('/search : résultats et attente (refonte A)', () => {
+  const SANS_ARRETE = {
+    ...REPONSE_RECHERCHE,
+    facets: { ...EFFECTIFS_DE_RECHERCHE, types: EFFECTIFS_DE_RECHERCHE.types.filter((t) => t.value !== 'arrêté') },
+  };
+
+  async function violationsGraves(page: Page): Promise<string[]> {
+    const resultats = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    return resultats.violations
+      .filter((v) => v.impact === 'serious' || v.impact === 'critical')
+      .map((v) => `${v.id} (${v.impact}) : ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
+  }
+
+  for (const theme of ['light', 'dark']) {
+    test.describe(`thème ${theme}`, () => {
+      test.beforeEach(async ({ page, request }) => {
+        await enregistrerLaRecherche(request, ['licenciement', REPONSE_RECHERCHE.query], SANS_ARRETE);
+        await page.addInitScript((valeur) => localStorage.setItem('jurix-theme', valeur), theme);
+        await ouvrir(page, '/search?q=licenciement');
+        await attendreLeRepos(page);
+      });
+
+      test('les résultats : aucune violation sérieuse', async ({ page }) => {
+        await expect(page.locator('#contenu ul[role="list"] > li').first()).toBeVisible();
+        // Il y a bien de quoi mesurer : un onglet vide, et le champ compact.
+        await expect(page.getByRole('group', { name: 'Nature du texte' }).locator('[aria-disabled="true"]').first()).toBeVisible();
+        await expect(page.locator('#contenu form[role="search"]').getByRole('group', { name: 'Mode' })).toBeVisible();
+        expect(await violationsGraves(page)).toEqual([]);
+      });
+
+      test('pendant une nouvelle requête : aucune violation sérieuse', async ({ page }) => {
+        // La page a repris la main : Entrée navigue sans recharger.
+        await expect(page.getByTestId('search-filters-toggle')).toHaveAttribute('aria-expanded', 'false');
+        let liberer: () => void = () => {};
+        const retenue = new Promise<void>((fin) => (liberer = fin));
+        await page.route(
+          (url) => url.pathname === '/search/__data.json',
+          async (route) => {
+            await retenue;
+            await route.continue();
+          },
+        );
+        const champ = page.locator('#contenu').getByRole('combobox', { name: 'Rechercher', exact: true });
+        await champ.fill(REPONSE_RECHERCHE.query);
+        await champ.press('Enter');
+        await expect(page.getByTestId('search-skeleton')).toBeVisible();
+        const graves = await violationsGraves(page);
+        liberer();
+        expect(graves).toEqual([]);
+      });
     });
   }
 });

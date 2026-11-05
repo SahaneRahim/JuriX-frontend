@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { afterNavigate } from '$app/navigation';
 import { navigating as navigatingDeKit } from '$app/stores';
 import { t } from '$lib/stores/language';
+import type { ResultatAffiche } from '$lib/components/listes/reperes';
 import type { DonneesDeRecherche } from './resultats';
 import Page from './+page.svelte';
 
@@ -39,6 +40,15 @@ function naviguerVers(adresse: string) {
 /** Le rappel `afterNavigate` que la page a enregistré à sa création. */
 function apresNavigation(): (navigation: { type: string }) => void {
   return vi.mocked(afterNavigate).mock.calls.at(-1)?.[0] as unknown as (navigation: { type: string }) => void;
+}
+
+/**
+ * La balance qui pèse dans le champ pendant une recherche : le SEUL
+ * indicateur d'attente de la page (refonte A, E4b). L'en-tête est simulé :
+ * aucune autre balance n'est montée ici.
+ */
+function balanceQuiPese(container: HTMLElement): Element | null {
+  return container.querySelector('svg[data-etat="attente"]');
 }
 
 /**
@@ -150,12 +160,13 @@ describe('/search : la ligne d’état', () => {
     expect(region.textContent?.trim()).toBe('25 résultats');
   });
 
-  it('vers /search sans requête, rien n’est cherché : ni « Recherche en cours… » ni roue', async () => {
+  it('vers /search sans requête, rien n’est cherché : ni « Recherche en cours… » ni balance qui pèse', async () => {
     const { getByTestId, container } = render(Page, { props: { data: { ...RECHERCHE, total: 3 } } });
     naviguerVers('/search');
     await tick();
     expect(getByTestId('search-status').textContent?.trim()).toBe('3 résultats');
     expect(texteAffiche(container)).toBe('3 résultats');
+    expect(balanceQuiPese(container)).toBeNull();
     expect(container.querySelector('[data-icone="loader-circle"]')).toBeNull();
   });
 
@@ -165,7 +176,11 @@ describe('/search : la ligne d’état', () => {
     await tick();
     expect(texteAffiche(container)).toBe(t('search.searching', 'fr'));
     expect(getByTestId('search-status').textContent?.trim()).toBe(t('search.searching', 'fr'));
-    expect(container.querySelector('[data-icone="loader-circle"]')).not.toBeNull();
+    // L'attente se voit à un seul endroit : la balance, dans le champ.
+    const balance = balanceQuiPese(container);
+    expect(balance).not.toBeNull();
+    expect(balance?.closest('form[role="search"]')).not.toBeNull();
+    expect(container.querySelector('[data-icone="loader-circle"]')).toBeNull();
   });
 
   it('page créée par une navigation : le nombre s’affiche aussitôt, seule l’annonce attend', async () => {
@@ -175,9 +190,9 @@ describe('/search : la ligne d’état', () => {
     apresNavigation()({ type: 'link' });
     navigating.set(null);
     await tick();
-    // Ni roue ni liste atténuée : rien ne se cherche, et l'écran ne le dit pas.
+    // Ni balance qui pèse ni liste atténuée : rien ne se cherche, et l'écran ne le dit pas.
     expect(texteAffiche(container)).toBe('3 résultats');
-    expect(container.querySelector('[data-icone="loader-circle"]')).toBeNull();
+    expect(balanceQuiPese(container)).toBeNull();
     // La région, elle, attend d'être connue des lecteurs d'écran pour changer.
     expect(getByTestId('search-status').textContent?.trim()).toBe(t('search.searching', 'fr'));
 
@@ -290,7 +305,7 @@ describe('/search : le champ pendant une recherche', () => {
     naviguerVers('/search?q=bail&categorie=13');
     await tick();
     const envoi = container.querySelector('form[role="search"] button[type="submit"]') as HTMLButtonElement;
-    expect(container.querySelector('[data-icone="loader-circle"]')).not.toBeNull();
+    expect(balanceQuiPese(container)).not.toBeNull();
     expect(envoi.disabled).toBe(false);
   });
 });
@@ -389,5 +404,199 @@ describe('/search : la colonne de filtres', () => {
     // Plus de `target:block` : la colonne, encore ciblée par l'ancre, l'emportait sur `hidden`.
     expect(colonne.classList.contains('hidden')).toBe(true);
     expect(colonne.classList.contains('target:block')).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* Refonte A (E4) : arrivée des lignes, silhouettes, passerelle, onglets     */
+/* ------------------------------------------------------------------------ */
+
+/** Un résultat affiché (forme de ./resultats.ts), d'identifiant `id`. */
+function resultat(id: number): ResultatAffiche {
+  return {
+    id,
+    title: `Loi N°92/0${id} du 14 août 1992 portant Code du travail`,
+    type: 'loi',
+    publication_date: '1992-08-14',
+    category_id: 4,
+    category_name: 'Droit du Travail et Sécurité Sociale',
+    objet: `Code du travail ${id}`,
+    numero: `92/0${id}`,
+    date_signature: '1992-08-14',
+    annee: 1992,
+    date_publication_jo: null,
+    statut: null,
+    extrait: [
+      { texte: 'a droit à une ', gras: false },
+      { texte: 'indemnité', gras: true },
+    ],
+    articles: [],
+  };
+}
+
+/** « loi », nouvelle API : sept lignes à l'écran, 25 trouvées (12 décrets, 13 lois). */
+const AVEC_LIGNES: DonneesDeRecherche = {
+  ...AFFINEE,
+  resultats: [1, 2, 3, 4, 5, 6, 7].map(resultat),
+};
+
+/** Les lignes de résultats affichées (et non les silhouettes). */
+function lignes(container: HTMLElement): HTMLElement[] {
+  return [...container.querySelectorAll('ul[role="list"] > li')] as HTMLElement[];
+}
+
+describe('/search : l’arrivée des lignes (R9)', () => {
+  it('au premier affichage, chaque ligne monte, décalée de min(rang, 5) × 80 ms', () => {
+    const { container } = render(Page, { props: { data: AVEC_LIGNES } });
+    const affichees = lignes(container);
+    expect(affichees).toHaveLength(7);
+    expect(affichees.every((l) => l.classList.contains('mv-monter'))).toBe(true);
+    expect(affichees.map((l) => l.style.getPropertyValue('--d'))).toEqual([
+      '0ms',
+      '80ms',
+      '160ms',
+      '240ms',
+      '320ms',
+      '400ms',
+      '400ms',
+    ]);
+  });
+
+  it('ni une autre page, ni un autre tri, ni un onglet ne la rejouent ; une nouvelle requête, si', async () => {
+    const { container, rerender } = render(Page, { props: { data: AVEC_LIGNES } });
+    const parametres = AVEC_LIGNES.parametres;
+
+    // Page 2 : d'autres lignes, la même recherche.
+    await rerender({ data: { ...AVEC_LIGNES, parametres: { ...parametres, page: 2 }, resultats: [8, 9].map(resultat) } });
+    await tick();
+    expect(lignes(container)).toHaveLength(2);
+    expect(container.querySelector('.mv-monter')).toBeNull();
+    expect(container.querySelector('.mv-souligner')).toBeNull();
+
+    // Un autre tri, puis un onglet.
+    await rerender({ data: { ...AVEC_LIGNES, parametres: { ...parametres, tri: 'recent' }, resultats: [7, 3].map(resultat) } });
+    await tick();
+    expect(container.querySelector('.mv-monter')).toBeNull();
+    await rerender({ data: { ...AVEC_LIGNES, parametres: { ...parametres, nature: 'loi' } } });
+    await tick();
+    expect(container.querySelector('.mv-monter')).toBeNull();
+
+    // Une autre requête : les lignes arrivent de nouveau.
+    await rerender({ data: { ...AVEC_LIGNES, parametres: { ...parametres, q: 'bail' }, resultats: [11, 12].map(resultat) } });
+    await tick();
+    expect(lignes(container).every((l) => l.classList.contains('mv-monter'))).toBe(true);
+  });
+});
+
+describe('/search : l’arrivée, au retour en arrière (R6, R9)', () => {
+  /** Le routeur tel qu'il est quand la page se recrée : `$navigating` dit encore d'où l'on vient. */
+  function revenirVers(adresse: string, type: string) {
+    navigating.set({ from: null, to: { url: new URL(adresse, 'http://localhost') }, type });
+  }
+
+  it('revenir d’un texte vers ses résultats ne rejoue rien : ni lignes, ni mots, ni statuts, ni onglets', () => {
+    revenirVers('/search?q=loi', 'popstate');
+    const { container } = render(Page, { props: { data: AVEC_LIGNES } });
+    expect(lignes(container)).toHaveLength(7);
+    expect(container.querySelector('.mv-monter')).toBeNull();
+    expect(container.querySelector('.mv-souligner')).toBeNull();
+    expect(container.querySelector('.mv-tamponner')).toBeNull();
+    // Le trait des mots reste : c'est l'état final, seul le mouvement est retiré.
+    expect(container.querySelectorAll('strong.mv-souligne').length).toBeGreaterThan(0);
+  });
+
+  it('un lien vers la page (arrivée ordinaire) la joue, lui', () => {
+    revenirVers('/search?q=loi', 'link');
+    const { container } = render(Page, { props: { data: AVEC_LIGNES } });
+    expect(lignes(container).every((l) => l.classList.contains('mv-monter'))).toBe(true);
+  });
+
+  it('revenir à une requête précédente sur la page déjà ouverte : ses lignes arrivent sans monter', async () => {
+    const { container, rerender } = render(Page, { props: { data: AVEC_LIGNES } });
+    revenirVers('/search?q=bail', 'popstate');
+    await rerender({ data: { ...AVEC_LIGNES, parametres: { ...AVEC_LIGNES.parametres, q: 'bail' } } });
+    await tick();
+    expect(container.querySelector('.mv-monter')).toBeNull();
+  });
+});
+
+describe('/search : pendant la recherche (R7)', () => {
+  it('une NOUVELLE requête : des silhouettes muettes remplacent la liste et les onglets', async () => {
+    const { container, getByTestId, queryByTestId, queryByRole } = render(Page, { props: { data: AVEC_LIGNES } });
+    naviguerVers('/search?q=bail');
+    await tick();
+
+    const silhouettes = getByTestId('search-skeleton');
+    expect(silhouettes.getAttribute('aria-hidden')).toBe('true');
+    expect(silhouettes.textContent?.trim()).toBe('');
+    expect(silhouettes.querySelector('a, button, [title]')).toBeNull();
+    expect(lignes(container)).toHaveLength(0);
+    // Les effectifs de la requête précédente ne s'affichent plus.
+    expect(getByTestId('search-skeleton-tabs').getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('[role="group"][aria-label="Nature du texte"]')).toBeNull();
+    // La passerelle nommait la requête précédente.
+    expect(queryByRole('link', { name: t('search.askAssistantQuery', 'fr').replace('{q}', 'loi') })).toBeNull();
+    // Une seule attente à l'écran : la balance du champ. La ligne d'état l'annonce.
+    expect(container.querySelectorAll('svg[data-etat="attente"]')).toHaveLength(1);
+    expect(getByTestId('search-status').textContent?.trim()).toBe(t('search.searching', 'fr'));
+
+    // La navigation finit (ici, sans nouvelles données) : les silhouettes partent.
+    navigating.set(null);
+    await tick();
+    expect(queryByTestId('search-skeleton')).toBeNull();
+    expect(lignes(container)).toHaveLength(7);
+  });
+
+  it('la même requête (un onglet, une case, une page) : la liste reste, atténuée, sans silhouette', async () => {
+    const { container, queryByTestId } = render(Page, { props: { data: AVEC_LIGNES } });
+    naviguerVers('/search?q=loi&nature=decret');
+    await tick();
+    expect(queryByTestId('search-skeleton')).toBeNull();
+    expect(queryByTestId('search-skeleton-tabs')).toBeNull();
+    expect(lignes(container)).toHaveLength(7);
+    const liste = container.querySelector('ul[role="list"]')!.parentElement as HTMLElement;
+    expect(liste.classList.contains('opacity-60')).toBe(true);
+    expect(liste.getAttribute('aria-busy')).toBe('true');
+    expect(balanceQuiPese(container)).not.toBeNull();
+  });
+
+  it('depuis la page sans requête aussi : la carte « Commencez votre recherche » cède la place aux silhouettes', async () => {
+    const { getByTestId, queryByText } = render(Page, { props: { data: DEBUT } });
+    naviguerVers('/search?q=bail');
+    await tick();
+    expect(getByTestId('search-skeleton')).toBeTruthy();
+    expect(queryByText(t('search.startTitle', 'fr'))).toBeNull();
+  });
+});
+
+describe('/search : la passerelle et les onglets (R4)', () => {
+  it('« Poser « loi » à l’assistant IA » : nom visible et nom accessible confondus, vers /chat?q=loi, sans préchargement au survol', () => {
+    const { getByRole } = render(Page, { props: { data: AVEC_LIGNES } });
+    const nom = t('search.askAssistantQuery', 'fr').replace('{q}', 'loi');
+    const passerelle = getByRole('link', { name: nom });
+    expect(passerelle.textContent?.replace(/\s+/g, ' ').trim()).toBe(nom.replace(/\s+/g, ' '));
+    expect(passerelle.getAttribute('href')).toBe('/chat?q=loi');
+    expect(passerelle.getAttribute('data-sveltekit-preload-data')).toBe('tap');
+    expect(passerelle.querySelector('[data-icone="sparkle"]')).not.toBeNull();
+  });
+
+  it('l’effectif dans une pastille, sans texte caché : le nom de l’onglet reste « Lois 13 » ; un onglet vide en pointillés', () => {
+    const { getByRole } = render(Page, { props: { data: AVEC_LIGNES } });
+    const onglets = getByRole('group', { name: t('search.natureGroup', 'fr') });
+    const lois = [...onglets.querySelectorAll('a')].find((a) => a.textContent?.includes(t('search.laws', 'fr')))!;
+    expect(lois.textContent?.replace(/\s+/g, ' ').trim()).toBe('Lois 13');
+    expect(lois.querySelector('.sr-only')).toBeNull();
+    expect(lois.querySelector('span')?.textContent).toBe('13');
+    const vide = onglets.querySelector('[aria-disabled="true"]') as HTMLElement;
+    expect(vide.getAttribute('role')).toBe('link');
+    expect(vide.classList.contains('border-dashed')).toBe(true);
+  });
+
+  it('les onglets montent à leur arrivée, à 50 ms l’un de l’autre', () => {
+    const { getByRole } = render(Page, { props: { data: AVEC_LIGNES } });
+    const onglets = [...getByRole('group', { name: t('search.natureGroup', 'fr') }).children] as HTMLElement[];
+    expect(onglets).toHaveLength(6);
+    expect(onglets.map((o) => o.style.getPropertyValue('--d'))).toEqual(['0ms', '50ms', '100ms', '150ms', '200ms', '250ms']);
+    expect(onglets.every((o) => o.classList.contains('mv-monter'))).toBe(true);
   });
 });

@@ -198,7 +198,8 @@ src/routes/
   (main)/         accueil et assistant conversationnel
   laws/           liste et lecture des documents, explication d'un article par l'IA
   categories/[id] documents d'un domaine juridique
-  search/         résultats de recherche, titres puis mentions dans le texte
+  search/         résultats de recherche : une ligne par texte, onglets de nature,
+                  filtres, tri et pages ; champ compact avec bascule vers l'assistant
   signup/         création de compte (nom, adresse, mot de passe, ou Google)
   compare/        comparaison de deux régimes, grille sourcée cellule par cellule
   admin/          tableau de bord, documents, import en masse, comptes

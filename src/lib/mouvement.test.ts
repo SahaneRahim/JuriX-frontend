@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
  * écrit hors du bloc animerait la page pour qui a demandé moins de mouvement,
  * sans qu'aucun écran ne le montre en revue. Un @keyframes sans préfixe
  * (spin, pulse), chargé après app.css, remplacerait en silence celui d'un
- * utilitaire de Tailwind (animate-spin de la palette, de SearchBar…). Et une
+ * utilitaire de Tailwind (animate-spin de la palette, de StatusBadge…). Et une
  * feuille importée ailleurs qu'au layout racine changerait l'ordre des
  * feuilles en production.
  */

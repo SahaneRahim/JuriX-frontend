@@ -22,7 +22,7 @@
  * POURQUOI LE PRÉFIXE mv-. Ce fichier est chargé APRÈS app.css : un
  * @keyframes spin, pulse, ping ou bounce remplacerait celui des utilitaires
  * animate-spin ou animate-pulse de Tailwind, qu'emploient la palette,
- * SearchBar, StatusBadge et l'administration. Les gestes d'icône s'appellent
+ * StatusBadge et l'administration. Les gestes d'icône s'appellent
  * donc mv-icone-spin, mv-icone-flip…
  *
  * POURQUOI LE STYLE STATIQUE EST L'ÉTAT FINAL. Sans JavaScript, avant

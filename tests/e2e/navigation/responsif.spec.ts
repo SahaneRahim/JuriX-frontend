@@ -411,6 +411,28 @@ const PARCOURS: Parcours[] = [
       await page.goto('/search?q=travail');
       await expect(page.getByTestId('search-status')).toContainText(String(REPONSE_RECHERCHE.total));
     },
+    verifier: async (page) => {
+      // Refonte A (E4b) : le champ compact, sa bascule vers l'assistant et
+      // son bouton d'envoi tiennent entiers dans l'écran, à toute taille
+      // (sous 640 px, sur deux rangées) ; la pile de feuilles sous le champ
+      // ne pousse rien de côté.
+      const formulaire = page.locator('#contenu form[role="search"]');
+      await verifierDansLEcran(
+        page,
+        formulaire.getByRole('combobox', { name: 'Rechercher', exact: true }),
+        'le champ de recherche',
+      );
+      await verifierDansLEcran(
+        page,
+        formulaire.getByRole('link', { name: 'Assistant IA', exact: true }),
+        'la bascule « Assistant IA »',
+      );
+      await verifierDansLEcran(
+        page,
+        formulaire.getByRole('button', { name: 'Rechercher', exact: true }),
+        'le bouton d’envoi de la recherche',
+      );
+    },
   },
   {
     chemin: '/categories/[id]',

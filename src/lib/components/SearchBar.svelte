@@ -3,6 +3,7 @@
   import { createEventDispatcher, onMount, tick } from 'svelte';
   import { tr } from '$lib/stores/language';
   import { goto } from '$app/navigation';
+  import BalanceAnimee from '$lib/components/BalanceAnimee.svelte';
   import Icone from '$lib/components/Icone.svelte';
   import { typographieDesNumeros } from '$lib/sources';
 
@@ -17,9 +18,35 @@
    */
   export let placeholderCourt: string = '';
   export let value: string = '';
-  /** Une recherche est en cours : une roue remplace la loupe, le bouton reste actif. */
+  /**
+   * Une recherche est en cours : la balance pèse à la place de la loupe, le
+   * bouton reste actif (refonte A, E4b).
+   *
+   * POURQUOI LA BALANCE, ET PLUS LA ROUE DU BOUTON. L'attente avait deux
+   * indicateurs possibles, la roue dans le bouton d'envoi et la page
+   * atténuée ; la refonte n'en garde qu'UN, à un seul endroit : la balance de
+   * JuriX, qui « pèse » à la place de la loupe (A2 § 3.1, geste « peser »).
+   * Elle est décorative (`aria-hidden`) : c'est la ligne d'état de la page
+   * (`role="status"`) qui dit « Recherche en cours… ». Le bouton garde son
+   * libellé, ou sa loupe : il ne change plus de contenu pendant l'attente.
+   */
   export let loading: boolean = false;
-  export let size: 'normal' | 'large' = 'normal';
+  /**
+   * Le modèle du champ. `compacte` (refonte A, décision R8) : celui de /search,
+   * sur la maquette RefonteRecherche. Une carte posée sur une pile de deux
+   * feuilles, la loupe (ou la balance), la saisie, la bascule « Assistant IA |
+   * Recherche » et un bouton d'envoi carré, à la flèche. Une valeur de plus
+   * pour la prop existante, et non une seconde prop : les suggestions de
+   * titres, l'envoi par formulaire GET et les noms accessibles sont les mêmes.
+   */
+  export let size: 'normal' | 'large' | 'compacte' = 'normal';
+  /**
+   * L'adresse de la bascule « Assistant IA » (taille compacte). Par défaut,
+   * l'assistant avec la saisie en cours (`/chat?q=…`), que la page du chat
+   * pré-remplit sans l'envoyer ; recalculée à chaque frappe. Au rendu
+   * serveur, c'est la requête de l'adresse : le lien marche sans JavaScript.
+   */
+  export let assistantHref: string | undefined = undefined;
   /**
    * Champs cachés envoyés avec la requête (`[nom, valeur]`) : sur /search, les
    * filtres en cours (nature, domaines, période, tri), qu'une nouvelle
@@ -50,6 +77,16 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
   });
 
   $: indicatif = placeholderCourt && !champLarge ? placeholderCourt : placeholder;
+
+  $: compacte = size === 'compacte';
+
+  /** L'assistant, avec la question écrite ; sans question, l'assistant seul. */
+  function adresseDeLAssistant(saisie: string): string {
+    const question = saisie.trim();
+    return question ? `/chat?q=${encodeURIComponent(question)}` : '/chat';
+  }
+
+  $: lienAssistant = assistantHref ?? adresseDeLAssistant(value);
 
   /**
    * Envoi du formulaire (P8). C'est un VRAI formulaire GET vers /search, avec
@@ -189,128 +226,281 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
 </script>
 
 <!-- Aligné à gauche, sans mx-auto : la page décide de l'alignement.
-     Grand modèle (/search) : pleine largeur sous lg, 672 px au-delà. Plafonné
-     à 672 px dès le téléphone en paysage, son bord droit s'arrêtait à 49 px
-     de celui des résultats en 768 (21 px en 740) : presque aligné, il se
-     lisait comme une erreur. Sous lg, résultats et champ ont désormais la
-     même largeur ; au-delà, la colonne de filtres décale les résultats et
-     l'écart redevient franc.
+     Grand modèle : pleine largeur sous lg, 672 px au-delà. Plafonné à 672 px
+     dès le téléphone en paysage, son bord droit s'arrêtait à 49 px de celui
+     des résultats en 768 (21 px en 740) : presque aligné, il se lisait comme
+     une erreur. Modèle compact (/search, refonte A) : la largeur que la page
+     lui donne.
 
      role="search" : un repère de recherche pour les lecteurs d'écran (P8). -->
 <form
   method="get"
   action="/search"
   role="search"
-  class="relative w-full transition-all duration-300 {size === 'large' ? 'lg:max-w-2xl' : 'max-w-xl'}"
+  class="relative w-full {compacte ? '' : 'transition-all duration-300'} {size === 'large' ? 'lg:max-w-2xl' : compacte ? '' : 'max-w-xl'}"
   on:submit={handleSubmit}
 >
   {#each champs as [nom, valeur], i (`${nom}-${valeur}-${i}`)}
     <input type="hidden" name={nom} value={valeur} />
   {/each}
-  <div class="relative flex items-center">
-    <div class="pointer-events-none absolute left-0 flex h-full items-center text-zinc-500 dark:text-zinc-400 {size === 'large' ? 'pl-3.5' : 'pl-4'}">
-      <Icone nom="search" class="h-5 w-5" />
-    </div>
-
+  {#if compacte}
     <!--
-      Combobox complet, et non un simple champ texte.
+      LE CHAMP COMPACT (refonte A, E4b ; maquette RefonteRecherche).
 
-      La navigation au clavier fonctionnait deja (fleches, Entree, Echap dans
-      handleKeydown), mais rien ne l'ANNONCAIT : aucun aria-expanded, aucun
-      role="listbox", aucun aria-activedescendant. Un lecteur d'ecran ne savait
-      ni qu'une liste s'etait ouverte, ni quelle entree etait selectionnee — la
-      fonction existait sans etre perceptible.
-
-      `name="q"` : c'est ce que le formulaire envoie (P8).
-
-      Plus de `disabled` pendant le chargement : désactivé, le champ perdait le
-      focus à chaque recherche, et l'on ne pouvait pas corriger sa requête
-      pendant qu'elle partait.
-
-      Marge droite = place réelle des boutons posés par-dessus le champ, à
-      chaque palier : sous sm, 6 + effacer (44) + 4 + rechercher (44) = 98 px ;
-      de sm à md, 8 + 44 + 8 + 44 = 104 px ; à partir de md, le bouton porte
-      son libellé et l'ensemble mesure environ 180 px. Avec un pr-28 unique, la
-      fin d'une longue requête passait sous ces boutons. Champ VIDE (grand
-      modèle) : « effacer » n'existe pas, et sous md la marge ne garde que le
-      bouton d'envoi (6 + 44 + 6 = 56 px, pr-14) : le texte indicatif court a
-      186 px à 320 px de large, au lieu de 138 où il était coupé.
-
-      `text-ellipsis` : ce qui ne tient pas (une longue requête, champ sans
-      focus ; un texte indicatif traduit plus long) finit par « … » au lieu
-      d'être coupé au milieu d'un mot sous les boutons.
-
-      Recette des champs (rounded-xl, ombre légère) et non plus celle de la
-      barre du hero (rounded-2xl, shadow-xl, 70 px de haut à partir de sm) :
-      sur la page des résultats, le champ pesait plus que tout autre champ du
-      site. 54 px de haut à toute taille : les deux boutons de 44 px y
-      tiennent avec 5 px d'air au-dessus et au-dessous.
+      La pile de deux feuilles derrière la carte : deux pseudo-éléments
+      décalés vers le bas et réduits (7 px et 97 %, 14 px et 94 %, opacités
+      0,85 et 0,55 : A3 § 4). POURQUOI DEUX ÉLÉMENTS : un pseudo-élément à
+      z-index négatif passerait AU-DESSUS du fond de son propre parent
+      (PASSATION § 8, piège 3) ; la pile est donc portée par ce conteneur,
+      qui isole son empilement (`isolate`), et la carte est l'élément
+      intérieur. Décor seul : hors du flux, sans largeur de plus (aucun
+      défilement de côté), invisible aux lecteurs d'écran. Masquée sur écran
+      court (`court:`, téléphone en paysage) : chaque ligne y compte.
     -->
-    <input
-      bind:this={champ}
-      type="text"
-      name="q"
-      role="combobox"
-      aria-label={$tr("a11y.searchField")}
-      aria-expanded={showSuggestions && suggestions.length > 0}
-      aria-controls="suggestions-liste"
-      aria-autocomplete="list"
-      aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
-      enterkeyhint="search"
-      class="w-full text-ellipsis rounded-xl border border-zinc-200 bg-white text-zinc-950 shadow-sm placeholder-zinc-400 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:shadow-none dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 transition-all outline-none {size === 'large'
-        ? `py-3.5 pl-11 text-base md:pr-48 ${value ? 'pr-[6.5rem] sm:pr-28' : 'pr-14'}`
-        : 'py-4 pl-12 pr-28 text-base md:pr-48'}"
-      placeholder={indicatif}
-      {value}
-      on:input={handleInput}
-      on:keydown={handleKeydown}
-      on:blur={handleBlur}
-      on:focus={() => { if (suggestions.length > 0) showSuggestions = true; }}
-      autocomplete="off"
-    />
+    <div
+      class="relative isolate before:absolute before:inset-0 before:-z-10 before:translate-y-[7px] before:scale-[.97] before:rounded-3xl before:border before:border-zinc-200 before:bg-white before:opacity-[.85] before:content-[''] after:absolute after:inset-0 after:-z-10 after:translate-y-[14px] after:scale-[.94] after:rounded-3xl after:border after:border-zinc-200 after:bg-white after:opacity-[.55] after:content-[''] dark:before:border-zinc-800 dark:before:bg-zinc-900 dark:after:border-zinc-800 dark:after:bg-zinc-900 court:before:hidden court:after:hidden"
+    >
+      <!--
+        La carte : le contour du CHAMP. POURQUOI zinc-500 ET NON LE FILET
+        PÂLE DE LA MAQUETTE (décision X1, A3 § 5) : la limite d'un champ doit
+        atteindre 3:1 contre ce qui l'entoure (WCAG 1.4.11) ; le filet de la
+        maquette (zinc-200) n'en fait que 1,3:1. zinc-500 : 4,6:1 sur la page
+        claire (zinc-50), 4,1:1 sur la page sombre. Au focus, la recette des champs du
+        dépôt (encre et anneau d'un pixel), portée par la carte : la saisie,
+        sans bordure, est dedans. Ombre `feuille`, rayon de 24 px (`rounded-3xl`,
+        la maquette dit 20 : A3 § 2).
 
-    <div class="absolute right-1.5 flex items-center gap-1 sm:right-2 sm:gap-2">
-      {#if value}
-        <!-- Pas de rouge au survol : effacer la saisie ne détruit rien, et le
-             rouge est réservé aux erreurs et aux suppressions. 44 px à toute
-             taille : réduit à 36 px dès sm, il l'était aussi sur un téléphone
-             en paysage et sur une tablette, des écrans tactiles. -->
-        <button
-          type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
-          on:click={clearSearch}
-          aria-label={$tr("search.clearSearch")}
+        Sous sm, deux rangées, comme la maquette : la saisie sur toute la
+        largeur, puis la bascule et le bouton d'envoi. À partir de sm, une
+        seule.
+      -->
+      <div
+        class="relative flex flex-wrap items-center gap-2.5 rounded-3xl border border-zinc-500 bg-white p-2.5 shadow-feuille transition-colors focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:bg-zinc-900 dark:shadow-feuille-sombre dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 sm:flex-nowrap sm:p-2 sm:pl-4"
+      >
+        <!-- La loupe, ou la balance qui pèse pendant la recherche : le seul
+             indicateur d'attente de la page (décision de l'étape E4). -->
+        <span class="flex h-6 w-6 shrink-0 items-center justify-center text-xl text-zinc-600 dark:text-zinc-400">
+          {#if loading}
+            <BalanceAnimee etat="attente" />
+          {:else}
+            <Icone nom="search" />
+          {/if}
+        </span>
+
+        <!-- Le champ et « effacer », côte à côte : la saisie ne passe jamais
+             sous un bouton, aucune marge n'est à réserver pour eux. Sous sm,
+             il prend la rangée entière, moins la loupe (24 px) et l'écart
+             (10 px). -->
+        <div class="flex min-w-0 flex-[1_1_calc(100%_-_2.125rem)] items-center sm:flex-1">
+          <!--
+            Le même combobox que le grand modèle (voir plus bas) : nom
+            accessible « Rechercher » (décision R4), `name="q"`, suggestions
+            de titres, jamais `disabled`. Sans bordure ni fond : c'est la
+            carte qui les dessine. 18 px, comme la maquette (et au-dessus
+            des 16 px sous lesquels iOS zoome au focus).
+          -->
+          <input
+            bind:this={champ}
+            type="text"
+            name="q"
+            role="combobox"
+            aria-label={$tr("a11y.searchField")}
+            aria-expanded={showSuggestions && suggestions.length > 0}
+            aria-controls="suggestions-liste"
+            aria-autocomplete="list"
+            aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
+            enterkeyhint="search"
+            class="h-11 min-w-0 flex-1 text-ellipsis rounded-none border-0 bg-transparent px-1 py-0 text-lg text-zinc-950 placeholder-zinc-500 outline-none focus:outline-none focus:ring-0 dark:bg-transparent dark:text-zinc-100 dark:placeholder-zinc-400"
+            placeholder={indicatif}
+            {value}
+            on:input={handleInput}
+            on:keydown={handleKeydown}
+            on:blur={handleBlur}
+            on:focus={() => { if (suggestions.length > 0) showSuggestions = true; }}
+            autocomplete="off"
+          />
+          {#if value}
+            <!-- Même bouton que le grand modèle : 44 px, pas de rouge. -->
+            <button
+              type="button"
+              class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
+              on:click={clearSearch}
+              aria-label={$tr("search.clearSearch")}
+            >
+              <Icone nom="x" class="h-5 w-5" />
+            </button>
+          {/if}
+        </div>
+
+        <!--
+          LA BASCULE « Assistant IA | Recherche » (décision R8). « Recherche »
+          est la page où l'on est : un <span aria-current="page">, et non un
+          bouton à `aria-pressed` comme dans la maquette (il n'y a rien à
+          presser). « Assistant IA » est un LIEN vers l'assistant, la saisie en
+          `?q=` : il marche sans JavaScript, et la page du chat pré-remplit la
+          question sans l'envoyer. Pas de pastille qui glisse : rien ne bascule
+          ici, on change de page.
+
+          POURQUOI `preload-data="tap"`. Le site précharge les liens au simple
+          survol (app.html) : survoler la bascule lancerait des requêtes vers
+          /chat sans qu'on ait rien choisi. Le préchargement ne part donc qu'à
+          l'appui, comme pour les liens de /search (+page.svelte).
+
+          38 px dans une piste de 44, comme la maquette ; au doigt, le
+          ::before prolonge le lien jusqu'aux bords de la piste (44 px de
+          haut : redimensionnement.spec.ts). Sous 360 px, les deux icônes
+          (décoratives) s'effacent et les marges se resserrent : à 320 px,
+          « Assistant IA » ne tenait plus dans sa moitié de piste et se
+          coupait en « Assista… ».
+        -->
+        <div
+          role="group"
+          aria-label={$tr("search.modeGroup")}
+          class="grid flex-1 grid-cols-2 rounded-xl bg-zinc-100 p-[3px] dark:bg-zinc-800 sm:flex-none"
         >
-          <Icone nom="x" class="h-5 w-5" />
+          <a
+            href={lienAssistant}
+            data-sveltekit-preload-data="tap"
+            class="relative flex h-[38px] min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs max-[359px]:px-1.5 font-semibold text-zinc-600 transition-colors before:absolute before:-inset-[3px] before:content-[''] hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white sm:min-w-28 sm:text-[13px]"
+          >
+            <Icone nom="sparkle" class="shrink-0 text-[15px] max-[359px]:hidden" />
+            <span class="truncate">{$tr("mode.chat")}</span>
+          </a>
+          <span
+            aria-current="page"
+            class="flex h-[38px] min-w-0 items-center justify-center gap-1.5 rounded-lg bg-zinc-950 px-3 text-xs max-[359px]:px-1.5 font-semibold text-white dark:bg-white dark:text-zinc-950 sm:min-w-28 sm:text-[13px]"
+          >
+            <Icone nom="search" class="shrink-0 text-[15px] max-[359px]:hidden" />
+            <span class="truncate">{$tr("mode.search")}</span>
+          </span>
+        </div>
+
+        <!--
+          Bouton d'ENVOI (`type="submit"`) : celui que déclenchent Entrée et
+          la touche « Rechercher » du clavier d'un téléphone, avec ou sans
+          JavaScript. Carré de 44 px à la flèche, comme la maquette ; nom
+          accessible « Rechercher » (décision R4 : la maquette disait « Lancer
+          la recherche », que six tests ne trouveraient plus). Jamais
+          `disabled`, même pendant une recherche : voir `handleSubmit`. Il ne
+          tourne plus pendant l'attente : la balance du champ le dit.
+        -->
+        <button
+          type="submit"
+          aria-label={$tr("search.button")}
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-xl text-white transition duration-150 ease-jx hover:bg-zinc-800 motion-safe:active:scale-[.92] motion-reduce:transition-none dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+        >
+          <Icone nom="arrow-up" />
         </button>
-      {/if}
+      </div>
+    </div>
+  {:else}
+    <div class="relative flex items-center">
+      <!-- La loupe, ou la balance pendant une recherche (voir `loading`). -->
+      <div class="pointer-events-none absolute left-0 flex h-full items-center text-zinc-500 dark:text-zinc-400 {size === 'large' ? 'pl-3.5' : 'pl-4'}">
+        {#if loading}
+          <BalanceAnimee etat="attente" class="h-5 w-5" />
+        {:else}
+          <Icone nom="search" class="h-5 w-5" />
+        {/if}
+      </div>
 
       <!--
-        Bouton d'ENVOI du formulaire (`type="submit"`) : c'est lui que
-        déclenchent Entrée et la touche « Rechercher » du clavier d'un
-        téléphone, avec ou sans JavaScript. La loupe, et non une flèche (P8).
-        aria-label permanent : le libelle visible vit dans un
-        <span class="hidden md:inline">, donc absent sous md, et il disparait
-        entierement pendant le chargement au profit d'un rond animé. Le bouton
-        principal de la recherche n'avait alors AUCUN nom.
-        Libellé en text-sm, comme les autres boutons principaux du site
-        (guide, § 4.4) : en 16 px et md:px-8, il gardait la taille du hero.
-        Jamais `disabled`, même pendant une recherche : voir `handleSubmit`.
+        Combobox complet, et non un simple champ texte.
+
+        La navigation au clavier fonctionnait deja (fleches, Entree, Echap dans
+        handleKeydown), mais rien ne l'ANNONCAIT : aucun aria-expanded, aucun
+        role="listbox", aucun aria-activedescendant. Un lecteur d'ecran ne savait
+        ni qu'une liste s'etait ouverte, ni quelle entree etait selectionnee — la
+        fonction existait sans etre perceptible.
+
+        `name="q"` : c'est ce que le formulaire envoie (P8).
+
+        Plus de `disabled` pendant le chargement : désactivé, le champ perdait le
+        focus à chaque recherche, et l'on ne pouvait pas corriger sa requête
+        pendant qu'elle partait.
+
+        Marge droite = place réelle des boutons posés par-dessus le champ, à
+        chaque palier : sous sm, 6 + effacer (44) + 4 + rechercher (44) = 98 px ;
+        de sm à md, 8 + 44 + 8 + 44 = 104 px ; à partir de md, le bouton porte
+        son libellé et l'ensemble mesure environ 180 px. Avec un pr-28 unique, la
+        fin d'une longue requête passait sous ces boutons. Champ VIDE (grand
+        modèle) : « effacer » n'existe pas, et sous md la marge ne garde que le
+        bouton d'envoi (6 + 44 + 6 = 56 px, pr-14) : le texte indicatif court a
+        186 px à 320 px de large, au lieu de 138 où il était coupé.
+
+        `text-ellipsis` : ce qui ne tient pas (une longue requête, champ sans
+        focus ; un texte indicatif traduit plus long) finit par « … » au lieu
+        d'être coupé au milieu d'un mot sous les boutons.
+
+        Recette des champs (rounded-xl, ombre légère) et non plus celle de la
+        barre du hero (rounded-2xl, shadow-xl, 70 px de haut à partir de sm) :
+        sur la page des résultats, le champ pesait plus que tout autre champ du
+        site. 54 px de haut à toute taille : les deux boutons de 44 px y
+        tiennent avec 5 px d'air au-dessus et au-dessous.
       -->
-      <button
-        type="submit"
-        aria-label={$tr('search.button')}
-        class="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-zinc-950 px-3 sm:px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-black motion-safe:hover:scale-105 dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200 {size === 'large' ? 'md:px-5' : 'md:px-6'}"
-      >
-        {#if loading}
-          <Icone nom="loader-circle" class="h-5 w-5 motion-safe:animate-spin" />
-        {:else}
+      <input
+        bind:this={champ}
+        type="text"
+        name="q"
+        role="combobox"
+        aria-label={$tr("a11y.searchField")}
+        aria-expanded={showSuggestions && suggestions.length > 0}
+        aria-controls="suggestions-liste"
+        aria-autocomplete="list"
+        aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
+        enterkeyhint="search"
+        class="w-full text-ellipsis rounded-xl border border-zinc-200 bg-white text-zinc-950 shadow-sm placeholder-zinc-400 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:shadow-none dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 transition-all outline-none {size === 'large'
+          ? `py-3.5 pl-11 text-base md:pr-48 ${value ? 'pr-[6.5rem] sm:pr-28' : 'pr-14'}`
+          : 'py-4 pl-12 pr-28 text-base md:pr-48'}"
+        placeholder={indicatif}
+        {value}
+        on:input={handleInput}
+        on:keydown={handleKeydown}
+        on:blur={handleBlur}
+        on:focus={() => { if (suggestions.length > 0) showSuggestions = true; }}
+        autocomplete="off"
+      />
+
+      <div class="absolute right-1.5 flex items-center gap-1 sm:right-2 sm:gap-2">
+        {#if value}
+          <!-- Pas de rouge au survol : effacer la saisie ne détruit rien, et le
+               rouge est réservé aux erreurs et aux suppressions. 44 px à toute
+               taille : réduit à 36 px dès sm, il l'était aussi sur un téléphone
+               en paysage et sur une tablette, des écrans tactiles. -->
+          <button
+            type="button"
+            class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
+            on:click={clearSearch}
+            aria-label={$tr("search.clearSearch")}
+          >
+            <Icone nom="x" class="h-5 w-5" />
+          </button>
+        {/if}
+
+        <!--
+          Bouton d'ENVOI du formulaire (`type="submit"`) : c'est lui que
+          déclenchent Entrée et la touche « Rechercher » du clavier d'un
+          téléphone, avec ou sans JavaScript. La loupe, et non une flèche (P8).
+          aria-label permanent : le libelle visible vit dans un
+          <span class="hidden md:inline">, donc absent sous md, et il disparait
+          entierement pendant le chargement au profit d'un rond animé. Le bouton
+          principal de la recherche n'avait alors AUCUN nom. (Refonte A : il
+          ne tourne plus pendant l'attente, la balance de la loupe le dit.)
+          Libellé en text-sm, comme les autres boutons principaux du site
+          (guide, § 4.4) : en 16 px et md:px-8, il gardait la taille du hero.
+          Jamais `disabled`, même pendant une recherche : voir `handleSubmit`.
+        -->
+        <button
+          type="submit"
+          aria-label={$tr('search.button')}
+          class="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-zinc-950 px-3 sm:px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-black motion-safe:hover:scale-105 dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200 {size === 'large' ? 'md:px-5' : 'md:px-6'}"
+        >
           <span class="hidden md:inline">{$tr('search.button')}</span>
           <Icone nom="search" class="h-5 w-5 md:hidden" />
-        {/if}
-      </button>
+        </button>
+      </div>
     </div>
-  </div>
+  {/if}
 
   <!-- Autocomplete Suggestions Dropdown -->
   {#if showSuggestions && suggestions.length > 0}

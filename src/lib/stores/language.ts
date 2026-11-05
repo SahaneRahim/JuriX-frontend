@@ -1314,6 +1314,11 @@ export const translations = {
     'search.articleChip': 'Art.\u00a0{n}',
     'search.askAssistant': 'Poser cette question à l’assistant',
     'search.askAssistantEmpty': 'Poser la question à l’assistant',
+    // La passerelle de /search, au libellé de la refonte (décision R4) : la
+    // requête entre guillemets, nom visible ET nom accessible du lien.
+    'search.askAssistantQuery': 'Poser «\u202F{q}\u202F» à l’assistant IA',
+    // Le groupe de la bascule « Assistant IA | Recherche » du champ compact.
+    'search.modeGroup': 'Mode',
     'search.browseDomains': 'Parcourir par domaine',
     'search.beyondEnd': 'Il n’y a plus de résultats à cette page.',
     'search.firstPage': 'Revenir à la première page',
@@ -2448,6 +2453,8 @@ export const translations = {
     'search.articleChip': 'Art.\u00a0{n}',
     'search.askAssistant': 'Ask the assistant this question',
     'search.askAssistantEmpty': 'Ask the assistant',
+    'search.askAssistantQuery': 'Ask the AI assistant about “{q}”',
+    'search.modeGroup': 'Mode',
     'search.browseDomains': 'Browse by area of law',
     'search.beyondEnd': 'There are no more results on this page.',
     'search.firstPage': 'Back to the first page',
