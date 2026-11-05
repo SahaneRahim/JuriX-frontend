@@ -487,6 +487,11 @@ test.describe('P10 : le sommaire d’un texte', () => {
     // « Chapitre I · art. 1 à 4 » : la division et sa plage d'articles.
     await expect(sommaire.getByText(/·\s*art\.\s*\d+(er)?\s*(à\s*\d+)?$/).first()).toBeVisible();
 
+    // Les premiers mots et la barre de 3 px : dans le sommaire complet (la
+    // colonne n'a que « Art. N » et son repère qui glisse, décision L4).
+    await cliquerJusqualEffet(page.getByTestId('law-toc-tout'), page.getByRole('dialog', { name: 'Table des matières' }));
+    await expect(sommaire.getByText(/·\s*art\.\s*\d+(er)?\s*(à\s*\d+)?$/).first()).toBeVisible();
+
     const liens = sommaire.getByRole('link');
     expect(await liens.count()).toBeGreaterThan(1);
     const entrees = await liens.evaluateAll((as) =>

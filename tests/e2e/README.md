@@ -51,6 +51,7 @@ tests/e2e/
     ├── conversations.spec.ts          # panneau des conversations
     ├── explication-article.spec.ts    # bouton « Expliquer l'article »
     ├── inscription.spec.ts            # inscription et connexion
+    ├── lecture-mouvement.spec.ts      # lecture : feuilletage, ancrage de la note, mouvement réduit, sans JavaScript
     ├── link-integrity.spec.ts         # aucun lien mort, rendu serveur
     ├── mot-de-passe-oublie.spec.ts    # recuperation de compte
     ├── monochrome.spec.ts             # aucune teinte sauf le rouge, anglais sans francais (projet monochrome)

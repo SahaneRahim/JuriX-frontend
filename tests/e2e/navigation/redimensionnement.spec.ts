@@ -849,7 +849,9 @@ test.describe('états à travers un redimensionnement', () => {
     await attendreLeRepos(page);
     const bascule = page.getByTestId('law-toc-toggle');
     const sommaire = page.getByTestId('law-toc');
-    await cliquerJusqualEffet(bascule, sommaire);
+    // Fermé, le sommaire se voit déjà (ses puces) : l'effet du clic est la
+    // fenêtre modale.
+    await cliquerJusqualEffet(bascule, page.getByRole('dialog', { name: 'Table des matières' }));
     await expect(sommaire).toHaveAttribute('role', 'dialog');
 
     await redimensionner(page, 1280, 900);
@@ -863,7 +865,10 @@ test.describe('états à travers un redimensionnement', () => {
     await redimensionner(page, 390, 844);
     const retour = `/laws/${id} 390x844, après 1 280 px`;
     await expect.soft(bascule, `${retour} : le sommaire s'est rouvert`).toHaveAttribute('aria-expanded', 'false');
-    await expect.soft(sommaire, `${retour} : le sommaire couvre la page`).toBeHidden();
+    // Refermé, il redevient la rangée de puces, dans le flux de la page.
+    await expect.soft(sommaire, `${retour} : le sommaire couvre la page`).not.toHaveAttribute('role', 'dialog');
+    await expect.soft(sommaire, `${retour} : le sommaire couvre la page`).not.toHaveCSS('position', 'fixed');
+    expect.soft(await voileAffiche(page), `${retour} : un voile couvre la page`).toBeNull();
     expect.soft(await defilementLibre(page), `${retour} : le défilement reste verrouillé`).toBe(true);
   });
 });

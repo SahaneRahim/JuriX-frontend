@@ -1064,6 +1064,10 @@ export const translations = {
     'loi.document.texte_court': 'Texte',
     'loi.statut.origine': 'Version d’origine, non consolidée.',
     'loi.statut.aucune_modification': 'Aucune modification relevée par JuriX au {date}.',
+    // La pastille de la ligne de statut (refonte A, lecture) : sans point final,
+    // comme la maquette. `loi.statut.origine` garde le sien (décision L9).
+    'loi.statut.pastille': 'Version d’origine, non consolidée',
+    'loi.statut.incomplet': 'Ce relevé peut être incomplet.',
     'loi.statut.signaler': 'Signaler',
     'loi.statut.modifie': 'Modifié depuis sa publication.',
     'loi.statut.affiche_origine': 'Texte affiché\u00a0: version d’origine, non consolidée.',
@@ -1160,6 +1164,8 @@ export const translations = {
     'loi.sommaire.modifie': 'modifié',
     'loi.sommaire.abroge': 'abrogé',
     'loi.sommaire.remplace': 'remplacé',
+    'loi.sommaire.tout': 'Tout le sommaire',
+    'loi.sommaire.puces': 'Articles de la section',
     'loi.division.livre': 'Livre',
     'loi.division.titre': 'Titre',
     'loi.division.chapitre': 'Chapitre',
@@ -1185,6 +1191,7 @@ export const translations = {
     'loi.passageIntrouvable': 'Le passage demandé n’a pas été retrouvé dans ce texte : il est affiché en entier.',
     'loi.precedent': 'Précédent',
     'loi.suivant': 'Suivant',
+    'loi.navigation.voisins': 'Articles voisins',
     'loi.ia.titre': 'Explication simplifiée (IA)',
     'loi.ia.description': 'Demandez à l’assistant d’expliquer cet article en langage courant, à partir de son texte et de son document d’origine. Vous obtiendrez\u00a0:',
     'loi.ia.contenu_cle': 'Contenu clé\u00a0:',
@@ -1195,7 +1202,16 @@ export const translations = {
     'loi.ia.en_cours': 'Explication en cours…',
     'loi.ia.regenerer': 'Régénérer',
     'loi.ia.introuvable': 'Cet article n’a pas pu être retrouvé dans le document.',
-    'loi.ia.avertissement': 'Réponse générée par une IA. Vérifiez-la sur le texte de l’article ci-dessus.',
+    // « dans », et non plus « sur le texte … ci-dessus » : la note est à droite
+    // du texte à partir de 1 280 px (refonte A).
+    'loi.ia.avertissement': 'Réponse générée par une IA. Vérifiez-la dans le texte de l’article.',
+    'loi.ia.poser_question': 'Poser une question sur cet article',
+    // Pré-remplie dans l'assistant (`/chat?q=`), jamais envoyée seule.
+    // POURQUOI LE NOM ENTRE PARENTHÈSES, et non « de {nom} » (A4) : le nom court
+    // porte sa nature sans article (« Décret n° 2021/745 », « Code civil ») :
+    // « l'article 3 de Décret n° … » ne se dit pas en français. L'anglais n'a
+    // pas ce souci.
+    'loi.ia.question_modele': 'Que dit l’article {n} ({nom})\u202F?',
 
     // Chat (P3, P4, P5). Accueil en trois messages, ligne permanente sous le
     // champ, état de la réponse en texte, bouton « Arrêter », citations
@@ -2222,6 +2238,8 @@ export const translations = {
     'loi.document.texte_court': 'Text',
     'loi.statut.origine': 'Original version, not consolidated.',
     'loi.statut.aucune_modification': 'No amendment recorded by JuriX as of {date}.',
+    'loi.statut.pastille': 'Original version, not consolidated',
+    'loi.statut.incomplet': 'This record may be incomplete.',
     'loi.statut.signaler': 'Report',
     'loi.statut.modifie': 'Amended since its publication.',
     'loi.statut.affiche_origine': 'Text shown: original version, not consolidated.',
@@ -2315,6 +2333,8 @@ export const translations = {
     'loi.sommaire.modifie': 'amended',
     'loi.sommaire.abroge': 'repealed',
     'loi.sommaire.remplace': 'replaced',
+    'loi.sommaire.tout': 'Full contents',
+    'loi.sommaire.puces': 'Articles in this section',
     'loi.division.livre': 'Book',
     'loi.division.titre': 'Title',
     'loi.division.chapitre': 'Chapter',
@@ -2335,6 +2355,7 @@ export const translations = {
     'loi.passageIntrouvable': 'The requested passage was not found in this text, so the whole text is shown.',
     'loi.precedent': 'Previous',
     'loi.suivant': 'Next',
+    'loi.navigation.voisins': 'Neighbouring articles',
     'loi.ia.titre': 'Simplified explanation (AI)',
     'loi.ia.description': 'Ask the assistant to explain this article in plain language, from its text and its parent document. You will get:',
     'loi.ia.contenu_cle': 'Key content:',
@@ -2345,7 +2366,9 @@ export const translations = {
     'loi.ia.en_cours': 'Generating explanation…',
     'loi.ia.regenerer': 'Regenerate',
     'loi.ia.introuvable': 'This article could not be found in the document.',
-    'loi.ia.avertissement': 'AI-generated answer. Check it against the article text above.',
+    'loi.ia.avertissement': 'AI-generated answer. Check it in the article text.',
+    'loi.ia.poser_question': 'Ask a question about this article',
+    'loi.ia.question_modele': 'What does article {n} of {nom} say?',
 
     // Chat (P3, P4, P5).
     'chat.welcome.greeting': "Hello, I'm JuriX, your legal assistant. I'm here to help. What is your question?",

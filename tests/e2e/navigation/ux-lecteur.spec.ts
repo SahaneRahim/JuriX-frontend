@@ -19,7 +19,7 @@
  * Lancer : npx playwright test tests/e2e/navigation/ux-lecteur.spec.ts
  */
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { API, attendreLeRepos, exiger, lireListe, ouvrirAuServeur } from '../doublures';
 import { cliquerJusqualEffet } from '../hydratation';
@@ -40,6 +40,17 @@ async function suivantJusqualAdresse(page: Page): Promise<void> {
     await suivant.click();
     await expect(page).toHaveURL(/[?&]article=/, { timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
+}
+
+/**
+ * Ouvre « Tout le sommaire » et rend ses liens. La colonne ne montre que la
+ * division de l'article lu (décision L4) : un texte dont le premier chapitre
+ * a un seul article aurait sauté ces tests sans rien vérifier.
+ */
+async function toutLeSommaire(page: Page): Promise<Locator> {
+  const sommaire = page.getByTestId('law-toc');
+  await cliquerJusqualEffet(page.getByTestId('law-toc-tout'), page.getByRole('dialog', { name: 'Table des matières' }));
+  return sommaire.getByRole('link');
 }
 
 /**
@@ -104,15 +115,18 @@ test.describe('Page d’un texte', () => {
     exiger(deuxieme, 'pas de deuxième article');
     await expect(page.locator('article.article h2')).toContainText(`Article ${deuxieme}`);
 
-    // Un saut du sommaire (colonne visible à 1 280 px) ajoute une entrée :
-    // le retour arrière ramène à l'article d'avant, sans quitter le texte.
-    const liens = page.getByTestId('law-toc').getByRole('link');
+    // Un saut du sommaire ajoute une entrée : le retour arrière ramène à
+    // l'article d'avant, sans quitter le texte.
+    const liens = await toutLeSommaire(page);
     test.skip((await liens.count()) < 3, 'texte de moins de trois articles');
     await liens.nth(2).click();
     await expect(page).not.toHaveURL(new RegExp(`[?&]article=${deuxieme}(?:&|#|$)`));
     const troisieme = articleDeLAdresse(page);
     await expect(page.locator('article.article h2')).toContainText(`Article ${troisieme}`);
-    await expect(liens.nth(2)).toHaveAttribute('aria-current', 'location');
+    // Dans la colonne, revenue : l'article lu y est marqué.
+    await expect(page.getByTestId('law-toc').locator('[aria-current="location"]')).toContainText(
+      new RegExp(`Art\\.\\s${troisieme}`),
+    );
 
     await page.goBack();
     await expect(page).toHaveURL(new RegExp(`/laws/${id}\\?article=${deuxieme}(?:&|#|$)`));
@@ -182,7 +196,7 @@ test.describe('Page d’un texte', () => {
     const reponse = await request.get(`${API}/api/v1/laws/${id}`, { failOnStatusCode: false });
     exiger(reponse.ok(), 'texte illisible');
     await ouvrirAuServeur(page, `/laws/${id}`);
-    const liens = page.getByTestId('law-toc').getByRole('link');
+    const liens = await toutLeSommaire(page);
     test.skip((await liens.count()) < 2, 'texte d’un seul article');
     const ancre = (await liens.nth(1).getAttribute('href')) ?? '';
     const numero = /^#art-(\d+)/.exec(ancre)?.[1];
@@ -246,11 +260,12 @@ test.describe('Page d’un texte', () => {
     const ancre = await premier.getAttribute('id');
     await expect(premier.locator(`a[href="#${ancre}"]`)).toHaveCount(1);
 
-    // Un saut du sommaire en texte entier : l'ancre dans l'adresse.
-    const liens = page.getByTestId('law-toc').getByRole('link');
+    // Un saut du sommaire en texte entier : l'ancre dans l'adresse. Le lien
+    // lu AVANT le clic : le sommaire se referme, et la colonne suit la lecture.
+    const liens = await toutLeSommaire(page);
     test.skip((await liens.count()) < 2, 'texte d’un seul article');
-    await liens.nth(1).click();
     const cible = (await liens.nth(1).getAttribute('href')) ?? '';
+    await liens.nth(1).click();
     await expect(page).toHaveURL(new RegExp(`${cible}$`));
     await expect(page.locator(cible)).toBeInViewport();
     await attendreLaFinDuDefilement(page);

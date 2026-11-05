@@ -12,6 +12,22 @@
    *
    * Le contenu suit `etatDuBloc` (statut.ts), donc le relevé et rien d'autre :
    * sans statut, « Version d'origine, non consolidée » sans date de relevé.
+   *
+   * REFONTE A (lecture, décision L9). Les deux états « origine » et
+   * « inconnu », les seuls que la maquette RefonteLecture dessine, deviennent
+   * une LIGNE de statut : une pastille pointillée « Version d'origine, non
+   * consolidée » (`loi.statut.pastille`, sans point final ; `loi.statut.origine`
+   * garde son point, sans plus servir ici), puis la phrase du relevé suivie de
+   * « Ce relevé peut être incomplet. », puis « Signaler ». Plus d'aplat : la pastille porte le statut, par un mot
+   * et une icône, jamais par la couleur. Les états modifié, consolidé, abrogé
+   * et remplacé n'ont pas de maquette : leur rendu ne change pas (L8).
+   *
+   * POURQUOI UN TAMPON EN CSS SEUL. La pastille « se pose » une fois au
+   * chargement (A2 § 3.3, `mv-tamponner-pastille` de mouvement.css : 0,7 s après 0,8 s, l'onde à
+   * 0,95 s, D9). Animation CSS seule, en `backwards` et sous « mouvement
+   * réduit = rien ne bouge » : elle joue sur le HTML du serveur sans attendre
+   * le JavaScript, et sans mouvement la pastille est simplement là. Elle ne
+   * rejoue pas d'un article à l'autre : le composant n'est pas recréé.
    */
   import Icone from "$lib/components/Icone.svelte";
   import { language, tr } from "$lib/stores/language";
@@ -35,22 +51,38 @@
 </script>
 
 {#if etat.genre === "inconnu" || etat.genre === "origine"}
-  <!-- Étape 1 : « Version d'origine, non consolidée. Aucune modification
-       relevée par JuriX au 14 oct. 2026. Signaler ». Sans statut (ancienne
-       API), la première phrase seule : la date ne se devine pas. -->
+  <!-- « [Version d'origine, non consolidée] Aucune modification relevée par
+       JuriX au 14 oct. 2026. Ce relevé peut être incomplet. Signaler ». Sans
+       statut (ancienne API), la pastille et « Signaler » seuls : la date ne
+       se devine pas, et sans relevé, rien à dire de son exhaustivité.
+       Les blancs entre les trois éléments restent dans le texte du bloc
+       (une phrase lisible d'un trait, que les tests relisent). -->
   <div
-    class="mb-4 sm:mb-6 flex items-start gap-2.5 rounded-xl bg-zinc-100 px-3.5 py-2.5 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+    class="flex flex-wrap items-center gap-x-3.5 gap-y-2.5 text-sm text-zinc-700 dark:text-zinc-300"
     data-testid="law-status"
     data-etat={etat.genre}
   >
-    <Icone nom="circle-dashed" class="mt-0.5 shrink-0 text-base text-zinc-600 dark:text-zinc-400" />
-    <p>
-      <span class="font-semibold text-zinc-950 dark:text-white">{$tr("loi.statut.origine")}</span>
-      {#if etat.genre === "origine"}
+    <span
+      class="mv-tamponner-pastille relative inline-flex items-center gap-2 rounded-full border border-dashed border-zinc-300 py-1.5 pl-2.5 pr-3 text-[13px] font-semibold leading-5 text-zinc-950 dark:border-zinc-700 dark:text-white"
+    >
+      <Icone nom="circle-dashed" class="shrink-0 text-[15px]" />
+      {$tr("loi.statut.pastille")}
+    </span>
+    {#if etat.genre === "origine"}
+      <span>
         {$tr("loi.statut.aucune_modification").replace("{date}", releve)}
-      {/if}
-      <a href={lienSignaler} class={LIEN_DANS_LE_TEXTE}>{$tr("loi.statut.signaler")}</a>
-    </p>
+        {$tr("loi.statut.incomplet")}
+      </span>
+    {/if}
+    <!-- POURQUOI 44 px ICI. Il était un lien dans la phrase, exempté de la cible
+         au doigt ; élément de la rangée, il ne l'est plus. Les marges négatives
+         annulent l'écart de la rangée (`gap-y-2.5`) : la cible ne repousse pas
+         l'article sur un téléphone. -->
+    <a
+      href={lienSignaler}
+      class="{LIEN_DANS_LE_TEXTE} -my-2.5 inline-flex min-h-11 items-center lg:[@media(pointer:fine)]:my-0 lg:[@media(pointer:fine)]:min-h-0"
+      >{$tr("loi.statut.signaler")}</a
+    >
   </div>
 {:else if etat.genre === "modifie"}
   <!-- Étape 2 : les textes modificatifs connus, un par ligne, avec les

@@ -816,7 +816,33 @@ const ETATS_OUVERTS: EtatOuvert[] = [
     taille: TELEPHONE,
     ouvrir: async (page, request) => {
       await ouvrirUneLoi(page, request);
-      await cliquerJusqualEffet(page.getByTestId('law-toc-toggle'), page.getByTestId('law-toc'));
+      await cliquerJusqualEffet(page.getByTestId('law-toc-toggle'), page.getByRole('dialog', { name: 'Table des matières' }));
+    },
+  },
+  {
+    // « Tout le sommaire », feuille à gauche sur un ordinateur (décision L4).
+    nom: 'laws--tout-le-sommaire',
+    taille: BUREAU,
+    ouvrir: async (page, request) => {
+      await ouvrirUneLoi(page, request);
+      await cliquerJusqualEffet(page.getByTestId('law-toc-tout'), page.getByRole('dialog', { name: 'Table des matières' }));
+    },
+  },
+  {
+    // Le passage surligné, le trait et le point de la note (décision L2 :
+    // aucune donnée en v1, la réponse est simulée). Le marqueur, le filet, le
+    // trait et le point sont peints par des dégradés et des pseudo-éléments.
+    nom: 'laws--passage',
+    taille: BUREAU,
+    ouvrir: async (page, request) => {
+      await ouvrirUneLoi(page, request);
+      const passage = ((await page.locator('.article-content p').first().textContent()) ?? '').trim().slice(0, 40);
+      await page.route(
+        '**/api/v1/laws/*/explain-article',
+        repondreEnJson(200, { ...EXPLICATION, passages: [{ texte: passage, role: 'cle' }] }),
+      );
+      await cliquerJusqualEffet(page.getByTestId('law-explain').first(), page.locator('mark.passage-cle'));
+      await expect(page.locator('.ai-explanation.ancree')).toBeVisible();
     },
   },
   {

@@ -404,8 +404,10 @@ test.describe('Statut d’un texte (P1 A, étapes 1 et 2)', () => {
     ).size;
     await expect(page.getByTestId('law-tab-historique')).toHaveText(`Historique (${distincts})`);
 
-    // « · modifié » dans le sommaire, pour chaque article touché.
+    // « · modifié » dans le sommaire, pour chaque article touché. Le sommaire
+    // complet : la colonne ne montre que la division lue (décision L4).
     const sommaire = page.getByTestId('law-toc');
+    await cliquerJusqualEffet(page.getByTestId('law-toc-tout'), page.getByRole('dialog', { name: 'Table des matières' }));
     const touches = Object.keys(statut.par_article);
     for (const numero of touches) {
       const entree = sommaire.getByRole('link').filter({ hasText: new RegExp(`^Art\\.\\s${numero}(er)?\\b`) });
@@ -451,7 +453,7 @@ test.describe('Statut d’un texte (P1 A, étapes 1 et 2)', () => {
     const encadre = page.getByTestId('law-status');
     await expect(encadre).toHaveAttribute('data-etat', 'origine');
     await expect(encadre).toHaveText(
-      `Version d’origine, non consolidée. Aucune modification relevée par JuriX au ${dateFr(statut!.releve_le, 'short')}. Signaler`,
+      `Version d’origine, non consolidée Aucune modification relevée par JuriX au ${dateFr(statut!.releve_le, 'short')}. Ce relevé peut être incomplet. Signaler`,
     );
     if (loi?.date_signature) await expect(page.getByTestId('law-date')).toHaveText(`Signé le ${dateFr(loi.date_signature)}`);
     if (loi?.ajoute_le) await expect(page.getByTestId('law-added')).toHaveText(`Ajouté à JuriX le ${dateFr(loi.ajoute_le)}`);

@@ -4,6 +4,7 @@ import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { afterNavigate, pushState, replaceState } from '$app/navigation';
 import { page } from '$app/stores';
+import { language } from '$lib/stores/language';
 import type { StatutJuridique } from '$lib/types';
 import Page from './+page.svelte';
 
@@ -196,6 +197,21 @@ const titreDeLArticle = () => document.querySelector('article.article h2')?.text
  */
 const ouverture = () => screen.getByTestId('law-opening') as HTMLDetailsElement;
 
+/**
+ * Un saut du sommaire. La colonne ne montre que la division de l'article lu
+ * (décision L4) : un article d'une autre division se choisit dans « Tout le
+ * sommaire », comme le fait le lecteur. L'adresse et l'historique se vérifient
+ * à l'identique : seul le chemin jusqu'au lien change.
+ */
+async function sauterDansLeSommaire(ancre: string) {
+  const sommaire = screen.getByTestId('law-toc');
+  if (!sommaire.querySelector(`a[href="${ancre}"]`)) {
+    await fireEvent.click(screen.getByTestId('law-toc-tout'));
+    await tick();
+  }
+  await fireEvent.click(sommaire.querySelector(`a[href="${ancre}"]`) as Element);
+}
+
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -307,7 +323,7 @@ describe('adresse de lecture (P2)', () => {
     expect(titreDeLArticle()).toBe('Article 2');
     expect(pushState).not.toHaveBeenCalled();
 
-    await fireEvent.click(screen.getByTestId('law-toc').querySelector('a[href="#art-3"]') as Element);
+    await sauterDansLeSommaire('#art-3');
     // Une entrée de plus que l'arrivée : « Retour » saura d'où remonter.
     expect(pushState).toHaveBeenLastCalledWith('/laws/1740?article=3', {
       vue: 'article',
@@ -394,7 +410,7 @@ describe('fil d’Ariane et surtitre : toute la chaîne des divisions (P10)', ()
   it('distingue deux « Chapitre 1 » de deux titres', async () => {
     await monter({ law: { ...NOUVELLE, content: CONTENU_TITRES, articles: [] } }, '/laws/1740?article=15');
     expect(chaineDuFil()).toBe('Titre III · Chapitre 1');
-    await fireEvent.click(screen.getByTestId('law-toc').querySelector('a[href="#art-5"]') as Element);
+    await sauterDansLeSommaire('#art-5');
     expect(chaineDuFil()).toBe('Titre II · Chapitre 1');
     // Le fil va toujours jusqu'à l'article lu.
     expect(finDuFil()).toContain('Article 5');
@@ -410,18 +426,31 @@ describe('fil d’Ariane et surtitre : toute la chaîne des divisions (P10)', ()
 });
 
 describe('rangée de lecture (P10) et titre officiel (Q5)', () => {
-  it('la bascule et la barre Précédent / Suivant partagent une rangée ; « Suivant » reste le dernier bouton', async () => {
+  it('une seule navigation, sous l’article ; « Suivant » reste le dernier bouton, le voisin en petit', async () => {
     await monter({ law: NOUVELLE });
-    const barre = document.querySelector('.article-navigation') as HTMLElement;
+    const barres = document.querySelectorAll('.article-navigation');
+    expect(barres).toHaveLength(1);
+    const barre = barres[0] as HTMLElement;
+    expect(barre.tagName).toBe('NAV');
+    expect(barre.getAttribute('aria-label')).toBe('Articles voisins');
+    // Après l'article, plus à côté de la bascule (maquette : pas de barre du haut).
     const bascule = screen.getByTestId('law-mode-article').parentElement as HTMLElement;
     expect(bascule.getAttribute('role')).toBe('group');
-    expect(barre.parentElement).toBe(bascule.parentElement);
-    const boutons = [...barre.querySelectorAll('button')];
-    expect(boutons.at(-1)?.getAttribute('aria-label')).toBe('Suivant');
-    // À côté de la bascule, les libellés n'apparaissent qu'à partir de `xl`.
-    expect(classes(boutons.at(-1)?.querySelector('span'))).toEqual(['hidden', 'xl:inline']);
+    expect(barre.parentElement).not.toBe(bascule.parentElement);
+    const article = document.querySelector('article.article') as HTMLElement;
+    expect(article.compareDocumentPosition(barre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const texteDe = (bouton: Element | undefined) => bouton?.textContent?.replace(/\s+/g, ' ').trim();
+    const boutons = () => [...barre.querySelectorAll('button')];
+    // Le voisin en petit ; le premier article n'a pas de précédent, et le
+    // bouton désactivé garde sa place.
+    expect(texteDe(boutons().at(-1))).toBe('Suivant Article 2');
+    expect(texteDe(boutons()[0])).toBe('Précédent');
+    expect(boutons()[0].disabled).toBe(true);
+    await fireEvent.click(boutons().at(-1) as HTMLButtonElement);
+    expect(texteDe(boutons()[0])).toBe('Précédent Article 1er');
+    expect(texteDe(boutons().at(-1))).toBe('Suivant Article 3');
 
-    // Texte entier : la même rangée porte le résumé, et plus de barre.
+    // Texte entier : la rangée de la bascule porte le résumé, et plus de barre.
     await fireEvent.click(screen.getByTestId('law-mode-texte'));
     await tick();
     expect(document.querySelector('.article-navigation')).toBeNull();
@@ -431,13 +460,20 @@ describe('rangée de lecture (P10) et titre officiel (Q5)', () => {
     expect(classes(screen.getByTestId('law-toc-toggle-texte'))).toEqual(expect.arrayContaining(['h-11', 'sm:-my-3']));
   });
 
-  it('la carte bornée à 52rem dans un groupe centré, document d’origine ouvert compris', async () => {
+  it('plus de carte blanche : le texte à plat, la grille 200 px | lecture, document d’origine ouvert compris', async () => {
     await monter({ law: NOUVELLE });
     const grille = document.querySelector('.layout') as HTMLElement;
-    const colonnes = ['md:grid-cols-[minmax(0,52rem)]', 'lg:grid-cols-[280px_minmax(0,52rem)]', 'md:justify-center'];
+    const colonnes = ['lg:grid-cols-[200px_minmax(0,1fr)]'];
     expect(classes(grille)).toEqual(expect.arrayContaining(colonnes));
-    // La carte n'a plus de largeur à elle : c'est sa colonne qui la borne.
-    expect(classes(document.getElementById('contenu')).filter((classe) => classe.includes('max-w'))).toEqual([]);
+    const contenu = document.getElementById('contenu') as HTMLElement;
+    for (const classe of ['bg-white', 'border', 'rounded-2xl', 'shadow-sm']) expect(classes(contenu)).not.toContain(classe);
+    // `#contenu` n'a pas de largeur à lui : c'est sa colonne qui le borne.
+    expect(classes(contenu).filter((classe) => classe.includes('max-w'))).toEqual([]);
+    // La lecture à 34 em et la note de 280 px à droite, à partir de 1 280 px.
+    expect(classes(document.querySelector('.article-content'))).toContain('max-w-[34em]');
+    expect(classes(document.querySelector('.rangee'))).toContain('xl:grid-cols-[minmax(0,1fr)_280px]');
+    // Le glissement ne fait jamais défiler la page, sans casser le sommaire collant.
+    expect(classes(document.querySelector('.lecture'))).toContain('overflow-x-clip');
     // Ouvrir le document d'origine ne déplace pas le groupe.
     await fireEvent.click(screen.getByTestId('law-toggle-document'));
     await tick();
@@ -445,13 +481,20 @@ describe('rangée de lecture (P10) et titre officiel (Q5)', () => {
     expect(classes(grille)).toEqual(expect.arrayContaining(colonnes));
   });
 
-  it('un texte d’un seul article : la barre seule, dans son bloc, libellés dès `sm`', async () => {
+  it('un texte d’un seul article : ni bascule ni puces, la navigation du bas et son sommaire', async () => {
     const unSeul = 'Article 1er.- Est nommé directeur général de l’École.';
     await monter({ law: { ...NOUVELLE, content: unSeul, articles: [] } });
     expect(screen.queryByTestId('law-mode-texte')).toBeNull();
     const barre = document.querySelector('.article-navigation') as HTMLElement;
-    expect(classes(barre)).toContain('sm:p-4');
-    expect(classes(barre.querySelector('button:last-of-type span'))).toEqual(['hidden', 'sm:inline']);
+    const [precedent, suivant] = [...barre.querySelectorAll<HTMLButtonElement>('button:not([data-testid])')];
+    expect(precedent.disabled).toBe(true);
+    expect(suivant.disabled).toBe(true);
+    // Une puce seule ne dirait rien : pas de rangée sous `lg`, la colonne au-delà.
+    expect(screen.queryByTestId('law-toc-toggle')).toBeNull();
+    expect(classes(screen.getByTestId('law-toc'))).toEqual(expect.arrayContaining(['hidden', 'lg:flex']));
+    await fireEvent.click(screen.getByTestId('law-toc-toggle-bas'));
+    await tick();
+    expect(screen.getByTestId('law-toc').getAttribute('role')).toBe('dialog');
   });
 
   it('un texte d’un seul article avec une ouverture : la bascule, puis l’ouverture dépliée en texte entier', async () => {
@@ -468,10 +511,8 @@ describe('rangée de lecture (P10) et titre officiel (Q5)', () => {
     ].join('\n');
     await monter({ law: { ...NOUVELLE, content: arrete, articles: [] } });
     expect(titreDeLArticle()).toBe('Article 2');
-    // La barre à côté de la bascule, comme pour un texte de plusieurs articles.
-    const barre = document.querySelector('.article-navigation') as HTMLElement;
-    expect(classes(barre)).toContain('sm:ml-auto');
-    expect(classes(barre.querySelector('button:last-of-type span'))).toEqual(['hidden', 'xl:inline']);
+    // La bascule, comme pour un texte de plusieurs articles, et la navigation du bas.
+    expect(document.querySelectorAll('.article-navigation')).toHaveLength(1);
 
     await fireEvent.click(screen.getByTestId('law-mode-texte'));
     await tick();
@@ -493,6 +534,325 @@ describe('rangée de lecture (P10) et titre officiel (Q5)', () => {
     expect(tailles.length).toBeGreaterThanOrEqual(3);
     // Un `sm:text-2xl` sans interligne remettait celui de Tailwind (1,33).
     for (const classe of tailles) expect(classe).toMatch(/\/\[1\.2\]$/);
+  });
+});
+
+describe('sommaire : la division lue, et « Tout le sommaire » (L4)', () => {
+  const liens = () => [...screen.getByTestId('law-toc').querySelectorAll('a')].map((a) => a.getAttribute('href'));
+
+  it('un seul #sommaire : la division de l’article lu, et l’article lu marqué une fois', async () => {
+    await monter({ law: NOUVELLE }, '/laws/1740?article=3');
+    expect(document.querySelectorAll('#sommaire')).toHaveLength(1);
+    // L'article 3 est seul dans son chapitre : pas les deux du chapitre I.
+    expect(liens()).toEqual(['#art-3']);
+    expect(screen.getByTestId('law-toc').querySelectorAll('[aria-current="location"]')).toHaveLength(1);
+    // Le sommaire suit la lecture, d'une division à l'autre.
+    await fireEvent.click(document.querySelector('.article-navigation button:first-of-type') as HTMLButtonElement);
+    expect(liens()).toEqual(['#art-1', '#art-2']);
+  });
+
+  it('« Tout le sommaire » ouvre le sommaire complet, filtre compris, et Échap le referme', async () => {
+    await monter({ law: NOUVELLE });
+    const sommaire = screen.getByTestId('law-toc');
+    expect(sommaire.getAttribute('role')).toBeNull();
+    expect(sommaire.querySelector('input')).toBeNull();
+
+    await fireEvent.click(screen.getByTestId('law-toc-tout'));
+    await tick();
+    expect(sommaire.getAttribute('role')).toBe('dialog');
+    expect(sommaire.getAttribute('aria-modal')).toBe('true');
+    expect(liens()).toEqual(['#art-1', '#art-2', '#art-3']);
+    expect(sommaire.textContent).toContain('Le présent décret fixe les modalités');
+    const filtre = screen.getByLabelText('Filtrer les articles…') as HTMLInputElement;
+    expect(filtre).toBeTruthy();
+
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    await tick();
+    expect(sommaire.getAttribute('role')).toBeNull();
+    expect(liens()).toEqual(['#art-1', '#art-2']);
+  });
+
+  it('ouvert, il se referme au passage de `lg`, dans les deux sens, mais pas sur un signal qui ne change rien', async () => {
+    const ecouteurs: ((event: { matches: boolean }) => void)[] = [];
+    // Une affectation et non `vi.spyOn` : `matchMedia` est déjà une doublure
+    // (src/tests/setup.ts), et `mockRestore` la viderait pour tout le fichier.
+    const reel = window.matchMedia;
+    window.matchMedia = ((requete: string) =>
+      requete === '(min-width: 1024px)'
+        ? ({
+            matches: true,
+            media: requete,
+            addEventListener: (_type: string, rappel: (event: { matches: boolean }) => void) => ecouteurs.push(rappel),
+            removeEventListener: () => {},
+          } as unknown as MediaQueryList)
+        : reel(requete)) as typeof window.matchMedia;
+    try {
+      await monter({ law: NOUVELLE });
+      const sommaire = screen.getByTestId('law-toc');
+      const signaler = async (matches: boolean) => {
+        for (const rappel of ecouteurs) rappel({ matches });
+        await tick();
+      };
+      await fireEvent.click(screen.getByTestId('law-toc-tout'));
+      await tick();
+      expect(sommaire.getAttribute('role')).toBe('dialog');
+      // Une capture pleine page, dans Chrome : même valeur, le lecteur garde son sommaire.
+      await signaler(true);
+      expect(sommaire.getAttribute('role')).toBe('dialog');
+      await signaler(false);
+      expect(sommaire.getAttribute('role')).toBeNull();
+
+      await fireEvent.click(screen.getByTestId('law-toc-toggle'));
+      await tick();
+      expect(sommaire.getAttribute('role')).toBe('dialog');
+      await signaler(true);
+      expect(sommaire.getAttribute('role')).toBeNull();
+    } finally {
+      window.matchMedia = reel;
+    }
+  });
+
+  it('sous `lg`, le bouton « Sommaire » est à côté des puces, hors du panneau, et pas dans le fil d’Ariane', async () => {
+    await monter({ law: NOUVELLE }, '/laws/1740?article=2');
+    const bouton = screen.getByTestId('law-toc-toggle');
+    const sommaire = screen.getByTestId('law-toc');
+    expect(classes(bouton)).toContain('lg:hidden');
+    expect(bouton.parentElement).toBe(sommaire.parentElement);
+    expect(sommaire.contains(bouton)).toBe(false);
+    expect(document.querySelector('.breadcrumb')?.contains(bouton)).toBe(false);
+    // À partir de `lg`, l'enveloppe s'efface : le sommaire reste collé dans la grille.
+    expect(classes(sommaire.parentElement)).toContain('lg:contents');
+    expect(classes(sommaire)).toEqual(expect.arrayContaining(['lg:sticky', 'lg:top-24']));
+
+    await fireEvent.click(bouton);
+    await tick();
+    expect(bouton.getAttribute('aria-expanded')).toBe('true');
+    expect(sommaire.getAttribute('role')).toBe('dialog');
+  });
+
+  it('le fil d’Ariane garde le domaine en lecture article par article', async () => {
+    await monter({ law: { ...NOUVELLE, category: { name: 'Fiscalité' } } }, '/laws/1740?article=2');
+    const domaine = document.querySelector('.breadcrumb a[href="/categories/6"]');
+    expect(classes(domaine)).toContain('sm:block');
+    expect(screen.queryByTestId('law-toc-toggle-texte')).toBeNull();
+  });
+});
+
+describe('feuilleter : l’article glisse aux gestes du lecteur, jamais à l’arrivée (A2 § 3.6)', () => {
+  const feuille = () => document.querySelector('.feuille') as HTMLElement;
+  const glissement = () => classes(feuille()).filter((classe) => classe.startsWith('mv-feuilleter-'));
+  const suivant = () => document.querySelector('.article-navigation button:last-of-type') as HTMLButtonElement;
+  const precedent = () => document.querySelector('.article-navigation button:first-of-type') as HTMLButtonElement;
+
+  it('« Suivant » puis « Précédent » : le sens de la lecture, et deux noms qui alternent pour rejouer', async () => {
+    await monter({ law: NOUVELLE });
+    expect(glissement()).toEqual([]);
+    await fireEvent.click(suivant());
+    expect(glissement()).toEqual(['mv-feuilleter-suivant-a']);
+    await fireEvent.click(suivant());
+    expect(glissement()).toEqual(['mv-feuilleter-suivant-b']);
+    await fireEvent.click(precedent());
+    expect(glissement()).toEqual(['mv-feuilleter-precedent-a']);
+    await fireEvent.click(precedent());
+    expect(glissement()).toEqual(['mv-feuilleter-precedent-b']);
+  });
+
+  it('le même bloc : jamais recréé, le titre qui reçoit le focus survit (pas de `{#key}`)', async () => {
+    await monter({ law: NOUVELLE });
+    const titre = document.getElementById('titre-article');
+    const bloc = feuille();
+    await fireEvent.click(suivant());
+    expect(document.getElementById('titre-article')).toBe(titre);
+    expect(feuille()).toBe(bloc);
+    expect(titreDeLArticle()).toBe('Article 2');
+  });
+
+  it('un saut du sommaire glisse selon le rang d’arrivée ; vers l’article lu, rien', async () => {
+    await monter({ law: NOUVELLE }, '/laws/1740?article=2');
+    await sauterDansLeSommaire('#art-2');
+    expect(glissement()).toEqual([]);
+    await sauterDansLeSommaire('#art-1');
+    expect(glissement()).toHaveLength(1);
+    expect(glissement()[0]).toMatch(/^mv-feuilleter-precedent-/);
+    await sauterDansLeSommaire('#art-3');
+    expect(glissement()[0]).toMatch(/^mv-feuilleter-suivant-/);
+  });
+
+  it.each(['/laws/1740?article=2', '/laws/1740#art-3'])('l’arrivée par l’adresse (%s) ne glisse pas', async (adresse) => {
+    await monter({ law: NOUVELLE }, adresse);
+    expect(titreDeLArticle()).not.toBe('Article 1er');
+    expect(glissement()).toEqual([]);
+  });
+
+  it('un retour arrière du navigateur et une navigation retirent le glissement', async () => {
+    await monter({ law: NOUVELLE });
+    await fireEvent.click(suivant());
+    await fireEvent.click(suivant());
+    expect(glissement()).toHaveLength(1);
+    (page as unknown as { update: (f: (p: Record<string, unknown>) => unknown) => void }).update((p) => ({
+      ...p,
+      state: { vue: 'article', rang: 1, article: '2' },
+    }));
+    await tick();
+    expect(titreDeLArticle()).toBe('Article 2');
+    expect(glissement()).toEqual([]);
+
+    await fireEvent.click(suivant());
+    expect(glissement()).toHaveLength(1);
+    const rappel = vi.mocked(afterNavigate).mock.calls.at(-1)?.[0];
+    rappel?.({ from: null, to: { url: new URL(window.location.href) }, type: 'link' } as unknown as Navigation);
+    await tick();
+    expect(glissement()).toEqual([]);
+  });
+
+  it('l’article revenu du texte entier ne glisse pas', async () => {
+    await monter({ law: NOUVELLE });
+    await fireEvent.click(suivant());
+    await fireEvent.click(screen.getByTestId('law-mode-texte'));
+    await tick();
+    await fireEvent.click(screen.getByTestId('law-mode-article'));
+    await tick();
+    expect(glissement()).toEqual([]);
+  });
+});
+
+describe('la note de l’IA dans la page', () => {
+  const reponse = (corps: Record<string, unknown>) =>
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, json: async () => corps } as Response);
+  const note = () => document.querySelector('.ai-explanation') as HTMLElement;
+  const lien = () => screen.getByTestId('law-ask') as HTMLAnchorElement;
+  const question = () => new URL(lien().href, 'http://localhost').searchParams.get('q');
+
+  it('« Poser une question » : la question de l’article lu, pré-remplie, jamais envoyée', async () => {
+    await monter({ law: NOUVELLE });
+    expect(lien().getAttribute('href')).toMatch(/^\/chat\?q=/);
+    expect(lien().getAttribute('href')).not.toContain('envoyer');
+    expect(question()).toBe('Que dit l’article 1er (Décret n°\u00a02021/745)\u202F?');
+    await fireEvent.click(document.querySelector('.article-navigation button:last-of-type') as HTMLButtonElement);
+    expect(question()).toBe('Que dit l’article 2 (Décret n°\u00a02021/745)\u202F?');
+  });
+
+  it('en anglais, la question aussi', async () => {
+    language.set({ current: 'en' });
+    try {
+      await monter({ law: NOUVELLE });
+      expect(question()).toMatch(/^What does article 1 of .+ say\?$/);
+    } finally {
+      language.set({ current: 'fr' });
+    }
+  });
+
+  it('la balance pèse pendant l’attente réelle, dans la région d’annonce', async () => {
+    let repondre: (valeur: Response) => void = () => {};
+    const appel = vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise((fini) => (repondre = fini)));
+    try {
+      await monter({ law: NOUVELLE });
+      await fireEvent.click(screen.getByTestId('law-explain'));
+      await tick();
+      const attente = screen.getByTestId('law-explain-loading');
+      expect(attente.getAttribute('role')).toBe('status');
+      expect(attente.querySelector('.mv-balance--attente')).toBeTruthy();
+      repondre({ ok: true, status: 200, json: async () => ({ explanation: 'Réponse.' }) } as Response);
+      await vi.waitFor(() => expect(screen.getByTestId('law-explain-answer')).toBeTruthy());
+      expect(screen.queryByTestId('law-explain-loading')).toBeNull();
+    } finally {
+      appel.mockRestore();
+    }
+  });
+
+  it('un article suivant remet la note au repos sans la recréer ; le retour du texte entier sans la rejouer', async () => {
+    const appel = reponse({ explanation: 'Réponse.' });
+    try {
+      await monter({ law: NOUVELLE });
+      const bloc = note();
+      expect(classes(bloc)).toContain('mv-monter');
+      await fireEvent.click(screen.getByTestId('law-explain'));
+      await vi.waitFor(() => expect(screen.getByTestId('law-explain-answer')).toBeTruthy());
+      await fireEvent.click(document.querySelector('.article-navigation button:last-of-type') as HTMLButtonElement);
+      expect(screen.queryByTestId('law-explain-answer')).toBeNull();
+      expect(screen.getByTestId('law-explain')).toBeTruthy();
+      expect(note()).toBe(bloc);
+
+      await fireEvent.click(screen.getByTestId('law-mode-texte'));
+      await tick();
+      expect(note()).toBeNull();
+      await fireEvent.click(screen.getByTestId('law-mode-article'));
+      await tick();
+      expect(classes(note())).not.toContain('mv-monter');
+    } finally {
+      appel.mockRestore();
+    }
+  });
+
+  it('sans passage (v1, décision L2) : aucun <mark>, aucun trait, le texte tel quel', async () => {
+    const appel = reponse({ explanation: 'Réponse.' });
+    try {
+      await monter({ law: NOUVELLE });
+      await fireEvent.click(screen.getByTestId('law-explain'));
+      await vi.waitFor(() => expect(screen.getByTestId('law-explain-answer')).toBeTruthy());
+      expect(document.querySelector('.article-content mark')).toBeNull();
+      expect(classes(note())).not.toContain('ancree');
+      expect(document.querySelector('.rail')?.getAttribute('style')).toBeFalsy();
+    } finally {
+      appel.mockRestore();
+    }
+  });
+
+  it('un passage de l’API devient un nœud <mark>, jamais du HTML, et disparaît à l’article suivant', async () => {
+    const appel = reponse({
+      explanation: 'Réponse.',
+      passages: [{ texte: 'modalités d’exercice', role: 'cle' }, { texte: '<img src=x onerror=alert(1)>', role: 'sous' }],
+    });
+    try {
+      await monter({ law: NOUVELLE });
+      const corps = () => document.querySelector('.article-content') as HTMLElement;
+      const avant = corps().textContent;
+      await fireEvent.click(screen.getByTestId('law-explain'));
+      await vi.waitFor(() => expect(corps().querySelector('mark')).toBeTruthy());
+      expect(corps().textContent).toBe(avant);
+      const marques = [...corps().querySelectorAll('mark')];
+      expect(marques.map((marque) => marque.textContent)).toEqual(['modalités d’exercice']);
+      expect(classes(marques[0])).toEqual(expect.arrayContaining(['mv-surligne', 'mv-surligner', 'passage-cle']));
+      expect(corps().querySelector('img')).toBeNull();
+      await fireEvent.click(document.querySelector('.article-navigation button:last-of-type') as HTMLButtonElement);
+      expect(corps().querySelector('mark')).toBeNull();
+    } finally {
+      appel.mockRestore();
+    }
+  });
+});
+
+describe('rien n’est retiré (L1)', () => {
+  it('partage, téléchargement, document d’origine, type, dates, onglets, copies et mention « fait foi »', async () => {
+    await monter({ law: NOUVELLE, statut: MODIFIE }, '/laws/1740?article=2');
+    for (const testid of [
+      'law-share',
+      'law-toggle-document',
+      'law-date',
+      'law-added',
+      'law-tab-texte',
+      'law-tab-historique',
+      'law-mode-article',
+      'law-mode-texte',
+      'law-toc',
+      'law-toc-tout',
+      'law-toc-toggle',
+      'law-toc-toggle-bas',
+      'law-copy-reference',
+      'law-copy-link',
+      'law-copy-text',
+      'law-copy-foi',
+      'law-article-status',
+      'law-explain',
+      'law-ask',
+    ]) {
+      expect(screen.getByTestId(testid), testid).toBeTruthy();
+    }
+    const contenu = document.getElementById('contenu') as HTMLElement;
+    expect(contenu.textContent).toContain('Décret');
+    expect(contenu.querySelector('a[download]')?.getAttribute('href')).toMatch(/\/laws\/1740\/download$/);
+    expect(screen.getByTestId('law-toc-toggle').textContent).toContain('2 / 3');
+    expect(screen.getByTestId('law-toc-toggle-bas').textContent).toContain('2 / 3');
   });
 });
 

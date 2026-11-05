@@ -15,10 +15,24 @@
    *
    * Le découpage du texte, le statut, les références et les composants de la
    * page vivent dans src/lib/components/loi/, en fonctions pures testées.
+   *
+   * REFONTE A (maquette docs/refonte/maquettes/RefonteLecture, PASSATION E5).
+   * Plus de grande carte blanche : le texte est posé sur le fond de la page,
+   * en trois colonnes à partir de 1 280 px (sommaire de 200 px, lecture de
+   * 34 em au plus, note de l'IA de 280 px), la note passant sous le texte en
+   * dessous. Une ligne de statut (pastille tamponnée), les deux actions de
+   * l'article et la mention « fait foi », une navigation « Précédent /
+   * Suivant » avec le voisin, et un article qui glisse dans le sens de la
+   * lecture (`feuilleter`). Rien n'est retiré (décision L1) : partage,
+   * téléchargement, document d'origine, onglet « Historique », texte entier,
+   * « Copier le texte », compteur, type, dates et encadré d'article restent,
+   * au second plan. La logique d'adresse (`?article=`, `#art-N`, P2) ne
+   * change pas.
    */
   import { onDestroy, onMount, tick } from "svelte";
   import { afterNavigate, invalidateAll, pushState, replaceState } from "$app/navigation";
   import { page } from "$app/stores";
+  import { ancrerLaNote } from "$lib/actions/ancrer-la-note";
   import { piegerFocus } from "$lib/actions/pieger-focus";
   import { ajouteLe, dateDeLActe, nombreDeTextesDeLHistorique, type DateDeLActe } from "$lib/api-publique";
   import { LONGUEUR_MAX_NUMERO, normaliserNumeroArticle, numeroAAfficher } from "$lib/article";
@@ -35,6 +49,7 @@
   import HistoriqueDuTexte from "$lib/components/loi/HistoriqueDuTexte.svelte";
   import LienDePartage from "$lib/components/loi/LienDePartage.svelte";
   import ListeDuSommaire from "$lib/components/loi/ListeDuSommaire.svelte";
+  import NoteDeLIA from "$lib/components/loi/NoteDeLIA.svelte";
   import StatutDeLArticle from "$lib/components/loi/StatutDeLArticle.svelte";
   import StatutDuTexte from "$lib/components/loi/StatutDuTexte.svelte";
   import TexteEntier from "$lib/components/loi/TexteEntier.svelte";
@@ -69,16 +84,11 @@
     type ChangementsDeLArticle,
     type MarqueDuSommaire,
   } from "$lib/components/loi/statut";
-  import {
-    BOUTON_PRINCIPAL,
-    BOUTON_SECONDAIRE,
-    POLICE_DES_TITRES,
-    POLICE_DU_TEXTE_OFFICIEL,
-  } from "$lib/components/loi/typographie";
+  import { lirePassages, segmenter, type Passage } from "$lib/components/loi/surlignage";
+  import { BOUTON_SECONDAIRE, POLICE_DES_TITRES, POLICE_DU_TEXTE_OFFICIEL } from "$lib/components/loi/typographie";
   import { formatDate } from "$lib/format";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
   import { language, tr } from "$lib/stores/language";
-  import { blocsDeReponse } from "$lib/texte";
   import { classesBadgeDeType, typeDeTexte } from "$lib/type-de-texte";
 
   /** Rempli par `+page.server.ts`. Un identifiant inexistant n'arrive plus ici : 404. */
@@ -144,6 +154,12 @@
   /** Saisie du filtre du sommaire, et la valeur appliquée (150 ms après la frappe). */
   let saisieDuFiltre = "";
   let filtre = "";
+  /**
+   * La classe de feuilletage de l'article (`feuilleter`, plus bas), et la
+   * bascule entre ses deux noms. Vide au rendu serveur : aucun glissement.
+   */
+  let feuillete = "";
+  let basculeDuFeuilletage = false;
 
   /** Nouveau texte : la lecture repart de zéro. L'adresse est appliquée ensuite (`afterNavigate`). */
   let idAffiche: number | undefined = undefined;
@@ -158,6 +174,7 @@
     afficherDocument = false;
     saisieDuFiltre = "";
     filtre = "";
+    feuillete = "";
   }
 
   $: rangAffiche = mode === "texte" ? rangVisible : rangCourant;
@@ -241,6 +258,20 @@
   }
 
   $: classeTitre = tailleDuTitre(law?.title ?? "");
+  $: classeDeLArticle = tailleDeLArticle(law?.title ?? "");
+
+  /**
+   * POURQUOI UNE TAILLE CALCULÉE.
+   * « Article N » : 32 px dans la maquette, mais JAMAIS plus grand que le
+   * titre du texte (restes R3 : le h2 dominait le h1) : un palier sous celui
+   * du titre, selon la même longueur. Un titre de décret de 200 caractères
+   * (20 et 24 px) garde son « Article N » à 20 et 24 px.
+   */
+  function tailleDeLArticle(titre: string): string {
+    if (titre.length <= 40) return "text-2xl/[1.2] sm:text-[2rem]/[1.2]";
+    if (titre.length <= 100) return "text-xl/[1.2] sm:text-[1.75rem]/[1.2]";
+    return "text-xl/[1.2] sm:text-2xl/[1.2]";
+  }
 
   /**
    * Taille du titre officiel, selon sa longueur. Un intitulé de décret
@@ -258,7 +289,9 @@
    * 29/10/2026 : 32 px d'une ligne à l'autre).
    */
   function tailleDuTitre(titre: string): string {
-    if (titre.length <= 40) return "text-3xl/[1.2] sm:text-4xl/[1.2] court:text-3xl/[1.2]";
+    // Refonte A : un titre court monte jusqu'à 40 px à partir de `lg`, comme
+    // le `clamp(1.75rem, …, 2.5rem)` de la maquette, sans quitter l'échelle.
+    if (titre.length <= 40) return "text-3xl/[1.2] sm:text-4xl/[1.2] lg:text-[2.5rem]/[1.2] court:text-3xl/[1.2]";
     if (titre.length <= 100) return "text-2xl/[1.2] sm:text-3xl/[1.2] court:text-2xl/[1.2]";
     return "text-xl/[1.2] sm:text-2xl/[1.2] court:text-xl/[1.2]";
   }
@@ -278,6 +311,22 @@
   }
 
   $: numeroEcrit = articleCourant ? numeroDArticleEcrit(articleCourant.numero, langue) : "";
+  /**
+   * « Poser une question sur cet article » (décision L7) : l'assistant avec la
+   * question PRÉ-REMPLIE, jamais envoyée (`/chat?q=`, sans `envoyer=1`) : un
+   * appel au modèle ne part pas pour une phrase que le lecteur n'a pas
+   * écrite. Le chat ne reçoit que ce texte : il retrouve l'article par la
+   * recherche (PASSATION § 9, B6). Écrit APRÈS `numeroEcrit` et `nomCourt` :
+   * en Svelte 5 « legacy », les `$:` passent dans l'ordre du source. Rendu au
+   * serveur sur le premier article, comme le reste de la page en cache.
+   */
+  $: lienQuestion =
+    law && articleCourant
+      ? `/chat?q=${encodeURIComponent(remplir($tr("loi.ia.question_modele"), { n: numeroEcrit, nom: nomCourt }))}`
+      : "/chat";
+  /** Les voisins, nommés sous « Précédent » et « Suivant » (« Article 36 »). */
+  $: articlePrecedent = articles[rangCourant - 1] as ArticleDuTexte | undefined;
+  $: articleSuivant = articles[rangCourant + 1] as ArticleDuTexte | undefined;
   $: urlArticle = adressePartageable(articleCourant);
   $: referenceArticle =
     law && articleCourant
@@ -534,7 +583,13 @@
   function suivreLHistorique(_cle: string) {
     if (!monte) return;
     const avant = mode;
+    const rangAvant = rangCourant;
     appliquerLaNavigation(new URL(window.location.href), lireEtat($page.state));
+    // Retour ou avance du navigateur vers un autre article ou une autre vue :
+    // pas de feuilletage (voir `feuilleter`). L'adresse que la page vient
+    // d'écrire elle-même repasse ici sans rien changer : son geste garde son
+    // glissement.
+    if (mode !== avant || rangCourant !== rangAvant) feuillete = "";
     // Retour vers le texte entier depuis la lecture article par article : le
     // texte vient d'être rendu, par lots, et la position que rend le
     // navigateur peut tomber avant l'article lu alors.
@@ -649,8 +704,35 @@
   // Lecture article par article
   // ---------------------------------------------------------------------------
 
+  /**
+   * FEUILLETER (A2 § 3.6) : l'article glisse dans le sens de la lecture,
+   * vers la gauche pour le suivant, vers la droite pour le précédent.
+   *
+   * POURQUOI DEUX NOMS QUI ALTERNENT, ET PAS `{#key}`. CSS ne rejoue pas une
+   * animation dont l'élément garde le même nom ; `{#key rangCourant}`
+   * recréerait l'article, détruirait `h2#titre-article` (qui reçoit le focus
+   * après un choix au clavier dans le sommaire) et l'état des actions de
+   * copie, et ferait clignoter le texte. La colonne garde donc son élément,
+   * et sa classe passe de `…-a` à `…-b` à chaque geste (mouvement.css :
+   * deux @keyframes identiques).
+   *
+   * POURQUOI SEULEMENT AUX GESTES DU LECTEUR. Précédent, Suivant et un
+   * article choisi dans le sommaire, rien d'autre : ni l'arrivée par
+   * l'adresse (`?article=`, `#art-N`), ni le retour arrière du navigateur
+   * (`afterNavigate`, `popstate`). L'article vient alors d'être posé par
+   * l'adresse ; il glisserait au réveil de la page, après le premier
+   * affichage. Le HTML du serveur n'a aucune classe de feuilletage.
+   */
+  function feuilleter(ancien: number, nouveau: number) {
+    if (nouveau === ancien) return;
+    basculeDuFeuilletage = !basculeDuFeuilletage;
+    const sens = nouveau > ancien ? "suivant" : "precedent";
+    feuillete = `mv-feuilleter-${sens}-${basculeDuFeuilletage ? "a" : "b"}`;
+  }
+
   function navigateToPrevious() {
     if (rangCourant > 0) {
+      feuilleter(rangCourant, rangCourant - 1);
       rangCourant -= 1;
       ecrireLAdresse("remplacer");
       allerAuDebutDeLArticle();
@@ -659,6 +741,7 @@
 
   function navigateToNext() {
     if (rangCourant < articles.length - 1) {
+      feuilleter(rangCourant, rangCourant + 1);
       rangCourant += 1;
       ecrireLAdresse("remplacer");
       allerAuDebutDeLArticle();
@@ -666,9 +749,9 @@
   }
 
   /**
-   * Barre Précédent / Suivant du haut : début de l'article, et cible du
-   * défilement. La barre plutôt que le titre de l'article : elle reste sous
-   * le doigt pour enchaîner les « Suivant ».
+   * Début de l'article (son surtitre et « Article N »), cible du défilement à
+   * chaque changement d'article. La barre Précédent / Suivant du haut, qui
+   * l'était, n'existe plus (maquette : une seule navigation, en bas).
    */
   let debutArticle: HTMLElement | undefined;
   /** Titre « Article N » : reçoit le focus après un choix au clavier dans le sommaire. */
@@ -716,14 +799,18 @@
   let positionDuGeste: number | null = null;
 
   function retenirLeBouton() {
-    // Seulement quand le bouton est au-dessus de la carte du texte. Sur un
-    // écran large, la carte, bornée et centrée avec le sommaire, s'arrête
-    // avant lui : il reste affiché, et ne doit pas disparaître à chaque
-    // « Suivant ». Le bouton n'expose pas d'élément : on le trouve par son
-    // repère de test.
+    // Seulement quand le bouton est au-dessus d'une zone qu'il ne doit pas
+    // couvrir (`data-hors-du-bouton` : l'en-tête du texte, la colonne de
+    // lecture, la note). Sur un écran large, elles s'arrêtent avant lui : il
+    // reste affiché, et ne doit pas disparaître à chaque « Suivant ». Plus de
+    // carte blanche (refonte A) : `#contenu`, désormais de toute la largeur,
+    // l'aurait retenu à chaque fois. Le bouton n'expose pas d'élément : on le
+    // trouve par son repère de test.
     const bouton = document.querySelector('[data-testid="chat-fab"]')?.getBoundingClientRect();
-    const carte = document.getElementById("contenu")?.getBoundingClientRect();
-    if (bouton && carte && (carte.right < bouton.left - 8 || carte.left > bouton.right + 8)) return;
+    const zones = [...document.querySelectorAll("[data-hors-du-bouton]")]
+      .map((zone) => zone.getBoundingClientRect())
+      .filter((zone) => zone.width > 0);
+    if (bouton && zones.every((zone) => zone.right < bouton.left - 8 || zone.left > bouton.right + 8)) return;
     boutonRetenu = true;
     positionDuGeste = null;
   }
@@ -773,6 +860,7 @@
     // l'article 2 du sommaire écrivait `?article=2` dans une nouvelle entrée,
     // et le retour arrière ne changeait rien à l'écran.
     const dejaLu = rang === rangCourant;
+    feuilleter(rangCourant, rang);
     rangCourant = rang;
     ecrireLAdresse(dejaLu ? "remplacer" : "ajouter");
     await allerAuDebutDeLArticle();
@@ -781,6 +869,8 @@
 
   /** « Article par article | Texte entier » : on garde l'article lu d'un mode à l'autre. */
   async function changerDeMode(event: CustomEvent<Mode>) {
+    // L'article est recréé d'une vue à l'autre : il ne doit pas glisser.
+    feuillete = "";
     if (event.detail === "texte") {
       rangVisible = rangCourant;
       mode = "texte";
@@ -863,9 +953,6 @@
    */
   let tocOuvert = false;
 
-  /** La colonne du sommaire est affichée (à partir de `lg`) ; su après le montage. */
-  let grandEcran = false;
-
   /**
    * La liste d'un très long texte n'est pas dans le HTML du serveur. Le Code
    * civil a 2 041 articles reconnus : environ 700 Ko de balisage de plus dans
@@ -874,14 +961,38 @@
    * ordinaire la garde au rendu serveur.
    */
   const SEUIL_DU_SOMMAIRE_AU_SERVEUR = 400;
-  $: sommaireRendu = articles.length <= SEUIL_DU_SOMMAIRE_AU_SERVEUR || (monte && (grandEcran || tocOuvert));
+  /**
+   * Refonte A : fermé, le sommaire ne montre plus que la division de
+   * l'article lu (colonne, ou puces sous `lg`) ; c'est elle qui compte pour
+   * le seuil. Ouvert (« Tout le sommaire »), il se construit dans le
+   * navigateur, comme avant. Les puces existent sous `lg` : la liste se
+   * construit après le montage à toutes les largeurs.
+   */
+  $: articlesDeLaDivisionLue = decoupe.divisions[articles[Math.max(0, rangAffiche)]?.division ?? 0]?.articles.length ?? 0;
+  $: sommaireRendu = monte || articlesDeLaDivisionLue <= SEUIL_DU_SOMMAIRE_AU_SERVEUR;
 
-  function ouvrirSommaire() {
+  /**
+   * Le bouton qui a ouvert le sommaire, pour lui rendre le focus à la
+   * fermeture. POURQUOI : `piegerFocus` le fait déjà, sauf quand ce bouton était masqué
+   * pendant l'ouverture : « Tout le sommaire », dans la colonne, que la
+   * feuille remplace.
+   */
+  let declencheurDuSommaire: HTMLElement | null = null;
+
+  function ouvrirSommaire(event?: MouseEvent) {
+    declencheurDuSommaire = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     tocOuvert = true;
   }
 
   function fermerSommaire() {
     tocOuvert = false;
+    const declencheur = declencheurDuSommaire;
+    declencheurDuSommaire = null;
+    void tick().then(() => {
+      const actif = document.activeElement as HTMLElement | null;
+      const perdu = !actif || actif === document.body || actif.offsetParent === null;
+      if (declencheur?.isConnected && declencheur.offsetParent !== null && perdu) declencheur.focus();
+    });
   }
 
   // Un double appui sur « Sommaire » tombait, au second appui, sur le fond tout
@@ -959,7 +1070,9 @@
     void tick().then(() => {
       const zone = listeDuSommaire;
       const lien = zone?.querySelector<HTMLElement>('[aria-current="location"]');
-      if (!zone || !lien || zone.clientHeight === 0) return;
+      // Rien quand la liste ne défile pas en hauteur : les puces, sous `lg`,
+      // défilent à l'horizontale (ListeDuSommaire s'en charge).
+      if (!zone || !lien || zone.clientHeight === 0 || zone.scrollHeight <= zone.clientHeight) return;
       const cadre = zone.getBoundingClientRect();
       const boite = lien.getBoundingClientRect();
       // 48 px sous l'en-tête collé de la division, 32 px au-dessus du fondu.
@@ -995,10 +1108,17 @@
     // Passé à `lg` (tablette tournée, fenêtre agrandie), le panneau redevient
     // la colonne : le fermer retire le fond et rend le défilement.
     const requete = window.matchMedia("(min-width: 1024px)");
-    grandEcran = requete.matches;
+    // Refonte A : ouvert sur un ordinateur (« Tout le sommaire »), il passe
+    // aussi de la feuille latérale au panneau du bas en sens inverse ; se
+    // fermer, dans les deux sens, évite qu'une présentation hérite de l'autre.
+    // POURQUOI LA VALEUR RETENUE : Chrome signale aussi un changement qui ne
+    // change rien (une capture pleine page redimensionne un instant la vue),
+    // et le sommaire se refermait sous le lecteur.
+    let large = requete.matches;
     const surChangement = (event: MediaQueryListEvent) => {
-      grandEcran = event.matches;
-      if (event.matches) tocOuvert = false;
+      if (event.matches === large) return;
+      large = event.matches;
+      tocOuvert = false;
     };
     requete.addEventListener("change", surChangement);
     // Gestes du lecteur qui rendent la main au bouton de l'assistant.
@@ -1023,6 +1143,7 @@
     // Voir `revenir` : une page du site précède celle-ci.
     pagePrecedenteDuSite = from !== null;
     tocOuvert = false;
+    feuillete = "";
     const url = to?.url ?? new URL(window.location.href);
     const demande = appliquerLaNavigation(url, lireEtat($page.state));
     // `#historique` (pastille des listes) : l'onglet, s'il existe. Ancienne
@@ -1042,6 +1163,13 @@
   let explication = "";
   let explicationEnCours = false;
   let explicationErreur = "";
+  /**
+   * Les passages de l'article à surligner (surlignage.ts), lus dans la
+   * réponse de l'explication si l'API en donne un jour (PASSATION § 9, B3).
+   * Aujourd'hui toujours vides (décision L2) : aucun surlignage, la note n'est
+   * pas ancrée, la page s'affiche comme sans eux.
+   */
+  let passages: Passage[] = [];
   /** Jeton anti-course. Voir `reinitialiserExplication`. */
   let explicationJeton = 0;
 
@@ -1053,6 +1181,7 @@
    */
   function reinitialiserExplication(_rang: number, _lawId: number | undefined) {
     explication = "";
+    passages = [];
     explicationErreur = "";
     explicationEnCours = false;
     explicationJeton += 1;
@@ -1067,6 +1196,7 @@
     explicationEnCours = true;
     explicationErreur = "";
     explication = "";
+    passages = [];
 
     try {
       const reponse = await fetch(`${API_URL}/laws/${law.id}/explain-article`, {
@@ -1092,6 +1222,7 @@
         const donnees = await reponse.json();
         explication = donnees.explanation ?? "";
         if (!explication.trim()) explicationErreur = $tr("chat.errorServer");
+        else passages = lirePassages(donnees.passages);
       } else if (reponse.status === 404) {
         explicationErreur = $tr("loi.ia.introuvable");
       } else if (reponse.status === 429) {
@@ -1108,7 +1239,7 @@
     }
   }
 
-  // Lu par les deux barres Précédent / Suivant et par le bouton du sommaire.
+  // Lu par la navigation du bas et par le bouton du sommaire (sous `lg`).
   $: compteur = articles.length > 0 ? `${rangCourant + 1} / ${articles.length}` : "0 / 0";
 
   /** Le bouton « Sommaire » du fil d'Ariane : texte entier, sous `lg` (masqué au-delà). */
@@ -1126,13 +1257,6 @@
   $: avecBascule = articles.length > 1 || (decoupe.divisions[0]?.introduction.length ?? 0) > 0;
 
   /**
-   * Élément d'une ligne de méta (« 24 articles · Ajouté à JuriX le … »). Le
-   * « · » est dessiné AVANT chaque élément, centré dans l'écart de 16 px qui
-   * le sépare du précédent, et la ligne est décalée de cet écart (`-ml-4`)
-   * dans un cadre qui coupe ce qui dépasse : en début de ligne, le point tombe
-   * hors du cadre au lieu de rester seul en bout de ligne.
-   */
-  /**
    * « Décret n° 2021/745 · Article 1 » du fil d'Ariane sur téléphone. Le nom
    * reste seul dans son élément : tiré de l'intitulé quand l'acte n'a pas de
    * numéro (« Code civil applicable au Cameroun »), il est le texte du
@@ -1142,37 +1266,52 @@
    */
   const SEPARATEUR_DU_FIL = " · ";
 
+  /**
+   * Élément d'une ligne de méta (« 24 articles · Ajouté à JuriX le … »). Le
+   * « · » est dessiné AVANT chaque élément, centré dans l'écart de 16 px qui
+   * le sépare du précédent, et la ligne est décalée de cet écart (`-ml-4`)
+   * dans un cadre qui coupe ce qui dépasse : en début de ligne, le point tombe
+   * hors du cadre au lieu de rester seul en bout de ligne.
+   */
   const ELEMENT_SEPARE =
     "relative ml-4 before:absolute before:-left-4 before:w-4 before:text-center before:text-zinc-400 before:content-['·'] dark:before:text-zinc-600";
 
-  /** Barres Précédent / Suivant : carrés bordés de 44 px, comme la pagination du site. */
-  const BOUTON_DE_NAVIGATION =
-    "inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
+  /**
+   * « Précédent » et « Suivant » (maquette RefonteLecture, `.pnb`) : un
+   * libellé et, en petit dessous, l'article voisin ; sans bordure, un fond au
+   * survol, la flèche qui glisse de 4 px. 44 px de haut au doigt (52 avec le
+   * voisin). Aux bornes, désactivé et non masqué : la place ne saute pas.
+   */
+  const BOUTON_VOISIN =
+    "group inline-flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-semibold text-zinc-700 transition-colors enabled:hover:bg-zinc-100 enabled:hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white sm:gap-3 sm:px-4";
+
+  /** La flèche d'un voisin glisse au survol (A2 § 4), rien en mouvement réduit. */
+  const FLECHE_DU_VOISIN = "shrink-0 text-lg ease-jx motion-safe:transition-transform motion-safe:duration-[350ms]";
+
+  // ---------------------------------------------------------------------------
+  // La note de l'IA calée sur son passage (refonte A, étape 7)
+  // ---------------------------------------------------------------------------
 
   /**
-   * La barre Précédent / Suivant du HAUT, dans la rangée de lecture. Sous
-   * `sm`, sous la bascule, un bloc gris de toute la largeur (maquette
-   * loi-p1a). À partir de `sm`, une grappe sans fond à droite de la bascule :
-   * deux blocs bordés côte à côte, la bascule et ce bloc, se seraient
-   * disputé le regard. Un texte sans bascule (`avecBascule`) : sa barre
-   * garde son bloc, sur toute la largeur.
+   * Décalage du haut de la marge pour que le trait de la note tombe sur la
+   * ligne du passage clé (`ancrerLaNote`), ou `null` : note non ancrée, en
+   * haut de la marge, sans trait ni point. Toujours `null` au rendu serveur
+   * et sans passage (la v1 : décision L2).
    */
-  const BARRE_DU_HAUT =
-    "article-navigation flex items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700/60 dark:bg-zinc-800/50 scroll-mt-16 sm:scroll-mt-[4.5rem] sm:court:scroll-mt-14";
-  $: classesDeLaBarre =
-    avecBascule
-      ? `${BARRE_DU_HAUT} sm:ml-auto sm:gap-3 sm:border-0 sm:bg-transparent sm:p-0 sm:dark:bg-transparent`
-      : `${BARRE_DU_HAUT} sm:w-full sm:p-4`;
+  let decalageDeLaNote: number | null = null;
   /**
-   * « Précédent » et « Suivant » en toutes lettres dans la barre du haut : à
-   * partir de `sm` pour la barre seule ; à côté de la bascule, à partir de
-   * `xl` seulement. La bascule (308 px) et la barre avec ses libellés
-   * (280 px) ne tiennent côte à côte à coup sûr qu'à partir de 1 280 px
-   * d'écran : à 1 024 px, la carte n'en offre que 534, à 768 px, 638. En
-   * dessous, les flèches, nommées par aria-label. La barre du bas, seule sur
-   * sa ligne, les garde dès `sm`.
+   * POURQUOI CE DRAPEAU.
+   * La note n'arrive qu'une fois, au chargement (étape 10). Elle est recréée
+   * au retour du texte entier, sans rien à annoncer : son entrée, en 0,9 s de
+   * délai, l'y cacherait pour rien. Un article suivant ne la recrée pas.
    */
-  $: libelleDeLaBarre = avecBascule ? "hidden xl:inline" : "hidden sm:inline";
+  let noteDejaEntree = false;
+  $: if (mode === "texte") noteDejaEntree = true;
+
+  /** Ce qui change la ligne du passage : l'article, ses passages. */
+  $: cleDeLAncrage = `${law?.id}:${rangCourant}:${passages.map((passage) => passage.texte).join("|")}`;
+  let rangeeDeLecture: HTMLElement | undefined;
+  const passageCle = () => rangeeDeLecture?.querySelector<HTMLElement>("mark.passage-cle") ?? null;
 </script>
 
 <!--
@@ -1203,11 +1342,17 @@
     z-40 et non z-50 : le panneau du menu mobile de l'en-tête (z-50) doit
     passer devant lui. `sm:court:` (téléphone en paysage) et non `court:`
     seul : Tailwind écrit les règles `court:` AVANT celles de `sm:`.
+
+    Refonte A (décision L3) : le fil du dépôt est gardé (il porte
+    « Article N », que les tests lisent), restylé : plus d'ombre, et la
+    largeur du texte (1 320 px au plus) pour que le fil commence à l'aplomb
+    du titre. Sa hauteur ne change pas : le sommaire reste collé à
+    `lg:top-24`, et les marges de défilement (`scroll-mt-*`) la suivent.
   -->
   <div
-    class="breadcrumb bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-1 sm:py-4 sm:court:py-1.5 px-0 sticky top-0 z-40 shadow-sm dark:shadow-none"
+    class="breadcrumb bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-1 sm:py-4 sm:court:py-1.5 px-0 sticky top-0 z-40"
   >
-    <div class="mx-auto w-full max-w-[96rem] px-4 sm:px-6 lg:px-12 flex items-center justify-between gap-3">
+    <div class="mx-auto w-full max-w-[82.5rem] px-4 sm:px-6 lg:px-12 flex items-center justify-between gap-3">
       <nav
         aria-label={$tr("loi.fil_ariane")}
         class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"
@@ -1342,148 +1487,68 @@
       </div>
     </div>
   {:else if law}
-    <!-- Marges de l'en-tête (16, 24 puis 48 px), comme le fil d'Ariane. -->
-    <div class="main-content py-4 sm:py-8">
-      <div class="mx-auto w-full max-w-[96rem] px-4 sm:px-6 lg:px-12">
+    <!-- Marges de l'en-tête (16, 24 puis 48 px), comme le fil d'Ariane, et
+         1 320 px au plus (maquette RefonteLecture). -->
+    <div class="main-content pb-12 pt-5 sm:pb-16 sm:pt-8">
+      <div class="mx-auto w-full max-w-[82.5rem] px-4 sm:px-6 lg:px-12">
         <!--
-          LE SOMMAIRE ET LA CARTE, EN UN GROUPE CENTRÉ. La carte s'arrête à
-          52rem et le groupe se centre (`justify-center`) sous le fil d'Ariane.
-          Pleine largeur (r1), la carte laissait 300 à 380 px vides à droite
-          du texte des articles, borné à sa mesure ; bornée à 45,5rem et
-          collée à gauche (r2), elle laissait ce vide hors d'elle, à droite
-          de la page, et son titre officiel passait de 3 à 5 lignes, l'encadré
-          de statut de 1 à 2 (vérification r2 du 29/10/2026). À 52rem,
-          l'encadré « Version d'origine… Signaler » tient sur une ligne (il en
-          demande environ 45rem), « Article N » et ses trois actions aussi, et
-          il ne reste que 6rem à droite de la mesure du texte.
+          POURQUOI PLUS DE CARTE BLANCHE (refonte A, maquette RefonteLecture).
+          Le texte est posé sur le fond de la page : l'en-tête du document, un filet,
+          puis la grille « sommaire | lecture ». `main#contenu` porte le tout et
+          garde son `id` (lien d'évitement de l'en-tête).
 
-          Même largeur avec le document d'origine ouvert : élargir la carte à
-          ce moment déplaçait tout le groupe, et le bouton qui venait d'être
-          cliqué fuyait sous le pointeur. La visionneuse a son zoom.
-
-          `minmax(0, …)` et non `1fr` : un mot insécable élargissait la
-          colonne de lecture au-delà de l'écran entre 1 024 et 1 280 px.
+          POURQUOI `data-hors-du-bouton` A CHANGÉ DE PLACE. Le bouton de
+          l'assistant se retire quand une zone marquée
+          `data-hors-du-bouton` passe sous lui (ChatFab). Ce n'est plus `main`,
+          désormais de toute la largeur : entre 1 280 et 1 440 px, le bouton
+          aurait disparu sur toute la page. Ce sont l'en-tête du texte, le
+          sommaire, la colonne de lecture et la note (et, en texte entier ou
+          dans l'historique, toute la colonne) : il reste affiché à droite
+          d'un écran large, et se retire quand le texte ou la note passent
+          dessous.
         -->
-        <div
-          class="layout grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,52rem)] md:justify-center {articles.length > 0
-            ? 'lg:grid-cols-[280px_minmax(0,52rem)]'
-            : ''}"
-        >
-          {#if articles.length > 0}
-            {#if tocOuvert}
-              <!-- Fond du panneau du sommaire. Au-dessus du fil d'Ariane
-                   (z-40), sous la boîte du profil (z-[60]). -->
-              <div
-                class="fond-sommaire fixed inset-0 z-[55] bg-zinc-950/40 backdrop-blur-sm lg:hidden"
-                role="presentation"
-                on:click={surLeFond}
-              ></div>
-            {/if}
-            <!--
-              Colonne collante à partir de `lg` ; en dessous, masquée, ou
-              panneau qui monte du bas une fois ouvert par « Sommaire ». Le
-              titre et le filtre restent visibles, seule la liste défile.
-              `lg:pb-2` : la liste s'arrête au-dessus du bord arrondi, en
-              fondu (`.toc`, plus bas), au lieu d'être tranchée par lui.
-            -->
-            <div
-              id="sommaire"
-              data-testid="law-toc"
-              class="sidebar sommaire flex-col bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 dark:shadow-none {tocOuvert
-                ? 'fixed inset-x-0 bottom-0 z-[56] flex rounded-t-2xl border-t shadow-xl pb-zone-sure px-zone-sure'
-                : 'hidden'} lg:sticky lg:inset-auto lg:top-24 lg:z-auto lg:flex lg:h-fit lg:rounded-2xl lg:border lg:p-0 lg:pb-2 lg:shadow-sm"
-              class:ouvert={tocOuvert}
-              role={tocOuvert ? "dialog" : undefined}
-              aria-modal={tocOuvert ? "true" : undefined}
-              aria-labelledby={tocOuvert ? "sommaire-titre" : undefined}
-              use:piegerSiOuvert={tocOuvert}
-            >
-              <div
-                class="sidebar-header flex shrink-0 items-center justify-between gap-3 px-4 pt-2 lg:mb-4 lg:px-6 lg:pt-6"
-              >
-                <h2 id="sommaire-titre" class="text-lg font-bold text-zinc-950 dark:text-white">
-                  {$tr("loi.sommaire.titre")}
-                </h2>
-                <button
-                  type="button"
-                  class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors lg:hidden"
-                  on:click={fermerSommaire}
-                  aria-label={$tr("common.close")}
-                  data-testid="law-toc-close"
-                >
-                  <Icone nom="x" class="text-2xl" />
-                </button>
-              </div>
-
-              <!-- Le cadre dessine le champ et son focus (recette des champs
-                   du site) ; le champ lui-même reste transparent. 16 px sous
-                   `lg`, là où il vit dans le panneau tactile : en dessous,
-                   iOS zoome sur la page au focus. -->
-              <div
-                class="search-box mx-4 mb-3 mt-1 flex min-h-11 shrink-0 items-center bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-500 rounded-xl pl-4 focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 lg:mx-6 lg:mb-6 lg:mt-0"
-              >
-                <Icone nom="search" class="h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400" />
-                <input
-                  type="text"
-                  class="self-stretch bg-transparent border-none outline-none focus:ring-0 w-full min-w-0 py-2.5 pl-3 pr-4 text-base lg:text-sm text-zinc-950 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                  placeholder={$tr("loi.sommaire.filtre")}
-                  bind:value={saisieDuFiltre}
-                  aria-label={$tr("loi.sommaire.filtre")}
-                />
-              </div>
-
-              <nav
-                bind:this={listeDuSommaire}
-                class="toc min-h-0 overflow-y-auto overscroll-contain space-y-5 px-4 pb-12 lg:px-6"
-                aria-labelledby="sommaire-titre"
-              >
-                {#if sommaireRendu}
-                  <ListeDuSommaire
-                    {decoupe}
-                    rangCourant={rangAffiche}
-                    {marques}
-                    {filtre}
-                    {langueDuTexte}
-                    on:choisir={choisirDansLeSommaire}
-                  />
-                {/if}
-              </nav>
+        <main id="contenu" class="content relative min-w-0">
+          <div class="document-header" data-hors-du-bouton>
+            <!-- Le type du texte, traduit et avec son icône ($lib/type-de-texte),
+                 puis sa date : « Signé le 28 décembre 2021 ». La cote interne
+                 (« PRC-9153 ») n'est plus affichée (P2) : elle ne dit rien au
+                 lecteur. Au second plan, au-dessus du titre (décision L1). -->
+            <div class="document-meta mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span class={classesBadgeDeType(typeDuTexte)}>
+                <Icone nom={typeDuTexte.icone} class="text-sm" />
+                {$tr(typeDuTexte.cle)}
+              </span>
+              {#if libelleDate}
+                <span class="text-sm tabular-nums text-zinc-500 dark:text-zinc-400" data-testid="law-date">{libelleDate}</span>
+              {/if}
             </div>
-          {/if}
-
-          <!-- `min-w-0` : élément de grille, il ne doit pas s'élargir sur son
-               contenu le plus large. Sa largeur est celle de sa colonne
-               (52rem au plus, voir la grille). -->
-          <main
-            id="contenu"
-            data-hors-du-bouton
-            class="content min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-6 md:p-10 shadow-sm dark:shadow-none relative"
-          >
-            <!-- En-tête du document (maquettes loi-p1a et loi-p10a). -->
-            <div class="document-header border-b border-zinc-200 dark:border-zinc-800 pb-4 mb-4 sm:pb-8 sm:mb-8">
-              <!-- Le type du texte, traduit et avec son icône ($lib/type-de-texte),
-                   puis sa date : « Signé le 28 décembre 2021 ». La cote interne
-                   (« PRC-9153 ») n'est plus affichée (P2) : elle ne dit rien au
-                   lecteur. -->
-              <div class="document-meta flex flex-wrap items-center gap-x-3 gap-y-2 mb-4">
-                <span class={classesBadgeDeType(typeDuTexte)}>
-                  <Icone nom={typeDuTexte.icone} class="text-sm" />
-                  {$tr(typeDuTexte.cle)}
-                </span>
-                {#if libelleDate}
-                  <span class="text-sm tabular-nums text-zinc-500 dark:text-zinc-400" data-testid="law-date">{libelleDate}</span>
-                {/if}
-              </div>
-              <!-- Literata 600 (Q5), lignes équilibrées ; taille et
-                   interligne de 1,2 selon la longueur (`tailleDuTitre`).
-                   Jamais d'interlettrage serré sur cette serif. -->
-              <h1
-                class="{classeTitre} {POLICE_DES_TITRES} text-balance text-zinc-950 dark:text-white mb-4 coupe-mots"
-                lang={langueDuTexte}
-              >
-                {law.title}
-              </h1>
-              <div class="document-info mb-4 sm:mb-6 overflow-hidden text-sm tabular-nums text-zinc-500 dark:text-zinc-400">
+            <!-- Literata 600 (Q5), lignes équilibrées, 900 px au plus
+                 (maquette) ; taille et interligne de 1,2 selon la longueur
+                 (`tailleDuTitre`). Le titre du corpus TEL QUEL (décision L6).
+                 Jamais d'interlettrage serré sur cette serif. -->
+            <h1
+              class="{classeTitre} {POLICE_DES_TITRES} max-w-[56.25rem] text-balance text-zinc-950 dark:text-white coupe-mots"
+              lang={langueDuTexte}
+            >
+              {law.title}
+            </h1>
+            <!-- La ligne de statut (pastille tamponnée). POURQUOI `overflow-x:
+                 clip`, avec 8 px de marge (`-mx-2 px-2`) pour les contours de focus :
+                 l'onde du tampon grandit de moitié en s'effaçant, et ne doit
+                 jamais faire défiler la page à l'horizontale sur un
+                 téléphone. `clip` et non `hidden` : rien ne défile ici. -->
+            <div class="-mx-2 mt-5 overflow-x-clip px-2">
+              <StatutDuTexte {statut} {lienSignaler} />
+            </div>
+            <!--
+              Au second plan (décision L1) : le nombre d'articles et le jour
+              d'ajout, puis Partager, Télécharger et Document original, en
+              boutons bordés discrets : le seul bouton plein de la page est
+              « Expliquer l'article » (maquette). Trois actions sur UNE rangée
+              dès 320 px (P10), libellés courts sur téléphone.
+            -->
+            <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6">
+              <div class="document-info overflow-hidden text-sm tabular-nums text-zinc-500 dark:text-zinc-400">
                 <div class="-ml-4 flex flex-wrap items-center gap-y-1">
                   <span class={ELEMENT_SEPARE}>{libelleNombre}</span>
                   {#if ajout}
@@ -1493,22 +1558,8 @@
                   {/if}
                 </div>
               </div>
-
-              <StatutDuTexte {statut} {lienSignaler} />
-
-              <!--
-                Trois actions sur UNE rangée, dès 320 px (P10) : une grille de
-                trois colonnes sur téléphone, libellés courts (« PDF »,
-                « Original »), l'icône à côté du libellé comme la maquette
-                loi-p10a, au-dessus sous 360 px seulement (typographie.ts).
-                « Partager » ouvre la feuille de partage du système, ou
-                WhatsApp (P2). 44 px de haut, sauf sous un pointeur fin à
-                partir de `lg`.
-              -->
               <div
-                class="document-actions grid {law.file_id
-                  ? 'grid-cols-3'
-                  : 'grid-cols-2'} gap-2 sm:flex sm:flex-wrap sm:gap-3"
+                class="document-actions grid {law.file_id ? 'grid-cols-3' : 'grid-cols-2'} gap-2 sm:flex sm:flex-wrap"
               >
                 <LienDePartage partage={partageDuTexte} etiquette={$tr("loi.partage.texte")} testid="law-share">
                   {$tr("loi.partager")}
@@ -1517,8 +1568,8 @@
                   <!-- Téléchargement du document D'ORIGINE, servi par l'API.
                        `download` nu : le nom proposé est celui que l'API
                        annonce, construit sur le titre du document. -->
-                  <a class={BOUTON_PRINCIPAL} href={`${API_URL}/laws/${law.id}/download`} download>
-                    <Icone nom="download" class="w-5 h-5 shrink-0" />
+                  <a class={BOUTON_SECONDAIRE} href={`${API_URL}/laws/${law.id}/download`} download>
+                    <Icone nom="download" class="h-5 w-5 shrink-0" />
                     <span class="sm:hidden">{$tr("loi.telecharger_court")}</span>
                     <span class="hidden sm:inline">{$tr("loi.telecharger")}</span>
                   </a>
@@ -1527,11 +1578,11 @@
                        Bouton désactivé et expliqué, plutôt que masqué. -->
                   <button
                     type="button"
-                    class="{BOUTON_PRINCIPAL} disabled:cursor-not-allowed disabled:opacity-50"
+                    class="{BOUTON_SECONDAIRE} disabled:cursor-not-allowed disabled:opacity-50"
                     disabled
                     title={$tr("loi.fichier_absent")}
                   >
-                    <Icone nom="download" class="w-5 h-5 shrink-0" />
+                    <Icone nom="download" class="h-5 w-5 shrink-0" />
                     <span class="sm:hidden">{$tr("loi.telecharger_court")}</span>
                     <span class="hidden sm:inline">{$tr("loi.telecharger")}</span>
                   </button>
@@ -1547,7 +1598,7 @@
                       ? '!border-zinc-950 !bg-zinc-950 !text-white dark:!border-white dark:!bg-white dark:!text-zinc-950'
                       : ''}"
                   >
-                    <Icone nom="file-image" class="text-lg shrink-0" />
+                    <Icone nom="file-image" class="shrink-0 text-lg" />
                     <span class="sm:hidden"
                       >{afficherDocument ? $tr("loi.document.texte_court") : $tr("loi.document.original_court")}</span
                     >
@@ -1558,459 +1609,552 @@
                 {/if}
               </div>
             </div>
+          </div>
 
-            {#if afficherDocument && law.file_id}
-              <!-- Bord à bord sur téléphone (`-mx-4` annule la marge de la
-                   carte) : 32 px de plus pour la page du PDF. -->
-              <div
-                class="-mx-4 mt-6 mb-6 overflow-hidden border-y border-zinc-200 dark:border-zinc-800 sm:mx-0 sm:rounded-xl sm:border"
-                data-testid="law-document-viewer"
-              >
-                <!-- Recréée pour chaque document : la visionneuse ne lit son
-                     adresse qu'au montage. Elle suit ensuite l'article lu. -->
-                {#key law.id}
-                  <ImagePdfViewer url={`${API_URL}/laws/${law.id}/download`} initialPage={pageDuDocument} />
-                {/key}
-              </div>
-            {/if}
-
-            {#if nombreHistorique > 0}
-              <!-- « Texte | Historique (N) » (P1, étape 2), l'onglet actif
-                   marqué par une barre. Motif d'onglets ARIA : un seul arrêt
-                   de tabulation, flèches pour passer de l'un à l'autre. -->
-              <div
-                class="mb-6 flex gap-6 border-b border-zinc-200 text-sm dark:border-zinc-800"
-                role="tablist"
-                aria-label={$tr("loi.onglets")}
-              >
-                {#each ONGLETS as nom (nom)}
-                  {@const actif = onglet === nom}
-                  <button
-                    type="button"
-                    role="tab"
-                    id="onglet-{nom}"
-                    aria-selected={actif}
-                    aria-controls="panneau-{nom}"
-                    tabindex={actif ? 0 : -1}
-                    data-testid="law-tab-{nom}"
-                    class="-mb-px inline-flex min-h-11 items-center border-b-2 transition-colors {actif
-                      ? 'border-zinc-950 font-semibold text-zinc-950 dark:border-white dark:text-white'
-                      : 'border-transparent text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}"
-                    on:click={() => choisirOnglet(nom)}
-                    on:keydown={clavierDesOnglets}
-                  >
-                    {nom === "texte"
-                      ? $tr("loi.onglet.texte")
-                      : $tr("loi.onglet.historique").replace("{n}", String(nombreHistorique))}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-
+          {#if afficherDocument && law.file_id}
+            <!-- Bord à bord sur téléphone (`-mx-4` annule la marge de la
+                 page) : 32 px de plus pour la page du PDF. -->
             <div
-              id="panneau-texte"
-              role={nombreHistorique > 0 ? "tabpanel" : undefined}
-              aria-labelledby={nombreHistorique > 0 ? "onglet-texte" : undefined}
-              hidden={onglet !== "texte"}
+              class="-mx-4 mt-6 overflow-hidden border-y border-zinc-200 dark:border-zinc-800 sm:mx-0 sm:rounded-xl sm:border"
+              data-testid="law-document-viewer"
+              data-hors-du-bouton
             >
-              {#if articles.length === 0}
-                <!-- Aucun article reconnu : le texte tel qu'il est, divisions
-                     et paragraphes, sans rien en perdre. Sans division non
-                     plus, tout le texte est dans l'ouverture : dépliée, ou la
-                     page n'en montrait que le résumé (14 textes de la base de
-                     test le 29/10/2026, des circulaires budgétaires surtout,
-                     et l'arrêté 8448/CAB/PR, /laws/193). -->
-                {#if decoupe.divisions.length > 0}
-                  {#key law.id}
-                    <TexteEntier
-                      {decoupe}
-                      {changements}
-                      {consolide}
-                      {langueDuTexte}
-                      deplierLOuverture={!decoupe.structure}
-                    />
-                  {/key}
-                {:else}
-                  <p class="py-12 text-center text-zinc-500 dark:text-zinc-400">{$tr("loi.texte_indisponible")}</p>
-                {/if}
-              {:else}
-                <!--
-                  LA RANGÉE DE LECTURE (P10). « Article par article | Texte
-                  entier » à gauche ; à droite, « 24 articles · 7 chapitres » en
-                  texte entier (maquette loi-p10a), la barre Précédent / Suivant
-                  en lecture article par article. L'une sous l'autre, la bascule
-                  et la barre repoussaient l'article de 120 px : son premier mot
-                  tombait sous le pli à 1 440 × 900 (vérification r2 du
-                  29/10/2026). Sous `sm`, la bascule prend toute la largeur et la
-                  barre reste dessous, Précédent et Suivant aux deux bords, sous
-                  le pouce. Vers 640 px, où la rangée manque de place, la barre
-                  passe à la ligne (`flex-wrap`), à droite (`sm:ml-auto`).
-                -->
-                <div class="mb-4 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                  {#if avecBascule}
-                    <BasculeDeLecture {mode} on:change={changerDeMode} />
-                  {/if}
-                  {#if mode === "texte"}
-                    <p class="hidden text-sm tabular-nums text-zinc-500 dark:text-zinc-400 sm:block">{resumeDuTexte}</p>
-                  {:else}
-                    <!--
-                      Flèches seules sous `sm`, et à côté de la bascule jusqu'à
-                      `xl` (`libelleDeLaBarre`), le nom passant par aria-label.
-                      Sous `lg`, où la colonne du sommaire n'existe pas, le
-                      compteur devient le bouton qui l'ouvre. « Suivant » reste
-                      le DERNIER bouton de la barre : les tests le prennent par
-                      `.article-navigation button` puis `.last()`.
+              <!-- Recréée pour chaque document : la visionneuse ne lit son
+                   adresse qu'au montage. Elle suit ensuite l'article lu. -->
+              {#key law.id}
+                <ImagePdfViewer url={`${API_URL}/laws/${law.id}/download`} initialPage={pageDuDocument} />
+              {/key}
+            </div>
+          {/if}
 
-                      Cible du défilement à chaque changement d'article :
-                      `scroll-mt-*` suit la hauteur du fil d'Ariane collant
-                      (53 px, 33 en paysage sur téléphone), plus un écart plus
-                      petit que le vide au-dessus de la rangée (32 px sous
-                      l'en-tête du texte, 24 sous les onglets « Texte |
-                      Historique » ; sous `sm`, les 12 px qui séparent la barre
-                      de la bascule) : seul ce vide reste visible au-dessus
-                      d'elle, sans le filet de ce qui précède. Avec 96 px à
-                      partir de `lg` (`lg:scroll-mt-24`, celle de la colonne du
-                      sommaire), le bas de la bascule, alors au-dessus de la
-                      barre, dépassait sous le fil d'Ariane, pastille noire
-                      coupée (vérification r1 du 29/10/2026).
-                    -->
-                    <div bind:this={debutArticle} class={classesDeLaBarre}>
-                      <button
-                        type="button"
-                        class={BOUTON_DE_NAVIGATION}
-                        on:click={navigateToPrevious}
-                        disabled={rangCourant === 0}
-                        aria-label={$tr("loi.precedent")}
-                      >
-                        <Icone nom="chevron-left" class="w-4 h-4 shrink-0" />
-                        <span class={libelleDeLaBarre}>{$tr("loi.precedent")}</span>
-                      </button>
-                      <!-- Survol blanc sur le bloc gris ; zinc-100 à côté de
-                           la bascule, sur le blanc de la carte, où le blanc
-                           ne se voyait pas. -->
-                      <button
-                        type="button"
-                        class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-3 text-zinc-700 dark:text-zinc-200 enabled:hover:bg-white enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors lg:hidden {avecBascule
-                          ? 'sm:enabled:hover:bg-zinc-100'
-                          : ''}"
-                        on:click={ouvrirSommaire}
-                        aria-haspopup="dialog"
-                        aria-expanded={tocOuvert}
-                        aria-controls="sommaire"
-                        data-testid="law-toc-toggle"
-                      >
-                        <Icone nom="table-of-contents" class="text-xl" />
-                        <span class="flex min-w-0 flex-col items-start leading-tight">
-                          <span class="text-sm font-semibold">{$tr("loi.sommaire.ouvrir")}</span>
-                          <span class="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{compteur}</span>
-                        </span>
-                      </button>
-                      <div class="hidden lg:block text-sm font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
-                        {compteur}
-                      </div>
-                      <button
-                        type="button"
-                        class={BOUTON_DE_NAVIGATION}
-                        on:click={navigateToNext}
-                        disabled={rangCourant >= articles.length - 1}
-                        aria-label={$tr("loi.suivant")}
-                      >
-                        <span class={libelleDeLaBarre}>{$tr("loi.suivant")}</span>
-                        <Icone nom="chevron-right" class="w-4 h-4 shrink-0" />
-                      </button>
-                    </div>
-                  {/if}
-                </div>
+          <!--
+            LA GRILLE (maquette) : sous un filet, le sommaire de 200 px et la
+            colonne de lecture, à partir de `lg`. `minmax(0, 1fr)` et non `1fr` :
+            un mot insécable élargissait la colonne de lecture au-delà de
+            l'écran. La colonne de lecture est placée en deuxième colonne
+            (`lg:col-start-2`) : ouvert en feuille, le sommaire sort de la
+            grille, et elle ne doit pas glisser à sa place derrière le voile.
+          -->
+          <div
+            class="layout mt-8 grid grid-cols-1 gap-5 border-t border-zinc-200 pt-6 dark:border-zinc-800 sm:mt-12 sm:pt-9 {articles.length >
+            0
+              ? 'lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-12'
+              : ''}"
+          >
+            {#if articles.length > 0}
+              {#if tocOuvert}
+                <!-- Fond du sommaire ouvert. Au-dessus du fil d'Ariane (z-40),
+                     sous la boîte du profil (z-[60]). -->
+                <div
+                  class="fond-sommaire fixed inset-0 z-[55] bg-zinc-950/40 backdrop-blur-sm"
+                  role="presentation"
+                  on:click={surLeFond}
+                ></div>
+              {/if}
+              <!--
+                POURQUOI UN SEUL #sommaire, POUR TROIS PRÉSENTATIONS (décision L4). Fermé : la
+                division de l'article lu, en colonne collante de 200 px à partir
+                de `lg` (titre, « Tout le sommaire », lignes de 40 px et repère
+                qui glisse), en rangée de puces de 44 px en dessous. Ouvert
+                (« Tout le sommaire », ou le bouton « Sommaire » sous
+                `lg`) : le sommaire COMPLET, filtre compris, dans une fenêtre
+                modale (panneau qui monte du bas sous `lg`, feuille à gauche au-
+                delà), focus piégé, Échap, défilement verrouillé. Un seul
+                élément : un lien par article pour les lecteurs d'écran et pour
+                les tests.
 
-                {#if articleIntrouvable}
-                  <!-- Même aplat que l'encadré du statut (P1) : une information
-                       sur le texte, pas une erreur. -->
-                  <p
-                    role="status"
-                    data-testid="article-introuvable"
-                    class="mb-4 flex items-start gap-2 rounded-xl bg-zinc-100 px-4 py-3 text-sm text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300 sm:mb-6"
-                  >
-                    <Icone nom="circle-alert" class="mt-0.5 shrink-0" />
-                    <span class="min-w-0">{avisArticleIntrouvable}</span>
-                  </p>
-                {/if}
-
-                {#if mode === "texte"}
-                  {#key law.id}
-                    <!-- Le lien direct d'un article (`choisir`) saute comme le
-                         sommaire : une entrée d'historique que la page connaît.
-                         L'article demandé introuvable, l'ouverture se déplie :
-                         il y est souvent, faute d'avoir été lu par l'OCR. Pour
-                         un texte d'un seul article aussi : elle est tout ce que
-                         la lecture article par article ne montre pas. -->
-                    <TexteEntier
-                      bind:this={texteEntier}
-                      {decoupe}
-                      {changements}
-                      historique={nombreHistorique > 0}
-                      {consolide}
-                      {langueDuTexte}
-                      deplierLOuverture={articleIntrouvable !== null || articles.length === 1}
-                      on:courant={(event) => (rangVisible = event.detail)}
-                      on:historique={ouvrirHistorique}
-                      on:choisir={choisirDansLeSommaire}
-                    />
-                  {/key}
-                {:else if articleCourant}
-                  {@const intitule = intituleDeLArticle(articleCourant)}
-                  {@const chaine = divisionCourante ? nommerLaChaine(divisionCourante.ancetres, $tr) : ""}
-                  {@const intituleDeDivision = divisionCourante ? (enTetePrincipal(divisionCourante)?.intitule ?? "") : ""}
-                  <article class="article" id={ancreDeLArticle(articleCourant)} aria-labelledby="titre-article">
-                    <div class="article-header mb-4 sm:mb-6">
-                      {#if chaine}
-                        <!-- La division de l'article, toute sa chaîne
-                             (« Titre II · Chapitre 1 », `nommerLaChaine`) en
-                             surtitre Inter (Q5 : deux voix au plus), puis son
-                             intitulé, mot pour mot. -->
-                        <p class="mb-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">{chaine}</p>
-                        {#if intituleDeDivision}
-                          <p
-                            class="mb-1 line-clamp-2 text-xs leading-snug text-zinc-600 coupe-mots dark:text-zinc-400"
-                            title={intituleDeDivision}
-                            lang={langueDuTexte}
-                          >
-                            {intituleDeDivision}
-                          </p>
-                        {/if}
-                      {/if}
-                      <!--
-                        « Article N » et ses trois actions (P2) sur une rangée
-                        quand elles y tiennent, les actions à droite comme
-                        « Copier la citation » sur les maquettes. Il leur faut
-                        environ 41rem : la carte les a sur un écran de bureau
-                        (vers 1 150 px et plus) et sur une tablette en paysage
-                        (de 790 à 1 023 px). Ailleurs, elles passent dessous
-                        (`flex-wrap`) ; toujours dessous sur téléphone
-                        (`w-full`), en grille de trois. Toujours dessous, elles
-                        repoussaient l'article de 50 px à 1 440 px (vérification
-                        r2 du 29/10/2026). Alignées sur la ligne de base du
-                        titre : un message d'échec de copie, qui s'ajoute sous
-                        les boutons, ne fait pas bouger le titre.
-                      -->
-                      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-3">
-                        <!-- Literata 600 (Q5). Focusable par le script
-                             seulement : choix d'un article au clavier. -->
-                        <h2
-                          id="titre-article"
-                          bind:this={titreDeLArticle}
-                          tabindex="-1"
-                          class="text-xl sm:text-2xl {POLICE_DES_TITRES} text-zinc-950 dark:text-white"
-                        >
-                          {$tr("loi.article")}
-                          {articleCourant.numero}{#if langue === "fr" && articleCourant.numero === "1"}<sup>er</sup>{/if}
-                        </h2>
-                        <div class="w-full sm:w-auto">
-                          <ActionsDeLArticle
-                            reference={referenceACopierIci}
-                            texte={texteACopierIci}
-                            lien={urlArticle}
-                            partage={partageDeLArticle}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Un vrai intitulé (« Imputabilité ») ; une première
-                         ligne qui porte le texte passe dans le corps. -->
-                    {#if intitule}
-                      <h3 class="text-lg sm:text-xl font-semibold text-zinc-800 dark:text-zinc-200 mb-6 sm:mb-8 coupe-mots" lang={langueDuTexte}>
-                        {intitule}
-                      </h3>
-                    {/if}
-
-                    <StatutDeLArticle
-                      changements={changements.get(rangCourant)}
-                      historique={nombreHistorique > 0}
-                      {consolide}
-                      on:historique={ouvrirHistorique}
-                    />
-
-                    <!-- Texte officiel en Literata texte (Q5, second temps),
-                         16 px sur téléphone, 18 au-dessus ; mesure de 36em
-                         (650 px en 18 px, 67 à 77 caractères). -->
-                    <div
-                      class="article-content max-w-[36em] space-y-4 sm:space-y-6 text-base sm:text-lg leading-relaxed text-zinc-700 dark:text-zinc-300 coupe-mots {POLICE_DU_TEXTE_OFFICIEL}"
-                      lang={langueDuTexte}
-                    >
-                      {#each paragraphesDeLArticle(articleCourant) as paragraphe, i (i)}
-                        <p>{paragraphe}</p>
-                      {/each}
-                    </div>
-
-                    <!-- Explication par l'IA, en Inter (jamais la serif
-                         officielle sur un texte généré). Bornée à la mesure du
-                         texte de l'article (restes R3 : 110 caractères par
-                         ligne à 1 440 px). Empilée sous `sm`. -->
-                    <div
-                      class="ai-explanation mt-8 sm:mt-12 max-w-[40.5rem] flex flex-col sm:flex-row gap-3 sm:gap-6 p-4 sm:p-6 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/60 rounded-xl relative overflow-hidden"
-                    >
-                      <div
-                        class="ai-icon w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 rounded-xl flex items-center justify-center"
-                      >
-                        <Icone nom="sparkles" class="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <div class="ai-content flex-1 min-w-0 z-10 coupe-mots">
-                        <h4 class="ai-title font-bold text-zinc-950 dark:text-white mb-2">
-                          {$tr("loi.ia.titre")}
-                        </h4>
-                        <p class="ai-description text-sm text-zinc-600 dark:text-zinc-400 mb-4 leading-relaxed">
-                          {$tr("loi.ia.description")}
-                        </p>
-                        {#if explicationEnCours}
-                          <div
-                            role="status"
-                            aria-live="polite"
-                            data-testid="law-explain-loading"
-                            class="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400"
-                          >
-                            <Icone nom="loader-circle" class="text-base text-zinc-950 motion-safe:animate-spin dark:text-white" />
-                            {$tr("loi.ia.en_cours")}
-                          </div>
-                        {:else if explicationErreur}
-                          <div
-                            role="alert"
-                            data-testid="law-explain-error"
-                            class="flex gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-sm text-red-700 dark:text-red-300"
-                          >
-                            <Icone nom="circle-alert" class="mt-0.5 text-base" />
-                            <div class="min-w-0">
-                              <p>{explicationErreur}</p>
-                              <button
-                                type="button"
-                                on:click={expliquerArticle}
-                                data-testid="law-explain-retry"
-                                class="mt-2 inline-flex min-h-11 items-center lg:[@media(pointer:fine)]:min-h-0 underline font-medium hover:no-underline"
-                              >
-                                {$tr("common.retry")}
-                              </button>
-                            </div>
-                          </div>
-                        {:else if explication}
-                          <!-- Rendu en NŒUDS Svelte, donc échappé : le markdown du
-                               modèle est reconnu par `blocsDeReponse`, jamais
-                               passé à `{@html}`. -->
-                          <div
-                            data-testid="law-explain-answer"
-                            aria-live="polite"
-                            class="space-y-3 text-base leading-relaxed text-zinc-800 dark:text-zinc-200"
-                          >
-                            {#each blocsDeReponse(explication) as bloc, i (i)}
-                              {#if bloc.type === "titre"}
-                                <h5 class="font-bold text-zinc-950 dark:text-white pt-1">
-                                  {bloc.texte}
-                                </h5>
-                              {:else if bloc.type === "puce"}
-                                <p
-                                  class="pl-5 relative before:content-['•'] before:absolute before:left-1 before:font-bold before:text-zinc-950 dark:before:text-white"
-                                >
-                                  {bloc.texte}
-                                </p>
-                              {:else}
-                                <p>{bloc.texte}</p>
-                              {/if}
-                            {/each}
-                          </div>
-                          <p class="mt-4 text-xs italic text-zinc-500 dark:text-zinc-400" data-testid="law-explain-disclaimer">
-                            {$tr("loi.ia.avertissement")}
-                          </p>
-                          <button
-                            type="button"
-                            on:click={expliquerArticle}
-                            data-testid="law-explain-regenerate"
-                            class="mt-4 w-full sm:w-auto min-h-11 lg:[@media(pointer:fine)]:min-h-0 px-4 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:hover:border-zinc-200 dark:hover:text-white rounded-xl text-sm font-medium transition-colors"
-                          >
-                            {$tr("loi.ia.regenerer")}
-                          </button>
-                        {:else}
-                          <ol
-                            class="ai-list list-decimal pl-5 space-y-2 text-sm text-zinc-600 dark:text-zinc-400 marker:text-zinc-950 dark:marker:text-zinc-200 marker:font-bold"
-                          >
-                            <li>
-                              <strong>{$tr("loi.ia.contenu_cle")}</strong>
-                              {$tr("loi.ia.contenu_cle_desc")}
-                            </li>
-                            <li>
-                              <strong>{$tr("loi.ia.implications")}</strong>
-                              {$tr("loi.ia.implications_desc")}
-                            </li>
-                          </ol>
-                          <button
-                            type="button"
-                            on:click={expliquerArticle}
-                            data-testid="law-explain"
-                            class="ai-question-btn mt-6 w-full sm:w-auto min-h-11 lg:[@media(pointer:fine)]:min-h-0 px-4 py-2 bg-zinc-950 hover:bg-black dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 rounded-xl text-sm font-medium transition-colors shadow-sm dark:shadow-none"
-                          >
-                            {$tr("loi.ia.expliquer")}
-                          </button>
-                        {/if}
-                      </div>
-                    </div>
-                  </article>
-
-                  <!-- La barre, répétée sous l'article : il fallait remonter tout
-                       un long article pour passer au suivant. Classe distincte
-                       de `article-navigation` : les tests qui visent la barre du
-                       haut la trouvent seule. -->
+                POURQUOI UNE ENVELOPPE. Sous `lg`, une rangée : les puces, et à leur droite
+                le bouton « Sommaire » et son compteur (`law-toc-toggle`), hors
+                du panneau qu'il ouvre : il garde la place de la rangée pendant
+                l'ouverture, et `piegerFocus` lui rend le focus. Il était dans
+                la barre Précédent / Suivant du haut, retirée (maquette). Pas
+                dans le fil d'Ariane : il y aurait pris la place du domaine
+                entre `sm` et `lg`. À partir de `lg` (`contents`), l'enveloppe
+                n'existe plus : le sommaire est l'élément de la grille, seul à
+                pouvoir rester collé. Elle garde sa hauteur quand le sommaire
+                passe en panneau, pour que le texte ne remonte pas derrière le
+                voile. Un texte d'un seul article n'a ni puce ni rangée : son
+                sommaire s'ouvre depuis la navigation du bas, comme avant.
+              -->
+              <div class="flex min-w-0 items-center gap-2 lg:contents {articles.length > 1 ? 'min-h-11' : ''}">
+                <div
+                  id="sommaire"
+                  data-testid="law-toc"
+                  class="sidebar sommaire min-w-0 flex-1 {tocOuvert
+                    ? 'fixed inset-x-0 bottom-0 z-[56] flex flex-col rounded-t-2xl border-t border-zinc-200 bg-white pb-zone-sure px-zone-sure shadow-xl dark:border-zinc-800 dark:bg-zinc-900 lg:inset-x-auto lg:inset-y-0 lg:left-0 lg:w-[26rem] lg:rounded-none lg:rounded-r-2xl lg:border-r lg:border-t-0'
+                    : `${articles.length > 1 ? 'block' : 'hidden'} lg:sticky lg:top-24 lg:flex lg:h-fit lg:flex-col lg:self-start`}"
+                  class:ouvert={tocOuvert}
+                  role={tocOuvert ? "dialog" : undefined}
+                  aria-modal={tocOuvert ? "true" : undefined}
+                  aria-labelledby={tocOuvert ? "sommaire-titre" : undefined}
+                  data-hors-du-bouton
+                  use:piegerSiOuvert={tocOuvert}
+                >
                   <div
-                    class="article-navigation-bas mt-8 sm:mt-10 flex justify-between items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-2 sm:p-4 border border-zinc-200 dark:border-zinc-700/60"
+                    class="sidebar-header shrink-0 items-center justify-between gap-3 {tocOuvert
+                      ? 'flex px-4 pt-2 lg:mb-4 lg:px-6 lg:pt-6'
+                      : 'mb-1 hidden lg:flex'}"
                   >
-                    <button
-                      type="button"
-                      class={BOUTON_DE_NAVIGATION}
-                      on:click={navigateToPrevious}
-                      disabled={rangCourant === 0}
-                      aria-label={$tr("loi.precedent")}
+                    <h2
+                      id="sommaire-titre"
+                      class="font-bold text-zinc-950 dark:text-white {tocOuvert ? 'text-lg' : 'text-[13px] leading-[18px]'}"
                     >
-                      <Icone nom="chevron-left" class="w-4 h-4 shrink-0" />
-                      <span class="hidden sm:inline">{$tr("loi.precedent")}</span>
-                    </button>
+                      {$tr("loi.sommaire.titre")}
+                    </h2>
+                    {#if tocOuvert}
+                      <button
+                        type="button"
+                        class="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                        on:click={fermerSommaire}
+                        aria-label={$tr("common.close")}
+                        data-testid="law-toc-close"
+                      >
+                        <Icone nom="x" class="text-2xl" />
+                      </button>
+                    {/if}
+                  </div>
+
+                  {#if articles.length > 1}
+                    <!-- Le sommaire complet, depuis la colonne (la maquette n'y a
+                         que la division lue). Masqué, et non retiré, pendant
+                         l'ouverture : le focus lui revient à la fermeture
+                         (`fermerSommaire`). -->
                     <button
                       type="button"
-                      class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-3 text-zinc-700 dark:text-zinc-200 enabled:hover:bg-white enabled:hover:text-zinc-950 dark:enabled:hover:bg-zinc-800 dark:enabled:hover:text-white transition-colors lg:hidden"
+                      class="mb-2 min-h-11 items-center gap-2 self-start rounded-lg text-sm text-zinc-600 transition-colors hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white lg:[@media(pointer:fine)]:min-h-9 {tocOuvert
+                        ? 'hidden'
+                        : 'hidden lg:inline-flex'}"
                       on:click={ouvrirSommaire}
                       aria-haspopup="dialog"
                       aria-expanded={tocOuvert}
                       aria-controls="sommaire"
-                      data-testid="law-toc-toggle-bas"
+                      data-testid="law-toc-tout"
                     >
-                      <Icone nom="table-of-contents" class="text-xl" />
-                      <span class="flex min-w-0 flex-col items-start leading-tight">
-                        <span class="text-sm font-semibold">{$tr("loi.sommaire.ouvrir")}</span>
-                        <span class="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{compteur}</span>
-                      </span>
+                      <Icone nom="table-of-contents" class="shrink-0 text-base" />
+                      {$tr("loi.sommaire.tout")}
                     </button>
-                    <div class="hidden lg:block text-sm font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
-                      {compteur}
-                    </div>
-                    <button
-                      type="button"
-                      class={BOUTON_DE_NAVIGATION}
-                      on:click={navigateToNext}
-                      disabled={rangCourant >= articles.length - 1}
-                      aria-label={$tr("loi.suivant")}
-                    >
-                      <span class="hidden sm:inline">{$tr("loi.suivant")}</span>
-                      <Icone nom="chevron-right" class="w-4 h-4 shrink-0" />
-                    </button>
-                  </div>
-                {/if}
-              {/if}
-            </div>
+                  {/if}
 
-            {#if nombreHistorique > 0 && statut}
-              <div id="panneau-historique" role="tabpanel" aria-labelledby="onglet-historique" hidden={onglet !== "historique"}>
-                {#if onglet === "historique"}
-                  <HistoriqueDuTexte {statut} />
+                  {#if tocOuvert}
+                    <!-- Le cadre dessine le champ et son focus (recette des
+                         champs du site) ; le champ lui-même reste transparent.
+                         16 px sous `lg`, là où il vit dans le panneau tactile :
+                         en dessous, iOS zoome sur la page au focus. -->
+                    <div
+                      class="search-box mx-4 mb-3 mt-1 flex min-h-11 shrink-0 items-center rounded-xl border border-zinc-200 bg-zinc-50 pl-4 focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 lg:mx-6 lg:mb-6 lg:mt-0"
+                    >
+                      <Icone nom="search" class="h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                      <input
+                        type="text"
+                        class="w-full min-w-0 self-stretch border-none bg-transparent py-2.5 pl-3 pr-4 text-base text-zinc-950 placeholder-zinc-400 outline-none focus:ring-0 dark:text-zinc-100 dark:placeholder-zinc-500 lg:text-sm"
+                        placeholder={$tr("loi.sommaire.filtre")}
+                        bind:value={saisieDuFiltre}
+                        aria-label={$tr("loi.sommaire.filtre")}
+                      />
+                    </div>
+                  {/if}
+
+                  <nav
+                    bind:this={listeDuSommaire}
+                    class="toc min-h-0 {tocOuvert
+                      ? 'space-y-5 overflow-y-auto overscroll-contain px-4 pb-12 lg:px-6'
+                      : 'lg:overflow-y-auto lg:overscroll-contain lg:pb-12'}"
+                    aria-labelledby="sommaire-titre"
+                  >
+                    {#if sommaireRendu}
+                      <ListeDuSommaire
+                        {decoupe}
+                        rangCourant={rangAffiche}
+                        {marques}
+                        filtre={tocOuvert ? filtre : ""}
+                        {langueDuTexte}
+                        variante={tocOuvert ? "feuille" : "colonne"}
+                        on:choisir={choisirDansLeSommaire}
+                      />
+                    {/if}
+                  </nav>
+                </div>
+                {#if mode === "article" && articles.length > 1}
+                  <button
+                    type="button"
+                    class="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl px-2 text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-white lg:hidden"
+                    on:click={ouvrirSommaire}
+                    aria-haspopup="dialog"
+                    aria-expanded={tocOuvert}
+                    aria-controls="sommaire"
+                    data-testid="law-toc-toggle"
+                  >
+                    <Icone nom="table-of-contents" class="text-xl" />
+                    <span class="flex flex-col items-start leading-tight">
+                      <span class="text-sm font-semibold max-[359px]:sr-only">{$tr("loi.sommaire.ouvrir")}</span>
+                      <span class="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{compteur}</span>
+                    </span>
+                  </button>
                 {/if}
               </div>
             {/if}
-          </main>
-        </div>
+
+            <!-- `min-w-0` : élément de grille, il ne doit pas s'élargir sur
+                 son contenu le plus large. -->
+            <div
+              class="min-w-0 {articles.length > 0 ? 'lg:col-start-2' : ''}"
+              data-hors-du-bouton={mode === "texte" || articles.length === 0 || onglet === "historique"
+                ? ""
+                : undefined}
+            >
+              {#if nombreHistorique > 0}
+                <!-- « Texte | Historique (N) » (P1, étape 2), l'onglet actif
+                     marqué par une barre. Motif d'onglets ARIA : un seul arrêt
+                     de tabulation, flèches pour passer de l'un à l'autre. Au
+                     second plan (L1), au-dessus du texte. -->
+                <div
+                  class="mb-6 flex gap-6 border-b border-zinc-200 text-sm dark:border-zinc-800"
+                  role="tablist"
+                  aria-label={$tr("loi.onglets")}
+                  data-hors-du-bouton
+                >
+                  {#each ONGLETS as nom (nom)}
+                    {@const actif = onglet === nom}
+                    <button
+                      type="button"
+                      role="tab"
+                      id="onglet-{nom}"
+                      aria-selected={actif}
+                      aria-controls="panneau-{nom}"
+                      tabindex={actif ? 0 : -1}
+                      data-testid="law-tab-{nom}"
+                      class="-mb-px inline-flex min-h-11 items-center border-b-2 transition-colors {actif
+                        ? 'border-zinc-950 font-semibold text-zinc-950 dark:border-white dark:text-white'
+                        : 'border-transparent text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}"
+                      on:click={() => choisirOnglet(nom)}
+                      on:keydown={clavierDesOnglets}
+                    >
+                      {nom === "texte"
+                        ? $tr("loi.onglet.texte")
+                        : $tr("loi.onglet.historique").replace("{n}", String(nombreHistorique))}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+
+              <div
+                id="panneau-texte"
+                role={nombreHistorique > 0 ? "tabpanel" : undefined}
+                aria-labelledby={nombreHistorique > 0 ? "onglet-texte" : undefined}
+                hidden={onglet !== "texte"}
+              >
+                {#if articles.length === 0}
+                  <!-- Aucun article reconnu : le texte tel qu'il est, divisions
+                       et paragraphes, sans rien en perdre. Sans division non
+                       plus, tout le texte est dans l'ouverture : dépliée, ou la
+                       page n'en montrait que le résumé (14 textes de la base de
+                       test le 29/10/2026, des circulaires budgétaires surtout,
+                       et l'arrêté 8448/CAB/PR, /laws/193). -->
+                  {#if decoupe.divisions.length > 0}
+                    {#key law.id}
+                      <TexteEntier
+                        {decoupe}
+                        {changements}
+                        {consolide}
+                        {langueDuTexte}
+                        deplierLOuverture={!decoupe.structure}
+                      />
+                    {/key}
+                  {:else}
+                    <p class="py-12 text-center text-zinc-500 dark:text-zinc-400">{$tr("loi.texte_indisponible")}</p>
+                  {/if}
+                {:else}
+                  {#if avecBascule}
+                    <!--
+                      « Article par article | Texte entier » (P10), au second
+                      plan (L1) : une ligne au-dessus du texte, que la maquette
+                      ne dessine pas ; en texte entier, « 24 articles · 7
+                      chapitres » à droite. Plus de barre Précédent / Suivant
+                      ici : la navigation est en bas de l'article (maquette).
+                    -->
+                    <div
+                      class="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+                      data-hors-du-bouton
+                    >
+                      <BasculeDeLecture {mode} on:change={changerDeMode} />
+                      {#if mode === "texte"}
+                        <p class="hidden text-sm tabular-nums text-zinc-500 dark:text-zinc-400 sm:block">{resumeDuTexte}</p>
+                      {/if}
+                    </div>
+                  {/if}
+
+                  {#if articleIntrouvable}
+                    <!-- Même aplat que l'ancien encadré du statut (P1) : une
+                         information sur le texte, pas une erreur. -->
+                    <p
+                      role="status"
+                      data-testid="article-introuvable"
+                      class="mb-4 flex items-start gap-2 rounded-xl bg-zinc-100 px-4 py-3 text-sm text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300 sm:mb-6"
+                    >
+                      <Icone nom="circle-alert" class="mt-0.5 shrink-0" />
+                      <span class="min-w-0">{avisArticleIntrouvable}</span>
+                    </p>
+                  {/if}
+
+                  {#if mode === "texte"}
+                    {#key law.id}
+                      <!-- Le lien direct d'un article (`choisir`) saute comme le
+                           sommaire : une entrée d'historique que la page connaît.
+                           L'article demandé introuvable, l'ouverture se déplie :
+                           il y est souvent, faute d'avoir été lu par l'OCR. Pour
+                           un texte d'un seul article aussi : elle est tout ce que
+                           la lecture article par article ne montre pas. -->
+                      <TexteEntier
+                        bind:this={texteEntier}
+                        {decoupe}
+                        {changements}
+                        historique={nombreHistorique > 0}
+                        {consolide}
+                        {langueDuTexte}
+                        deplierLOuverture={articleIntrouvable !== null || articles.length === 1}
+                        on:courant={(event) => (rangVisible = event.detail)}
+                        on:historique={ouvrirHistorique}
+                        on:choisir={choisirDansLeSommaire}
+                      />
+                    {/key}
+                  {:else if articleCourant}
+                    {@const intitule = intituleDeLArticle(articleCourant)}
+                    {@const chaine = divisionCourante ? nommerLaChaine(divisionCourante.ancetres, $tr) : ""}
+                    {@const intituleDeDivision = divisionCourante ? (enTetePrincipal(divisionCourante)?.intitule ?? "") : ""}
+                    <!--
+                      LA RANGÉE « TEXTE | NOTE » : la note de l'IA dans une marge
+                      de 280 px à partir de 1 280 px, sous le texte en dessous.
+                      Le texte ne bouge jamais à cause de la note : colonne de
+                      280 px fixe, alignée en haut, la lecture en `minmax(0,1fr)`.
+                      `ancrerLaNote` cale le haut de la marge sur le passage clé,
+                      quand il y en a un (aucun en v1 : décision L2).
+                    -->
+                    <div
+                      bind:this={rangeeDeLecture}
+                      class="rangee grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start xl:gap-x-14"
+                      use:ancrerLaNote={{
+                        cible: passageCle,
+                        surMesure: (decalage) => (decalageDeLaNote = decalage),
+                        cle: cleDeLAncrage,
+                      }}
+                    >
+                      <!--
+                        POURQUOI `overflow-x: clip` SUR LA COLONNE DE LECTURE. Le
+                        feuilletage fait glisser l'article de 36 px, et la page
+                        ne doit jamais défiler à l'horizontale (320 px compris).
+                        `clip` et non `hidden`, qui ferait de la colonne un
+                        conteneur de défilement ; et sur la colonne, jamais sur
+                        un ancêtre du sommaire collant (PASSATION § 8, piège 8).
+                        8 px de marge (`-mx-2 px-2`) : les contours de focus
+                        des boutons, au bord, ne sont pas rognés.
+                      -->
+                      <div class="lecture -mx-2 min-w-0 overflow-x-clip px-2" data-hors-du-bouton>
+                        <article class="article" id={ancreDeLArticle(articleCourant)} aria-labelledby="titre-article">
+                          <!-- Ce qui glisse d'un article à l'autre (`feuillete`) :
+                               le surtitre, « Article N » et le texte ; ni les
+                               actions, ni la navigation, ni la note. Cible du
+                               défilement à chaque changement d'article :
+                               `scroll-mt-*` suit la hauteur du fil d'Ariane
+                               collant (53 px, 33 en paysage sur téléphone). -->
+                          <div
+                            bind:this={debutArticle}
+                            class="feuille scroll-mt-16 sm:scroll-mt-[4.5rem] sm:court:scroll-mt-14 {feuillete}"
+                          >
+                            <div class="article-header mb-5">
+                              {#if chaine}
+                                <!-- La division de l'article, toute sa chaîne
+                                     (« Titre II · Chapitre 1 », `nommerLaChaine`)
+                                     en surtitre Inter (Q5 : deux voix au plus),
+                                     puis son intitulé, mot pour mot. -->
+                                <p class="mb-1 text-[13px] leading-[18px] text-zinc-500 dark:text-zinc-400">{chaine}</p>
+                                {#if intituleDeDivision}
+                                  <p
+                                    class="mb-2 line-clamp-2 text-[13px] leading-[18px] text-zinc-500 coupe-mots dark:text-zinc-400"
+                                    title={intituleDeDivision}
+                                    lang={langueDuTexte}
+                                  >
+                                    {intituleDeDivision}
+                                  </p>
+                                {/if}
+                              {/if}
+                              <!-- Literata 600 (Q5), 32 px au plus et jamais plus
+                                   grand que le titre (`tailleDeLArticle`).
+                                   Focusable par le script seulement : choix d'un
+                                   article au clavier. -->
+                              <h2
+                                id="titre-article"
+                                bind:this={titreDeLArticle}
+                                tabindex="-1"
+                                class="{classeDeLArticle} {POLICE_DES_TITRES} text-zinc-950 dark:text-white"
+                              >
+                                {$tr("loi.article")}
+                                {articleCourant.numero}{#if langue === "fr" && articleCourant.numero === "1"}<sup>er</sup>{/if}
+                              </h2>
+                            </div>
+
+                            <!-- Un vrai intitulé (« Imputabilité ») ; une première
+                                 ligne qui porte le texte passe dans le corps. -->
+                            {#if intitule}
+                              <h3
+                                class="mb-6 text-lg font-semibold text-zinc-800 coupe-mots dark:text-zinc-200 sm:text-xl"
+                                lang={langueDuTexte}
+                              >
+                                {intitule}
+                              </h3>
+                            {/if}
+
+                            <StatutDeLArticle
+                              changements={changements.get(rangCourant)}
+                              historique={nombreHistorique > 0}
+                              {consolide}
+                              on:historique={ouvrirHistorique}
+                            />
+
+                            <!--
+                              Texte officiel en Literata texte (Q5), 17 px sur
+                              téléphone, 19 au-dessus, interligne de 1,8, couleur
+                              pleine, 34 em au plus (maquette : 646 px en 19 px).
+                              Les passages surlignés sont des NŒUDS (`segmenter`,
+                              surlignage.ts : <mark> ou texte), jamais du HTML ;
+                              sans passage, le paragraphe tel quel (L2).
+                            -->
+                            <div
+                              class="article-content max-w-[34em] space-y-4 text-[17px] leading-[1.8] text-zinc-950 coupe-mots dark:text-zinc-100 sm:space-y-5 sm:text-[19px] {POLICE_DU_TEXTE_OFFICIEL}"
+                              lang={langueDuTexte}
+                            >
+                              {#each paragraphesDeLArticle(articleCourant) as paragraphe, i (i)}
+                                <p>{#each segmenter(paragraphe, passages) as segment, rang (rang)}{#if segment.passage}<mark class="passage mv-surligne mv-surligner" class:passage-cle={segment.passage.role === "cle"} style="--d: {segment.passage.role === 'cle' ? 0 : 150}ms">{segment.texte}</mark>{:else}{segment.texte}{/if}{/each}</p>
+                              {/each}
+                            </div>
+                          </div>
+
+                          <!-- « Copier la référence », « Copier le lien », puis
+                               « Copier le texte » au second plan, et la mention
+                               « Seul le texte publié au Journal officiel fait
+                               foi » (ActionsDeLArticle). -->
+                          <div class="mt-7">
+                            <ActionsDeLArticle
+                              reference={referenceACopierIci}
+                              texte={texteACopierIci}
+                              lien={urlArticle}
+                              partage={partageDeLArticle}
+                            />
+                          </div>
+                        </article>
+
+                        <!--
+                          « Précédent » et « Suivant », avec le voisin en petit
+                          (maquette), sous un filet. Une seule navigation, en
+                          bas : la barre du haut est retirée. Au milieu (L1), le
+                          compteur « 3 / 24 » ; sous `lg`, où la colonne du
+                          sommaire n'existe pas, c'est le bouton qui l'ouvre
+                          (`law-toc-toggle-bas`) : au bas d'un long article, les
+                          puces sont loin. Sous `sm`, son icône seule : trois
+                          cibles tiennent ainsi sur une rangée dès 320 px.
+                          Classe `article-navigation` gardée, et « Suivant »
+                          DERNIER bouton : les tests le prennent par
+                          `.article-navigation button` puis `.last()`.
+                        -->
+                        <nav
+                          class="article-navigation mt-9 flex items-center justify-between gap-2 border-t border-zinc-200 pt-5 dark:border-zinc-800"
+                          aria-label={$tr("loi.navigation.voisins")}
+                        >
+                          <button
+                            type="button"
+                            class="{BOUTON_VOISIN} text-left"
+                            on:click={navigateToPrevious}
+                            disabled={rangCourant === 0}
+                          >
+                            <Icone
+                              nom="arrow-left"
+                              class="{FLECHE_DU_VOISIN} motion-safe:group-enabled:group-hover:-translate-x-1"
+                            />
+                            <span class="flex min-w-0 flex-col items-start">
+                              <span>{$tr("loi.precedent")}</span>
+                              {#if articlePrecedent}
+                                <span class="max-w-full truncate text-xs font-normal text-zinc-500 dark:text-zinc-400"
+                                  >{$tr("loi.article")} {numeroDArticleEcrit(articlePrecedent.numero, langue)}</span
+                                >
+                              {/if}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-white sm:px-3 lg:hidden"
+                            on:click={ouvrirSommaire}
+                            aria-haspopup="dialog"
+                            aria-expanded={tocOuvert}
+                            aria-controls="sommaire"
+                            data-testid="law-toc-toggle-bas"
+                          >
+                            <Icone nom="table-of-contents" class="text-xl" />
+                            <span class="sr-only">{$tr("loi.sommaire.ouvrir")}</span>
+                            <span class="hidden text-xs tabular-nums text-zinc-500 dark:text-zinc-400 sm:inline">{compteur}</span>
+                          </button>
+                          <p class="hidden text-sm tabular-nums text-zinc-500 dark:text-zinc-400 lg:block">{compteur}</p>
+                          <button
+                            type="button"
+                            class="{BOUTON_VOISIN} text-right"
+                            on:click={navigateToNext}
+                            disabled={rangCourant >= articles.length - 1}
+                          >
+                            <span class="flex min-w-0 flex-col items-end">
+                              <span>{$tr("loi.suivant")}</span>
+                              {#if articleSuivant}
+                                <span class="max-w-full truncate text-xs font-normal text-zinc-500 dark:text-zinc-400"
+                                  >{$tr("loi.article")} {numeroDArticleEcrit(articleSuivant.numero, langue)}</span
+                                >
+                              {/if}
+                            </span>
+                            <Icone
+                              nom="arrow-right"
+                              class="{FLECHE_DU_VOISIN} motion-safe:group-enabled:group-hover:translate-x-1"
+                            />
+                          </button>
+                        </nav>
+                      </div>
+
+                      <!-- La marge de la note. En haut de la marge sans passage
+                           (rendu serveur compris) ; calée sur le passage clé
+                           sinon (`decalageDeLaNote`, à partir de 1 280 px). -->
+                      <aside
+                        class="rail pt-8 xl:pt-0"
+                        aria-label={$tr("loi.ia.titre")}
+                        style={decalageDeLaNote !== null ? `padding-top: ${decalageDeLaNote}px` : undefined}
+                      >
+                        <div class="max-w-[34em] xl:max-w-none">
+                          <NoteDeLIA
+                            {explication}
+                            enCours={explicationEnCours}
+                            erreur={explicationErreur}
+                            {lienQuestion}
+                            ancree={decalageDeLaNote !== null}
+                            entree={!noteDejaEntree}
+                            data-hors-du-bouton
+                            on:expliquer={expliquerArticle}
+                          />
+                        </div>
+                      </aside>
+                    </div>
+                  {/if}
+                {/if}
+              </div>
+
+              {#if nombreHistorique > 0 && statut}
+                <div
+                  id="panneau-historique"
+                  role="tabpanel"
+                  aria-labelledby="onglet-historique"
+                  hidden={onglet !== "historique"}
+                >
+                  {#if onglet === "historique"}
+                    <HistoriqueDuTexte {statut} />
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   {/if}
@@ -2028,17 +2172,19 @@
    * Hauteurs maximales du sommaire. Ici plutôt qu'en classes Tailwind : une
    * classe `max-h-[80dvh]` n'écrit que la valeur en dvh, et un navigateur qui
    * ne la connaît pas laisserait le panneau sans limite. La valeur en vh,
-   * écrite d'abord, sert de repli.
+   * écrite d'abord, sert de repli. Sous `lg`, fermé, le sommaire n'est
+   * qu'une rangée de puces : pas de limite. Ouvert à partir de `lg`, c'est
+   * une feuille de toute la hauteur (`inset-y-0`).
    */
   @media not all and (min-width: 1024px) {
-    .sommaire {
+    .sommaire.ouvert {
       max-height: 80vh;
       max-height: 80dvh;
     }
   }
 
   @media (min-width: 1024px) {
-    .sommaire {
+    .sommaire:not(.ouvert) {
       max-height: calc(100vh - 7rem);
       max-height: calc(100dvh - 7rem);
     }
@@ -2055,16 +2201,28 @@
    * divisions, il estompe toujours le début de la suivante. À 2rem, il
    * tombait parfois tout entier dans cet écart, et le sommaire du décret
    * 2021/745 semblait finir à l'article 8, seize articles avant sa fin
-   * (vérification r3 du 29/10/2026).
+   * (vérification r3 du 29/10/2026). Refonte A : seulement là où la liste
+   * défile en hauteur (panneau ouvert, colonne) ; il effacerait les puces.
    */
-  .toc {
+  .sommaire.ouvert .toc {
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent);
     mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent);
   }
 
+  @media (min-width: 1024px) {
+    .toc {
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent);
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent);
+    }
+  }
+
   /*
-   * Le panneau monte du bas et le fond apparaît en fondu. Rien de tout cela
-   * pour qui a demandé moins d'animations.
+   * Le panneau monte du bas (la feuille vient de la gauche à partir de
+   * `lg`) et le fond apparaît en fondu. La marge de la note glisse vers son
+   * passage quand elle s'y cale (`ancrerLaNote`) : `padding-top`, seule
+   * propriété de mise en page animée de la page, voulue (cartes/lecture.md,
+   * étape 7) et hors du texte, qui ne bouge pas. Rien de tout cela pour qui
+   * a demandé moins d'animations.
    */
   @media (prefers-reduced-motion: no-preference) {
     .sommaire.ouvert {
@@ -2074,6 +2232,16 @@
     .fond-sommaire {
       animation: fondu 0.2s ease-out;
     }
+
+    .rail {
+      transition: padding-top 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) and (min-width: 1024px) {
+    .sommaire.ouvert {
+      animation-name: glisser;
+    }
   }
 
   @keyframes monter {
@@ -2082,6 +2250,15 @@
     }
     to {
       transform: translateY(0);
+    }
+  }
+
+  @keyframes glisser {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
     }
   }
 

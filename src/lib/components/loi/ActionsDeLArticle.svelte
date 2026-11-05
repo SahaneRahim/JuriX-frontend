@@ -23,6 +23,17 @@
    *
    * Trois boutons au même gabarit (44 px au doigt, 14 px), une rangée de
    * trois sur téléphone, libellés courts.
+   *
+   * REFONTE A (maquette RefonteLecture, décision L1). Deux actions au premier
+   * plan, en cartes bordées : « Copier la référence » (icône `copy`) et
+   * « Copier le lien » ; « Copier le texte », choix du propriétaire (P2) que
+   * la maquette ne dessine pas, reste là, au second plan : dernier de la
+   * rangée, sans bordure ni fond, même cible de 44 px. La coche de la copie
+   * réussie se pose avec un petit ressort (`mv-ressort`, A2 § 3.4), rien en
+   * mouvement réduit. Sous la rangée, la mention « Seul le texte publié au
+   * Journal officiel fait foi », jusqu'ici dans le seul texte copié, est
+   * visible (X7, `loi.copie.foi`) : en zinc-500 sur le fond de la page, et
+   * jamais sur un aplat gris, où elle passerait sous 4,5:1.
    */
   import { onDestroy, onMount } from "svelte";
   import Icone from "$lib/components/Icone.svelte";
@@ -45,6 +56,15 @@
    * son icône, et une colonne en laisse 59 à 390 px, 51 à 360 px.
    */
   const EMPILE = "max-sm:text-xs max-[389px]:flex-col max-[389px]:gap-0.5";
+
+  /**
+   * « Copier le texte », au second plan (L1) : le gabarit du bouton
+   * secondaire, sans sa bordure ni son fond. POURQUOI `!` : ces classes
+   * doivent l'emporter sur celles de BOUTON_SECONDAIRE, écrites plus loin
+   * dans la feuille de Tailwind pour certaines.
+   */
+  const SECOND_PLAN =
+    "!border-transparent !bg-transparent !text-zinc-600 hover:!text-zinc-950 dark:!text-zinc-400 dark:hover:!text-white";
 
   /**
    * Feuille de partage du système, seulement sous un pointeur tactile : sur
@@ -123,23 +143,18 @@
   onDestroy(() => clearTimeout(minuterie));
 </script>
 
-<div class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap" data-testid="law-article-actions">
+<div class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center" data-testid="law-article-actions">
   <button
     type="button"
     class="{BOUTON_SECONDAIRE} {EMPILE}"
     on:click={() => copier("reference")}
     data-testid="law-copy-reference"
   >
-    <Icone nom={referenceCopiee ? "check" : "section"} class="h-5 w-5 shrink-0" />
+    <Icone nom={referenceCopiee ? "check" : "copy"} class="h-4 w-4 shrink-0 {referenceCopiee ? 'mv-ressort' : ''}" />
     <span class="sm:hidden">{referenceCopiee ? $tr("loi.copie.faite") : $tr("loi.copie.reference_court")}</span>
     <span class="hidden sm:inline">
       {referenceCopiee ? $tr("loi.copie.reference_faite") : $tr("loi.copie.reference")}
     </span>
-  </button>
-  <button type="button" class="{BOUTON_SECONDAIRE} {EMPILE}" on:click={() => copier("texte")} data-testid="law-copy-text">
-    <Icone nom={texteCopie ? "check" : "copy"} class="h-5 w-5 shrink-0" />
-    <span class="sm:hidden">{texteCopie ? $tr("loi.copie.fait") : $tr("loi.copie.texte_court")}</span>
-    <span class="hidden sm:inline">{texteCopie ? $tr("loi.copie.texte_fait") : $tr("loi.copie.texte")}</span>
   </button>
   <!-- Nommé par son libellé visible, comme les deux autres boutons : une
        étiquette plus longue ne contiendrait plus « Copié » pendant
@@ -150,7 +165,7 @@
     on:click={lienDeLArticle}
     data-testid="law-copy-link"
   >
-    <Icone nom={lienCopie ? "check" : "link"} class="h-5 w-5 shrink-0" />
+    <Icone nom={lienCopie ? "check" : "link"} class="h-4 w-4 shrink-0 {lienCopie ? 'mv-ressort' : ''}" />
     <span class="sm:hidden">{lienCopie ? $tr("loi.copie.fait") : $tr("loi.copie.lien_court")}</span>
     <span class="hidden sm:inline"
       >{lienCopie
@@ -160,8 +175,22 @@
           : $tr("loi.copie.lien")}</span
     >
   </button>
+  <!-- Au second plan (L1) : le même bouton, sans bordure ni fond. -->
+  <button
+    type="button"
+    class="{BOUTON_SECONDAIRE} {EMPILE} {SECOND_PLAN}"
+    on:click={() => copier("texte")}
+    data-testid="law-copy-text"
+  >
+    <Icone nom={texteCopie ? "check" : "file-text"} class="h-4 w-4 shrink-0 {texteCopie ? 'mv-ressort' : ''}" />
+    <span class="sm:hidden">{texteCopie ? $tr("loi.copie.fait") : $tr("loi.copie.texte_court")}</span>
+    <span class="hidden sm:inline">{texteCopie ? $tr("loi.copie.texte_fait") : $tr("loi.copie.texte")}</span>
+  </button>
 </div>
 <p role="status" class="sr-only">{annonce}</p>
 {#if echec}
   <p class="mt-2 text-sm text-red-600 dark:text-red-400" data-testid="law-copy-error">{echec}</p>
 {/if}
+<p class="mt-3 text-[13px] leading-[18px] text-zinc-500 dark:text-zinc-400" data-testid="law-copy-foi">
+  {$tr("loi.copie.foi")}
+</p>

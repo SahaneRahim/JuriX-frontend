@@ -7,6 +7,7 @@ import ActionsDeLArticle from './ActionsDeLArticle.svelte';
 import BasculeDeLecture from './BasculeDeLecture.svelte';
 import HistoriqueDuTexte from './HistoriqueDuTexte.svelte';
 import ListeDuSommaire from './ListeDuSommaire.svelte';
+import NoteDeLIA from './NoteDeLIA.svelte';
 import StatutDeLArticle from './StatutDeLArticle.svelte';
 import StatutDuTexte from './StatutDuTexte.svelte';
 import TexteEntier from './TexteEntier.svelte';
@@ -100,7 +101,10 @@ describe('StatutDuTexte', () => {
   it('sans statut (ancienne API) : version d’origine, sans date ni « en vigueur »', () => {
     render(StatutDuTexte, { props: { statut: null, lienSignaler: 'mailto:x@y.z' } });
     const bloc = screen.getByTestId('law-status');
-    expect(texte(bloc)).toBe('Version d’origine, non consolidée. Signaler');
+    expect(bloc.dataset.etat).toBe('inconnu');
+    // Refonte A (L9) : la pastille, sans point final, puis « Signaler » ; sans
+    // relevé, ni date ni « Ce relevé peut être incomplet ».
+    expect(texte(bloc)).toBe('Version d’origine, non consolidée Signaler');
     expect(bloc.querySelector('a')?.getAttribute('href')).toBe('mailto:x@y.z');
     expect(texte(bloc).toLowerCase()).not.toContain('vigueur');
   });
@@ -109,10 +113,20 @@ describe('StatutDuTexte', () => {
     const statut = { ...CONSTITUTION, etat: 'aucune_modification_connue' as const, modifie_par: [], par_article: {} };
     render(StatutDuTexte, { props: { statut, lienSignaler: 'mailto:x@y.z' } });
     expect(texte(screen.getByTestId('law-status'))).toBe(
-      'Version d’origine, non consolidée. Aucune modification relevée par JuriX au 14 oct. 2026. Signaler',
+      'Version d’origine, non consolidée Aucune modification relevée par JuriX au 14 oct. 2026. Ce relevé peut être incomplet. Signaler',
     );
     // D'un seul bloc en fin de ligne : « au 14 oct. / 2026. » se coupait à 768 px.
     expect(screen.getByTestId('law-status').textContent).toContain('14 oct. 2026');
+  });
+
+  it('la pastille : un mot et une icône, pointillée, tamponnée au chargement (CSS seul)', () => {
+    render(StatutDuTexte, { props: { statut: null, lienSignaler: 'mailto:x@y.z' } });
+    const pastille = screen.getByTestId('law-status').querySelector('.mv-tamponner-pastille') as HTMLElement;
+    expect(texte(pastille)).toBe('Version d’origine, non consolidée');
+    expect(pastille.querySelector('svg')?.getAttribute('data-icone')).toBe('circle-dashed');
+    expect(pastille.classList).toContain('border-dashed');
+    // Plus d'aplat gris : le statut n'est pas dit par un fond.
+    expect(screen.getByTestId('law-status').className).not.toMatch(/bg-zinc-100/);
   });
 
   it('modifié : chaque texte modificatif, ses articles, et un lien vers lui', () => {
@@ -142,6 +156,24 @@ describe('StatutDuTexte', () => {
     expect(texte(screen.getByTestId('law-status'))).toBe(
       'Remplacé par l’ordonnance n° 2025/002 du 18 juillet 2025. Relevé de JuriX au 14 oct. 2026. Le texte ci-dessous est sa version d’origine. Signaler',
     );
+  });
+
+  it('les états sans maquette gardent leur rendu : ni pastille, ni tampon (L8, L9)', () => {
+    const ordonnance = lie('2025/002', '2025-07-18', 2106, 'ordonnance');
+    const remplace: StatutJuridique = {
+      ...CONSTITUTION,
+      etat: 'remplace',
+      abroge: true,
+      abroge_par: ordonnance,
+      modifie_par: [changement('c1', { type: 'remplace', nature_modification: 'remplace', etendue: 'texte', texte: ordonnance })],
+    };
+    for (const statut of [CONSTITUTION, remplace]) {
+      const { unmount } = render(StatutDuTexte, { props: { statut, lienSignaler: 'mailto:x@y.z' } });
+      const bloc = screen.getByTestId('law-status');
+      expect(bloc.querySelector('.mv-tamponner-pastille')).toBeNull();
+      expect(bloc.className).toMatch(/bg-zinc-100/);
+      unmount();
+    }
   });
 
   it('un texte hors de JuriX est nommé sans lien', () => {
@@ -332,6 +364,176 @@ describe('ListeDuSommaire', () => {
   });
 });
 
+describe('ListeDuSommaire, colonne et puces (refonte A, L4)', () => {
+  const decoupe = decouperLeTexte(
+    'CHAPITREI DISPOSITIONS GENERALES\nArticle 1er.- Le présent décret fixe les modalités.\nArticle 2.- La Région assure la SÉCURITÉ.\nArticle 3.- La Région délivre les titres.\nCHAPITRE V\nDE LA DELIVRANCE\nArticle 12.- La Région délivre.',
+  );
+
+  it('la colonne ne montre que la division lue : « Art. N », sans premiers mots', () => {
+    render(ListeDuSommaire, {
+      props: { decoupe, rangCourant: 1, marques: new Map([[2, 'modifie' as const]]), variante: 'colonne' },
+    });
+    const liens = screen.getAllByRole('link');
+    expect(liens.map((lien) => lien.getAttribute('href'))).toEqual(['#art-1', '#art-2', '#art-3']);
+    expect(liens.map(texte)).toEqual(['Art. 1er', 'Art. 2', 'Art. 3 · modifié']);
+    // Le surtitre de la division : dans la colonne seulement (masqué sous `lg`).
+    const surtitre = screen.getByText('Chapitre I · art. 1 à 3');
+    expect(surtitre.parentElement?.className).toMatch(/hidden lg:block/);
+  });
+
+  it('un seul article lu (aria-current), et le repère de 2 px à sa ligne', () => {
+    const { container } = render(ListeDuSommaire, {
+      props: { decoupe, rangCourant: 2, marques: new Map(), variante: 'colonne' },
+    });
+    const lus = container.querySelectorAll('[aria-current="location"]');
+    expect(lus).toHaveLength(1);
+    expect(lus[0].getAttribute('href')).toBe('#art-3');
+    const repere = container.querySelector('.repere') as HTMLElement;
+    expect(repere.getAttribute('aria-hidden')).toBe('true');
+    // Son rang DANS la division ; la hauteur de ligne est dans la feuille du
+    // composant (40 px, 44 au doigt), mesurée par lecture-mouvement.spec.ts.
+    expect(repere.style.getPropertyValue('--rang')).toBe('2');
+  });
+
+  it('les mêmes liens font les puces sous `lg` et la colonne au-delà (classes, pas de JavaScript)', () => {
+    render(ListeDuSommaire, { props: { decoupe, rangCourant: 0, marques: new Map(), variante: 'colonne' } });
+    const rangee = screen.getByRole('list', { name: 'Articles de la section' });
+    // Sous `lg` : une rangée qui défile à l'horizontale ; à partir de `lg` : une liste.
+    expect(rangee.className).toMatch(/\bflex\b.*overflow-x-auto/);
+    expect(rangee.className).toMatch(/lg:block/);
+    const puce = screen.getAllByRole('link')[0];
+    // Puce de 44 px sous `lg`, ligne de hauteur fixe à partir de `lg`.
+    expect(puce.className).toMatch(/\bh-11\b/);
+    expect(puce.className).toMatch(/lg:h-\[var\(--ligne\)\]/);
+  });
+
+  it('la feuille garde le sommaire complet : toutes les divisions, les premiers mots, sans repère', () => {
+    render(ListeDuSommaire, {
+      props: { decoupe, rangCourant: 1, marques: new Map(), filtre: '', variante: 'feuille' },
+    });
+    expect(screen.getAllByRole('link').map((lien) => lien.getAttribute('href'))).toEqual([
+      '#art-1',
+      '#art-2',
+      '#art-3',
+      '#art-12',
+    ]);
+    expect(texte(screen.getAllByRole('link')[0])).toBe('Art. 1er Le présent décret fixe les modalités.');
+    expect(document.querySelector('.repere')).toBeNull();
+  });
+
+  it('passe le clic simple d’une puce à la page', async () => {
+    const choisir = vi.fn();
+    render(ListeDuSommaire, {
+      props: { decoupe, rangCourant: 0, marques: new Map(), variante: 'colonne' },
+      events: { choisir: (event: CustomEvent<{ rang: number }>) => choisir(event.detail.rang) },
+    });
+    await fireEvent.click(screen.getAllByRole('link')[2]);
+    expect(choisir).toHaveBeenCalledWith(2);
+  });
+});
+
+describe('NoteDeLIA', () => {
+  const LIEN = '/chat?q=Que%20dit%20l%E2%80%99article%206%20(Loi%20n%C2%B0%2096%2F06)%E2%80%AF%3F';
+
+  it('au repos : la description, « Expliquer l’article », et le lien vers l’assistant', async () => {
+    const expliquer = vi.fn();
+    const { container } = render(NoteDeLIA, {
+      props: { lienQuestion: LIEN },
+      events: { expliquer: () => expliquer() },
+    });
+    const note = container.querySelector('.ai-explanation') as HTMLElement;
+    expect(note).toBeTruthy();
+    expect(texte(note.querySelector('h3'))).toBe('Explication simplifiée (IA)');
+    expect(texte(note)).toContain('Contenu clé : Le résumé des points importants de l’article.');
+    const bouton = screen.getByTestId('law-explain');
+    expect(bouton.querySelector('svg')?.getAttribute('data-icone')).toBe('sparkle');
+    await fireEvent.click(bouton);
+    expect(expliquer).toHaveBeenCalledOnce();
+    const lien = screen.getByTestId('law-ask');
+    expect(lien.tagName).toBe('A');
+    expect(lien.getAttribute('href')).toBe(LIEN);
+    expect(texte(lien)).toBe('Poser une question sur cet article');
+    expect(lien.querySelector('svg')?.getAttribute('data-icone')).toBe('message-circle');
+    // Sans passage : ni trait ni point.
+    expect(note.classList).not.toContain('ancree');
+    // Arrive au chargement, après le statut.
+    expect(note.classList).toContain('mv-monter');
+  });
+
+  it('recréée en cours de lecture (retour du texte entier), elle n’arrive pas une seconde fois', () => {
+    const { container } = render(NoteDeLIA, { props: { entree: false } });
+    const note = container.querySelector('.ai-explanation') as HTMLElement;
+    expect(note.classList).not.toContain('mv-monter');
+  });
+
+  it('en attente : la balance pèse dans la région d’annonce, sans rôle à elle, et un squelette muet', () => {
+    const { container } = render(NoteDeLIA, { props: { enCours: true } });
+    const attente = screen.getByTestId('law-explain-loading');
+    expect(attente.getAttribute('role')).toBe('status');
+    expect(texte(attente)).toBe('Explication en cours…');
+    const balance = attente.querySelector('svg.mv-balance') as SVGElement;
+    expect(balance.getAttribute('aria-hidden')).toBe('true');
+    expect(balance.getAttribute('role')).toBeNull();
+    expect(balance.classList).toContain('mv-balance--attente');
+    expect(container.querySelectorAll('[aria-hidden="true"] .mv-squelette')).toHaveLength(3);
+    expect(screen.queryByTestId('law-explain')).toBeNull();
+    // Le lien vers l'assistant reste.
+    expect(screen.getByTestId('law-ask')).toBeTruthy();
+  });
+
+  it('en erreur : l’alerte rouge et « Réessayer », qui redemande', async () => {
+    const expliquer = vi.fn();
+    render(NoteDeLIA, { props: { erreur: 'Le quota est épuisé.' }, events: { expliquer: () => expliquer() } });
+    const erreur = screen.getByTestId('law-explain-error');
+    expect(erreur.getAttribute('role')).toBe('alert');
+    expect(texte(erreur)).toContain('Le quota est épuisé.');
+    await fireEvent.click(screen.getByTestId('law-explain-retry'));
+    expect(expliquer).toHaveBeenCalledOnce();
+  });
+
+  it('la réponse : des nœuds (jamais de HTML), bloc par bloc, l’avertissement et « Régénérer »', async () => {
+    const expliquer = vi.fn();
+    render(NoteDeLIA, {
+      props: { explication: '**En clair**\n\nPremier <b>paragraphe</b>.\n\nSecond.\n\nTroisième.\n\nQuatrième.' },
+      events: { expliquer: () => expliquer() },
+    });
+    const reponse = screen.getByTestId('law-explain-answer');
+    expect(reponse.getAttribute('aria-live')).toBe('polite');
+    expect(reponse.querySelector('b')).toBeNull();
+    expect(texte(reponse)).toContain('Premier <b>paragraphe</b>.');
+    // Un titre de la réponse est un h4, sous le h3 de la note.
+    expect(texte(reponse.querySelector('h4'))).toBe('En clair');
+    // Du flou au net, 450 ms d'un bloc à l'autre, jamais plus de 0,9 s (D9).
+    const delais = [...reponse.children].map((bloc) => (bloc as HTMLElement).style.getPropertyValue('--d'));
+    expect(delais).toEqual(['0ms', '450ms', '900ms', '900ms', '900ms']);
+    for (const bloc of reponse.children) expect(bloc.classList).toContain('mv-ecrire');
+    expect(texte(screen.getByTestId('law-explain-disclaimer'))).toBe(
+      'Réponse générée par une IA. Vérifiez-la dans le texte de l’article.',
+    );
+    const regenerer = screen.getByTestId('law-explain-regenerate');
+    expect(regenerer.querySelector('svg')?.getAttribute('data-icone')).toBe('rotate-ccw');
+    await fireEvent.click(regenerer);
+    expect(expliquer).toHaveBeenCalledOnce();
+  });
+
+  it('calée sur un passage : trait et point (classe `ancree`), à l’encre une fois la réponse là', async () => {
+    const { container, rerender } = render(NoteDeLIA, { props: { ancree: true } });
+    const note = container.querySelector('.ai-explanation') as HTMLElement;
+    expect(note.classList).toContain('ancree');
+    expect(note.classList).not.toContain('vivante');
+    await rerender({ ancree: true, explication: 'Réponse.' });
+    expect(note.classList).toContain('vivante');
+  });
+
+  it('en anglais, tout est traduit', () => {
+    language.set({ current: 'en' });
+    render(NoteDeLIA, { props: { explication: 'Answer.' } });
+    expect(texte(screen.getByTestId('law-explain-disclaimer'))).toBe('AI-generated answer. Check it in the article text.');
+    expect(texte(screen.getByTestId('law-ask'))).toBe('Ask a question about this article');
+    expect(texte(screen.getByTestId('law-explain-regenerate'))).toBe('Regenerate');
+  });
+});
+
 describe('BasculeDeLecture', () => {
   it('dit le mode par aria-pressed et ne signale qu’un changement', async () => {
     const changer = vi.fn();
@@ -375,7 +577,9 @@ describe('ActionsDeLArticle', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: ecrire }, configurable: true });
     render(ActionsDeLArticle, { props });
     const boutons = screen.getAllByRole('button');
-    expect(boutons.map((b) => b.dataset.testid)).toEqual(['law-copy-reference', 'law-copy-text', 'law-copy-link']);
+    // Refonte A : la référence et le lien au premier plan, « Copier le texte »
+    // en dernier, au second plan (L1), toujours là.
+    expect(boutons.map((b) => b.dataset.testid)).toEqual(['law-copy-reference', 'law-copy-link', 'law-copy-text']);
     // Plus de second « Partager » : celui de l'en-tête partage le texte.
     expect(screen.queryByText('Partager')).toBeNull();
     const lien = screen.getByTestId('law-copy-link');
@@ -386,6 +590,32 @@ describe('ActionsDeLArticle', () => {
     expect(ecrire).toHaveBeenCalledWith(props.lien);
     expect(screen.getByRole('status').textContent).toBe('Lien copié');
     expect(String(ecrire.mock.calls[0][0])).not.toMatch(/PRC/);
+  });
+
+  it('refonte A : icônes de la maquette, « Copier le texte » au second plan, « fait foi » visible', () => {
+    render(ActionsDeLArticle, { props });
+    const icone = (testid: string) => screen.getByTestId(testid).querySelector('svg')?.getAttribute('data-icone');
+    expect(icone('law-copy-reference')).toBe('copy');
+    expect(icone('law-copy-link')).toBe('link');
+    expect(icone('law-copy-text')).toBe('file-text');
+    // Le même bouton de 44 px, sans bordure ni fond.
+    expect(screen.getByTestId('law-copy-text').className).toMatch(/!border-transparent/);
+    expect(screen.getByTestId('law-copy-text').className).toMatch(/min-h-11/);
+    expect(screen.getByTestId('law-copy-reference').className).not.toMatch(/!border-transparent/);
+    expect(texte(screen.getByTestId('law-copy-foi'))).toBe('Seul le texte publié au Journal officiel fait foi.');
+  });
+
+  it('la coche d’une copie réussie se pose avec un ressort, sur le seul bouton copié', async () => {
+    const ecrire = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: ecrire }, configurable: true });
+    render(ActionsDeLArticle, { props });
+    await fireEvent.click(screen.getByTestId('law-copy-reference'));
+    await tick();
+    await tick();
+    const coche = screen.getByTestId('law-copy-reference').querySelector('svg');
+    expect(coche?.getAttribute('data-icone')).toBe('check');
+    expect(coche?.classList).toContain('mv-ressort');
+    expect(screen.getByTestId('law-copy-link').querySelector('svg')?.classList).not.toContain('mv-ressort');
   });
 
   it('sur un écran tactile qui l’a, le lien ouvre la feuille de partage du système', async () => {
