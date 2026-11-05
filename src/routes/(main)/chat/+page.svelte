@@ -833,6 +833,57 @@
     });
   }
 
+  /** La question de l'adresse (`?q=…&envoyer=1`) est déjà partie : jamais deux fois. */
+  let questionDeLAdresseEnvoyee = false;
+
+  /**
+   * La question venue de l'adresse, lue au montage (refonte A, décision H1).
+   *
+   * `?q=…` seul PRÉ-REMPLIT la saisie sans rien envoyer (palette de
+   * commandes, blog, passerelle des résultats de recherche, lien « Poser une
+   * question » d'un texte) : on ne dépense pas un appel au modèle pour une
+   * phrase que le lecteur n'a pas écrite.
+   *
+   * `?q=…&envoyer=1` vient du champ unique de l'accueil et de ses questions
+   * fréquentes : le lecteur a appuyé sur « Poser la question », il attend la
+   * réponse. Elle part UNE fois (drapeau local), dans une conversation neuve
+   * si un fil était ouvert : une question posée depuis l'accueil n'en
+   * continue pas une autre. La question du profil (P5) reste celle du fil.
+   * Moins de cinq caractères : le serveur la refuserait, elle est seulement
+   * pré-remplie, sans message d'erreur.
+   *
+   * Puis `q` et `envoyer` quittent l'adresse : un rechargement ne renvoie
+   * rien. `replaceState` dans un `setTimeout(…, 0)`, sous `try` : au montage
+   * du premier chargement, le routeur de SvelteKit n'est pas encore prêt et
+   * refuserait l'appel (même procédé que `adopterLEntree`, page d'un texte).
+   */
+  function recevoirLaQuestionDeLAdresse() {
+    const adresse = $page.url;
+    const q = adresse.searchParams.get("q");
+    const envoyer = adresse.searchParams.get("envoyer") === "1";
+    if (!envoyer) {
+      if (q) chatInput = q;
+      return;
+    }
+    if (q && q.trim().length >= QUESTION_MIN_LENGTH && !questionDeLAdresseEnvoyee) {
+      questionDeLAdresseEnvoyee = true;
+      if (sessionId !== null) nouvelleConversation(false);
+      void handleSendChatMessage(q);
+    } else if (q) {
+      chatInput = q;
+    }
+    const nettoyee = new URL(adresse);
+    nettoyee.searchParams.delete("q");
+    nettoyee.searchParams.delete("envoyer");
+    setTimeout(() => {
+      try {
+        replaceState(`${nettoyee.pathname}${nettoyee.search}${nettoyee.hash}`, $page.state);
+      } catch {
+        // Routeur pas prêt : l'adresse garde sa question, la page n'en souffre pas.
+      }
+    }, 0);
+  }
+
   // ---------------------------------------------------------------------------
   // Défilement de la conversation
   // ---------------------------------------------------------------------------
@@ -1566,8 +1617,8 @@
     // IA » arrive ici avec le sujet déjà rédigé. La question est PRÉ-REMPLIE et
     // non envoyée : l'utilisateur la complète avant de la poser, sinon on
     // dépenserait un appel au modèle pour une phrase qu'il n'a pas écrite.
-    const q = $page.url.searchParams.get("q");
-    if (q) chatInput = q;
+    // Seule exception, `envoyer=1` (voir `recevoirLaQuestionDeLAdresse`).
+    recevoirLaQuestionDeLAdresse();
 
     // Pas de défilement d'office au chargement : seul l'accueil est affiché,
     // et le pousser en bas en cachait le début sur un écran court. La vue

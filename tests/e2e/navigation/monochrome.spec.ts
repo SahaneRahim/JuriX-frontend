@@ -642,6 +642,27 @@ async function ouvrirLaPalette(page: Page): Promise<void> {
   await expect(palette.getByText(SUGGESTIONS[0].title.replace(/N°\s*/, 'n° '))).toBeVisible();
 }
 
+/** Le champ unique de l'accueil en mode « Recherche », rempli : la pastille déplacée, le contour au focus. */
+async function remplirLeChampUnique(page: Page): Promise<void> {
+  await ouvrirAuServeur(page, '/');
+  const recherche = page.getByTestId('accueil-mode-recherche');
+  await cliquerJusqualEffet(recherche, page.locator('[data-testid="accueil-mode-recherche"][aria-pressed="true"]'));
+  await page.getByTestId('accueil-saisie').fill('garde à vue');
+}
+
+/**
+ * « Ce que JuriX vous montre », jouée jusqu'au repos : la page ouverte a ses
+ * démonstrations armées (opacité 0), et ni leurs couleurs ni une capture ne
+ * verraient la puce, les statuts et le passage surligné.
+ */
+async function voirLesDemonstrations(page: Page): Promise<void> {
+  await ouvrirAuServeur(page, '/');
+  const grille = page.getByTestId('accueil-preuves').locator('[data-etat]');
+  await expect(grille).toHaveAttribute('data-etat', 'arme');
+  await grille.scrollIntoViewIfNeeded();
+  await expect(grille).toHaveAttribute('data-etat', 'repos');
+}
+
 const ETATS_OUVERTS: EtatOuvert[] = [
   {
     nom: 'accueil--menu-mobile',
@@ -670,6 +691,10 @@ const ETATS_OUVERTS: EtatOuvert[] = [
       await expect(page.getByTestId('user-name')).toBeVisible();
     },
   },
+  { nom: 'accueil--champ-rempli', taille: TELEPHONE, ouvrir: remplirLeChampUnique },
+  { nom: 'accueil--champ-rempli', taille: BUREAU, ouvrir: remplirLeChampUnique },
+  { nom: 'accueil--demonstrations', taille: TELEPHONE, ouvrir: voirLesDemonstrations },
+  { nom: 'accueil--demonstrations', taille: BUREAU, ouvrir: voirLesDemonstrations },
   { nom: 'accueil--palette', taille: TELEPHONE, ouvrir: ouvrirLaPalette },
   { nom: 'accueil--palette', taille: BUREAU, ouvrir: ouvrirLaPalette },
   {

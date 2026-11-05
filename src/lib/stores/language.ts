@@ -944,17 +944,65 @@ export const translations = {
     'accueil.titre': 'Que dit la loi camerounaise\u202F?',
     'accueil.sousTitre': 'Cherchez dans {n} textes officiels, ou posez votre question\u00a0: l’assistant IA répond en citant les articles.',
     'accueil.sousTitreSansChiffre': 'Cherchez dans les textes officiels, ou posez votre question\u00a0: l’assistant IA répond en citant les articles.',
-    // Le même sous-titre en une ligne, pour l'écran court (téléphone en
-    // paysage, variante `court:` de (main)/+layout.svelte) : le nombre de
-    // textes et la garantie de l'IA restent au premier écran. Espace
-    // insécable avant le point médian : à la coupure, il finit la ligne.
-    'accueil.sousTitreCourt': '{n} textes officiels\u00a0· l’assistant IA cite les articles',
-    'accueil.sousTitreCourtSansChiffre': 'Textes officiels\u00a0· l’assistant IA cite les articles',
-    'accueil.domaines.titre': 'Parcourir par domaine',
+    'accueil.domaines.titre': 'Parcourir le droit',
     'accueil.domaines.tous': 'Les {n} textes officiels du corpus',
     'accueil.domaines.tousSansChiffre': 'Lois, décrets, arrêtés et autres textes officiels',
     'accueil.domaines.vide': 'Aucun texte pour l’instant',
+    // Refonte A, E3 (docs/refonte/annexes/A4-i18n.md § 3.1). Le surtitre de
+    // l'accueil : le nombre vient de GET /corpus, la version courte est celle
+    // du téléphone. Le sous-titre long reste pour la description des moteurs
+    // de recherche (MetaSeo de l'accueil).
+    'accueil.eyebrow': '{n} textes officiels\u00a0· chaque réponse cite ses articles',
+    'accueil.eyebrowSansChiffre': 'Textes officiels\u00a0· chaque réponse cite ses articles',
+    'accueil.eyebrowCourt': '{n} textes officiels',
+    'accueil.eyebrowCourtSansChiffre': 'Textes officiels',
+    // Le champ unique : profil, saisie, exemple tapé, mode et envoi.
+    'accueil.champ.etiquette': 'Votre question ou votre recherche',
+    'accueil.champ.exemple': 'Exemple\u202F:',
+    'accueil.champ.jeSuis': 'Je suis',
+    'accueil.champ.jeSuisProfil': 'Je suis\u202F: {profil}',
+    'accueil.champ.sansProfil': 'Sans profil',
+    'accueil.champ.mode': 'Mode',
+    'accueil.champ.envoyerAssistant': 'Poser la question',
+    // Exemples tapés en mode « Recherche » : des mots-clés qui trouvent leur
+    // texte dans le corpus (vérifié le 05/11/2026 sur la copie du corpus de
+    // l'API de test : Code du travail, Code de procédure pénale, Code minier).
+    'accueil.exemples.recherche.1': 'Code du travail',
+    'accueil.exemples.recherche.2': 'licenciement pour motif économique',
+    'accueil.exemples.recherche.3': 'garde à vue',
+    'accueil.exemples.recherche.4': 'permis de recherche minière',
+    // « Questions fréquentes · citoyens » : le pluriel du profil.
+    'accueil.faq.titre': 'Questions fréquentes\u00a0·',
+    'accueil.faq.citoyen': 'citoyens',
+    'accueil.faq.etudiant': 'étudiants en droit',
+    'accueil.faq.avocat': 'avocats et juristes',
+    'accueil.faq.entrepreneur': 'entrepreneurs',
+    'accueil.faq.general': 'profil général',
+    'accueil.domaines.sousTitre': '{n} domaines, du travail à l’environnement.',
+    'accueil.domaines.liste': 'Domaines du droit',
+    // « Ce que JuriX vous montre » : trois démonstrations statiques. Les
+    // extraits viennent de l'article 37 de la loi n° 92/007 (Code du travail),
+    // relu dans le corpus le 05/11/2026 : « … a droit à une indemnité de
+    // licenciement distincte de celle du préavis dont la détermination tient
+    // compte de l'ancienneté. » La mention « fait foi » est la clé existante
+    // chat.preview.official (décision X7).
+    'accueil.preuves.titre': 'Ce que JuriX vous montre',
+    'accueil.preuves.sousTitre': 'Trois façons de vérifier.',
+    'accueil.preuves.cite.titre': 'Chaque réponse cite ses articles',
+    'accueil.preuves.cite.texte': 'Touchez une citation\u202F: le texte officiel s’ouvre à côté de la réponse.',
+    'accueil.preuves.statut.titre': 'Chaque texte indique ce que JuriX en sait',
+    'accueil.preuves.statut.texte': 'Version d’origine, modifié, abrogé\u202F: un mot et une icône, jamais la couleur seule.',
+    'accueil.preuves.verif.titre': 'Vérifiable dans le texte',
+    'accueil.preuves.verif.texte': 'Le passage le plus proche de la phrase est souligné, quand JuriX le retrouve.',
+    'accueil.preuves.demo.extrait1': '…\u00a0distincte de celle du préavis',
+    'accueil.preuves.demo.extrait2': '…\u00a0a droit à une {passage} distincte de celle du préavis…',
+    'accueil.preuves.demo.passage': 'indemnité de licenciement',
+    'accueil.preuves.demo.statutOrigine': 'Version d’origine, non consolidée',
+    'accueil.preuves.demo.statutModifie': 'Modifié',
+    'accueil.preuves.demo.statutAbroge': 'Abrogé',
     'entete.pageDeRecherche': 'Ouvrir la page de recherche',
+    // La barre d'onglets du bas, sous md (BarreDOnglets.svelte).
+    'entete.navigationMobile': 'Navigation',
     // La ligne FR / EN du panneau du menu mobile (SiteHeader.svelte).
     'entete.langue': 'Langue',
 
@@ -2063,13 +2111,59 @@ export const translations = {
     'accueil.titre': 'What does Cameroonian law say?',
     'accueil.sousTitre': 'Search {n} official texts, or ask your question: the AI assistant answers by citing the articles.',
     'accueil.sousTitreSansChiffre': 'Search the official texts, or ask your question: the AI assistant answers by citing the articles.',
-    'accueil.sousTitreCourt': '{n} official texts\u00a0· the AI assistant cites the articles',
-    'accueil.sousTitreCourtSansChiffre': 'Official texts\u00a0· the AI assistant cites the articles',
-    'accueil.domaines.titre': 'Browse by area of law',
+    'accueil.domaines.titre': 'Browse the law',
     'accueil.domaines.tous': 'All {n} official texts in the corpus',
     'accueil.domaines.tousSansChiffre': 'Laws, decrees, orders and other official texts',
     'accueil.domaines.vide': 'No texts yet',
+    // Refonte A, E3: same keys as in French.
+    'accueil.eyebrow': '{n} official texts\u00a0· every answer cites its articles',
+    'accueil.eyebrowSansChiffre': 'Official texts\u00a0· every answer cites its articles',
+    'accueil.eyebrowCourt': '{n} official texts',
+    'accueil.eyebrowCourtSansChiffre': 'Official texts',
+    'accueil.champ.etiquette': 'Your question or search',
+    'accueil.champ.exemple': 'Example:',
+    'accueil.champ.jeSuis': 'I am',
+    'accueil.champ.jeSuisProfil': 'I am: {profil}',
+    'accueil.champ.sansProfil': 'No profile',
+    'accueil.champ.mode': 'Mode',
+    'accueil.champ.envoyerAssistant': 'Ask the question',
+    // POURQUOI CES MOTS-CLÉS NE SONT PAS DITS VÉRIFIÉS, À LA DIFFÉRENCE DES
+    // FRANÇAIS (décision X6 ⚑). Le corpus est en français : relus le 05/11/2026
+    // sur l'API de test, sans modèle d'embeddings, ils ramènent 5 à 14 textes,
+    // sans le bon en tête. La recherche sémantique de la production peut
+    // faire mieux : à mesurer avant publication.
+    'accueil.exemples.recherche.1': 'Labour Code',
+    'accueil.exemples.recherche.2': 'dismissal for economic reasons',
+    'accueil.exemples.recherche.3': 'police custody',
+    'accueil.exemples.recherche.4': 'mining exploration permit',
+    'accueil.faq.titre': 'Frequently asked questions\u00a0·',
+    'accueil.faq.citoyen': 'citizens',
+    'accueil.faq.etudiant': 'law students',
+    'accueil.faq.avocat': 'lawyers and legal professionals',
+    'accueil.faq.entrepreneur': 'entrepreneurs',
+    'accueil.faq.general': 'general profile',
+    'accueil.domaines.sousTitre': '{n} areas of law, from labour to the environment.',
+    'accueil.domaines.liste': 'Areas of law',
+    'accueil.preuves.titre': 'What JuriX shows you',
+    'accueil.preuves.sousTitre': 'Three ways to check.',
+    'accueil.preuves.cite.titre': 'Every answer cites its articles',
+    'accueil.preuves.cite.texte': 'Tap a citation: the official text opens beside the answer.',
+    'accueil.preuves.statut.titre': 'Every text shows what JuriX knows about it',
+    'accueil.preuves.statut.texte': 'Original version, amended, repealed: a word and an icon, never colour alone.',
+    'accueil.preuves.verif.titre': 'Verifiable in the text',
+    'accueil.preuves.verif.texte': 'The passage closest to the sentence is underlined, when JuriX finds it.',
+    // POURQUOI « Example: » ICI ET PAS EN FRANÇAIS (décision X6 ⚑). Les clés
+    // françaises citent l'article 37 de la loi n° 92/007, relu dans le corpus.
+    // Le corpus n'en a pas le texte anglais : ces phrases en sont une
+    // traduction, pas une citation, et sont donc marquées comme un exemple.
+    'accueil.preuves.demo.extrait1': 'Example:\u00a0…\u00a0distinct from the notice pay',
+    'accueil.preuves.demo.extrait2': 'Example:\u00a0…\u00a0entitled to a {passage} distinct from the notice pay…',
+    'accueil.preuves.demo.passage': 'severance allowance',
+    'accueil.preuves.demo.statutOrigine': 'Original version, not consolidated',
+    'accueil.preuves.demo.statutModifie': 'Amended',
+    'accueil.preuves.demo.statutAbroge': 'Repealed',
     'entete.pageDeRecherche': 'Open the search page',
+    'entete.navigationMobile': 'Navigation',
     'entete.langue': 'Language',
 
     // Law page (P1, P2, P10, Q5).

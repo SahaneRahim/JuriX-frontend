@@ -97,3 +97,34 @@ export const PAGES_DE_COMPTE: readonly string[] = [
   '/reset-password',
   '/verify-email',
 ] as const;
+
+/**
+ * Les trois onglets de la barre du bas, sous md (refonte A, décision H6) :
+ * Accueil, Assistant IA, Parcourir. Les mêmes objets que l'accueil et les
+ * deux premiers liens de l'en-tête : un lien n'a qu'une définition, et son
+ * prédicat d'état actif (« Parcourir » reste actif sur /laws/42 et sur
+ * /categories/13) vaut pour l'onglet comme pour la barre du bureau. Pas
+ * d'onglet « Chercher » : le mode « Recherche » du champ unique suffit (A1
+ * § 3).
+ */
+export const ONGLETS_DU_BAS: readonly NavLink[] = [
+  LIEN_ACCUEIL,
+  ...NAV_LINKS.filter((lien) => lien.href === '/chat' || lien.href === '/laws'),
+];
+
+/**
+ * La barre d'onglets du bas paraît-elle sur ce chemin ?
+ *
+ * Non sur /chat (sa saisie est en bas de l'écran, au-dessus du clavier : une
+ * barre fixe de 64 px la réduirait, et l'onglet « Assistant IA » y mènerait à
+ * la page même), ni dans l'administration (sa propre barre latérale), ni sur
+ * les pages de compte, dont la carte porte déjà l'action de la page. Oui
+ * partout ailleurs, page d'erreur comprise : elle est le retour le plus
+ * proche du pouce. Lu par la barre (BarreDOnglets.svelte) et par le pied de
+ * page, qui lui réserve sa place.
+ */
+export function barreDuBasSur(chemin: string): boolean {
+  const sous = (racine: string) => chemin === racine || chemin.startsWith(`${racine}/`);
+  if (sous('/chat') || sous('/admin')) return false;
+  return !PAGES_DE_COMPTE.some(sous);
+}

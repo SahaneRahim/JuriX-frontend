@@ -132,8 +132,10 @@ export const PAGES: PageDuSite[] = [
       return '/';
     },
     principal: titre,
-    // Le bouton de la barre de recherche du hero (sous sm, une flèche seule).
-    action: (page) => page.locator('#contenu').getByRole('button', { name: 'Rechercher', exact: true }),
+    // Le bouton d'envoi du champ unique (refonte A), par son type : il
+    // s'appelle « Rechercher » avant l'hydratation, « Poser la question »
+    // ensuite, en mode « Assistant IA » (décision H10).
+    action: (page) => page.locator('#contenu form[role="search"] button[type="submit"]'),
   },
   {
     nom: '/chat',

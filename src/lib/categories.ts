@@ -60,6 +60,15 @@ export interface TextesPhares {
 interface Domaine {
   /** Nom court affiché partout (Q2 A). */
   court: Record<Language, string>;
+  /**
+   * Nom très court de la pastille de l'accueil au téléphone (refonte A, E3) :
+   * un ou deux mots, pris DANS le nom court (`court`), pour que le nom
+   * accessible du lien, le nom court entier, contienne ce qu'on lit à
+   * l'écran (WCAG 2.5.3). Les six premiers viennent de la maquette mobile
+   * (Travail, Pénal, Famille, Foncier, Affaires, Civil) ; les autres suivent
+   * la même règle.
+   */
+  puce: Record<Language, string>;
   /** Nom complet en anglais : la traduction du nom en base. */
   completEn: string;
   /** Description en anglais ; la française vient de la base. */
@@ -84,6 +93,7 @@ const INSECABLE = '\u00a0';
 const DOMAINES: Record<string, Domaine> = {
   'droit constitutionnel': {
     court: { fr: 'Constitution et institutions', en: 'Constitution and institutions' },
+    puce: { fr: 'Constitution', en: 'Constitution' },
     completEn: 'Constitutional Law',
     descriptionEn: 'Constitution, institutions, elections and public powers',
     // Loi n° 96/06 (révision de la Constitution), loi n° 2012/001 (Code
@@ -97,6 +107,10 @@ const DOMAINES: Record<string, Domaine> = {
     // « councils » : les communes, dans l'anglais des textes camerounais (voir
     // « Largeur des noms anglais », en tête de fichier).
     court: { fr: 'Administration et collectivités', en: 'Administration and councils' },
+    // POURQUOI « Councils » : « Administration » est aussi une chaîne française
+    // de l'interface (nav.admin), que l'anglais de la page ne doit pas montrer
+    // (monochrome.spec.ts) ; l'autre moitié du nom court dit le domaine.
+    puce: { fr: 'Administration', en: 'Councils' },
     completEn: 'Administrative Law',
     descriptionEn: 'Organisation and operation of public services and local authorities',
     // Loi n° 2019/024 portant Code général des collectivités territoriales
@@ -114,6 +128,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'fonction publique': {
     court: { fr: 'Fonction publique', en: 'Civil service' },
+    puce: { fr: 'Fonction publique', en: 'Civil service' },
     completEn: 'Civil Service',
     descriptionEn: 'Status of public servants, careers, appointments and honours',
     // Décret n° 94/199 (Statut général de la fonction publique de l'État),
@@ -125,6 +140,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'droit international': {
     court: { fr: 'Traités et accords', en: 'Treaties and agreements' },
+    puce: { fr: 'Traités', en: 'Treaties' },
     completEn: 'International Law',
     descriptionEn: 'Ratified treaties, conventions and bilateral agreements',
     // 149 textes de ratification dans le domaine ; Code CIMA des assurances
@@ -136,6 +152,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'finances publiques et fiscalité': {
     court: { fr: 'Finances publiques et impôts', en: 'Public finance and taxes' },
+    puce: { fr: 'Impôts', en: 'Taxes' },
     completEn: 'Public Finance and Taxation',
     descriptionEn: 'State budget, taxation, customs, public loans and financing',
     // Lois de finances 2015 à 2025, loi n° 2018/012 (régime financier de
@@ -147,6 +164,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'droit pénal et procédure pénale': {
     court: { fr: 'Pénal et procédure pénale', en: 'Criminal law and procedure' },
+    puce: { fr: 'Pénal', en: 'Criminal' },
     completEn: 'Criminal Law and Criminal Procedure',
     descriptionEn: 'Offences, penalties, prosecutions and military justice',
     // Loi n° 2016/007 (Code pénal), loi n° 2005/007 (Code de procédure
@@ -158,6 +176,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'droit civil et procédure civile': {
     court: { fr: 'Civil et procédure civile', en: 'Civil law and procedure' },
+    puce: { fr: 'Civil', en: 'Civil' },
     completEn: 'Civil Law and Civil Procedure',
     descriptionEn: 'Persons, obligations, contracts, civil proceedings and enforcement',
     // Code civil annoté (CODE-CIVIL), Acte uniforme OHADA sur les voies
@@ -169,6 +188,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'droit des personnes, de la famille et état civil': {
     court: { fr: 'Famille et état civil', en: 'Family and civil status' },
+    puce: { fr: 'Famille', en: 'Family' },
     completEn: 'Law of Persons, Family and Civil Status',
     descriptionEn: 'Marriage, filiation, succession, civil status, national ID and nationality',
     // Ordonnance n° 81/002 (état civil), loi n° 1968-LF-3 (Code de la
@@ -180,6 +200,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'droit du travail et sécurité sociale': {
     court: { fr: 'Travail et sécurité sociale', en: 'Labour and social security' },
+    puce: { fr: 'Travail', en: 'Labour' },
     completEn: 'Labour Law and Social Security',
     descriptionEn: 'Employment relations, collective agreements, trade unions and social security',
     // Loi n° 92/007 (Code du travail), loi n° 69/LF/18 (pensions de
@@ -191,6 +212,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'droit des affaires, banque et ohada': {
     court: { fr: 'Affaires, banque et OHADA', en: 'Business, banking, OHADA' },
+    puce: { fr: 'Affaires', en: 'Business' },
     completEn: 'Business Law, Banking and OHADA',
     descriptionEn: 'Companies, commerce, banking secrecy, public procurement and OHADA law',
     // Actes uniformes OHADA : sociétés commerciales (AUSCGIE-2014), droit
@@ -202,6 +224,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'droit foncier et domanial': {
     court: { fr: 'Foncier et domaine de l’État', en: 'Land and State property' },
+    puce: { fr: 'Foncier', en: 'Land' },
     completEn: 'Land and State Property Law',
     descriptionEn: 'State domain, land titles, expropriation and cadastre',
     // Ordonnances n° 74/1 (régime foncier) et 74/2 (régime domanial),
@@ -213,6 +236,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   "droit de l'environnement et des ressources naturelles": {
     court: { fr: 'Environnement, mines et forêts', en: 'Environment, mines, forests' },
+    puce: { fr: 'Environnement', en: 'Environment' },
     completEn: 'Environmental and Natural Resources Law',
     descriptionEn: 'Environment, mining, forests, water, hydrocarbons and biodiversity',
     // Loi n° 2023/014 (Code minier), loi n° 2024/008 (forêts et faune), loi
@@ -224,6 +248,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'santé publique et sécurité sanitaire': {
     court: { fr: 'Santé publique', en: 'Public health' },
+    puce: { fr: 'Santé', en: 'Health' },
     completEn: 'Public Health and Health Safety',
     descriptionEn: 'Public health, medicine, pharmacy, health safety and radiological security',
     // Loi n° 96/03 (loi-cadre dans le domaine de la santé), loi n° 2018/020
@@ -235,6 +260,7 @@ const DOMAINES: Record<string, Domaine> = {
   },
   'éducation, recherche, culture et médias': {
     court: { fr: 'Éducation, culture et médias', en: 'Education, culture, media' },
+    puce: { fr: 'Éducation', en: 'Education' },
     completEn: 'Education, Research, Culture and Media',
     descriptionEn: 'Education, universities, research, culture, heritage, media and official languages',
     // Loi n° 98/004 (orientation de l'éducation), loi n° 2023/007
@@ -296,6 +322,15 @@ function domaine(nom: string | null | undefined): Domaine | undefined {
 export function nomCategorie(nom: string | null | undefined, lang: Language): string {
   if (!nom) return '';
   return domaine(nom)?.court[lang] ?? nom;
+}
+
+/**
+ * Le nom très court d'un domaine (pastille de l'accueil au téléphone), ou son
+ * nom court quand il est inconnu de cette table.
+ */
+export function nomPuce(nom: string | null | undefined, lang: Language): string {
+  if (!nom) return '';
+  return domaine(nom)?.puce[lang] ?? nomCategorie(nom, lang);
 }
 
 /**
@@ -467,4 +502,34 @@ const REGLES = ICONES_DES_DOMAINES.map(({ mots, icone }) => ({
 export function iconeCategorie(nom: string | null | undefined): NomIcone {
   const texte = formeComparable(nom ?? '');
   return REGLES.find(({ mots }) => mots.some((mot) => texte.includes(mot)))?.icone ?? ICONE_DOMAINE_INCONNU;
+}
+
+/**
+ * Le geste que joue l'icône d'un domaine au survol de sa tuile (refonte A,
+ * A2 § 4) : la balance pèse pour le civil, le marteau frappe pour le pénal…
+ * Les @keyframes sont dans src/lib/mouvement.css (`mv-icone-…`), sous
+ * prefers-reduced-motion: no-preference.
+ *
+ * POURQUOI PAR L'ICÔNE ET NON PAR LE DOMAINE. Le geste dit ce que l'icône
+ * dessine (un marteau frappe, un globe tourne) : l'icône est déjà choisie ici
+ * (`iconeCategorie`), et un domaine inconnu, ou une icône sans geste propre,
+ * retombe sur le saut générique (`hop`).
+ */
+export type GesteDIcone = 'hop' | 'tap' | 'tilt' | 'press' | 'swing' | 'sway' | 'spin' | 'flip' | 'beat' | 'weigh';
+
+const GESTE_DE_L_ICONE: Partial<Record<NomIcone, GesteDIcone>> = {
+  'hard-hat': 'tilt',
+  gavel: 'tap',
+  scale: 'weigh',
+  coins: 'flip',
+  stamp: 'press',
+  'id-card-lanyard': 'swing',
+  globe: 'spin',
+  'heart-pulse': 'beat',
+  leaf: 'sway',
+};
+
+/** Le geste de l'icône du domaine `nom` ; `hop` par défaut. */
+export function gesteCategorie(nom: string | null | undefined): GesteDIcone {
+  return GESTE_DE_L_ICONE[iconeCategorie(nom)] ?? 'hop';
 }

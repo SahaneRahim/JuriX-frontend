@@ -25,9 +25,10 @@
  *    qui s'ouvre, se referme à Échap et au choix d'une conversation ;
  *  - l'en-tête : 56 px sous lg, sa hauteur de bureau au-dessus ; sous lg, le
  *    menu ouvert ne fait pas glisser la page, et ses liens font 48 px ;
- *  - accueil en 390×844 : le champ de recherche sans défiler ;
- *  - accueil sur trois téléphones courts (320×568, 360×584, 375×553) : le
- *    bouton flottant de l'assistant ne couvre pas le bouton « Rechercher ».
+ *  - accueil en 390×844 : le champ unique et son envoi sans défiler ;
+ *  - accueil sur trois téléphones courts (320×568, 360×584, 375×553) : ni la
+ *    barre d'onglets du bas ni le bouton flottant de l'assistant ne couvrent
+ *    le bouton d'envoi du champ unique.
  *
  * HORS DE PORTÉE. Le clavier virtuel, la barre d'adresse qui se replie et le
  * zoom au doigt n'existent pas en émulation : ils se vérifient sur un vrai
@@ -635,33 +636,39 @@ for (const taille of TAILLES) {
     });
 
     if (taille.largeur === 390 && taille.hauteur === 844) {
-      test('/ : le champ de recherche dans le premier écran', async ({ page }) => {
+      test('/ : le champ unique dans le premier écran', async ({ page }) => {
         // L'API n'y est pour rien : le titre et le champ précèdent la grille
         // des catégories, seule à en dépendre.
         await page.goto('/');
         await attendreLeRepos(page);
-        // Par son rôle de champ, `text` aujourd'hui, `search` selon le plan : le
-        // bouton voisin s'appelle lui aussi « Rechercher ».
-        const contenu = page.locator('#contenu');
-        const champ = contenu
-          .getByRole('searchbox', { name: 'Rechercher', exact: true })
-          .or(contenu.getByRole('textbox', { name: 'Rechercher', exact: true }));
-        await verifierDansLEcran(page, champ, 'le champ de recherche de l’accueil');
+        // La zone de texte du champ unique (refonte A, H12) : rôle `textbox`,
+        // nommée « Votre question ou votre recherche ».
+        const champ = page
+          .locator('#contenu')
+          .getByRole('textbox', { name: 'Votre question ou votre recherche', exact: true });
+        await verifierDansLEcran(page, champ, 'le champ unique de l’accueil');
+        // Et son envoi, que la barre d'onglets du bas ne couvre pas.
+        const envoi = page.locator('#contenu form[role="search"] button[type="submit"]');
+        await verifierDansLEcran(page, envoi, 'le bouton d’envoi de l’accueil');
+        expect.soft(await ceQuiRecoitLAppui(envoi), 'le bouton d’envoi de l’accueil reçoit l’appui').toBe(LA_CIBLE);
       });
     }
   });
 }
 
 // ---------------------------------------------------------------------------
-// Téléphones courts : le bouton flottant et le bouton « Rechercher »
+// Téléphones courts : rien ne couvre le bouton d'envoi de l'accueil
 // ---------------------------------------------------------------------------
 
 /**
- * Sur ces écrans, le bouton « Rechercher » de l'accueil arrive en bas à droite
- * du premier écran, là où se pose le bouton flottant de l'assistant : celui-ci
- * en captait l'appui. Le layout le retire désormais tant que le haut de
- * l'accueil est à l'écran (src/routes/(main)/+layout.svelte). Seul l'accueil
- * y est ouvert : c'est là que les deux boutons se rencontraient.
+ * Sur ces écrans, le bouton d'envoi de l'accueil arrive en bas du premier
+ * écran. Le bouton flottant de l'assistant s'y posait et en captait l'appui :
+ * le layout le retirait tant que le haut de l'accueil était à l'écran
+ * (src/routes/(main)/+layout.svelte). Depuis la refonte A, il ne paraît plus
+ * sous md, et c'est la barre d'onglets du bas (64 px, fixe) qui occupe le
+ * bas de l'écran : le bouton d'envoi doit rester au-dessus d'elle, sans
+ * défiler. Seul l'accueil y est ouvert : c'est là que ces boutons se
+ * rencontrent.
  */
 const TELEPHONES_COURTS: Taille[] = [
   // iPhone SE de première génération : la plus étroite des largeurs suivies.
@@ -683,18 +690,20 @@ for (const taille of TELEPHONES_COURTS) {
       ...(taille.telephone ? { userAgent: AGENT_MOBILE } : {}),
     });
 
-    test('/ : le bouton flottant ne couvre pas le bouton « Rechercher »', async ({ page }) => {
-      // Comme pour le champ en 390×844 : le hero et la barre de recherche
-      // précèdent la grille des catégories, seule à dépendre de l'API.
+    test('/ : ni la barre du bas ni le bouton flottant ne couvrent le bouton d’envoi', async ({ page }) => {
+      // Comme pour le champ en 390×844 : le hero et le champ unique précèdent
+      // la grille des catégories, seule à dépendre de l'API.
       await page.goto('/');
       await attendreLeRepos(page);
-      // Par son rôle et son nom : sous sm, le bouton ne montre qu'une flèche.
-      const bouton = page.locator('#contenu').getByRole('button', { name: 'Rechercher', exact: true });
+      // Par son type : une flèche seule, nommée « Rechercher » avant
+      // l'hydratation, « Poser la question » ensuite (H10).
+      const bouton = page.locator('#contenu form[role="search"] button[type="submit"]');
       await expect(bouton).toBeVisible();
+      await expect(page.getByTestId('barre-onglets')).toBeVisible();
       // La mesure d'abord, sur la page telle qu'elle s'affiche, au repos ; la
       // capture suit, même en cas d'échec (vérification souple).
       const touche = await ceQuiRecoitLAppui(bouton);
-      expect.soft(touche, `sur le bouton « Rechercher », un appui atteint : ${touche}`).toBe(LA_CIBLE);
+      expect.soft(touche, `sur le bouton d’envoi, un appui atteint : ${touche}`).toBe(LA_CIBLE);
       await capturer(page, `accueil-${dimensions}`);
     });
   });

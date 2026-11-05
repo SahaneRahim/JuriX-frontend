@@ -17,7 +17,8 @@
  *  - P7 : « Poser cette question à l'assistant » mène à /chat?q=… ; rien ne
  *    vérifiait que la question y arrive, PRÉ-REMPLIE et non envoyée (un envoi
  *    d'office dépenserait un appel au modèle pour une phrase que l'on n'a pas
- *    écrite).
+ *    écrite). Seul `&envoyer=1` (le champ unique de l'accueil, refonte A,
+ *    décision H1) la fait partir, une fois.
  *  - P3 : la feuille d'aperçu est MODALE sur téléphone (focus enfermé), et
  *    « Lire dans le texte intégral » doit mener à l'article cité, pas au
  *    début du texte ; « Textes consultés, non cités » est replié et s'ouvre.
@@ -252,6 +253,49 @@ test.describe('P7 : « Poser cette question à l’assistant »', () => {
     await page.waitForLoadState('networkidle');
     expect(envois).toEqual([]);
     await expect(page.getByTestId('chat-progress')).toHaveCount(0);
+  });
+
+  // Refonte A, décision H1 : `envoyer=1` (champ unique et questions
+  // fréquentes de l'accueil) fait partir la question, une seule fois ; puis
+  // `q` et `envoyer` quittent l'adresse, et un rechargement ne renvoie rien.
+  test('/chat?q=…&envoyer=1 envoie la question une seule fois, puis nettoie l’adresse', async ({ page }) => {
+    const envois: string[] = [];
+    await intercepterLApi(page, (methode, chemin) => {
+      if (chemin === '/corpus') return { json: { detail: 'Not Found' }, statut: 404 };
+      if (chemin === '/rag/ask/stream') {
+        envois.push(chemin);
+        return { flux: [{ chunk: 'Réponse simulée.', done: false }, { chunk: '', done: true, sources: [] }] };
+      }
+      return undefined;
+    });
+    await page.goto('/chat?q=licenciement%20%C3%A9conomique&envoyer=1');
+    await expect(page.getByRole('log')).toContainText('licenciement économique');
+    await expect(page).toHaveURL(/\/chat$/);
+    await page.waitForLoadState('networkidle');
+    expect(envois).toHaveLength(1);
+    await expect(saisieDuChat(page)).toHaveValue('');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    expect(envois).toHaveLength(1);
+  });
+
+  test('/chat?q=abc&envoyer=1 : trop courte, pré-remplie sans erreur ni envoi', async ({ page }) => {
+    const envois: string[] = [];
+    await intercepterLApi(page, (methode, chemin) => {
+      if (chemin === '/corpus') return { json: { detail: 'Not Found' }, statut: 404 };
+      if (chemin === '/rag/ask/stream') {
+        envois.push(chemin);
+        return { flux: [{ chunk: '', done: true, sources: [] }] };
+      }
+      return undefined;
+    });
+    await page.goto('/chat?q=abc&envoyer=1');
+    await expect(saisieDuChat(page)).toHaveValue('abc');
+    await page.waitForLoadState('networkidle');
+    expect(envois).toEqual([]);
+    await expect(page.getByRole('log')).not.toContainText(/trop courte|too short/);
+    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 });
 

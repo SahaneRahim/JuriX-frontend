@@ -10,7 +10,8 @@
  *    src/lib/stores/language.ts ; une clé oubliée s'affiche brute (`t()` rend
  *    la clé) : « loi.copie.lien » sur le troisième bouton d'un article,
  *    « chat.profileLabel » dans la barre du chat, « accueil.sousTitreCourt »
- *    sous le titre de l'accueil en paysage. Le contrôle unitaire
+ *    sous le titre de l'accueil en paysage (devenu, avec la refonte A, le
+ *    champ unique et ses libellés). Le contrôle unitaire
  *    (language.test.ts) ne compare que les dictionnaires des tests d'écran,
  *    et une clé absente d'eux passait. Ici, l'écran lui-même est lu, en
  *    français et en anglais, aux tailles où chaque libellé court ou long
@@ -275,7 +276,7 @@ test.describe('Aucune clé de traduction à l’écran', () => {
       test.describe('téléphone en paysage', () => {
         test.use(PAYSAGE);
 
-        test('accueil : le sous-titre court de l’écran court', async ({ page }) => {
+        test('accueil : l’écran court (titre de 24 px, champ unique, sans surtitre)', async ({ page }) => {
           await poserLaLangue(page, langue);
           await ouvrirAuServeur(page, '/');
           await attendreLaLangue(page, langue);

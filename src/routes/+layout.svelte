@@ -2,17 +2,26 @@
   /**
    * Layout racine.
    *
-   * Il ne rend volontairement aucune coquille : celle-ci vit dans
-   * `$lib/components/SiteHeader` et `SiteFooter`, montés page par page. La
-   * monter ici la poserait aussi sur `/admin/*`, qui a sa propre barre latérale,
-   * et sur `/login`.
+   * L'en-tête et le pied de page n'y sont pas : `$lib/components/SiteHeader`
+   * et `SiteFooter` restent montés page par page. Les monter ici les poserait
+   * aussi sur `/admin/*`, qui a sa propre barre latérale, et sur les pages de
+   * compte, qui ont les leurs.
    *
-   * Il porte en revanche ce qui n'a de sens qu'au niveau du document : la
-   * langue, la boîte « Changer de profil », et la synchronisation du profil
-   * avec le compte.
+   * Seule exception, la barre d'onglets du bas de la refonte A (décision H6,
+   * `BarreDOnglets`) : la monter page par page, à côté de chaque pied de page,
+   * la répéterait dans dix pages. Elle choisit seule où elle paraît (sous md,
+   * ni sur /chat, ni dans l'administration, ni sur les pages de compte :
+   * `barreDuBasSur`, $lib/nav), et elle vit DANS l'enveloppe inerte
+   * ci-dessous, pour se taire avec la page derrière la palette et la boîte du
+   * profil.
+   *
+   * Il porte aussi ce qui n'a de sens qu'au niveau du document : la langue,
+   * la boîte « Changer de profil », et la synchronisation du profil avec le
+   * compte.
    */
   import { onMount, tick } from "svelte";
   import { afterNavigate } from "$app/navigation";
+  import BarreDOnglets from "$lib/components/BarreDOnglets.svelte";
   import ChoixPersona from "$lib/components/ChoixPersona.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import { synchroniserPersonaAuDemarrage } from "$lib/persona-compte";
@@ -119,9 +128,11 @@
      navigateur qui ignore `inert` laisse le focus entrer dans la page : la
      palette le renvoie à son champ. Inerte, la page se tait aussi : le chat
      annonce alors par la région de la boîte ouverte (`annonceDuChat`,
-     `annonceDansLaPalette`). -->
+     `annonceDansLaPalette`). La barre d'onglets du bas est dedans, après
+     la page : inerte avec elle. -->
 <div style="display: contents" inert={dialogue || $commandPaletteOpen}>
   <slot />
+  <BarreDOnglets />
 </div>
 
 {#if dialogue}

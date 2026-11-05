@@ -14,6 +14,14 @@ import Layout from './+layout.svelte';
  */
 
 vi.mock('$app/navigation', () => ({ afterNavigate: vi.fn(), beforeNavigate: vi.fn(), goto: vi.fn() }));
+// La barre d'onglets du bas (refonte A, H6) lit le chemin de la page : sur
+// l'accueil, elle paraît.
+vi.mock('$app/stores', async () => {
+  const { writable } = await import('svelte/store');
+  return {
+    page: writable({ url: new URL('http://site/'), route: { id: '/(main)' }, params: {}, data: {}, error: null }),
+  };
+});
 // Au montage, le layout lit le profil du compte : aucun appel à l'API ici.
 vi.mock('$lib/persona-compte', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/persona-compte')>()),
@@ -84,6 +92,25 @@ describe('layout racine et palette', () => {
     commandPaletteOpen.set(false);
     await tick();
     expect(page.inert).toBe(false);
+  });
+
+  it('la barre d’onglets du bas est dans la page : inerte, elle aussi, palette ouverte (H6)', async () => {
+    const { page } = rendre();
+    const barre = page.querySelector<HTMLElement>('[data-testid="barre-onglets"]');
+    expect(barre).not.toBeNull();
+    // Après la page, dans l'enveloppe : elle suit la page dans l'ordre du
+    // clavier, et se tait avec elle.
+    expect(page.lastElementChild).toBe(barre);
+    const accueil = barre!.querySelector<HTMLAnchorElement>('a[href="/"]')!;
+    commandPaletteOpen.set(true);
+    await tick();
+    expect(barre!.closest('[inert]')).toBe(page);
+    accueil.focus();
+    expect(document.activeElement).not.toBe(accueil);
+    commandPaletteOpen.set(false);
+    await tick();
+    accueil.focus();
+    expect(document.activeElement).toBe(accueil);
   });
 
   it('ouverte depuis la loupe, la palette lui rend le focus, la page redevenue active', async () => {

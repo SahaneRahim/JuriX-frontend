@@ -1255,3 +1255,69 @@ describe('la question du profil, dans le fil (P5)', () => {
     expect(questions).toHaveLength(0);
   });
 });
+
+describe('la question venue de l’adresse (refonte A, décision H1)', () => {
+  /** L'adresse de la page, telle que la lit le chat au montage. */
+  const adresse = (chemin: string) => pageEnTest.update((p) => ({ ...p, url: new URL(chemin, 'http://localhost') }));
+  /** Laisse partir le `setTimeout(…, 0)` qui nettoie l'adresse. */
+  const minuterieDuNettoyage = () => new Promise((fin) => setTimeout(fin, 5));
+
+  afterEach(() => adresse('/chat'));
+
+  it('/chat?q=…&envoyer=1 : la question part une seule fois, puis quitte l’adresse', async () => {
+    adresse('/chat?q=licenciement%20%C3%A9conomique&envoyer=1');
+    const ecran = render(Page);
+    await waitFor(() => expect(questions).toHaveLength(1));
+    expect(questions[0].question).toBe('licenciement économique');
+    expect(questions[0]).not.toHaveProperty('session_id');
+    await minuterieDuNettoyage();
+    expect(simule.replaceState).toHaveBeenCalledTimes(1);
+    expect(simule.replaceState.mock.calls[0][0]).toBe('/chat');
+    // La question est dans le fil, pas dans la saisie.
+    expect((ecran.getByRole('textbox') as HTMLTextAreaElement).value).toBe('');
+    await new Promise((fin) => setTimeout(fin, 20));
+    expect(questions).toHaveLength(1);
+  });
+
+  it('une conversation déjà ouverte : la question de l’accueil en ouvre une neuve', async () => {
+    localStorage.setItem('jurix-chat-session', 'sid-ancienne');
+    localStorage.setItem('jurix-chat-persona', 'citoyen');
+    adresse('/chat?q=Quels%20sont%20mes%20droits%20en%20garde%20%C3%A0%20vue%20%3F&envoyer=1');
+    render(Page);
+    await waitFor(() => expect(questions).toHaveLength(1));
+    // Sans l'identifiant de l'ancienne conversation : elle n'est pas continuée.
+    expect(questions[0]).not.toHaveProperty('session_id');
+    expect(localStorage.getItem('jurix-chat-session')).not.toBe('sid-ancienne');
+  });
+
+  it('moins de cinq caractères : pré-remplie, sans envoi ni message d’erreur', async () => {
+    adresse('/chat?q=abc&envoyer=1');
+    const ecran = render(Page);
+    await waitFor(() => expect((ecran.getByRole('textbox') as HTMLTextAreaElement).value).toBe('abc'));
+    await minuterieDuNettoyage();
+    expect(questions).toEqual([]);
+    expect(fil().textContent).not.toContain('chat.errorTooShort');
+    expect(fil().textContent).not.toMatch(/trop courte/);
+    // L'adresse est nettoyée aussi : un rechargement ne redemande rien.
+    expect(simule.replaceState.mock.calls[0]?.[0]).toBe('/chat');
+  });
+
+  it('/chat?q=… sans `envoyer` : pré-remplie seulement, l’adresse intacte (P7)', async () => {
+    adresse('/chat?q=licenciement%20%C3%A9conomique');
+    const ecran = render(Page);
+    await waitFor(() =>
+      expect((ecran.getByRole('textbox') as HTMLTextAreaElement).value).toBe('licenciement économique'),
+    );
+    await minuterieDuNettoyage();
+    expect(questions).toEqual([]);
+    expect(simule.replaceState).not.toHaveBeenCalled();
+  });
+
+  it('rechargée après le nettoyage (/chat) : rien ne repart', async () => {
+    adresse('/chat');
+    render(Page);
+    await minuterieDuNettoyage();
+    expect(questions).toEqual([]);
+    expect(simule.replaceState).not.toHaveBeenCalled();
+  });
+});

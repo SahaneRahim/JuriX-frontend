@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOOTER_LINKS, LIEN_ACCUEIL, NAV_LINKS, PAGES_DE_COMPTE } from '$lib/nav';
+import { FOOTER_LINKS, LIEN_ACCUEIL, NAV_LINKS, ONGLETS_DU_BAS, PAGES_DE_COMPTE, barreDuBasSur } from '$lib/nav';
 import { translations } from '$lib/stores/language';
 
 /**
@@ -80,5 +80,32 @@ describe('les libellés', () => {
 describe('PAGES_DE_COMPTE', () => {
   it('liste les cinq pages de compte', () => {
     expect([...PAGES_DE_COMPTE]).toEqual(['/login', '/signup', '/forgot-password', '/reset-password', '/verify-email']);
+  });
+});
+
+describe('la barre d’onglets du bas (refonte A, H6)', () => {
+  it('trois onglets : Accueil, Assistant IA, Parcourir, les mêmes liens que l’en-tête', () => {
+    expect(ONGLETS_DU_BAS.map((lien) => [lien.href, lien.key])).toEqual([
+      ['/', 'nav.home'],
+      ['/chat', 'nav.chat'],
+      ['/laws', 'nav.parcourir'],
+    ]);
+    expect(ONGLETS_DU_BAS[0]).toBe(LIEN_ACCUEIL);
+    for (const onglet of ONGLETS_DU_BAS.slice(1)) expect(NAV_LINKS).toContain(onglet);
+  });
+
+  it('paraît sur les pages publiques, page d’erreur comprise', () => {
+    for (const chemin of ['/', '/laws', '/laws/42', '/categories/13', '/search', '/compare', '/blog', '/blog/un-article', '/about', '/page-inconnue']) {
+      expect(barreDuBasSur(chemin), chemin).toBe(true);
+    }
+  });
+
+  it('jamais sur /chat, dans l’administration ni sur les pages de compte', () => {
+    for (const chemin of ['/chat', '/admin', '/admin/users', ...PAGES_DE_COMPTE, '/reset-password/jeton', '/verify-email/jeton']) {
+      expect(barreDuBasSur(chemin), chemin).toBe(false);
+    }
+    // Un préfixe n'est pas une page : /chatons ou /administration resteraient publiques.
+    expect(barreDuBasSur('/chatons')).toBe(true);
+    expect(barreDuBasSur('/administration')).toBe(true);
   });
 });

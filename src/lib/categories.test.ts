@@ -4,7 +4,9 @@ import {
   _domainesTraduits,
   _ordreProvisoire,
   descriptionCategorie,
+  gesteCategorie,
   nomCategorie,
+  nomPuce,
   nomCompletCategorie,
   nombreDeTextesDuCorpus,
   ordonnerLesDomaines,
@@ -249,6 +251,56 @@ describe('nombreDeTextesDuCorpus : le chiffre du sous-titre (Q1 A)', () => {
   it('rend null pour un nombre qu’une phrase au pluriel ne peut pas porter', () => {
     for (const textes of [0, 1, -3, 2.5, Number.POSITIVE_INFINITY, 2 ** 60]) {
       expect(nombreDeTextesDuCorpus({ textes }), String(textes)).toBeNull();
+    }
+  });
+});
+
+describe('nomPuce : la pastille de l’accueil au téléphone (refonte A, E3b)', () => {
+  it('donne un nom très court à chaque domaine, en français et en anglais', () => {
+    expect(DOMAINES.map(([nom]) => nomPuce(nom, 'fr')).slice(0, 6)).toEqual([
+      'Travail',
+      'Pénal',
+      'Famille',
+      'Foncier',
+      'Affaires',
+      'Civil',
+    ]);
+    for (const [nom] of DOMAINES) {
+      expect(nomPuce(nom, 'fr').length, nom).toBeLessThanOrEqual(17);
+      expect(nomPuce(nom, 'en').length, nom).toBeLessThanOrEqual(17);
+    }
+  });
+
+  it('prend le nom très court DANS le nom court : ce qu’on lit est dans le nom du lien (WCAG 2.5.3)', () => {
+    for (const [nom] of DOMAINES) {
+      for (const langue of ['fr', 'en'] as const) {
+        expect(nomCategorie(nom, langue).toLowerCase(), `${nom} (${langue})`).toContain(nomPuce(nom, langue).toLowerCase());
+      }
+    }
+  });
+
+  it('rend le nom court d’un domaine inconnu, et rien pour un nom absent', () => {
+    expect(nomPuce('Droit Spatial', 'fr')).toBe('Droit Spatial');
+    expect(nomPuce(null, 'fr')).toBe('');
+  });
+});
+
+describe('gesteCategorie : le geste de l’icône au survol (A2 § 4)', () => {
+  it('fait peser la balance du civil, frapper le marteau du pénal, pencher le casque du travail…', () => {
+    expect(gesteCategorie('Droit Civil et Procédure Civile')).toBe('weigh');
+    expect(gesteCategorie('Droit Pénal et Procédure Pénale')).toBe('tap');
+    expect(gesteCategorie('Droit du Travail et Sécurité Sociale')).toBe('tilt');
+    expect(gesteCategorie('Finances Publiques et Fiscalité')).toBe('flip');
+    expect(gesteCategorie('Droit Administratif')).toBe('press');
+    expect(gesteCategorie('Fonction Publique')).toBe('swing');
+    expect(gesteCategorie('Droit International')).toBe('spin');
+    expect(gesteCategorie('Santé Publique et Sécurité Sanitaire')).toBe('beat');
+    expect(gesteCategorie("Droit de l'Environnement et des Ressources Naturelles")).toBe('sway');
+  });
+
+  it('fait sauter les autres, et un domaine inconnu', () => {
+    for (const nom of ['Droit des Personnes, de la Famille et État Civil', 'Droit Foncier et Domanial', 'Droit Constitutionnel', 'Droit Spatial', null]) {
+      expect(gesteCategorie(nom), String(nom)).toBe('hop');
     }
   });
 });

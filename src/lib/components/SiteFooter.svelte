@@ -11,8 +11,9 @@
    * partout que grâce à lui. Rien n'en est retiré (décision H7) : logo, liens
    * et copyright restent, dans le même style.
    */
+  import { page } from "$app/stores";
   import Icone from "$lib/components/Icone.svelte";
-  import { FOOTER_LINKS, LIEN_ACCUEIL } from "$lib/nav";
+  import { FOOTER_LINKS, LIEN_ACCUEIL, barreDuBasSur } from "$lib/nav";
   import { tr } from "$lib/stores/language";
 
   /**
@@ -71,13 +72,29 @@
    * suivent le 1er janvier.
    */
   const annee = new Date().getFullYear();
+
+  /**
+   * La place de la barre d'onglets du bas (refonte A, décision H6), là où
+   * elle paraît : sous md, hors écran court, sur les pages que
+   * `barreDuBasSur` retient. Fixe, haute de 64 px plus la zone sûre, elle
+   * couvrait le copyright en fin de défilement. La marge basse du pied de
+   * page passe de 40 px à 88 px : 24 px d'air au-dessus de la barre, 64 px
+   * sur les pages qui réservent aussi la place du bouton flottant
+   * (`reserverBouton`, qui ne se montre plus sous md). Sur écran court, la
+   * barre se retire, la marge d'origine revient. Le chemin vient de `$page`,
+   * le même au serveur et dans le navigateur : rien ne bouge à
+   * l'hydratation.
+   */
+  $: placeDeLaBarre = barreDuBasSur($page.url?.pathname ?? "")
+    ? "max-md:pb-[calc(5.5rem+env(safe-area-inset-bottom))] court:pb-[calc(2.5rem+env(safe-area-inset-bottom))]"
+    : "";
 </script>
 
 <!-- Marge basse augmentée de la zone sûre : sur iPhone, le copyright tombait
      sous la barre d'accueil. -->
 <footer
   data-testid="site-footer"
-  class="border-t border-zinc-200 dark:border-zinc-800 pt-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] bg-white dark:bg-zinc-950 mt-auto"
+  class="border-t border-zinc-200 dark:border-zinc-800 pt-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] bg-white dark:bg-zinc-950 mt-auto {placeDeLaBarre}"
 >
   <!-- Empilé et centré jusqu'à xl, en ligne au-delà : à md, les trois blocs
        côte à côte repliaient les liens sur deux lignes et le copyright sur

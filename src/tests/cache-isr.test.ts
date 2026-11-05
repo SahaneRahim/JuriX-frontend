@@ -196,15 +196,20 @@ describe('/chat : la coquille en cache', () => {
     expect(SOURCES['/src/routes/(main)/chat/+page.server.ts']).toBeUndefined();
   });
 
-  it('ne lit que `?q=`, appliqué dans le navigateur', () => {
-    // Hors de la clé, `?q=` n'atteint pas la fonction : la page le lit au
-    // montage (question pré-remplie). Tout autre paramètre lu devrait, lui,
-    // être examiné comme ceux des pages ci-dessus.
+  it('ne lit que `?q=` et `?envoyer=`, appliqués dans le navigateur', () => {
+    // Hors de la clé, `?q=` et `?envoyer=` (refonte A, décision H1 : la
+    // question de l'accueil part une fois) n'atteignent pas la fonction : la
+    // page les lit au montage seulement, dans `recevoirLaQuestionDeLAdresse`,
+    // appelée par `onMount`. Tout autre paramètre lu devrait, lui, être
+    // examiné comme ceux des pages ci-dessus.
     const source = SOURCES['/src/routes/(main)/chat/+page.svelte'];
     const lus = [...source.matchAll(/searchParams\s*\.\s*(?:get|getAll|has)\(\s*(["'`])([^"'`]+)\1/g)].map(
       (m) => m[2],
     );
-    expect(lus).toEqual(['q']);
+    expect(lus).toEqual(['q', 'envoyer']);
+    const lecture = /function recevoirLaQuestionDeLAdresse\(\) \{([\s\S]*?)\n {2}\}/.exec(source)?.[1] ?? '';
+    expect(lecture.match(/searchParams\s*\.\s*get\(/g)).toHaveLength(2);
+    expect(source).toMatch(/onMount\(\(\) => \{[\s\S]*?recevoirLaQuestionDeLAdresse\(\);/);
     expect(SOURCES['/src/routes/(main)/+layout.svelte']).not.toMatch(/searchParams\s*\.\s*(?:get|getAll|has)\(/);
   });
 });

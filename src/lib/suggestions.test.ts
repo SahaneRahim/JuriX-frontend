@@ -1,9 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
 import { PERSONAS } from '$lib/stores/persona';
-import { SUGGESTIONS, SUGGESTIONS_A_L_ACCUEIL, suggestionsDeLAccueil, suggestionsPour } from './suggestions';
+import {
+  SUGGESTIONS,
+  SUGGESTIONS_A_L_ACCUEIL,
+  questionAffichee,
+  suggestionsDeLAccueil,
+  suggestionsPour,
+} from './suggestions';
 
 const JEUX = [...PERSONAS, 'general'] as const;
+
+describe('questionAffichee', () => {
+  it('colle le « ? » au dernier mot, pour qu’il ne tombe jamais seul sur sa ligne', () => {
+    expect(questionAffichee('Quels sont mes droits en garde à vue ?')).toBe('Quels sont mes droits en garde à vue\u202f?');
+    for (const question of SUGGESTIONS.fr.general) expect(questionAffichee(question)).not.toContain(' ?');
+  });
+
+  it('ne touche pas à l’anglais, qui n’a pas d’espace devant le « ? »', () => {
+    for (const question of SUGGESTIONS.en.general) expect(questionAffichee(question)).toBe(question);
+  });
+});
 
 describe('suggestions du chat', () => {
   it.each(JEUX)('%s : 3 ou 4 questions, autant en FR qu en EN', (jeu) => {

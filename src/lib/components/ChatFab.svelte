@@ -17,6 +17,12 @@
    * Les pages qui le montent réservent de la place en bas (`SiteFooter
    * reserverBouton`, ou une marge basse sur <main>) pour que rien d'utile ne
    * reste dessous en fin de défilement.
+   *
+   * ABSENT SOUS md (refonte A, décision H6) : l'onglet « Assistant IA » de la
+   * barre du bas (BarreDOnglets.svelte) mène au même endroit, et deux accès
+   * à l'assistant au même coin de l'écran seraient un défaut. Il revient sur
+   * écran court (téléphone en paysage, variante `court`), où la barre du bas
+   * se retire : l'assistant reste à un appui.
    */
   import { onMount } from "svelte";
   import Icone from "$lib/components/Icone.svelte";
@@ -139,7 +145,7 @@
   tabindex={retire ? -1 : undefined}
   on:focus={() => (focalise = true)}
   on:blur={() => (focalise = false)}
-  class="group fixed right-4 sm:right-8 bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:bottom-[calc(2rem+env(safe-area-inset-bottom))] z-40 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 border border-zinc-800 dark:border-zinc-200 shadow-xl shadow-zinc-950/25 dark:shadow-white/10 transition-all duration-300 motion-safe:hover:-translate-y-1.5 motion-safe:hover:scale-105 motion-safe:hover:shadow-2xl motion-safe:hover:shadow-zinc-950/40 dark:motion-safe:hover:shadow-white/20 motion-safe:active:scale-95 motion-reduce:transition-none {retire
+  class="group fixed right-4 sm:right-8 bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:bottom-[calc(2rem+env(safe-area-inset-bottom))] z-40 flex max-md:hidden court:flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 border border-zinc-800 dark:border-zinc-200 shadow-xl shadow-zinc-950/25 dark:shadow-white/10 transition-all duration-300 motion-safe:hover:-translate-y-1.5 motion-safe:hover:scale-105 motion-safe:hover:shadow-2xl motion-safe:hover:shadow-zinc-950/40 dark:motion-safe:hover:shadow-white/20 motion-safe:active:scale-95 motion-reduce:transition-none {retire
     ? 'pointer-events-none invisible translate-y-4 opacity-0'
     : ''}"
 >

@@ -18,6 +18,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { attendreLeRepos } from '../doublures';
 import { cliquerJusqualEffet } from '../hydratation';
 
 /**
@@ -142,6 +143,30 @@ test.describe('Noms accessibles', () => {
   }
 });
 
+test.describe('Accueil : le champ unique (refonte A)', () => {
+  test('les bascules disent leur état, et l’exemple tapé, caché, ne retient pas le focus', async ({ page }) => {
+    await ouvrir(page, '/');
+
+    // Profil et mode : des boutons à `aria-pressed`, dans des groupes nommés
+    // (et non la seule couleur de la pastille).
+    const profils = page.getByRole('group', { name: 'Je suis' });
+    await expect(profils.locator('button')).toHaveCount(5);
+    for (const bouton of await profils.locator('button').all()) await expect(bouton).toHaveAttribute('aria-pressed', /^(true|false)$/);
+    const modes = page.getByRole('group', { name: 'Mode' }).getByRole('button');
+    await expect(modes).toHaveCount(2);
+    await expect(modes.first()).toHaveAttribute('aria-pressed', 'true');
+
+    // L'exemple tapé est décoratif : caché aux lecteurs d'écran, sans rien
+    // de focalisable dedans ; la zone de texte porte le vrai nom.
+    const exemple = page.getByTestId('accueil-exemple');
+    await expect(exemple).toHaveAttribute('aria-hidden', 'true');
+    expect(await exemple.locator('a, button, input, textarea, select, [tabindex]').count()).toBe(0);
+    await expect(
+      page.locator('#contenu').getByRole('textbox', { name: 'Votre question ou votre recherche', exact: true }),
+    ).toBeVisible();
+  });
+});
+
 test.describe('Annonces dynamiques', () => {
   test('/search annonce l’état de la recherche', async ({ page }) => {
     await page.goto('/search?q=loi');
@@ -226,6 +251,9 @@ test.describe('Balayage axe-core', () => {
   for (const chemin of PAGES_PUBLIQUES) {
     test(`${chemin} : aucune violation serieuse`, async ({ page }) => {
       await ouvrir(page, chemin);
+      // POURQUOI AU REPOS. La refonte fait entrer les blocs en fondu : axe lirait
+      // le contraste d'un texte à mi-opacité, et non celui de la page.
+      await attendreLeRepos(page);
 
       const resultats = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

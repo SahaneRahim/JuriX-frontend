@@ -13,7 +13,7 @@
   import { cubicOut } from "svelte/easing";
 
   /**
-   * Le hero, les onglets et le bouton flottant sont propres à l'accueil.
+   * Le hero et le bouton flottant sont propres à l'accueil.
    *
    * Ils étaient rendus par ce layout, donc aussi sur /chat : le titre marketing
    * s'affichait au-dessus de la fenêtre de conversation, et le bouton flottant
@@ -25,39 +25,45 @@
   $: isChat = $page.route.id === "/(main)/chat";
 
   /**
-   * Sous-titre du hero (proposition Q1, variante A). Le titre dit la tâche
-   * (« Que dit la loi camerounaise ? ») ; l'IA est nommée ici, une seule fois,
-   * avec sa garantie : elle « répond en citant les articles ». Le badge « IA
-   * Juridique Camerounaise » à point pulsé, quatrième mention de l'IA au-dessus
-   * du pli, est retiré : un point qui pulse annonce un service « en direct »,
-   * et en monochrome le gris du mot « IA » disait « secondaire ».
+   * Le surtitre du hero (refonte A, E3c) : « 2 275 textes officiels · chaque
+   * réponse cite ses articles ». Il remplace le sous-titre (Q1 A) : le
+   * nombre de textes et la garantie y restent, l'IA y est dite par ce
+   * qu'elle fait. Le champ unique, juste dessous, nomme l'assistant (sa
+   * bascule « Assistant IA »). Le badge « IA Juridique Camerounaise » à point
+   * pulsé ne revient pas : un point qui pulse annonce un service « en direct ».
    *
    * Le nombre de textes vient de l'API (`GET /corpus`), par les données de la
    * page (`$page.data.corpus`, posé par le `load` de l'accueil). Absent
    * (ancienne API, panne, `load` qui ne le lit pas encore), la phrase s'écrit
    * sans chiffre : un nombre écrit en dur vieillirait en silence.
    * `Intl.NumberFormat` sépare les milliers selon la langue : « 2 275 »
-   * (espace fine insécable) en français, « 2,275 » en anglais.
+   * (espace fine insécable) en français, « 2,275 » en anglais. Au téléphone,
+   * la première moitié seulement (« 2 275 textes officiels »), comme la
+   * maquette ; sur écran court, rien (le titre et le champ d'abord).
+   *
+   * Le nombre est en demi-gras : la phrase est coupée autour de `{n}`.
    */
   $: totalDesTextes = nombreDeTextesDuCorpus($page.data?.corpus);
   $: nombreDeTextes = totalDesTextes === null ? "" : new Intl.NumberFormat($language.current).format(totalDesTextes);
-  $: sousTitre =
-    totalDesTextes === null
-      ? $tr("accueil.sousTitreSansChiffre")
-      : $tr("accueil.sousTitre").replace("{n}", nombreDeTextes);
+  $: surtitre = $tr(totalDesTextes === null ? "accueil.eyebrowSansChiffre" : "accueil.eyebrow").split("{n}");
+  $: surtitreCourt = $tr(totalDesTextes === null ? "accueil.eyebrowCourtSansChiffre" : "accueil.eyebrowCourt").split(
+    "{n}",
+  );
 
   /**
-   * Le même sous-titre en une ligne, pour l'écran court (téléphone en
-   * paysage, `court:`) : « 2 275 textes officiels · l'assistant IA cite les
-   * articles ». La phrase entière y prenait deux lignes de 18 px, et la barre
-   * de recherche passait sous la ligne de flottaison ; elle était donc
-   * retirée, et avec elle le nombre de textes et la garantie de l'IA, que Q1 A
-   * place justement dans le sous-titre. Même repli sans chiffre.
+   * Les mots du titre, révélés un à un (A2 § 3.5) : chacun monte dans son
+   * masque, 30 ms après le précédent, le premier sans délai (LCP : rien
+   * n'attend). Le texte réel reste dans la page : sans JavaScript, avant
+   * l'hydratation et en mouvement réduit, le titre est simplement là.
+   *
+   * POURQUOI SUR L'ESPACE ORDINAIRE SEULEMENT (U+0020), jamais `/\s+/` :
+   * `accueil.titre` porte une espace fine insécable avant le « ? », qui doit
+   * rester collé à « camerounaise ». Une vraie espace U+0020 sépare deux mots
+   * dans le balisage : le `textContent` du <h1> est exactement « Que dit la
+   * loi camerounaise ? », au serveur comme après l'hydratation
+   * (accueil.serveur.test.ts, ux-accueil.spec.ts).
    */
-  $: sousTitreCourt =
-    totalDesTextes === null
-      ? $tr("accueil.sousTitreCourtSansChiffre")
-      : $tr("accueil.sousTitreCourt").replace("{n}", nombreDeTextes);
+  $: motsDuTitre = $tr("accueil.titre").split(" ");
 
   /**
    * Taille du titre ANGLAIS au téléphone : elle suit la largeur de la
@@ -99,17 +105,18 @@
    * Bouton flottant retiré tant que le haut de l'accueil est à l'écran.
    *
    * Sur un téléphone court (320×568, 360×584, 375×553), il se posait sur le
-   * bouton « Rechercher » du premier écran et en captait l'appui. Tant que le
-   * hero est visible, il ne sert de toute façon à rien : l'onglet « Assistant
-   * IA » mène au même endroit. Il se retire donc tant que le titre, les
-   * onglets ou la barre de recherche sont à l'écran, et revient dès qu'ils en
-   * sont tous sortis. Le layout ne le monte que sur l'accueil ; la recherche
-   * monte le sien, jamais retiré.
+   * bouton d'envoi du premier écran et en captait l'appui. Tant que le hero
+   * est visible, il ne sert de toute façon à rien : la bascule « Assistant
+   * IA » du champ unique mène au même endroit. Il se retire donc tant que le
+   * titre ou le champ unique sont à l'écran, et revient dès qu'ils en sont
+   * tous sortis. Le layout ne le monte que sur l'accueil ; la recherche monte
+   * le sien, jamais retiré. Sous md, il ne paraît plus du tout (refonte A :
+   * l'onglet « Assistant IA » de la barre du bas le remplace, ChatFab.svelte).
    *
    * Retiré D'EMBLÉE, au rendu serveur comme avant le premier rapport de
    * l'observateur : affiché par défaut, il aurait glissé hors de l'écran
    * juste après l'hydratation, à chaque arrivée sur l'accueil. Sans
-   * JavaScript, il reste donc retiré : l'assistant en a besoin, et l'onglet
+   * JavaScript, il reste donc retiré : l'assistant en a besoin, et le champ
    * est là. Sans IntersectionObserver (navigateur ancien), rien ne le
    * ramènerait : il reste affiché, comme avant.
    */
@@ -244,8 +251,9 @@
     ></div>
 
     <!-- Hero persistant (accueil) et contenu de la page. Marges du hero
-         réduites sur téléphone : la barre de recherche commençait vers 780 px
-         du haut, sous la ligne de flottaison de tous les téléphones.
+         réduites sur téléphone : 20 px entre l'en-tête et le surtitre (avec
+         les 16 px de <main>), comme la maquette mobile, pour que le champ
+         unique tienne dans le premier écran (390 × 844 : acceptation E3).
          À partir de md, la marge haute suit la HAUTEUR de l'écran (5vh, 48 px
          au plus) : 112 px fixes repoussaient la barre de recherche sous la
          ligne de flottaison des portables (1 024 × 768, 1 366 × 650), et la
@@ -262,16 +270,15 @@
     <div
       class="relative flex w-full flex-col {isChat
         ? 'min-h-0 flex-1'
-        : 'items-center px-0 pt-6 pb-8 sm:pt-10 sm:pb-12 md:pt-[min(3rem,5vh)] court:!pt-4'}"
+        : 'items-center px-0 pt-1 pb-8 sm:pt-10 sm:pb-12 md:pt-[min(3rem,5vh)] court:!pt-4'}"
     >
       {#if !isChat}
         <!--
           Hero traduisible. L'ancien et le nouveau texte se croisent dans la
           MÊME cellule de grille : empilés l'un sous l'autre le temps du fondu,
           ils doublaient la hauteur du hero et la page sautait à chaque
-          changement de langue. Ce bloc et les onglets sont suivis par
-          `surveillerHero` : le bouton flottant reste retiré tant qu'ils sont
-          à l'écran.
+          changement de langue. Ce bloc est suivi par `surveillerHero` : le
+          bouton flottant reste retiré tant qu'il est à l'écran.
           Le bloc est un conteneur de requête (`[container-type:inline-size]`,
           comme dans l'administration) : au téléphone, le titre anglais prend
           sa taille dans la largeur de ce bloc, celle de la colonne (`cqi`,
@@ -280,14 +287,37 @@
           grand pour deux lignes. Sans effet sur la mise en page : un
           conteneur calcule sa largeur sans son contenu, et celle de ce bloc
           vient déjà de `w-full`.
+          Au téléphone, surtitre et titre sont calés à gauche, comme le champ
+          qui les suit (maquette mobile) ; centrés à partir de sm.
         -->
-        <div class="grid w-full justify-items-center [container-type:inline-size]" use:surveillerHero>
+        <div class="grid w-full justify-items-start sm:justify-items-center [container-type:inline-size]" use:surveillerHero>
           {#key $language.current}
             <div
-              class="col-start-1 row-start-1 flex flex-col items-center w-full"
+              class="col-start-1 row-start-1 flex w-full flex-col items-start sm:items-center"
               in:fade={{ duration: duree(200), delay: duree(100) }}
               out:fade={{ duration: duree(150) }}
             >
+              <!-- Le surtitre (voir `surtitre`) : en Inter et non en chasse
+                   fixe (décision D1), le nombre en demi-gras. zinc-600 sur
+                   blanc. Masqué sur écran court : le titre et le champ
+                   d'abord (A1 § 3). Il arrive en fondu, sans retarder le
+                   titre. -->
+              <p
+                class="mv-fondre mb-3.5 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white py-[5px] pl-[9px] pr-3 text-[11px]/4 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 sm:mb-6 sm:py-1.5 sm:pl-2.5 sm:pr-3.5 sm:text-xs/4 court:hidden"
+                data-testid="accueil-surtitre"
+              >
+                <Icone nom="files" class="text-[13px] text-zinc-950 dark:text-white sm:text-sm" />
+                <span class="sm:hidden"
+                  >{surtitreCourt[0]}{#if surtitreCourt.length > 1}<b class="font-semibold text-zinc-950 dark:text-white"
+                      >{nombreDeTextes}</b
+                    >{surtitreCourt[1]}{/if}</span
+                ><span class="hidden sm:inline"
+                  >{surtitre[0]}{#if surtitre.length > 1}<b class="font-semibold text-zinc-950 dark:text-white"
+                      >{nombreDeTextes}</b
+                    >{surtitre[1]}{/if}</span
+                >
+              </p>
+
               <!-- Titre de tâche (Q1 A), d'une seule couleur : il dit ce que
                    l'on obtient, et non la technologie. En Literata (Q5 A,
                    `font-titre` : instance figée en taille optique 72, graisse
@@ -298,101 +328,56 @@
                    de laisser un mot seul sur la seconde.
                    `max-w-5xl` (1 024 px) et non `max-w-4xl` (896 px) : en
                    56 px, le titre anglais fait 898 à 903 px (775 en
-                   français). Il passait sur deux lignes à 1 440 px, et la
-                   barre de recherche descendait de 65 px. À partir de lg, la
-                   colonne fait 928 px au moins : une ligne dans les deux
-                   langues. Au téléphone, l'anglais tient aussi sur deux
-                   lignes (« What does / Cameroonian law say? ») : sous
-                   435 px de large, sa taille suit celle de la colonne
-                   (`tailleDuTitreAuTelephone`, plus haut). En 36 px, il en
-                   prenait trois.
+                   français). Il passait sur deux lignes à 1 440 px, et le
+                   champ descendait de 65 px. À partir de lg, la colonne fait
+                   928 px au moins : une ligne dans les deux langues. Au
+                   téléphone, l'anglais tient aussi sur deux lignes (« What
+                   does / Cameroonian law say? ») : sous 435 px de large, sa
+                   taille suit celle de la colonne (`tailleDuTitreAuTelephone`,
+                   plus haut). En 36 px, il en prenait trois.
                    Interligne de 1,15 posé AVEC chaque taille (`…/[1.15]`) :
                    `sm:text-5xl` apporte son interligne de 1, écrit dans sa
                    requête donc après un `leading-*` posé à part, qui ne
                    vaudrait plus qu'au téléphone. 1,15 : le bas de la
                    fourchette prévue par Q5 pour un titre en serif (1,15 à
                    1,25), qui garde deux lignes serrées à 360 px.
-                   Sur écran court (téléphone en paysage), 36 px, et 8 px
-                   dessous : le sous-titre d'une ligne suit (voir plus bas). -->
+                   Sur écran court (téléphone en paysage, clavier ouvert),
+                   24 px (A1 § 3) : le champ remonte dans l'écran.
+                   MOT À MOT (A2 § 3.5, voir `motsDuTitre`) : chaque mot est
+                   un masque (`overflow-hidden`, marges de garde contre le
+                   rognage des accents et des jambages, compensées par des
+                   marges négatives) où il monte (`mv-mot`). Masque calé en
+                   haut de la ligne (`align-top`) : un bloc en ligne qui rogne
+                   prend pour ligne de base le bas de sa boîte, et la ligne
+                   aurait grandi. Le balisage tient sur une ligne : aucun
+                   blanc ne s'ajoute au texte du titre. -->
               <h1
-                class="text-4xl/[1.15] {tailleDuTitreAuTelephone} sm:text-5xl/[1.15] lg:text-[3.5rem]/[1.15] court:!text-4xl/[1.15] font-titre font-semibold text-center text-zinc-950 dark:text-white mb-4 md:mb-6 court:!mb-2 max-w-5xl text-balance"
-              >
-                {$tr("accueil.titre")}
-              </h1>
-
-              <!-- Sous-titre : l'IA nommée une fois, avec sa garantie (voir
-                   `sousTitre`). `text-balance` : sans lui, le dernier mot
-                   restait seul sur sa ligne à 390 px.
-                   Sur écran court, la version d'une ligne (`sousTitreCourt`),
-                   en 14 px, 12 px au-dessus des onglets. La phrase entière
-                   remplissait le hero sur 360 px de haut ; d'une ligne, elle
-                   descend la barre de recherche de 24 px : à 740 × 360, la
-                   barre finit vers 310 px, au-dessus de la ligne de
-                   flottaison (mesuré sur une réplique dans Chromium,
-                   data/ux-front/correctifs-r1-accueil/ du dépôt backend).
-                   Une seule des deux versions est affichée, donc lue :
-                   l'autre est en `display: none`. -->
-              <p
-                class="text-center text-zinc-600 dark:text-zinc-400 text-base sm:text-lg md:text-xl max-w-2xl mb-8 md:mb-10 leading-relaxed font-normal text-balance court:!mb-3 court:!text-sm/5"
-              >
-                <span class="court:hidden">{sousTitre}</span><span class="hidden court:inline">{sousTitreCourt}</span>
-              </p>
+                class="text-4xl/[1.15] {tailleDuTitreAuTelephone} sm:text-5xl/[1.15] lg:text-[3.5rem]/[1.15] court:!text-2xl/[1.15] font-titre font-semibold text-left sm:text-center text-zinc-950 dark:text-white mb-5 md:mb-10 court:!mb-3 max-w-5xl text-balance"
+              >{#each motsDuTitre as mot, rang (rang)}{rang > 0 ? " " : ""}<span
+                    class="-mx-[0.04em] -mb-[0.16em] -mt-[0.1em] inline-block overflow-hidden px-[0.04em] pb-[0.16em] pt-[0.1em] align-top"
+                    ><span class="mv-mot" style="--i: {rang}">{mot}</span></span
+                  >{/each}</h1>
             </div>
           {/key}
-        </div>
-
-        <!-- Search Tabs. Pleine largeur (320 px au plus) sur téléphone : avec
-             deux onglets de 140 px minimum, la bascule débordait à 320 px.
-             Onglet au repos en zinc-600 : sur la piste zinc-100, le zinc-500
-             n'atteint que 4,4:1. -->
-        <div
-          class="relative grid w-full max-w-xs grid-cols-2 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-full border border-zinc-200 dark:border-zinc-800 mb-8 md:mb-10 court:!mb-4 shadow-sm dark:shadow-none sm:inline-grid sm:w-auto sm:max-w-none"
-          use:surveillerHero
-        >
-          <!-- Sliding Background -->
-          <div
-            class="sliding-pill-tabs absolute top-1 bottom-1 rounded-full bg-white dark:bg-zinc-800 shadow-sm dark:shadow-none border border-zinc-200/80 dark:border-zinc-700/80"
-            class:left-1={$page.url.pathname === "/"}
-            class:right-1={$page.url.pathname === "/chat"}
-            style="width: calc(50% - 4px);"
-          ></div>
-
-          <a
-            href="/"
-            class="relative z-10 flex min-h-11 min-w-0 items-center justify-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-colors duration-200 sm:min-w-[140px] {$page
-              .url.pathname === '/'
-              ? 'text-zinc-950 dark:text-white'
-              : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}"
-          >
-            <Icone nom="search" class="text-base" />
-            {$tr("mode.search")}
-          </a>
-          <a
-            href="/chat"
-            class="relative z-10 flex min-h-11 min-w-0 items-center justify-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-colors duration-200 sm:min-w-[140px] {$page
-              .url.pathname === '/chat'
-              ? 'text-zinc-950 dark:text-white'
-              : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white'}"
-          >
-            <Icone nom="sparkles" class="text-base" />
-            {$tr("mode.chat")}
-          </a>
         </div>
       {/if}
 
       <!--
-        Contenu de la page (barre de recherche ou chat), rejoué à chaque
-        changement de chemin. Entrée seule, sans sortie : avec une sortie,
-        l'ancienne page restait dans le flux le temps de son animation et la
-        nouvelle s'insérait dessous, puis remontait d'un coup. Sur /chat,
-        l'enveloppe prolonge la chaîne de hauteur jusqu'à la page. Recréée à
-        chaque page, elle y retrouve la barre de recherche de l'accueil
-        (`data-hero-recherche`), dernière zone du hero suivie.
+        Contenu de la page (le champ unique de l'accueil, ou le chat). Sur
+        /chat, il entre en glissant à chaque arrivée, sans sortie : avec une
+        sortie, l'ancienne page restait dans le flux le temps de son
+        animation et la nouvelle s'insérait dessous, puis remontait d'un coup.
+        Sur l'accueil, plus de glissement (refonte A, E3c) : le titre et le
+        champ n'attendent rien (LCP, A2 § 2.4), et les blocs suivants ont
+        leurs propres entrées. Sur /chat, l'enveloppe prolonge la chaîne de
+        hauteur jusqu'à la page. Recréée à chaque page, elle y retrouve le
+        champ unique de l'accueil (`data-hero-recherche`), dernière zone du
+        hero suivie.
       -->
       {#key $page.url.pathname}
         <div
           class="flex w-full flex-col {isChat ? 'min-h-0 flex-1' : 'items-center justify-center'}"
-          in:fly={{ y: 16, duration: duree(250), easing: cubicOut }}
+          in:fly={{ y: 16, duration: isChat ? duree(250) : 0, easing: cubicOut }}
           use:surveillerHero={"[data-hero-recherche]"}
         >
           <slot />
@@ -411,17 +396,3 @@
     <ChatFab masque={boutonMasque} />
   {/if}
 </div>
-
-<style>
-  .sliding-pill-tabs {
-    transition:
-      left 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-      right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .sliding-pill-tabs {
-      transition: none;
-    }
-  }
-</style>

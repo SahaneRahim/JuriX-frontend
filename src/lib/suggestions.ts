@@ -124,6 +124,18 @@ export function suggestionsPour(persona: Persona | null, langue: Language): read
 export const SUGGESTIONS_A_L_ACCUEIL = 3;
 
 /**
+ * Une question telle que l'accueil l'affiche : une espace fine insécable
+ * devant le « ? » (A3 § 3).
+ *
+ * POURQUOI À L'AFFICHAGE SEULEMENT. Les questions ci-dessus ont été validées
+ * telles quelles, et partent telles quelles au chat : seul l'écran change. Leur
+ * espace ordinaire laissait le « ? » seul sur sa ligne au téléphone.
+ */
+export function questionAffichee(question: string): string {
+  return question.replace(/ \?/g, '\u202f?');
+}
+
+/**
  * Les questions de l'accueil : les premières du profil, dans l'ordre où elles
  * ont été validées. Le profil général en a exactement trois.
  */

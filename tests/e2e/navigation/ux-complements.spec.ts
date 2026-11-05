@@ -24,7 +24,9 @@
  *  - P1 : le statut n'était lu que sur le premier texte venu, sans liens ;
  *    jamais sur un texte modifié (la Constitution) avec ses textes
  *    modificatifs, ses marques « · modifié » et l'encadré d'un article.
- *  - Q1 : un titre « d'une seule couleur » et l'IA nommée une seule fois.
+ *  - Q1 : un titre « d'une seule couleur » et l'IA nommée une seule fois
+ *    (depuis la refonte A : la bascule du champ unique, la garantie dans le
+ *    surtitre).
  *
  * DONNÉES. Les pages rendues par le serveur lisent la vraie API (sautées
  * quand elle est éteinte, échouées avec E2E_EXIGER_BACKEND=1) ; /search
@@ -86,24 +88,25 @@ async function couleursRouges(zone: Locator): Promise<string[]> {
 // Q1 : un titre d'une seule couleur, l'IA nommée une fois
 // ---------------------------------------------------------------------------
 
-test.describe('Accueil : le titre et le sous-titre (Q1 A)', () => {
+test.describe('Accueil : le titre et le surtitre (Q1 A, refonte A)', () => {
   test.use(BUREAU);
 
-  test('un titre d’une seule couleur ; l’IA nommée une seule fois, avec sa garantie', async ({ page }) => {
+  test('un titre d’une seule couleur ; l’IA nommée une seule fois, sa garantie dans le surtitre', async ({ page }) => {
     await ouvrirAuServeur(page, '/');
     const titre = page.locator('h1');
     // « IA » gris seul sur sa ligne : le défaut que Q1 corrige. Aucune partie
-    // du titre n'a sa propre couleur.
+    // du titre n'a sa propre couleur, masques des mots compris (refonte A).
     const couleurs = await titre.evaluate((h1) => [h1, ...h1.querySelectorAll('*')].map((e) => getComputedStyle(e).color));
     expect(new Set(couleurs).size).toBe(1);
     await expect(titre).toHaveCSS('text-wrap', /balance/);
 
-    // Le sous-titre suit le titre : la seule mention de l'IA au-dessus de la
-    // liste, avec ce qu'elle garantit.
-    const sousTitre = titre.locator('xpath=following-sibling::p[1]');
-    await expect(sousTitre).toContainText('l’assistant IA répond en citant les articles');
-    const contenu = (await page.locator('#contenu').innerText()).split('Parcourir par domaine')[0];
-    expect(contenu.match(/\bIA\b/g) ?? []).toHaveLength(2); // l'onglet « Assistant IA » et le sous-titre
+    // La garantie de l'assistant, dite par ce qu'il fait : le surtitre, au
+    // dessus du titre (il remplace le sous-titre de Q1 A).
+    await expect(page.getByTestId('accueil-surtitre')).toContainText('chaque réponse cite ses articles');
+    // Au-dessus des domaines, l'IA n'est nommée qu'une fois : la bascule
+    // « Assistant IA » du champ unique (plus d'onglet sous le titre).
+    const contenu = (await page.locator('#contenu').innerText()).split('Parcourir le droit')[0];
+    expect(contenu.match(/\bIA\b/g) ?? []).toHaveLength(1);
   });
 });
 
@@ -120,9 +123,14 @@ test.describe('Sans JavaScript : la recherche aboutit (P8)', () => {
     test('le formulaire de l’accueil arrive sur /search AVEC ses résultats', async ({ page }) => {
       await enregistrerLaRecherche(page.request, ['bail commercial']);
       await ouvrirAuServeur(page, '/');
-      const champ = page.locator('#contenu').getByRole('searchbox', { name: 'Rechercher', exact: true });
+      // Le champ unique (refonte A) est une zone de texte : sans JavaScript,
+      // Entrée y va à la ligne, et c'est le bouton d'envoi, « Rechercher »,
+      // qui part (décision H12).
+      const champ = page
+        .locator('#contenu')
+        .getByRole('textbox', { name: 'Votre question ou votre recherche', exact: true });
       await champ.fill('bail commercial');
-      await champ.press('Enter');
+      await page.locator('#contenu').getByRole('button', { name: 'Rechercher', exact: true }).click();
 
       await expect(page).toHaveURL(/\/search\?q=bail\+commercial$/);
       await expect(page.getByTestId('search-status')).toContainText(String(REPONSE_RECHERCHE.total));

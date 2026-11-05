@@ -7,6 +7,8 @@
  */
 import { expect, test } from '@playwright/test';
 
+import { exiger } from '../doublures';
+
 test.describe('Sans JavaScript', () => {
   test.use({ javaScriptEnabled: false });
 
@@ -25,6 +27,18 @@ test.describe('Sans JavaScript', () => {
       await expect(page.getByTestId(bouton)).toBeDisabled();
     });
   }
+
+  // L'inverse sur l'accueil (refonte A, H10) : son formulaire GET marche sans
+  // JavaScript. Le bouton d'envoi y est donc actif, et nommé pour ce qu'il
+  // fait alors : « Rechercher ».
+  test('/ : l’envoi du champ unique reste actif, et cherche', async ({ page }) => {
+    const statut = (await page.goto('/'))?.status() ?? 0;
+    exiger(statut !== 503, '/ : API indisponible (503)');
+    const envoi = page.locator('#contenu form[role="search"][action="/search"] button[type="submit"]');
+    await expect(envoi).toBeEnabled();
+    await expect(envoi).toHaveAccessibleName('Rechercher');
+    await expect(page.locator('#contenu textarea[name="q"]')).toBeEditable();
+  });
 });
 
 test.describe('Icône du thème', () => {

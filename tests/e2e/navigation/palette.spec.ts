@@ -53,7 +53,10 @@ test('ouverte, la palette rend la page inerte ; Échap rend le focus à la loupe
   await page.keyboard.press('Shift+Tab');
   expect(await ouEstLeFocus(page)).not.toBe('page');
   // … et la page refuse le focus qu'on lui donne.
-  await page.locator('#contenu').getByRole('searchbox', { name: 'Rechercher', exact: true }).focus();
+  await page
+    .locator('#contenu')
+    .getByRole('textbox', { name: 'Votre question ou votre recherche', exact: true })
+    .focus();
   expect(await ouEstLeFocus(page)).not.toBe('page');
 
   await page.keyboard.press('Escape');
