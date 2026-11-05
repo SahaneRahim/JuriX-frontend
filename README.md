@@ -189,8 +189,9 @@ src/lib/
   icones.ts          les icônes du site (SVG Lucide), dessinées par components/Icone
   stores/            language (i18n), auth, theme, persona
   actions/           piegerFocus : le focus clavier des fenêtres modales
-  components/        SearchBar, SearchResultCard, StatusBadge, ImagePdfViewer,
-                     ChoixPersona (la question du profil), admin/
+  components/        SearchBar, SearchResultCard, BalanceAnimee, StatusBadge,
+                     ImagePdfViewer, ChoixPersona (la question du profil),
+                     accueil/, admin/, chat/, listes/, loi/
 src/hooks.server.ts  rendu serveur : noindex des pages privées, appels de
                      l'API par le réseau interne, journal des erreurs sans jeton
 src/error.html       page de dernier recours, sans JavaScript

@@ -112,9 +112,20 @@ async function categorieFournie(request: APIRequestContext): Promise<number | nu
 async function articleDuBlog(request: APIRequestContext): Promise<string | null> {
   const reponse = await request.get(`${API}/api/v1/blog`, { failOnStatusCode: false }).catch(() => null);
   if (reponse?.ok()) {
-    const articles = (await reponse.json().catch(() => [])) as { slug?: string }[];
-    const slug = Array.isArray(articles) ? articles.find((a) => a.slug)?.slug : undefined;
-    if (slug) return slug;
+    const articles = (await reponse.json().catch(() => [])) as {
+      slug?: string;
+      etat_publication?: string;
+      etatPublication?: string;
+    }[];
+    // POURQUOI : l'API locale ou les bases de test peuvent contenir les
+    // articles non consolidés du 26/10, que `+page.server.ts` écarte en 404
+    // (décision du 30/10, `servableAuPublic`). On n'ouvre que les articles
+    // explicitement « publiable » ; sinon on se replie sur l'article de la
+    // rédaction, toujours servi en 200 par la route.
+    const publiable = Array.isArray(articles)
+      ? articles.find((a) => a.slug && (a.etat_publication === 'publiable' || a.etatPublication === 'publiable'))
+      : undefined;
+    if (publiable?.slug) return publiable.slug;
   }
   const source = fs.readFileSync(new URL('../../src/lib/data/blog.ts', import.meta.url), 'utf8');
   return /\bslug:\s*'([^']+)'/.exec(source)?.[1] ?? null;
