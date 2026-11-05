@@ -1,6 +1,34 @@
 <script lang="ts">
+  /**
+   * Comparer deux régimes : deux recherches distinctes dans le corpus, puis
+   * une grille sourcée article par article, dont chaque cellule se vérifie
+   * (le texte de l'article cité se déplie sous elle).
+   *
+   * REFONTE A, NIVEAU A (docs/refonte/PASSATION.md, étape E7, décision R2).
+   * La structure ne change pas : formulaire, tableau rangé en cartes sous lg,
+   * rôles ARIA, `data-testid` et `id` sont ceux d'avant. La page reprend le
+   * style et le mouvement de Comparer.dc.html :
+   * - pendant l'attente, la balance pèse (BalanceAnimee, `attente`) à la
+   *   place des trois points qui rebondissaient ; la région `compare-loading`
+   *   (`role="status"`) et son libellé disent toujours l'attente ;
+   * - à l'arrivée, les lignes de la grille viennent l'une après l'autre ; à
+   *   partir de lg, la cellule du premier sujet vient de la gauche, celle du
+   *   second de la droite (`mv-comparer`, src/lib/mouvement.css) ;
+   * - « Voir le texte » déroule l'article cité en place, et son chevron
+   *   tourne ;
+   * - la grille est une carte à filets, ses en-têtes sur le fond `fill`, et
+   *   le texte cité est en Literata Texte (`font-texte`).
+   * Le gréement de la maquette (les deux champs suspendus à un fléau : le
+   * niveau B) n'est PAS repris : il change la structure du formulaire, et
+   * reste à valider à 768 et 1 024 px, que la maquette ne montre pas (R2).
+   * En mouvement réduit, rien ne bouge : la balance reste droite, la grille
+   * est là d'un coup, le texte se déplie sans glisser.
+   */
   import { onMount } from "svelte";
+  import { quintOut } from "svelte/easing";
+  import { slide } from "svelte/transition";
   import { API_URL } from "$lib/api";
+  import BalanceAnimee from "$lib/components/BalanceAnimee.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
@@ -9,6 +37,7 @@
   import { nomCourtDuTexte, typographieDesNumeros } from "$lib/sources";
   import { tr } from "$lib/stores/language";
   import { language } from "$lib/stores/language";
+  import { duree } from "$lib/mouvement";
   import type { ComparisonCell, ComparisonResponse, ComparisonRow, SourceRef } from "$lib/types";
 
   let sujetA = "";
@@ -62,6 +91,30 @@
   function nomDeLaSource(source: SourceRef, t: (cle: string) => string): string {
     return typographieDesNumeros(nomCourtDuTexte(source.law_title, source.reference)) || t("chat.citation.sansIntitule");
   }
+
+  /**
+   * Délai d'arrivée de la ligne `i` de la grille (0 pour la première), en
+   * millisecondes : la variable `--d` de `mv-comparer`.
+   *
+   * POURQUOI 150 MS PUIS 160 PAR RANG, PLAFONNÉ AU SIXIÈME. Ce sont les délais
+   * de la maquette (`--r * 160ms + 150ms`) : la grille arrive juste après
+   * l'attente, une ligne après l'autre, de haut en bas. Au-delà du sixième
+   * rang, le délai ne croît plus : aucune ligne ne part après 950 ms, et aucun
+   * délai d'entrée ne dépasse une seconde (décision D9), même pour une grille
+   * de douze critères ; les dernières, hors du premier écran, arrivent
+   * ensemble.
+   */
+  function delaiDeLaLigne(i: number): number {
+    return 150 + Math.min(i, 5) * 160;
+  }
+
+  /**
+   * Ce qui suit la grille (différences, angles morts, note de l'IA) arrive
+   * 300 ms après le départ de sa dernière ligne, et jamais après une seconde
+   * (D9 : la note de la maquette attendait 1,2 s). « Une seule chose animée
+   * à la fois » (A2 § 1) : la grille, puis ce qu'on en tire.
+   */
+  $: delaiDeLaSuite = resultat ? Math.min(delaiDeLaLigne(Math.max(resultat.rows.length - 1, 0)) + 300, 1000) : 0;
 
   function basculer(cle: string) {
     const copie = new Set(depliees);
@@ -211,20 +264,22 @@
         data-testid="compare-loading"
         class="flex items-center gap-3 text-zinc-600 dark:text-zinc-300"
       >
-        <!-- motion-safe : un rebond est un déplacement, coupé quand le système
-             demande de réduire les animations ; le libellé suffit alors. -->
-        <span class="flex items-center gap-1" aria-hidden="true">
-          <span class="w-2 h-2 bg-zinc-900 dark:bg-zinc-100 rounded-full motion-safe:animate-bounce" style="animation-delay: 0ms"></span>
-          <span class="w-2 h-2 bg-zinc-900 dark:bg-zinc-100 rounded-full motion-safe:animate-bounce" style="animation-delay: 150ms"></span>
-          <span class="w-2 h-2 bg-zinc-900 dark:bg-zinc-100 rounded-full motion-safe:animate-bounce" style="animation-delay: 300ms"></span>
-        </span>
+        <!-- La balance pèse tant que la comparaison est en cours (A2 § 3.1 :
+             elle dit une attente RÉELLE, et s'arrête avec elle), à la place
+             des trois points qui rebondissaient. Décorative (`aria-hidden`,
+             sans `role`) : c'est le libellé de cette région `role="status"`
+             qui annonce l'attente. En mouvement réduit, elle reste droite ;
+             le libellé suffit alors. Une seule balance : le bouton dit
+             « Comparaison en cours… » sans en porter une seconde, qui
+             peserait en même temps (« une seule chose animée à la fois »). -->
+        <BalanceAnimee etat="attente" class="text-xl text-zinc-950 dark:text-white" />
         {$tr("compare.loading")}
       </div>
     {:else if erreur}
       <div
         role="alert"
         data-testid="compare-error"
-        class="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+        class="flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
       >
         <Icone nom="circle-alert" class="mt-0.5 text-base" />
         <div class="min-w-0">
@@ -258,7 +313,7 @@
           <div
             role="alert"
             data-testid="compare-unmatched"
-            class="mb-6 flex gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
+            class="mb-6 flex gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
           >
             <Icone nom="triangle-alert" class="mt-0.5 text-base text-zinc-950 dark:text-white" />
             <div class="min-w-0">
@@ -302,46 +357,77 @@
           dans le tableau : les colonnes ont beau être fixées, une coupure
           « n'importe où » n'y sert à rien, un mot trop long pour sa colonne se
           coupe de toute façon.
+
+          REFONTE A (E7, Comparer.dc.html). À partir de lg, le tableau est une
+          carte à filets : un cadre arrondi, des filets d'un pixel entre les
+          lignes et entre les colonnes, l'en-tête sur le fond `fill`
+          (zinc-100), le critère en demi-gras d'encre. Le cadre coupe ce qui
+          dépasse (`overflow-hidden`) : ses coins arrondis, et les cellules
+          qui arrivent de côté (48 px, `mv-comparer`). Il remplace un
+          `overflow-x-auto` : une barre de défilement aurait clignoté pendant
+          l'arrivée, et le tableau, `table-fixed` à pleine largeur, ne
+          déborde jamais de lui-même ; il n'y avait rien à faire défiler.
+          Sous lg, les cartes empilées ne changent pas.
         -->
-        <div class="lg:overflow-x-auto">
+        <div
+          class="lg:overflow-hidden lg:rounded-2xl lg:border lg:border-zinc-200 lg:bg-white lg:dark:border-zinc-800 lg:dark:bg-zinc-900"
+        >
           <!-- L'exception vaut pour tout le tableau : rôles redondants voulus. -->
           <!-- svelte-ignore a11y_no_redundant_roles -->
           <table role="table" class="block w-full border-collapse text-sm lg:table lg:table-fixed">
             <caption class="sr-only">
               {$tr("compare.title")}{deuxPoints} {resultat.subject_a} / {resultat.subject_b}
             </caption>
+            <!-- En-tête sur le fond `fill`, en demi-gras d'encre, « Critère »
+                 compris : en zinc-500 sur zinc-100, il ne tiendrait plus
+                 4,5:1 (A3 § 1, `--tx3`). -->
             <thead class="hidden lg:table-header-group">
-              <tr class="border-b-2 border-zinc-300 dark:border-zinc-700">
-                <th scope="col" class="w-48 text-left p-3 font-semibold text-zinc-500 dark:text-zinc-400">
+              <tr class="border-b border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-800">
+                <th scope="col" class="w-48 px-4 py-3 text-left font-semibold text-zinc-950 dark:text-white">
                   {$tr("compare.criterion")}
                 </th>
-                <th scope="col" class="text-left p-3 font-semibold break-words text-zinc-950 dark:text-white">
+                <th
+                  scope="col"
+                  class="border-l border-zinc-200 px-4 py-3 text-left font-semibold break-words text-zinc-950 dark:border-zinc-800 dark:text-white"
+                >
                   {resultat.subject_a}
                 </th>
-                <th scope="col" class="text-left p-3 font-semibold break-words text-zinc-950 dark:text-white">
+                <th
+                  scope="col"
+                  class="border-l border-zinc-200 px-4 py-3 text-left font-semibold break-words text-zinc-950 dark:border-zinc-800 dark:text-white"
+                >
                   {resultat.subject_b}
                 </th>
               </tr>
             </thead>
             <tbody role="rowgroup" class="block space-y-4 lg:table-row-group lg:space-y-0">
               {#each resultat.rows as ligne, i}
+                <!-- `--d` : le délai d'arrivée de la ligne, posé sur elle et
+                     hérité par ses trois cellules, qui portent l'animation
+                     (`mv-comparer`) : elles arrivent ensemble, chacune de son
+                     côté à partir de lg. -->
                 <tr
                   role="row"
-                  class="block rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 align-top lg:table-row lg:rounded-none lg:border-0 lg:border-b lg:bg-transparent lg:dark:bg-transparent lg:p-0"
+                  style="--d: {delaiDeLaLigne(i)}ms"
+                  class="block rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 align-top lg:table-row lg:rounded-none lg:border-0 lg:border-b lg:last:border-b-0 lg:bg-transparent lg:dark:bg-transparent lg:p-0"
                 >
                   <th
                     scope="row"
                     role="rowheader"
-                    class="block text-left text-base font-semibold coupe-mots lg:break-words text-zinc-950 dark:text-white lg:table-cell lg:p-3 lg:text-sm lg:font-medium lg:text-zinc-500 lg:dark:text-zinc-400"
+                    class="mv-comparer block text-left text-base font-semibold coupe-mots lg:break-words text-zinc-950 dark:text-white lg:table-cell lg:p-4 lg:text-sm"
                   >
                     {ligne.criterion}
                   </th>
                   {#each colonnes(ligne) as { cote, cellule }}
+                    {@const ouvert = depliees.has(`${i}:${cote}`)}
+                    <!-- Sous lg, le filet de 4 px à gauche (plein pour A,
+                         gris pour B) ; à partir de lg, le filet d'un pixel
+                         entre deux colonnes. -->
                     <td
                       role="cell"
-                      class="mt-3 block border-l-4 pl-3 coupe-mots lg:break-words text-zinc-800 dark:text-zinc-200 lg:mt-0 lg:table-cell lg:border-l-0 lg:p-3 {cote === 'a'
-                        ? 'border-zinc-950 dark:border-white'
-                        : 'border-zinc-400 dark:border-zinc-600'}"
+                      class="mv-comparer mt-3 block border-l-4 pl-3 coupe-mots lg:break-words text-zinc-700 dark:text-zinc-300 lg:mt-0 lg:table-cell lg:border-l lg:border-zinc-200 lg:p-4 lg:dark:border-zinc-800 {cote === 'a'
+                        ? 'mv-comparer--a border-zinc-950 dark:border-white'
+                        : 'mv-comparer--b border-zinc-400 dark:border-zinc-600'}"
                     >
                       <!-- Lu aussi par les lecteurs d'écran : sous lg, c'est le
                            seul lien entre la cellule et son sujet. -->
@@ -354,20 +440,21 @@
                       </p>
                       <!-- L'absence est écrite en gris, mais lisible : zinc-500
                            (zinc-400 en sombre) est le plus pâle qui tienne 4,5:1,
-                           sur la carte blanche comme sur le fond de page. -->
-                      <p class:italic={!cellule.sources.length}
-                         class:text-zinc-500={!cellule.sources.length}
-                         class:dark:text-zinc-400={!cellule.sources.length}>
+                           sur la carte blanche comme sur le fond de page. Sans
+                           italique, comme la maquette : c'est la phrase qui dit
+                           l'absence, et aucune bascule ne la suit. -->
+                      <p class={cellule.sources.length ? undefined : "text-zinc-500 dark:text-zinc-400"}>
                         {cellule.value}
                       </p>
                       {#if cellule.sources.length}
                         <!-- Puces et bascule de 44 px : ce sont les seuls
                              moyens de vérifier une citation, et elles
-                             faisaient 20 px de haut. Réduites à partir de lg
-                             sous un pointeur fin seulement : une tablette est
-                             un écran tactile. Même puce que les articles
-                             trouvés de /search (SearchResultCard) : badge
-                             zinc, inversé au survol.
+                             faisaient 20 px de haut. Réduites à 28 px (la
+                             maquette) à partir de lg sous un pointeur fin
+                             seulement : une tablette est un écran tactile.
+                             Même puce que les articles trouvés de /search
+                             (SearchResultCard) et que la maquette : pastille
+                             bordée, l'encre au survol.
                              Une puce tient sur UNE ligne : coupée en deux
                              dans sa pastille (« … MINFI/MINCOMMERCE · » puis
                              « art. 4 », ou « … 40-2 » puis « (nouveau) »),
@@ -391,29 +478,37 @@
                             <a
                               href="/laws/{source.law_id}?article={encodeURIComponent(source.number)}"
                               title={source.law_title}
-                              class="inline-flex min-h-11 min-w-0 max-w-full items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium lg:px-2 lg:py-0.5 lg:[@media(pointer:fine)]:min-h-0 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-950 hover:bg-zinc-950 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-zinc-950 transition-colors"
+                              class="inline-flex min-h-11 min-w-0 max-w-full items-center whitespace-nowrap rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition-colors hover:border-zinc-950 hover:text-zinc-950 lg:px-2.5 lg:py-0.5 lg:[@media(pointer:fine)]:min-h-7 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white dark:hover:text-white"
                             >
                               <span class="min-w-0 truncate">{nomDeLaSource(source, $tr)}</span><span class="shrink-0">&nbsp;· art.&nbsp;{source.number}</span>
                             </a>
                           {/each}
+                          <!-- « Voir le texte » : sans soulignement, avec un
+                               chevron qui tourne d'un demi-tour quand le texte
+                               est déplié (`mv-ouvert` et `mv-chevron`,
+                               src/lib/mouvement.css : l'état tourné est
+                               statique, seule la rotation est sous
+                               « no-preference »). Nom accessible inchangé : le
+                               libellé visible y est en tête. -->
                           <button
                             on:click={() => basculer(`${i}:${cote}`)}
                             data-testid="compare-toggle-{i}-{cote}"
-                            aria-expanded={depliees.has(`${i}:${cote}`)}
+                            aria-expanded={ouvert}
                             aria-controls="src-{i}-{cote}"
-                            aria-label="{depliees.has(`${i}:${cote}`)
+                            aria-label="{ouvert
                               ? $tr('compare.hideText')
                               : $tr('compare.showText')} — {ligne.criterion}, {cote === 'a'
                               ? resultat.subject_a
                               : resultat.subject_b}"
-                            class="inline-flex min-h-11 items-center whitespace-nowrap px-1 text-sm lg:px-0 lg:text-xs lg:[@media(pointer:fine)]:min-h-0 text-zinc-950 dark:text-white underline decoration-zinc-300 dark:decoration-zinc-600 underline-offset-4 hover:decoration-zinc-950 dark:hover:decoration-white"
+                            class="inline-flex min-h-11 items-center gap-1 whitespace-nowrap px-1 text-sm font-semibold text-zinc-600 transition-colors hover:text-zinc-950 lg:px-0 lg:text-xs lg:[@media(pointer:fine)]:min-h-7 dark:text-zinc-400 dark:hover:text-white {ouvert
+                              ? 'mv-ouvert'
+                              : ''}"
                           >
-                            {depliees.has(`${i}:${cote}`)
-                              ? $tr("compare.hideText")
-                              : $tr("compare.showText")}
+                            {ouvert ? $tr("compare.hideText") : $tr("compare.showText")}
+                            <Icone nom="chevron-down" class="mv-chevron text-base lg:text-sm" />
                           </button>
                         </div>
-                        {#if depliees.has(`${i}:${cote}`)}
+                        {#if ouvert}
                           <!--
                             Le texte intégral de l'article cité, sous la cellule.
                             C'est ce qui rend visible une citation surnuméraire :
@@ -425,31 +520,49 @@
                             une carte large (de 768 à 1 024 px), la ligne
                             dépassait 100 caractères ; dans le tableau, la
                             colonne la borne déjà.
-                            Bloc dans une carte (guide, § 4.1) sous lg ; à
-                            partir de lg, les lignes du tableau sont posées
-                            sur le fond de la page (zinc-50), et l'extrait y
-                            prend le blanc des panneaux, comme l'encadré des
-                            citations orphelines : en zinc-50, il n'en était
-                            qu'un contour.
+
+                            Il se DÉROULE en place (A2 § 3.8) : `slide` de
+                            Svelte, 500 ms, sur la courbe commune (`quintOut`
+                            est la fonction dont cubic-bezier(.22,1,.36,1),
+                            COURBE de $lib/mouvement, est le tracé usuel : une
+                            transition Svelte prend une fonction, pas une
+                            courbe CSS). POURQUOI `slide` ET {#if}, et non la
+                            grille 0fr → 1fr de la maquette : replié, le texte
+                            n'est pas dans la page (aucun lien à tabuler, rien
+                            de lu par un lecteur d'écran), et `slide` l'anime
+                            à l'entrée comme à la sortie ; `duree` le rend
+                            immédiat en mouvement réduit. Transition locale :
+                            elle ne joue qu'à la bascule, pas quand une
+                            nouvelle comparaison remplace la grille.
+
+                            Le texte officiel, cité mot pour mot, en Literata
+                            Texte (`font-texte`, 15 px : la maquette), sur le
+                            fond `fill` (zinc-100), sans bordure, à toute
+                            largeur. Sa ligne de référence reste en Inter, en
+                            zinc-600 : zinc-500 ne tiendrait pas 4,5:1 sur
+                            zinc-100 (A3 § 1).
                           -->
                           <div
                             id="src-{i}-{cote}"
                             data-testid="compare-source-{i}-{cote}"
-                            class="mt-2 max-w-[65ch] space-y-3 p-3 rounded-xl bg-zinc-50 lg:bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/60"
+                            transition:slide={{ duration: duree(500), easing: quintOut }}
+                            class="mt-2 max-w-[65ch] space-y-3 rounded-xl bg-zinc-100 p-3 dark:bg-zinc-800"
                           >
                             {#each cellule.sources as source}
                               <div>
-                                <p class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                                <p class="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                                   {nomDeLaSource(source, $tr)} — Art. {source.number}
                                   {#if source.page_number}· p. {source.page_number}{/if}
                                 </p>
-                                <!-- text-sm à toute taille : le texte de
+                                <!-- 15 px à toute taille : le texte de
                                      l'article est ce qu'on vient lire. En
                                      md:text-xs, il passait à 12 px, et la
                                      hauteur de ligne de text-xs (16 px), écrite
                                      après leading-relaxed dans la feuille de
                                      styles, serrait les lignes. -->
-                                <p class="text-sm leading-relaxed whitespace-pre-line text-zinc-700 dark:text-zinc-300">
+                                <p
+                                  class="mt-1 whitespace-pre-line font-texte text-[15px] leading-relaxed text-zinc-950 dark:text-zinc-100"
+                                >
                                   {source.content}
                                 </p>
                               </div>
@@ -465,8 +578,10 @@
           </table>
         </div>
 
+        <!-- Les différences, les angles morts et la note de l'IA arrivent
+             après la grille, en fondu (`delaiDeLaSuite`). -->
         {#if resultat.key_differences.length}
-          <section class="mt-8">
+          <section class="mt-8 mv-fondre" style="--d: {delaiDeLaSuite}ms; --mv-duree: 600ms">
             <h2 class="font-bold text-zinc-950 dark:text-white mb-2">
               {$tr("compare.differences")}
             </h2>
@@ -477,7 +592,11 @@
         {/if}
 
         {#if resultat.blind_spots.length}
-          <section class="mt-6" data-testid="compare-blindspots">
+          <section
+            class="mt-6 mv-fondre"
+            style="--d: {delaiDeLaSuite}ms; --mv-duree: 600ms"
+            data-testid="compare-blindspots"
+          >
             <h2 class="font-bold text-zinc-950 dark:text-white mb-2">
               {$tr("compare.blindSpots")}
             </h2>
@@ -490,16 +609,22 @@
         <!-- Les durées de la recherche et de la génération ne disent rien au
              lecteur : elles passent dans l'infobulle, pour qui veut les voir.
              « 2 + 1 » insécable : coupé, le « + » restait seul en fin de
-             ligne. -->
-        <p class="mt-8 text-xs italic text-zinc-500 dark:text-zinc-400">
-          {$tr("compare.disclaimer")}
-          <span
-            class="not-italic"
-            title={$tr("compare.timing")
-              .replace("{r}", String(resultat.retrieval_time_ms))
-              .replace("{g}", String(resultat.generation_time_ms))}
-            >({$tr("compare.articlesRead")}{deuxPoints} {resultat.articles_a.length}&nbsp;+&nbsp;{resultat.articles_b.length})</span
-          >
+             ligne. La note de la maquette : l'icône d'information devant,
+             13 px, en zinc-500 (4,6:1 sur le fond de page), sans italique. -->
+        <p
+          class="mt-8 flex items-start gap-2 text-[13px] leading-[18px] text-zinc-500 dark:text-zinc-400 mv-fondre"
+          style="--d: {delaiDeLaSuite}ms; --mv-duree: 600ms"
+        >
+          <Icone nom="circle-alert" class="mt-px text-[15px]" />
+          <span>
+            {$tr("compare.disclaimer")}
+            <span
+              title={$tr("compare.timing")
+                .replace("{r}", String(resultat.retrieval_time_ms))
+                .replace("{g}", String(resultat.generation_time_ms))}
+              >({$tr("compare.articlesRead")}{deuxPoints} {resultat.articles_a.length}&nbsp;+&nbsp;{resultat.articles_b.length})</span
+            >
+          </span>
         </p>
       </div>
     {/if}

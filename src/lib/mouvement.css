@@ -418,6 +418,46 @@
   }
 
   /* -------------------------------------------------------------------------
+   * Comparer (A1 § 7, PASSATION E7) : les lignes de la grille de /compare
+   * arrivent l'une après l'autre (--d, posé sur la ligne et hérité par ses
+   * trois cellules). À partir de lg, en tableau, la cellule du premier sujet
+   * vient de la gauche et celle du second de la droite (fromL et fromR de
+   * Comparer.dc.html), le critère apparaît sur place. Sous lg, les cellules
+   * montent dans leur carte : venue de côté, une carte pleine largeur
+   * sortirait de l'écran, et la page glisserait (responsif.spec.ts).
+   *
+   * POURQUOI UNE SEULE ANIMATION, RÉGLÉE PAR VARIABLES. Une animation pour
+   * les cartes et une autre pour le tableau changeraient de nom au passage de
+   * lg : un changement de nom relance l'animation, et la grille déjà lue
+   * disparaîtrait puis reviendrait à chaque redimensionnement qui franchit
+   * 1 024 px. Le nom reste le même à toute largeur ; seules les distances
+   * changent, et une animation finie ne repart pas quand elles changent.
+   * ----------------------------------------------------------------------- */
+  .mv-comparer {
+    --mv-comparer-x: 0px;
+    --mv-comparer-y: 14px;
+    animation: mv-comparer 0.7s var(--mv-courbe) var(--d, 0ms) backwards;
+  }
+
+  @media (min-width: 1024px) {
+    .mv-comparer {
+      --mv-comparer-y: 0px;
+    }
+
+    .mv-comparer--a {
+      --mv-comparer-x: -48px;
+    }
+
+    .mv-comparer--b {
+      --mv-comparer-x: 48px;
+    }
+  }
+
+  @keyframes mv-comparer {
+    from { opacity: 0; transform: translate(var(--mv-comparer-x), var(--mv-comparer-y)); }
+  }
+
+  /* -------------------------------------------------------------------------
    * Tracer : le trait qui relie la note de lecture à son passage (A2 § 4),
    * dessiné depuis le passage ; délai sous 1 s (D9 : la maquette disait
    * 1,2 s).

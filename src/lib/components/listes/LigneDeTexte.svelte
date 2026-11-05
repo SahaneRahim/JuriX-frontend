@@ -29,11 +29,33 @@
   /** Une ligne déjà réduite au serveur (`ligneAffichee`). */
   export let ligne: LigneAffichee;
 
+  /**
+   * Rang de la ligne dans le lot que « Afficher 20 de plus » vient d'ajouter
+   * (0 pour la première) ; `null` pour toute autre ligne, qui ne bouge pas
+   * (ListeDeTextes, `apparitions`).
+   *
+   * POURQUOI 80 MS PAR RANG, PLAFONNÉ AU CINQUIÈME (refonte A, décision R9,
+   * A2 § 4). Les lignes ajoutées montent l'une après l'autre, comme les
+   * résultats de /search ; au-delà du cinquième rang, le décalage ne croît
+   * plus : un lot de vingt est entier à l'écran en moins d'une seconde, et ses
+   * dernières lignes, hors du premier écran, montent ensemble. La classe vit
+   * dans src/lib/mouvement.css, sous « no-preference » : en mouvement réduit,
+   * la ligne est là d'un coup.
+   */
+  export let apparition: number | null = null;
+
+  $: delai = apparition === null ? 0 : Math.min(Math.max(apparition, 0), 5) * 80;
+
   $: reperes = reperesDuTexte(ligne, { langue: $language.current, traduire: $tr, suite: "articles" });
   $: intitule = intituleDuTexte(ligne);
 </script>
 
-<li>
+<!-- `mv-monter` sur le <li> et non sur le lien : le filet qui le sépare de la
+     ligne d'avant (`divide-y` de la liste) monte avec lui. -->
+<li
+  class={apparition === null ? undefined : "mv-monter"}
+  style={apparition === null ? undefined : `--d: ${delai}ms`}
+>
   <!-- `id` : après « Afficher 20 de plus », le focus passe à la première
        ligne ajoutée (ListeDeTextes). Anneau de focus à l'intérieur de la
        ligne : la liste coupe ce qui dépasse de ses coins arrondis. -->

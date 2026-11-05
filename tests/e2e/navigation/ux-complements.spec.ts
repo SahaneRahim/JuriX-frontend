@@ -253,6 +253,44 @@ test.describe('Listes de textes (P11 A)', () => {
     const attendu = corps.items[0];
     await expect(objet).toHaveText(attendu.objet ?? attendu.title);
   });
+
+  // Refonte A (E7) : seules les lignes d'un lot ajouté sous les yeux
+  // apparaissent ; le premier lot, rendu au serveur, se lit tel quel.
+  test('/laws, avec JavaScript : « Afficher 20 de plus » ajoute un lot ; seules ses lignes montent, le focus va à la première', async ({
+    page,
+    request,
+  }) => {
+    const lot = await request
+      .get(`${API}/api/v1/laws/?page=1&page_size=20&sort=date_desc`, { failOnStatusCode: false })
+      .catch(() => null);
+    exiger(lot?.ok(), 'API injoignable');
+    const corps = await lot!.json();
+    test.skip(Array.isArray(corps), 'ancienne API : pas de lots');
+    exiger((corps.total ?? 0) > 40, 'moins de 41 textes : pas de troisième lot');
+
+    await ouvrirAuServeur(page, '/laws');
+    await expect(lignes(page)).toHaveCount(20);
+    const montantes = page.locator('#contenu ul[role="list"] > li.mv-monter');
+    await expect(montantes).toHaveCount(0);
+
+    // Un clic parti avant l'hydratation suit le lien (?page=2, rendu au
+    // serveur, sans rien ajouter) : répété jusqu'à ce que la liste s'allonge.
+    await cliquerJusqualEffet(page.getByRole('link', { name: /^Afficher \d+ de plus$/ }), lignes(page).nth(20));
+
+    const total = await lignes(page).count();
+    expect(total).toBeGreaterThan(20);
+    await expect(montantes).toHaveCount(total - 20);
+    await expect(lignes(page).nth(19)).not.toHaveClass(/\bmv-monter\b/);
+    await expect(lignes(page).nth(20)).toHaveClass(/\bmv-monter\b/);
+    // Le délai cesse de croître au cinquième rang (R9) : 0, 80… 400 ms.
+    await expect(lignes(page).nth(20)).toHaveCSS('animation-delay', '0s');
+    await expect(lignes(page).nth(25)).toHaveCSS('animation-delay', '0.4s');
+    await expect(lignes(page).nth(30)).toHaveCSS('animation-delay', '0.4s');
+    // Le lot arrivé, la balance du lien s'en va avec l'attente.
+    await expect(page.locator('#contenu a[data-sveltekit-noscroll] svg.mv-balance')).toHaveCount(0);
+    // Au clavier, on poursuit là où la liste s'arrêtait.
+    await expect(lignes(page).nth(20).locator('a')).toBeFocused();
+  });
 });
 
 // ---------------------------------------------------------------------------

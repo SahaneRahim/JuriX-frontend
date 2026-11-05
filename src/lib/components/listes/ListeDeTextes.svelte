@@ -29,6 +29,7 @@
    */
   import { tick } from "svelte";
   import { afterNavigate } from "$app/navigation";
+  import BalanceAnimee from "$lib/components/BalanceAnimee.svelte";
   import { language, tr } from "$lib/stores/language";
   import type { TriDesTextes } from "$lib/types";
   import LigneDeTexte from "./LigneDeTexte.svelte";
@@ -63,6 +64,20 @@
   let aFocaliser: number | null = null;
   /** Un lot demandé par le bouton, pas encore arrivé. */
   let demande = false;
+  /**
+   * Les lignes du dernier lot ajouté par « Afficher 20 de plus », chacune avec
+   * son rang dans ce lot (0 pour la première) : elles seules apparaissent
+   * (LigneDeTexte, `apparition`).
+   *
+   * POURQUOI LES LIGNES AJOUTÉES SEULEMENT (refonte A, E7). Le premier lot est
+   * rendu par le serveur : il doit se lire tel quel, sans JavaScript et sans
+   * attendre une animation. Une liste reprise par `restaurer` (retour arrière,
+   * jusqu'à 60 lignes d'un coup) ramène à une lecture en cours : rien n'y
+   * monte. Et un autre filtre repart du seul lot reçu, comme une page neuve.
+   * Seul le lot qui s'ajoute sous les yeux dit, en montant, ce qui vient
+   * d'arriver.
+   */
+  let apparitions = new Map<number, number>();
 
   /**
    * Un clic qui reste dans la page (ni nouvel onglet ni nouvelle fenêtre) :
@@ -91,10 +106,12 @@
       const ajout = recues.filter((l) => !vues.has(l.id));
       affichees = [...affichees, ...ajout];
       aFocaliser = ajout[0]?.id ?? null;
+      apparitions = new Map(ajout.map((l, rang) => [l.id, rang]));
     } else {
       affichees = recues;
       premierePage = n;
       aFocaliser = null;
+      apparitions = new Map();
     }
     derniereCle = c;
     dernierePage = n;
@@ -138,6 +155,7 @@
     derniereCle = reprise.cle;
     aFocaliser = null;
     demande = false;
+    apparitions = new Map();
     void tick().then(() => window.scrollTo(reprise.x, reprise.y));
   }
 
@@ -252,7 +270,7 @@
        ./classes.ts), une seule recette pour les deux. -->
   <ul role="list" data-hors-du-bouton class={LISTE_A_FILETS}>
     {#each affichees as ligne (ligne.id)}
-      <LigneDeTexte {ligne} />
+      <LigneDeTexte {ligne} apparition={apparitions.get(ligne.id) ?? null} />
     {/each}
   </ul>
 
@@ -262,7 +280,14 @@
            maquette. `noscroll` : la liste s'allonge sous les yeux au lieu de
            remonter en haut ; `keepfocus` : le focus est posé ensuite sur la
            première ligne ajoutée (afterNavigate). `aria-busy` le temps que le
-           lot arrive. -->
+           lot arrive.
+           POURQUOI LA BALANCE (refonte A, E7). Le temps que le lot arrive,
+           la balance pèse devant le libellé (A2 § 3.1 : elle dit une attente
+           RÉELLE, ici la demande partie au clic, et s'arrête avec elle). Elle
+           n'existe que pendant `demande` : rendue par le serveur, au repos,
+           elle ne dirait rien. Décorative (`aria-hidden`) : le nom du lien
+           reste « Afficher 20 de plus », et `aria-busy` dit l'attente. En
+           mouvement réduit, elle reste droite. -->
       <a
         href={lienSuivant}
         data-sveltekit-noscroll
@@ -273,6 +298,7 @@
           ? 'opacity-60'
           : ''}"
       >
+        {#if demande}<BalanceAnimee etat="attente" class="text-base" />{/if}
         {remplir($tr("listes.plus"), { n: prochainLot })}
       </a>
       {#if total !== null}

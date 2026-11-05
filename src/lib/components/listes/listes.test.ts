@@ -1,4 +1,4 @@
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -187,6 +187,114 @@ describe('ListeDeTextes', () => {
       // Sans la clé, `t` rendait la clé elle-même des deux côtés : le test
       // passait avec « listes.plageSurTotal » à l'écran.
       expect(progression(container)).not.toContain('listes.');
+    });
+  });
+
+  /**
+   * Le mouvement des listes (refonte A, E7) : la balance pèse dans le lien le
+   * temps qu'un lot arrive, et seules les lignes de ce lot montent. Le premier
+   * lot (rendu au serveur), une liste reprise au retour arrière et une liste
+   * refiltrée ne bougent pas : on y lit, on n'y voit rien arriver.
+   */
+  describe('le mouvement : la balance, puis les lignes ajoutées seulement', () => {
+    /** Un lot de 20 lignes : ids 20·(n-1)+1 à 20·n. */
+    function lot(n: number): LigneAffichee[] {
+      return Array.from({ length: 20 }, (_, i) => ({ ...ANCIENNE, id: 20 * (n - 1) + i + 1, title: `Texte ${20 * (n - 1) + i + 1}` }));
+    }
+    const base = { ...proprietes, chemin: '/laws', filtres: {}, total: 1277, suivante: true, tri: 'date_desc' as const };
+    const lignesDe = (container: HTMLElement) => [...container.querySelectorAll<HTMLLIElement>('ul[role="list"] > li')];
+    const montantes = (container: HTMLElement) => lignesDe(container).filter((li) => li.classList.contains('mv-monter'));
+    /** Le délai d'une ligne, tel que l'écrit son attribut `style` (`--d: 80ms`). */
+    const delai = (li: HTMLLIElement) => li.getAttribute('style')?.match(/--d:\s*([^;]+)/)?.[1].trim();
+    const lienSuivant = (container: HTMLElement) => container.querySelector<HTMLAnchorElement>('a[data-sveltekit-noscroll]')!;
+
+    let defilement: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      defilement = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    });
+    afterEach(() => defilement.mockRestore());
+
+    it('le premier lot, rendu tel quel, ne monte pas', () => {
+      const { container } = render(ListeDeTextes, { props: { ...base, lignes: lot(1), page: 1 } });
+      expect(lignesDe(container)).toHaveLength(20);
+      expect(montantes(container)).toHaveLength(0);
+      expect(lignesDe(container).some((li) => li.hasAttribute('style'))).toBe(false);
+    });
+
+    it('« Afficher 20 de plus » : seules les lignes ajoutées montent, 80 ms d’écart, plafonné au cinquième rang', async () => {
+      const liste = render(ListeDeTextes, { props: { ...base, lignes: lot(1), page: 1 } });
+      await liste.rerender({ lignes: lot(2), page: 2 });
+      const lignes = lignesDe(liste.container);
+      expect(lignes).toHaveLength(40);
+      expect(lignes.slice(0, 20).some((li) => li.classList.contains('mv-monter'))).toBe(false);
+      expect(lignes.slice(20).every((li) => li.classList.contains('mv-monter'))).toBe(true);
+      // R9 : min(rang, 5) × 80 ms ; toute la vingtaine est partie avant 400 ms.
+      expect(lignes.slice(20).map(delai)).toEqual(Array.from({ length: 20 }, (_, rang) => `${Math.min(rang, 5) * 80}ms`));
+    });
+
+    it('un lot de plus : le précédent ne remonte pas, seul le dernier arrive', async () => {
+      const liste = render(ListeDeTextes, { props: { ...base, lignes: lot(1), page: 1 } });
+      await liste.rerender({ lignes: lot(2), page: 2 });
+      await liste.rerender({ lignes: lot(3), page: 3 });
+      const lignes = lignesDe(liste.container);
+      expect(lignes).toHaveLength(60);
+      expect(montantes(liste.container)).toEqual(lignes.slice(40));
+      expect(delai(lignes[40])).toBe('0ms');
+    });
+
+    it('une liste reprise au retour arrière ne monte pas, ses 40 lignes sont là d’un coup', async () => {
+      const premiere = render(ListeDeTextes, { props: { ...base, lignes: lot(1), page: 1 } });
+      await premiere.rerender({ lignes: lot(2), page: 2 });
+      const garde = JSON.parse(JSON.stringify(premiere.component.capturer()));
+      premiere.unmount();
+
+      const retour = render(ListeDeTextes, { props: { ...base, lignes: lot(2), page: 2 } });
+      retour.component.restaurer(garde);
+      await tick();
+      await tick();
+      expect(lignesDe(retour.container)).toHaveLength(40);
+      expect(montantes(retour.container)).toHaveLength(0);
+    });
+
+    it('un autre filtre repart du lot reçu, sans apparition', async () => {
+      const liste = render(ListeDeTextes, { props: { ...base, lignes: lot(1), page: 1 } });
+      await liste.rerender({ lignes: lot(2), page: 2 });
+      await liste.rerender({ filtres: { lang: 'en' }, lignes: lot(5), page: 1 });
+      expect(lignesDe(liste.container)).toHaveLength(20);
+      expect(montantes(liste.container)).toHaveLength(0);
+    });
+
+    it('la balance pèse dans « Afficher 20 de plus » le temps que le lot arrive, sans changer le nom du lien', async () => {
+      const liste = render(ListeDeTextes, { props: { ...base, lignes: lot(1), page: 1 } });
+      const libelle = remplir(t('listes.plus', get(language).current), { n: 20 });
+      expect(lienSuivant(liste.container).querySelector('svg')).toBeNull();
+      expect(lienSuivant(liste.container).hasAttribute('aria-busy')).toBe(false);
+
+      // jsdom ne navigue pas : le clic garde la page, le gestionnaire du lien
+      // (`surDemande`) joue seul.
+      liste.container.addEventListener('click', (evenement) => evenement.preventDefault());
+      await fireEvent.click(lienSuivant(liste.container));
+
+      const lien = lienSuivant(liste.container);
+      expect(lien.getAttribute('aria-busy')).toBe('true');
+      const balance = lien.querySelector('svg.mv-balance');
+      expect(balance?.classList.contains('mv-balance--attente')).toBe(true);
+      // Décorative : ni nom, ni rôle ; le lien garde son nom.
+      expect(balance?.getAttribute('aria-hidden')).toBe('true');
+      expect(balance?.hasAttribute('role')).toBe(false);
+      expect(lien.textContent?.trim()).toBe(libelle);
+
+      // Le lot arrive : la balance s'en va avec l'attente.
+      await liste.rerender({ lignes: lot(2), page: 2 });
+      expect(lienSuivant(liste.container).querySelector('svg')).toBeNull();
+      expect(lienSuivant(liste.container).hasAttribute('aria-busy')).toBe(false);
+    });
+
+    it('un clic qui ouvre un nouvel onglet n’attend rien ici : pas de balance', async () => {
+      const liste = render(ListeDeTextes, { props: { ...base, lignes: lot(1), page: 1 } });
+      liste.container.addEventListener('click', (evenement) => evenement.preventDefault());
+      await fireEvent.click(lienSuivant(liste.container), { ctrlKey: true });
+      expect(lienSuivant(liste.container).querySelector('svg')).toBeNull();
     });
   });
 });
