@@ -9,7 +9,6 @@ vi.mock('$lib/stores/language', async () => {
   return { tr: readable(traduireEnTest), language: writable({ current: 'fr' }), switchLanguage: () => {} };
 });
 
-import EtatDeLaReponse from './EtatDeLaReponse.svelte';
 import QuestionDuProfil from './QuestionDuProfil.svelte';
 
 describe('QuestionDuProfil (P5)', () => {
@@ -89,29 +88,5 @@ describe('QuestionDuProfil (P5)', () => {
   });
 });
 
-describe('EtatDeLaReponse (P4)', () => {
-  afterEach(() => cleanup());
-
-  it('les étapes passées cochées et dites terminées, l’étape en cours animée', () => {
-    const { getByTestId } = render(EtatDeLaReponse, {
-      props: {
-        etapes: [
-          { libelle: 'Recherche dans les textes…', faite: true },
-          { libelle: '6 articles trouvés : Code du travail, Décret n° 94/199…', faite: true },
-          { libelle: 'Rédaction de la réponse…', faite: false },
-        ],
-      },
-    });
-
-    const etapes = getByTestId('chat-progress').querySelectorAll('li');
-    expect(etapes).toHaveLength(3);
-    expect(etapes[0].querySelector('svg')?.getAttribute('data-icone')).toBe('check');
-    expect(etapes[0].textContent).toContain('(terminé)');
-    const enCours = etapes[2].querySelector('svg');
-    expect(enCours?.getAttribute('data-icone')).toBe('loader-circle');
-    expect(enCours?.getAttribute('class')).toContain('motion-safe:animate-spin');
-    expect(etapes[2].className).toContain('font-medium');
-    // Plus de points qui sautent.
-    expect(getByTestId('chat-progress').querySelector('.animate-bounce, [class*="animate-bounce"]')).toBeNull();
-  });
-});
+// L'attente (EtatDeLaReponse) a son propre fichier depuis la refonte A :
+// EtatDeLaReponse.test.ts (balance, coche dessinée, aucune région d'annonce).

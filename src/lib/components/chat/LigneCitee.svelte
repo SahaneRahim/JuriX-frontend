@@ -22,6 +22,17 @@
    *   se coupent plus en fin de ligne ($lib/texte, `insecablesDuTexte`), dans
    *   la phrase comme dans les citations.
    *
+   * - Puce (refonte A, décision C1 de docs/refonte/PASSATION.md) : après
+   *   chaque citation retrouvée, une pastille « Art. 37 · Code du travail »
+   *   (« Art. 37 » aux suivantes du même article : `pucesDeLaReponse`). Elle
+   *   S'AJOUTE au renvoi, qui garde son lien, son `data-testid="chat-citation"`
+   *   et sa mise en évidence : aucun mot de la réponse n'est masqué (la
+   *   remplacer aurait laissé des phrases fausses, « selon l'[Art. 35] »).
+   *   C'est un second lien, frère du renvoi et jamais dans lui, vers le même
+   *   article, qui appelle le même `surCitation` : l'aperçu s'ouvre, et le
+   *   focus revient à la puce touchée. Active (aperçu ouvert sur sa
+   *   citation), elle s'inverse.
+   *
    * Tout est rendu en nœuds de texte : le dépôt s'interdit `{@html}`
    * ($lib/texte). Les morceaux s'écrivent bout à bout, sans blanc entre les
    * balises : une espace glissée entre un lien et la parenthèse qui le suit se
@@ -35,6 +46,7 @@
   import { insecablesDuTexte, morceauxDuTexte } from "$lib/texte";
   import type { CitationPositionnee } from "$lib/types";
   import { rattacherLesElisions, segmentsDuTexte, type Segment } from "./citations";
+  import type { EtiquetteDeLaPuce } from "./libelles";
 
   /** Le texte du bloc, avec ses marques de citation s'il en porte. */
   export let texte: string;
@@ -48,6 +60,17 @@
   export let liens = true;
   /** Ouvre l'aperçu d'une citation ; `declencheur` reprendra le focus à sa fermeture. */
   export let surCitation: (index: number, declencheur: HTMLElement) => void = () => {};
+  /**
+   * La puce de chaque citation retrouvée, à l'indice de la citation, et son
+   * délai d'arrivée en ms (TexteDeReponse) ; sans entrée, pas de puce.
+   */
+  export let puces: ReadonlyMap<number, EtiquetteDeLaPuce & { delai: number }> = new Map();
+  /**
+   * Les citations viennent d'arriver (événement `done` de la réponse qui
+   * s'écrit) : les puces se posent, une à une. Faux partout ailleurs (réponse
+   * plus ancienne, conversation rouverte) : elles sont là, sans geste.
+   */
+  export let nouvelles = false;
 
   $: t = $tr;
 
@@ -82,6 +105,38 @@
     "rounded-sm text-zinc-950 underline decoration-zinc-400 decoration-1 underline-offset-[3px] transition-colors hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-500 dark:hover:decoration-white";
   const CLASSE_CITATION_ACTIVE = "bg-zinc-100 decoration-zinc-950 dark:bg-zinc-800 dark:decoration-white";
 
+  /**
+   * La puce (A3 § 4, maquette RefonteAssistant) : pastille blanche bordée,
+   * 12 px demi-gras ; active, elle s'inverse, comme tout élément actif du site.
+   *
+   * POURQUOI UN LIEN EN LIGNE, ET NON UNE PASTILLE `inline-block` DE 24 PX. Au
+   * doigt, toute cible fait 44 × 44 px (redimensionnement.spec.ts), sauf un
+   * lien pris dans une phrase, en ligne : la maquette dessinait la puce en
+   * `inline-block` (24 px), qui échouerait à cette règle. En ligne, sa marge
+   * verticale ne compte pas dans la hauteur de la ligne : `py-0.5` la dessine
+   * à 20 px dans une ligne de 26, sans écarter les lignes. Coupée en fin de
+   * ligne (un nom long, un écran de 320 px), chaque morceau garde sa bordure
+   * arrondie (`box-decoration-break: clone`) ; l'espace insécable de « Art. 37 »
+   * et celle d'avant le point médian ne la coupent jamais là.
+   */
+  const CLASSE_PUCE =
+    "mx-0.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors [-webkit-box-decoration-break:clone] [box-decoration-break:clone]";
+  const CLASSE_PUCE_REPOS =
+    "border-zinc-300 bg-white text-zinc-950 hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:border-white";
+  const CLASSE_PUCE_ACTIVE = "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950";
+  // La puce suit son renvoi, séparée par une espace (une phrase copiée garde
+  // « … 92/007 Art. 35 · Code du travail, … ») ; la ponctuation qui suit le
+  // renvoi suit la puce, sans blanc, comme dans la maquette. L'espace est une
+  // expression, comme le suffixe des lecteurs d'écran plus bas : Svelte 5
+  // retire le blanc écrit au bord d'un bloc.
+  const ESPACE = " ";
+  //
+  // POURQUOI SEULE L'OPACITÉ JOUE À L'ARRIVÉE. Le geste « citer » (mv-citer,
+  // ressort de 0,5 s, A2 § 3.4) monte et grandit la puce ; sur un élément en
+  // ligne, le `transform` est sans effet, et la puce reste en ligne
+  // (ci-dessus) : elle apparaît en fondu, à son rang (`--d`). L'état final est
+  // son style au repos : en mouvement réduit, elle est là d'emblée.
+
   /** Le gras d'une réponse : la vraie graisse 600 d'Inter, en noir comme les titres de la bulle. */
   const CLASSE_GRAS = "font-semibold text-zinc-950 dark:text-white";
 
@@ -109,7 +164,9 @@
   }
 </script>
 
-{#each segments as segment, i (i)}{#if segment.genre === "citation" && citations[segment.index]}<a
+{#each segments as segment, i (i)}{#if segment.genre === "citation" && citations[segment.index]}{@const puce = puces.get(
+      segment.index,
+    )}<a
       href={adresseDeLArticle(citations[segment.index].law_id, citations[segment.index].article)}
       aria-haspopup="dialog"
       data-testid="chat-citation"
@@ -120,7 +177,16 @@
       ><span class="whitespace-nowrap"
         ><Icone nom="section" class="mr-0.5 text-[14px] text-zinc-500 dark:text-zinc-400" />{premierMot(segment.texte)}</span
       >{suite(segment.texte)}</a
-    >{:else if segment.genre === "introuvable"}<span
+    >{#if puce}{ESPACE}<a
+        href={adresseDeLArticle(citations[segment.index].law_id, citations[segment.index].article)}
+        aria-haspopup="dialog"
+        aria-label={puce.nom}
+        data-testid="chat-puce"
+        on:click={(event) => cliquer(event, segment.index)}
+        class="{CLASSE_PUCE} {citationActive === segment.index ? CLASSE_PUCE_ACTIVE : CLASSE_PUCE_REPOS}"
+        class:mv-citer={nouvelles}
+        style:--d={nouvelles ? `${puce.delai}ms` : undefined}>{puce.texte}</a
+      >{/if}{:else if segment.genre === "introuvable"}<span
       class="underline decoration-zinc-500 decoration-dashed underline-offset-4 {segment.gras ? CLASSE_GRAS : ''}"
       data-testid="chat-citation-introuvable">{segment.texte}</span
     ><span class="sr-only">{` (${t("chat.citation.unfoundShort")})`}</span>{:else if segment.gras}<strong

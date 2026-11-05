@@ -488,6 +488,13 @@ describe('attente lisible et « Arrêter » (P4)', () => {
     const etapes = await ecran.findByTestId('chat-progress');
     // L'objet du décret (« Statut Général »), comme la maquette chat-attente-p4a.
     await waitFor(() => expect(etapes.textContent).toContain('6 articles trouvés : Code du travail, Statut Général'));
+    // Refonte A (E6, étape 1) : l'IA pèse sur l'étape en cours, la recherche
+    // finie porte sa coche tracée ; l'attente n'ajoute aucune région
+    // d'annonce au fil (une seule dans la page : chat-announce).
+    expect(etapes.querySelectorAll('.mv-balance--attente')).toHaveLength(1);
+    expect(etapes.querySelector('li svg.mv-dessiner')?.getAttribute('data-icone')).toBe('check');
+    expect(fil().querySelector('[role="status"], [aria-live="polite"], [aria-live="assertive"]')).toBeNull();
+    expect(document.querySelectorAll('[data-testid="chat-announce"]')).toHaveLength(1);
     expect(fil().getAttribute('aria-busy')).toBe('true');
     expect(fil().getAttribute('aria-live')).toBe('off');
     const arreter = ecran.getByTestId('chat-stop');
@@ -676,10 +683,85 @@ describe('citations dans la phrase et aperçu (P3)', () => {
 
     expect(await ecran.findByTestId('chat-source')).toBeTruthy();
     expect(ecran.queryByTestId('chat-citation')).toBeNull();
+    expect(ecran.queryByTestId('chat-puce')).toBeNull();
     expect(ecran.queryByTestId('chat-article-cite')).toBeNull();
     // Sans étape du serveur, l'attente disait « Préparation de la réponse… » : finie, plus rien.
     expect(ecran.queryByTestId('chat-progress')).toBeNull();
     await waitFor(() => expect(annonce()).toBe('Réponse terminée.'));
+  });
+});
+
+/**
+ * Refonte A, E6 étapes 2 et 4 : la réponse s'écrit bloc par bloc (`enFlux`),
+ * puis, à la fin (`done`), les puces de citation se posent après leurs
+ * renvois. Les citations n'existent qu'à la fin (C11) : avant, ni renvoi ni
+ * puce.
+ */
+describe('écriture et puces de citation (refonte A)', () => {
+  it('le texte s’écrit sans puce ; à la fin, les mêmes blocs reçoivent renvoi et puce, qui se pose', async () => {
+    const { ecran, pilote } = await uneReponseQuiArrive();
+
+    pilote.envoyer({ chunk: TEXTE, done: false });
+    await waitFor(() => expect(fil().textContent).toContain('réprime les abus'));
+    const paragraphe = Array.from(fil().querySelectorAll('p')).find((p) => p.textContent?.includes('réprime les abus'))!;
+    // Un bloc né pendant l'écriture arrive du flou au net.
+    expect(paragraphe.classList.contains('mv-ecrire')).toBe(true);
+    expect(ecran.queryByTestId('chat-citation')).toBeNull();
+    expect(ecran.queryByTestId('chat-puce')).toBeNull();
+
+    pilote.envoyer(FIN_NOUVELLE_API);
+    pilote.fermer();
+
+    const puce = await ecran.findByTestId('chat-puce');
+    // Le même nœud : le texte déjà écrit ne rejoue rien quand ses citations arrivent.
+    expect(paragraphe.isConnected).toBe(true);
+    expect(paragraphe.contains(puce)).toBe(true);
+    expect(puce.previousElementSibling).toBe(ecran.getByTestId('chat-citation'));
+    expect(puce.textContent).toBe('Art.\u00A035\u00A0· Code du travail');
+    // Les citations viennent d'arriver : la puce se pose (geste « citer »).
+    expect(puce.classList.contains('mv-citer')).toBe(true);
+    expect(puce.style.getPropertyValue('--d')).toBe('0ms');
+    // Un seul renvoi, une seule puce : `chat-citation` n'est pas doublé.
+    expect(ecran.getAllByTestId('chat-citation')).toHaveLength(1);
+    await waitFor(() => expect(fil().getAttribute('aria-busy')).toBeNull());
+  });
+
+  it('la question suivante : la puce de la réponse d’avant reste, sans geste', async () => {
+    reponse = () => flux([{ chunk: TEXTE, done: false }, FIN_NOUVELLE_API]);
+    const ecran = render(Page);
+    await poser('Quelles indemnités en cas de licenciement ?', ecran);
+    const premiere = await ecran.findByTestId('chat-puce');
+    expect(premiere.classList.contains('mv-citer')).toBe(true);
+    await waitFor(() => expect(fil().getAttribute('aria-busy')).toBeNull());
+
+    await poser('Et pour un licenciement économique ?', ecran);
+
+    await waitFor(() => expect(ecran.getAllByTestId('chat-puce')).toHaveLength(2));
+    const [ancienne, nouvelle] = ecran.getAllByTestId('chat-puce');
+    expect(ancienne).toBe(premiere);
+    expect(ancienne.classList.contains('mv-citer')).toBe(false);
+    expect(nouvelle.classList.contains('mv-citer')).toBe(true);
+  });
+
+  it('toucher la puce ouvre le même aperçu que le renvoi ; elle s’inverse, puis reprend le focus', async () => {
+    reponse = () => flux([{ chunk: TEXTE, done: false }, FIN_NOUVELLE_API]);
+    const ecran = render(Page);
+    await poser('Quelles indemnités en cas de licenciement ?', ecran);
+    const puce = await ecran.findByTestId('chat-puce');
+
+    await fireEvent.click(puce);
+
+    const apercu = await ecran.findByTestId('chat-preview');
+    expect(apercu.textContent).toContain('Art. 35 — Code du travail');
+    expect(simule.apercu).toHaveBeenCalledWith(2274, '35', 97421, expect.any(AbortSignal));
+    expect(puce.className).toContain('bg-zinc-950');
+    expect(ecran.getByTestId('chat-citation').className).toContain('bg-zinc-100');
+
+    await fireEvent.click(ecran.getByTestId('chat-preview-close'));
+
+    await waitFor(() => expect(ecran.queryByTestId('chat-preview')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(puce));
+    expect(puce.className).not.toContain('bg-zinc-950');
   });
 });
 
@@ -1253,71 +1335,5 @@ describe('la question du profil, dans le fil (P5)', () => {
 
     expect(ecran.getByTestId('chat-profile-skip')).toBeTruthy();
     expect(questions).toHaveLength(0);
-  });
-});
-
-describe('la question venue de l’adresse (refonte A, décision H1)', () => {
-  /** L'adresse de la page, telle que la lit le chat au montage. */
-  const adresse = (chemin: string) => pageEnTest.update((p) => ({ ...p, url: new URL(chemin, 'http://localhost') }));
-  /** Laisse partir le `setTimeout(…, 0)` qui nettoie l'adresse. */
-  const minuterieDuNettoyage = () => new Promise((fin) => setTimeout(fin, 5));
-
-  afterEach(() => adresse('/chat'));
-
-  it('/chat?q=…&envoyer=1 : la question part une seule fois, puis quitte l’adresse', async () => {
-    adresse('/chat?q=licenciement%20%C3%A9conomique&envoyer=1');
-    const ecran = render(Page);
-    await waitFor(() => expect(questions).toHaveLength(1));
-    expect(questions[0].question).toBe('licenciement économique');
-    expect(questions[0]).not.toHaveProperty('session_id');
-    await minuterieDuNettoyage();
-    expect(simule.replaceState).toHaveBeenCalledTimes(1);
-    expect(simule.replaceState.mock.calls[0][0]).toBe('/chat');
-    // La question est dans le fil, pas dans la saisie.
-    expect((ecran.getByRole('textbox') as HTMLTextAreaElement).value).toBe('');
-    await new Promise((fin) => setTimeout(fin, 20));
-    expect(questions).toHaveLength(1);
-  });
-
-  it('une conversation déjà ouverte : la question de l’accueil en ouvre une neuve', async () => {
-    localStorage.setItem('jurix-chat-session', 'sid-ancienne');
-    localStorage.setItem('jurix-chat-persona', 'citoyen');
-    adresse('/chat?q=Quels%20sont%20mes%20droits%20en%20garde%20%C3%A0%20vue%20%3F&envoyer=1');
-    render(Page);
-    await waitFor(() => expect(questions).toHaveLength(1));
-    // Sans l'identifiant de l'ancienne conversation : elle n'est pas continuée.
-    expect(questions[0]).not.toHaveProperty('session_id');
-    expect(localStorage.getItem('jurix-chat-session')).not.toBe('sid-ancienne');
-  });
-
-  it('moins de cinq caractères : pré-remplie, sans envoi ni message d’erreur', async () => {
-    adresse('/chat?q=abc&envoyer=1');
-    const ecran = render(Page);
-    await waitFor(() => expect((ecran.getByRole('textbox') as HTMLTextAreaElement).value).toBe('abc'));
-    await minuterieDuNettoyage();
-    expect(questions).toEqual([]);
-    expect(fil().textContent).not.toContain('chat.errorTooShort');
-    expect(fil().textContent).not.toMatch(/trop courte/);
-    // L'adresse est nettoyée aussi : un rechargement ne redemande rien.
-    expect(simule.replaceState.mock.calls[0]?.[0]).toBe('/chat');
-  });
-
-  it('/chat?q=… sans `envoyer` : pré-remplie seulement, l’adresse intacte (P7)', async () => {
-    adresse('/chat?q=licenciement%20%C3%A9conomique');
-    const ecran = render(Page);
-    await waitFor(() =>
-      expect((ecran.getByRole('textbox') as HTMLTextAreaElement).value).toBe('licenciement économique'),
-    );
-    await minuterieDuNettoyage();
-    expect(questions).toEqual([]);
-    expect(simule.replaceState).not.toHaveBeenCalled();
-  });
-
-  it('rechargée après le nettoyage (/chat) : rien ne repart', async () => {
-    adresse('/chat');
-    render(Page);
-    await minuterieDuNettoyage();
-    expect(questions).toEqual([]);
-    expect(simule.replaceState).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ArticleApercu, Changement, StatutProuve, TexteLie } from '$lib/types';
+import type { ArticleApercu, Changement, CitationPositionnee, StatutProuve, TexteLie } from '$lib/types';
 import {
   annonceDeFin,
   designationDuTexte,
@@ -14,8 +14,11 @@ import {
   mentionDuStatut,
   nomRaccourci,
   ponctuationFrancaise,
+  etiquetteDeLaPuce,
+  pucesDeLaReponse,
   typographieDesNumeros,
 } from './libelles';
+import { traduireEnTest } from './traductions-de-test';
 
 /** Les textes français proposés pour language.ts (clés listées au retour de l'agent). */
 const FR: Record<string, string> = {
@@ -407,5 +410,92 @@ describe('ponctuationFrancaise', () => {
     expect(ponctuationFrancaise('Ouverture à 16:00')).toBe('Ouverture à 16:00');
     const juste = `Section 1${INSECABLE}: Dispositions générales`;
     expect(ponctuationFrancaise(juste)).toBe(juste);
+  });
+});
+
+/**
+ * Les puces de citation (refonte A, décision C1) : leur étiquette et leur nom
+ * accessible, avec les textes de chat/traductions-de-test.ts, que
+ * language.test.ts compare mot pour mot à l'interface.
+ */
+describe('puces de citation', () => {
+  const CODE_DU_TRAVAIL = { titre: 'Loi N°92/007 du 14 août 1992 portant Code du travail', reference: 'LOI-1992-007' };
+  const CODE_PENAL = { titre: 'Loi N°2016/007 du 12 juillet 2016 portant Code pénal', reference: 'LOI-2016-007' };
+
+  function cite(article: string | null, texte = CODE_DU_TRAVAIL, lawId = 2274): CitationPositionnee {
+    return {
+      debut: 0,
+      fin: 1,
+      texte_cite: 'x',
+      law_id: lawId,
+      article,
+      article_id: null,
+      reference: texte.reference,
+      titre: texte.titre,
+      date_du_texte: null,
+      statut: { etat: null, liens: [], lignes: [] },
+    };
+  }
+
+  it('« Art. 37 · Code du travail », puis « Art. 37 » ; un nom accessible qui commence par l’étiquette', () => {
+    expect(etiquetteDeLaPuce(cite('37'), true, traduireEnTest)).toEqual({
+      texte: 'Art.\u00a037\u00a0· Code du travail',
+      nom: 'Art.\u00a037\u00a0· Code du travail\u202f: voir le passage',
+    });
+    expect(etiquetteDeLaPuce(cite('37'), false, traduireEnTest)).toEqual({
+      texte: 'Art.\u00a037',
+      nom: 'Art.\u00a037\u00a0· Code du travail\u202f: voir le passage',
+    });
+  });
+
+  it('un nom long raccourci dans la puce, entier dans le nom accessible ; un texte sans article, son nom', () => {
+    const statut = {
+      titre: 'Décret N°94/199 du 07 octobre 1994 portant Statut Général de la Fonction Publique de l’État',
+      reference: 'DEC-1994-199',
+    };
+    const puce = etiquetteDeLaPuce(cite('120', statut, 2279), true, traduireEnTest);
+    expect(puce.texte).toBe('Art.\u00a0120\u00a0· Statut Général de la Fonction…');
+    expect(puce.nom).toBe('Art.\u00a0120\u00a0· Statut Général de la Fonction Publique de l’État\u202f: voir le passage');
+
+    expect(etiquetteDeLaPuce(cite(null), true, traduireEnTest)).toEqual({
+      texte: 'Code du travail',
+      nom: 'Code du travail\u202f: voir le texte',
+    });
+    expect(etiquetteDeLaPuce({ article: '3', titre: '', reference: 'PRC-9153' }, true, traduireEnTest).texte).toBe(
+      'Art.\u00a03\u00a0· Texte sans intitulé',
+    );
+  });
+
+  it('dans l’ordre de LECTURE : la première puce d’un article le nomme, les suivantes non', () => {
+    const citations = [cite('37'), cite('35'), cite('37')];
+    // La réponse montre la citation 2 avant la 0.
+    const puces = pucesDeLaReponse([2, 1, 0], citations, traduireEnTest);
+
+    expect([...puces.keys()]).toEqual([2, 1, 0]);
+    expect(puces.get(2)).toMatchObject({ texte: 'Art.\u00a037\u00a0· Code du travail', rang: 0 });
+    expect(puces.get(1)).toMatchObject({ texte: 'Art.\u00a035\u00a0· Code du travail', rang: 1 });
+    expect(puces.get(0)).toMatchObject({ texte: 'Art.\u00a037', rang: 2 });
+  });
+
+  it('un même numéro dans deux textes : la puce garde le nom du texte, chaque fois', () => {
+    const citations = [cite('37'), cite('37', CODE_PENAL, 2301), cite('37'), cite('35'), cite('35')];
+    const puces = pucesDeLaReponse([0, 1, 2, 3, 4], citations, traduireEnTest);
+
+    expect([0, 1, 2, 3, 4].map((i) => puces.get(i)?.texte)).toEqual([
+      'Art.\u00a037\u00a0· Code du travail',
+      'Art.\u00a037\u00a0· Code pénal',
+      'Art.\u00a037\u00a0· Code du travail',
+      'Art.\u00a035\u00a0· Code du travail',
+      'Art.\u00a035',
+    ]);
+  });
+
+  it('une citation absente ou affichée deux fois ne fait pas de puce de plus', () => {
+    const puces = pucesDeLaReponse([0, 7, 0, 1], [cite('37'), cite('37')], traduireEnTest);
+
+    expect([...puces.entries()].map(([i, p]) => [i, p.rang])).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
   });
 });

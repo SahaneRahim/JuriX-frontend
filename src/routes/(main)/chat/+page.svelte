@@ -810,6 +810,8 @@
     idEnAttente = null;
     if (image) cancelAnimationFrame(image);
     image = 0;
+    idEnFlux = null;
+    idCitationsNouvelles = null;
   }
 
   function nouvelleConversation(fermerLePanneau = true) {
@@ -1101,6 +1103,24 @@
   let arretDemande = false;
   /** La bulle de la réponse en cours, pour la marquer arrêtée. */
   let idReponseCourante: number | null = null;
+  /**
+   * La réponse qui S'ÉCRIT : de son premier morceau à son dernier événement
+   * (`done`). Ses blocs nouveaux arrivent du flou au net (TexteDeReponse,
+   * `enFlux`, refonte A, E6 étape 2).
+   *
+   * POURQUOI PAS `envoiEnCours && id === idReponseCourante`. Les deux restent
+   * vrais jusqu'au `finally`, APRÈS l'arrivée des citations : la réponse
+   * marquée de ses citations, recomposée à `done`, aurait encore été « en
+   * flux ». Celle-ci retombe avant (`lireLaReponse`) : rien ne joue après
+   * `done` (cartes/assistant-preuves.md § 5, étape 2).
+   */
+  let idEnFlux: number | null = null;
+  /**
+   * La réponse dont les citations viennent d'arriver, dans CETTE vue : ses
+   * puces se posent une à une (TexteDeReponse, `nouvelles`, E6 étape 4). Une
+   * réponse plus ancienne, ou rouverte, a ses puces sans geste.
+   */
+  let idCitationsNouvelles: number | null = null;
   /** La session avant la question : une session neuve fait recharger la liste des conversations. */
   let sessionAvantLaQuestion: string | null = null;
 
@@ -1330,6 +1350,7 @@
         controleur = null;
         arretDemande = false;
         idReponseCourante = null;
+        idEnFlux = null;
         progressions = [];
         await tick();
         suivre();
@@ -1423,6 +1444,7 @@
           idReponse = nouvelId();
           idReponseCourante = idReponse;
           idEnAttente = idReponse;
+          idEnFlux = idReponse;
           isTyping = false;
           chatMessages = [
             ...chatMessages,
@@ -1444,6 +1466,14 @@
       if (evenement.done) {
         afficherEnAttente();
         termine = true;
+        // POURQUOI UNE IMAGE D'ATTENTE. Le dernier texte reçu vient d'être
+        // remis à la page : un paragraphe qui y naît arrive du flou au net
+        // comme les autres, tant que la réponse est encore « en flux ». Puis
+        // elle ne l'est plus, AVANT que les citations n'y entrent : un bloc
+        // recomposé par elles ne rejoue rien.
+        await tick();
+        if (gen !== generation) return;
+        idEnFlux = null;
         if (idReponse === null) {
           // Fin sans aucun texte : une réponse vide reste signalée
           idReponse = nouvelId();
@@ -1458,6 +1488,7 @@
           ];
         }
         const listes = listesDuFlux(evenement);
+        if (listes) idCitationsNouvelles = idReponse;
         ajouterAuMessage({
           sources: (evenement.sources ?? []) as ChatMessage["sources"],
           ...(listes ? { citations: listes } : {}),
@@ -2215,6 +2246,8 @@
                         ? sourceApercu.index
                         : null}
                       surCitation={(index, declencheur) => ouvrirLaCitation(message, index, declencheur)}
+                      enFlux={message.id === idEnFlux}
+                      nouvelles={message.id === idCitationsNouvelles}
                     />
 
                     {#if aDesListes(message)}

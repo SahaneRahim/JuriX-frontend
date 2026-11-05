@@ -12,6 +12,10 @@
  * alors pas s'afficher du tout — c'est ce qui fait disparaître l'article du
  * Code Minier affiché sous « comment vas-tu ? ».
  *
+ * Troisième invariant (refonte A, E6 étape 2) : la réponse s'écrit BLOC PAR
+ * BLOC, du flou au net ; un bloc déjà affiché ne rejoue jamais rien, ni quand
+ * le texte s'allonge, ni quand les citations y entrent à la fin.
+ *
  * Les appels du chat sont interceptés : aucun quota dépensé. Une exception :
  * la fiche qu'ouvre une source est rendue par le SERVEUR, que `page.route` ne
  * voit pas ; ce test-là ouvre une loi réelle de l'API locale, et il est sauté
@@ -21,7 +25,8 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 import { decouperLeTexte } from '../../../src/lib/components/loi/decoupage';
-import { API, exiger, lireListe } from '../doublures';
+import { API, exiger, lireListe, saisieDuChat } from '../doublures';
+import { saisirJusqualEffet } from '../hydratation';
 
 /**
  * Le chat lit la réponse EN FLUX (`/rag/ask/stream`, événements SSE) : le
@@ -43,6 +48,33 @@ async function repondre(page: Page, corps: Record<string, unknown>) {
     }),
   );
 }
+
+/**
+ * Un flux du chat TENU par le test, événement par événement (la recette de
+ * `tenirLeFlux` dans ux-complements.spec.ts) : `page.route` livre un corps
+ * d'un bloc, où l'on ne verrait jamais un bloc naître APRÈS un autre. `fetch`
+ * est enveloppé avant tout script de la page ; le test alimente le corps
+ * (`window.__pousserFlux`) puis le ferme (`window.__finirFlux`).
+ */
+async function tenirLeFlux(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    const fetchDOrigine = window.fetch.bind(window);
+    window.fetch = (entree: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
+      const adresse = typeof entree === 'string' ? entree : entree instanceof URL ? entree.href : entree.url;
+      if (!adresse.includes('/rag/ask/stream')) return fetchDOrigine(entree, options);
+      const encodeur = new TextEncoder();
+      let flux!: ReadableStreamDefaultController<Uint8Array>;
+      const corps = new ReadableStream<Uint8Array>({ start: (c) => void (flux = c) });
+      w.__pousserFlux = (evenement: unknown) => flux.enqueue(encodeur.encode(`data: ${JSON.stringify(evenement)}\n\n`));
+      w.__finirFlux = () => flux.close();
+      return Promise.resolve(new Response(corps, { status: 200, headers: { 'content-type': 'text/event-stream' } }));
+    };
+  });
+}
+
+const pousser = (page: Page, evenement: Record<string, unknown>) =>
+  page.evaluate((e) => (window as unknown as { __pousserFlux: (e: unknown) => void }).__pousserFlux(e), evenement);
 
 async function poser(page: Page, question: string) {
   await page.goto('/chat');
@@ -213,6 +245,80 @@ test.describe('Rendu des réponses du chat', () => {
     // « Suivant » avance : le lien ne ramène pas le lecteur à l'article demandé.
     await page.locator('.article-navigation button').last().click();
     await expect(article).toContainText(loi.suivant);
+  });
+
+  test('l’écriture : chaque nouveau bloc arrive du flou au net, une fois ; rien ne rejoue à la fin', async ({ page }) => {
+    await tenirLeFlux(page);
+    await page.goto('/chat');
+    await saisirJusqualEffet(saisieDuChat(page), 'Quelles indemnités en cas de licenciement ?', page.getByTestId('chat-progress'));
+    // Le temps des animations ralenti cinquante fois (Chromium, protocole
+    // DevTools) : le geste de 0,8 s en dure 40, et l'on vérifie QUI le joue
+    // sans courir après l'horloge d'une machine chargée.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Animation.enable');
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 0.02 });
+
+    const PREMIER = 'Premier paragraphe de la réponse.';
+    const SECOND = '\n\nSecond paragraphe, selon l’article 35 de la loi n° 92/007.';
+    const fil = page.getByRole('log');
+    const temoins = () =>
+      fil.locator('p[data-temoin]').evaluateAll((ps) => ps.map((p) => p.getAttribute('data-temoin')));
+
+    await pousser(page, { chunk: PREMIER, done: false });
+    const premier = fil.locator('p', { hasText: 'Premier paragraphe' });
+    await expect(premier).toHaveClass(/(^|\s)mv-ecrire(\s|$)/);
+    expect(await premier.evaluate((p) => getComputedStyle(p).animationName)).toBe('mv-ecrire');
+    await premier.evaluate((p) => p.setAttribute('data-temoin', 'premier'));
+
+    await pousser(page, { chunk: SECOND, done: false });
+    const second = fil.locator('p', { hasText: 'Second paragraphe' });
+    await expect(second).toHaveClass(/(^|\s)mv-ecrire(\s|$)/);
+    await second.evaluate((p) => p.setAttribute('data-temoin', 'second'));
+    // Le premier n'est pas recréé : son geste continue, il ne repart pas.
+    expect(await temoins()).toEqual(['premier', 'second']);
+
+    const texte = PREMIER + SECOND;
+    const cite = 'article 35 de la loi n° 92/007';
+    await pousser(page, {
+      chunk: '',
+      done: true,
+      session_id: 'sid-ecriture',
+      sources: [],
+      citations: [
+        {
+          debut: texte.indexOf(cite),
+          fin: texte.indexOf(cite) + cite.length,
+          texte_cite: cite,
+          law_id: 2274,
+          article: '35',
+          article_id: 97421,
+          reference: 'LOI-1992-007',
+          titre: 'Loi N°92/007 du 14 août 1992 portant Code du travail',
+          date_du_texte: '1992-08-14',
+          statut: { etat: null, liens: [], lignes: [] },
+        },
+      ],
+      citations_introuvables: [],
+      articles_cites: [],
+      textes_consultes_non_cites: [],
+    });
+    await page.evaluate(() => (window as unknown as { __finirFlux: () => void }).__finirFlux());
+
+    // Les citations entrent dans les MÊMES blocs : renvoi et puce, sans
+    // recréer le paragraphe, et la puce se pose (geste « citer »).
+    const puce = page.getByTestId('chat-puce');
+    await expect(puce).toHaveText('Art. 35 · Code du travail');
+    await expect(puce).toHaveClass(/(^|\s)mv-citer(\s|$)/);
+    expect(await temoins()).toEqual(['premier', 'second']);
+    await expect(fil.locator('p[data-temoin="second"]').getByTestId('chat-citation')).toHaveCount(1);
+    await expect(fil).not.toHaveAttribute('aria-busy', 'true');
+
+    // Au temps normal, chaque geste finit : la classe s'en va, le texte reste
+    // net, à son style de repos.
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 });
+    await expect(fil.locator('.mv-ecrire')).toHaveCount(0);
+    await expect(second).toHaveCSS('opacity', '1');
+    await expect(second).toHaveCSS('filter', 'none');
   });
 
   test('une panne en cours de flux s’affiche en erreur, sans fausse réponse', async ({ page }) => {

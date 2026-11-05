@@ -19,9 +19,11 @@ import { nomCourtDuTexte, typographieDesNumeros } from '$lib/sources';
 
 // Réexportée : les écrans du chat la prennent ici, avec les autres libellés.
 export { typographieDesNumeros };
+import { remplir } from '$lib/components/listes/reperes';
 import type { Language } from '$lib/stores/language';
 import type {
   ArticleApercu,
+  CitationPositionnee,
   CitationsDeLaReponse,
   EtatProuve,
   ProgressionDuChat,
@@ -219,6 +221,107 @@ export function libelleDeLaCitation(
   const nom = designationDuTexteCite(titre, reference).nom || t('chat.citation.sansIntitule');
   const n = numero?.trim();
   return n ? t('chat.citation.article').replace('{n}', n).replace('{nom}', nom) : nom;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Puces de citation (refonte A, décision C1)                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Au-delà, le nom du texte est raccourci DANS la puce (`nomRaccourci`) : c'est
+ * une pastille posée dans une phrase, et « Art. 120 · Statut Général de la
+ * Fonction Publique de l'État » y prenait deux lignes d'un téléphone. Le nom
+ * accessible garde le nom entier.
+ */
+const LONGUEUR_D_UN_NOM_DANS_LA_PUCE = 36;
+
+/** Ce qu'affiche une puce de citation, et son nom accessible. */
+export interface EtiquetteDeLaPuce {
+  /** « Art. 37 · Code du travail » pour la première puce d'un article, « Art. 37 » ensuite. */
+  texte: string;
+  /** Toujours entier : « Art. 37 · Code du travail : voir le passage ». */
+  nom: string;
+}
+
+/**
+ * L'étiquette d'une puce de citation (maquette RefonteAssistant) :
+ * « Art. 37 · Code du travail » à la première puce d'un article, « Art. 37 »
+ * aux suivantes ; le nom du texte seul pour un texte cité sans numéro
+ * d'article.
+ *
+ * POURQUOI LE NOM ACCESSIBLE COMMENCE PAR CE QUI EST ÉCRIT. Les maquettes
+ * nommaient la puce « Article 37 du Code du travail : voir le passage » : le
+ * mot affiché, « Art. 37 », n'était pas dans son nom, et qui pilote le site à
+ * la voix (« cliquer Art. 37 ») ne l'atteignait pas (WCAG 2.5.3, la règle
+ * qu'applique déjà R4 au lien de l'assistant). Et « du {nom} » s'accordait
+ * mal au corpus : « Article 3 du Loi n° 2016/007 ». Le nom est donc
+ * l'étiquette entière, suivie de « : voir le passage » : toujours complet,
+ * même sous une puce courte ou un nom raccourci, que les lecteurs d'écran
+ * entendent ainsi en entier.
+ */
+export function etiquetteDeLaPuce(
+  citation: Pick<CitationPositionnee, 'article' | 'titre' | 'reference'>,
+  premiereDeLArticle: boolean,
+  t: Traduire,
+): EtiquetteDeLaPuce {
+  const nom = designationDuTexteCite(citation.titre, citation.reference).nom || t('chat.citation.sansIntitule');
+  const court = nomRaccourci(nom, LONGUEUR_D_UN_NOM_DANS_LA_PUCE);
+  const n = citation.article?.trim();
+  const entiere = n ? remplir(t('chat.puce.articleDuTexte'), { n, nom }) : nom;
+  const texte = !n
+    ? court
+    : premiereDeLArticle
+      ? remplir(t('chat.puce.articleDuTexte'), { n, nom: court })
+      : remplir(t('chat.puce.article'), { n });
+  // Un texte cité sans article n'a pas de passage à montrer : son aperçu dit
+  // le texte entier (ApercuDeCitation, `numero` nul).
+  return { texte, nom: remplir(t(n ? 'chat.puce.voirLePassage' : 'chat.puce.voirLeTexte'), { etiquette: entiere }) };
+}
+
+/** Une puce de la réponse : son étiquette, et son rang dans l'ordre de lecture. */
+export interface PuceDeCitation extends EtiquetteDeLaPuce {
+  /** 0 pour la première puce de la réponse, 1 pour la suivante… */
+  rang: number;
+}
+
+/**
+ * Les puces d'une réponse, une par citation affichée, par indice de citation.
+ * `ordre` : les indices des citations dans l'ordre où la réponse les montre.
+ *
+ * « Première d'un article » se juge dans cet ordre de lecture, et non dans
+ * celui de la liste du serveur : c'est la première que l'on LIT qui nomme le
+ * texte. Un même article : même texte et même numéro (deux morceaux d'un
+ * article en plusieurs morceaux restent un seul article).
+ *
+ * POURQUOI LA FORME LONGUE QUAND UN AUTRE TEXTE PORTE LE MÊME NUMÉRO. Une
+ * réponse qui cite l'article 37 du Code du travail puis l'article 37 du Code
+ * pénal laisserait, à la puce suivante, un « Art. 37 » qui pourrait être l'un
+ * ou l'autre : la puce garde alors son texte, à chaque fois.
+ */
+export function pucesDeLaReponse(
+  ordre: readonly number[],
+  citations: readonly CitationPositionnee[],
+  t: Traduire,
+): Map<number, PuceDeCitation> {
+  const affichees = [...new Set(ordre)].filter((index) => citations[index] !== undefined);
+  const numero = (c: CitationPositionnee) => c.article?.trim() ?? '';
+  const textesParNumero = new Map<string, Set<number>>();
+  for (const index of affichees) {
+    const c = citations[index];
+    if (!numero(c)) continue;
+    textesParNumero.set(numero(c), (textesParNumero.get(numero(c)) ?? new Set()).add(c.law_id));
+  }
+
+  const vus = new Set<string>();
+  const puces = new Map<number, PuceDeCitation>();
+  affichees.forEach((index, rang) => {
+    const c = citations[index];
+    const cle = `${c.law_id}|${numero(c)}`;
+    const ambigu = (textesParNumero.get(numero(c))?.size ?? 0) > 1;
+    puces.set(index, { ...etiquetteDeLaPuce(c, !vus.has(cle) || ambigu, t), rang });
+    vus.add(cle);
+  });
+  return puces;
 }
 
 /* -------------------------------------------------------------------------- */

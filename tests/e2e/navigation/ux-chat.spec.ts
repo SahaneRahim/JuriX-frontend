@@ -10,6 +10,11 @@
  *   Échap et le retour système referment, sans jamais empiler deux aperçus.
  * - Une citation que le serveur n'a pas retrouvée est signalée en toutes
  *   lettres, pas seulement par un soulignement.
+ * - Refonte A (E6, première partie) : après chaque renvoi, une puce
+ *   « Art. 35 · Code du travail » (décision C1), lien EN LIGNE qui ouvre le
+ *   même aperçu, s'inverse quand il est ouvert et reprend le focus à sa
+ *   fermeture ; l'attente pèse (balance) sans seconde région d'annonce ; en
+ *   mouvement réduit, texte, puces et balance sont là d'emblée, immobiles.
  * - L'accueil dit le périmètre réel du corpus (GET /corpus) et rien de plus
  *   quand l'API ne le donne pas ; l'avertissement reste sous le champ.
  * - « Arrêter » coupe la requête ; l'attente est dite en texte.
@@ -209,6 +214,11 @@ test.describe('P4 : l’attente lisible et « Arrêter »', () => {
     await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-progress'));
     await expect(page.getByTestId('chat-progress')).toContainText('Préparation de la réponse…');
     await expect(page.getByRole('log')).toHaveAttribute('aria-busy', 'true');
+    // Refonte A : l'IA pèse sur l'étape en cours (la balance, plus la roue), et
+    // l'attente ne parle pas d'elle-même : la page n'a qu'une région d'annonce.
+    await expect(page.getByTestId('chat-progress').locator('svg.mv-balance--attente')).toHaveCount(1);
+    await expect(page.getByTestId('chat-progress').locator('[role="status"], [aria-live]')).toHaveCount(0);
+    await expect(page.getByRole('log').locator('[role="status"]')).toHaveCount(0);
     const arreter = page.getByRole('button', { name: 'Arrêter la réponse' });
     await expect(arreter).toBeEnabled();
 
@@ -218,6 +228,21 @@ test.describe('P4 : l’attente lisible et « Arrêter »', () => {
     await expect(page.getByTestId('chat-error')).toHaveCount(0);
     await expect(page.getByRole('log')).not.toHaveAttribute('aria-busy', 'true');
     await expect(boutonDEnvoi(page)).toBeVisible();
+  });
+});
+
+test.describe('P4 : l’attente en mouvement réduit', () => {
+  test('la balance de l’étape en cours reste droite : aucune animation', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await simuler(page);
+    await page.route('**/api/v1/rag/ask/stream', () => new Promise(() => {}));
+    await page.goto('/chat');
+
+    await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-progress'));
+    const fleau = page.getByTestId('chat-progress').locator('svg.mv-balance--attente .mv-balance__fleau');
+    await expect(fleau).toHaveCount(1);
+    await expect(fleau).toHaveCSS('animation-name', 'none');
+    await expect(page.getByTestId('chat-progress')).toContainText('Préparation de la réponse…');
   });
 });
 
@@ -259,6 +284,51 @@ test.describe('P3 : les citations, sur téléphone', () => {
     await expect(page.getByTestId('chat-preview')).toHaveCount(0);
     await expect(page).toHaveURL(/\/chat$/);
     await expect(citation).toBeFocused();
+  });
+
+  test('la puce suit le renvoi, ouvre la même feuille, s’inverse, puis reprend le focus (C1)', async ({ page }) => {
+    await simuler(page);
+    await poser(page, page.getByTestId('chat-puce'));
+
+    const puce = page.getByTestId('chat-puce');
+    // Elle s'ajoute au renvoi : un seul `chat-citation`, un seul `chat-puce`.
+    await expect(page.getByTestId('chat-citation')).toHaveCount(1);
+    await expect(puce).toHaveCount(1);
+    await expect(puce).toHaveText('Art. 35 · Code du travail');
+    await expect(puce).toHaveAttribute('href', '/laws/2274?article=35');
+    await expect(puce).toHaveAttribute('aria-label', 'Art.\u00a035\u00a0· Code du travail\u202f: voir le passage');
+    // Juste après son renvoi, dans la phrase, et EN LIGNE : un lien pris
+    // dans une phrase est exempté de la cible de 44 px (redimensionnement).
+    expect(await puce.evaluate((a) => a.previousElementSibling?.getAttribute('data-testid'))).toBe('chat-citation');
+    expect(await puce.evaluate((a) => getComputedStyle(a).display)).toBe('inline');
+
+    await puce.click();
+
+    const feuille = page.getByRole('dialog', { name: 'Art. 35 — Code du travail' });
+    await expect(feuille).toHaveAttribute('aria-modal', 'true');
+    await expect(feuille.getByTestId('chat-preview-close')).toBeFocused();
+    // Ouverte, elle s'inverse (zinc-950) ; le renvoi garde sa mise en évidence (zinc-100).
+    await expect(puce).toHaveCSS('background-color', 'rgb(9, 9, 11)');
+    await expect(page.getByTestId('chat-citation')).toHaveCSS('background-color', 'rgb(244, 244, 245)');
+
+    await feuille.getByTestId('chat-preview-close').click();
+    await expect(page.getByTestId('chat-preview')).toHaveCount(0);
+    await expect(puce).toBeFocused();
+    await expect(puce).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  });
+
+  test('mouvement réduit : le texte et la puce sont là d’emblée, sans geste', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await simuler(page);
+    await poser(page, page.getByTestId('chat-puce'));
+
+    const puce = page.getByTestId('chat-puce');
+    await expect(puce).toHaveCSS('animation-name', 'none');
+    await expect(puce).toHaveCSS('opacity', '1');
+    const paragraphe = page.getByRole('log').locator('p', { hasText: 'indemnité de licenciement est due' });
+    await expect(paragraphe).toHaveCSS('animation-name', 'none');
+    await expect(paragraphe).toHaveCSS('opacity', '1');
+    await expect(paragraphe).toHaveCSS('filter', 'none');
   });
 
   test('le retour système et Échap referment la feuille sans quitter le chat', async ({ page }) => {
@@ -356,6 +426,19 @@ test.describe('P3 : le panneau d’aperçu, sur ordinateur', () => {
     await page.goBack();
     await expect(page.getByTestId('chat-preview')).toHaveCount(0);
     await expect(page).toHaveURL(/\/chat$/);
+  });
+
+  test('la puce ouvre le même panneau, non modal ; elle s’inverse, le renvoi garde sa mise en évidence', async ({ page }) => {
+    await simuler(page);
+    await poser(page, page.getByTestId('chat-puce'));
+
+    await page.getByTestId('chat-puce').click();
+
+    const panneau = page.getByTestId('chat-preview');
+    await expect(panneau).toHaveAttribute('data-mode', 'panneau');
+    await expect(panneau).toContainText('Art. 35 — Code du travail');
+    await expect(page.getByTestId('chat-puce')).toHaveCSS('background-color', 'rgb(9, 9, 11)');
+    await expect(page.getByTestId('chat-citation')).toHaveCSS('background-color', 'rgb(244, 244, 245)');
   });
 });
 

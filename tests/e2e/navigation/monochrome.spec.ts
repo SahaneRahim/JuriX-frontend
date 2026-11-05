@@ -772,6 +772,60 @@ const ETATS_OUVERTS: EtatOuvert[] = [
     },
   },
   {
+    // Une réponse citée (refonte A, décision C1) : le renvoi et sa puce,
+    // l'aperçu de l'article ouvert par la puce, qui s'inverse (zinc-950, blanc
+    // en sombre) quand le renvoi garde sa mise en évidence (zinc-100).
+    nom: 'chat--reponse-citee',
+    taille: BUREAU,
+    ouvrir: async (page) => {
+      const texte = 'Selon l’article 35 de la loi n° 92/007, l’indemnité de licenciement est due.';
+      const cite = 'article 35 de la loi n° 92/007';
+      const titre = 'Loi N°92/007 du 14 août 1992 portant Code du travail';
+      const rien = { etat: null, liens: [], lignes: [] };
+      await page.route('**/api/v1/rag/ask/stream', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: [
+            { chunk: texte, done: false },
+            {
+              chunk: '',
+              done: true,
+              session_id: 'sid-monochrome',
+              sources: [],
+              citations: [
+                {
+                  debut: texte.indexOf(cite),
+                  fin: texte.indexOf(cite) + cite.length,
+                  texte_cite: cite,
+                  law_id: 2274,
+                  article: '35',
+                  article_id: 97421,
+                  reference: 'LOI-1992-007',
+                  titre,
+                  date_du_texte: '1992-08-14',
+                  statut: rien,
+                },
+              ],
+              citations_introuvables: [],
+              articles_cites: [],
+              textes_consultes_non_cites: [],
+            },
+          ]
+            .map((e) => `data: ${JSON.stringify(e)}\n\n`)
+            .join(''),
+        }),
+      );
+      // L'aperçu de l'article : non simulé, il dirait « indisponible », en zinc lui aussi.
+      await page.route('**/api/v1/laws/2274/articles/35', repondreEnJson(404, { detail: 'Not Found' }));
+      await page.goto('/chat');
+      await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-puce'));
+      await page.getByTestId('chat-puce').click();
+      await expect(page.getByTestId('chat-preview')).toBeVisible();
+      await expect(page.getByTestId('chat-puce')).toHaveClass(/bg-zinc-950/);
+    },
+  },
+  {
     // L'API injoignable : l'appel est coupé avant de partir, jamais servi par le modèle.
     nom: 'chat--api-injoignable',
     taille: TELEPHONE,

@@ -58,8 +58,10 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   AGENT_MOBILE,
   MEMBRE,
+  QUESTION,
   SUPERADMIN,
   connecter,
+  intercepterLApi,
   saisieDuChat,
   boutonDEnvoi,
   simulerLAdministration,
@@ -68,7 +70,7 @@ import {
   exiger,
   ouvrirAuServeur,
 } from '../doublures';
-import { cliquerJusqualEffet } from '../hydratation';
+import { cliquerJusqualEffet, saisirJusqualEffet } from '../hydratation';
 import { PAGES, loiAvecArticles, ouvrirAuRepos, type Entete, type PageDuSite } from '../pages-du-site';
 
 /** Les largeurs du balayage : chaque point de rupture de Tailwind, et ses deux voisins. */
@@ -1119,6 +1121,77 @@ test.describe('/search : le champ compact', () => {
 
 test.describe('390x844 au doigt', () => {
   test.use(reglages({ largeur: 390, hauteur: 844, telephone: true }));
+
+  /**
+   * Une réponse de la nouvelle API, citée (refonte A, décision C1) : le
+   * renvoi « l'article 35 de la loi n° 92/007 » et sa puce « Art. 35 · Code
+   * du travail ». Une puce en pastille `inline-block` de 24 px, comme la
+   * maquette, échouerait ici ; un lien en ligne, pris dans la phrase, est
+   * exempté comme le renvoi, et tout le reste de l'écran garde ses 44 px.
+   */
+  test('/chat, une réponse citée : renvoi et puce en ligne, dans la phrase ; le reste à 44 px', async ({ page }) => {
+    const TEXTE = 'Selon l’article 35 de la loi n° 92/007, l’indemnité de licenciement est due après deux ans de service.';
+    const CITE = 'article 35 de la loi n° 92/007';
+    const RIEN = { etat: null, liens: [], lignes: [] };
+    const TITRE = 'Loi N°92/007 du 14 août 1992 portant Code du travail';
+    await themeClair(page);
+    await intercepterLApi(page, (methode, chemin) => {
+      if (chemin !== '/rag/ask/stream') return undefined;
+      return {
+        flux: [
+          { chunk: TEXTE, done: false },
+          {
+            chunk: '',
+            done: true,
+            session_id: 'sid-puce',
+            persona: 'citoyen',
+            sources: [],
+            citations: [
+              {
+                debut: TEXTE.indexOf(CITE),
+                fin: TEXTE.indexOf(CITE) + CITE.length,
+                texte_cite: CITE,
+                law_id: 2274,
+                article: '35',
+                article_id: 97421,
+                reference: 'LOI-1992-007',
+                titre: TITRE,
+                date_du_texte: '1992-08-14',
+                statut: RIEN,
+              },
+            ],
+            citations_introuvables: [],
+            articles_cites: [
+              {
+                law_id: 2274,
+                law_reference: 'LOI-1992-007',
+                law_title: TITRE,
+                article_number: '35',
+                article_id: 97421,
+                excerpt: 'Le travailleur…',
+                relevance_score: 0.9,
+                date_du_texte: '1992-08-14',
+                statut: RIEN,
+              },
+            ],
+            textes_consultes_non_cites: [],
+          },
+        ],
+      };
+    });
+    await page.goto('/chat');
+    await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-puce'));
+    await expect(page.getByRole('log')).not.toHaveAttribute('aria-busy', 'true');
+
+    for (const testid of ['chat-citation', 'chat-puce']) {
+      expect(await page.getByTestId(testid).evaluate((a) => getComputedStyle(a).display), testid).toBe('inline');
+    }
+    const petites = await page.evaluate(mesurerLesCibles, CIBLE_MIN);
+    expect(
+      petites.map((c) => `${c.element} : ${c.largeur} × ${c.hauteur} px`),
+      `/chat, réponse citée : ${petites.length} cible(s) de moins de ${CIBLE_MIN} × ${CIBLE_MIN} px`,
+    ).toEqual([]);
+  });
 
   for (const parcours of PAGES) {
     test(`${parcours.nom} : des cibles de 44 × 44 px au moins`, async ({ page, request }) => {

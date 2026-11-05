@@ -1243,6 +1243,13 @@ export const translations = {
     'chat.citation.unfound': 'Citation non retrouvée dans les textes consultés : vérifiez-la avant de vous y fier.',
     'chat.citation.unfoundMany': 'Citations non retrouvées dans les textes consultés : vérifiez-les avant de vous y fier.',
     'chat.citation.unfoundShort': 'citation non retrouvée',
+    // Puces de citation (refonte A, décision C1) : « Art. 37 · Code du travail »
+    // à la première puce d'un article, « Art. 37 » ensuite ; le nom accessible
+    // commence par l'étiquette affichée (chat/libelles.ts, `etiquetteDeLaPuce`).
+    'chat.puce.article': 'Art.\u00a0{n}',
+    'chat.puce.articleDuTexte': 'Art.\u00a0{n}\u00a0· {nom}',
+    'chat.puce.voirLePassage': '{etiquette}\u202f: voir le passage',
+    'chat.puce.voirLeTexte': '{etiquette}\u202f: voir le texte',
     'chat.cited.title': 'Articles cités ({n})',
     'chat.consulted.title': 'Textes consultés, non cités ({n})',
     'chat.consulted.read': 'articles lus : {articles}',
@@ -2396,6 +2403,10 @@ export const translations = {
     'chat.citation.unfound': 'Citation not found in the texts consulted: check it before relying on it.',
     'chat.citation.unfoundMany': 'Citations not found in the texts consulted: check them before relying on them.',
     'chat.citation.unfoundShort': 'citation not found',
+    'chat.puce.article': 'Art.\u00a0{n}',
+    'chat.puce.articleDuTexte': 'Art.\u00a0{n}\u00a0· {nom}',
+    'chat.puce.voirLePassage': '{etiquette}: see the passage',
+    'chat.puce.voirLeTexte': '{etiquette}: see the text',
     'chat.cited.title': 'Articles cited ({n})',
     'chat.consulted.title': 'Texts consulted, not cited ({n})',
     'chat.consulted.read': 'articles read: {articles}',
