@@ -454,3 +454,65 @@ test.describe('Mode comparaison : le mouvement (refonte A, niveau A)', () => {
     await expect(chevron).toHaveCSS('transform', /^matrix\(-1, /);
   });
 });
+
+test.describe('Mode comparaison : le gréement (refonte A, niveau B)', () => {
+  const decor = (page: Page) => page.getByTestId('compare-greement');
+
+  for (const largeur of [768, 1023, 1024, 1440]) {
+    test(`à ${largeur} px, deux cartes suspendues côte à côte, le bouton dessous, sans débordement`, async ({ page }) => {
+      await page.setViewportSize({ width: largeur, height: 900 });
+      await page.goto('/compare');
+      await expect(decor(page)).toBeVisible();
+
+      const a = (await page.getByTestId('compare-a').boundingBox())!;
+      const b = (await page.getByTestId('compare-b').boundingBox())!;
+      const bouton = (await page.getByTestId('compare-submit').boundingBox())!;
+      expect(a.y).toBe(b.y);
+      expect(a.x + a.width).toBeLessThan(b.x);
+      expect(bouton.y).toBeGreaterThan(a.y + a.height);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+  }
+
+  test('sous 640 px, le décor disparaît et les champs s’empilent', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/compare');
+    await expect(decor(page)).toBeHidden();
+    const a = (await page.getByTestId('compare-a').boundingBox())!;
+    const b = (await page.getByTestId('compare-b').boundingBox())!;
+    expect(b.y).toBeGreaterThan(a.y + a.height);
+  });
+
+  test('sur un écran court, le formulaire reste sur une ligne, sans décor', async ({ page }) => {
+    await page.setViewportSize({ width: 740, height: 360 });
+    await page.goto('/compare');
+    await expect(decor(page)).toBeHidden();
+    const bouton = (await page.getByTestId('compare-submit').boundingBox())!;
+    expect(bouton.y + bouton.height).toBeLessThanOrEqual(360);
+  });
+
+  test('seul le décor s’anime, sans délai au-delà d’une seconde, et les champs servent aussitôt', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/compare');
+    const delais = await decor(page).evaluate((racine) =>
+      [...racine.children].map((el) => parseFloat(getComputedStyle(el).animationDelay)),
+    );
+    expect(delais).toHaveLength(5);
+    expect(Math.max(...delais)).toBeLessThanOrEqual(1);
+    await expect(page.getByTestId('compare-a')).toHaveCSS('animation-name', 'none');
+    await expect(page.getByTestId('compare-submit')).toHaveCSS('animation-name', 'none');
+    const carte = page.getByTestId('compare-a').locator('xpath=ancestor::label');
+    await expect(carte).toHaveCSS('animation-name', 'none');
+  });
+
+  test('en mouvement réduit, le gréement est là, immobile', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/compare');
+    await expect(decor(page)).toBeVisible();
+    const noms = await decor(page).evaluate((racine) =>
+      [...racine.children].map((el) => getComputedStyle(el).animationName),
+    );
+    expect(noms).toEqual(Array(5).fill('none'));
+  });
+});
