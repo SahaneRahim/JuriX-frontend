@@ -190,6 +190,8 @@ test.describe('Une conversation rouverte garde son profil', () => {
     );
     const corps = await repondre(page, { persona: 'avocat', session_id: 'sid-1' });
 
+    // La colonne des conversations (décision C3).
+    await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto('/chat');
     await page.getByTestId('conversation-item').first().click();
     await expect(page.getByTestId('chat-persona')).toHaveAttribute('data-persona', 'avocat');

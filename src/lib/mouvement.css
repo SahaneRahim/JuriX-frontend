@@ -462,11 +462,8 @@
    * dessiné depuis le passage ; délai sous 1 s (D9 : la maquette disait
    * 1,2 s).
    * ----------------------------------------------------------------------- */
-  .mv-tracer {
-    transform-origin: left;
-    animation: mv-tracer 0.7s var(--mv-courbe) var(--d, 0ms) backwards;
-  }
-
+  /* Pas de classe : le trait est un pseudo-élément, que NoteDeLIA.svelte anime
+     lui-même avec ce keyframe. */
   @keyframes mv-tracer {
     from { transform: scaleX(0); }
   }

@@ -741,6 +741,8 @@ const ETATS_OUVERTS: EtatOuvert[] = [
       await connecter(page, MEMBRE);
       await simulerLeChat(page);
       await page.goto('/chat');
+      // Le tiroir jusqu'à 1 535 px (décision C3).
+      await cliquerJusqualEffet(page.getByTestId('conversations-toggle'), page.getByTestId('conversation-item').first());
       await cliquerJusqualEffet(
         page.getByTestId('conversation-item').first(),
         page.getByRole('log').getByText(REPONSE_ROUVERTE),
@@ -823,6 +825,125 @@ const ETATS_OUVERTS: EtatOuvert[] = [
       await page.getByTestId('chat-puce').click();
       await expect(page.getByTestId('chat-preview')).toBeVisible();
       await expect(page.getByTestId('chat-puce')).toHaveClass(/bg-zinc-950/);
+    },
+  },
+  {
+    // La même réponse sur téléphone : la feuille des articles cités et son voile.
+    nom: 'chat--feuille-ouverte',
+    taille: TELEPHONE,
+    ouvrir: async (page) => {
+      const texte = 'Selon l’article 35 de la loi n° 92/007, l’indemnité de licenciement est due.';
+      const cite = 'article 35 de la loi n° 92/007';
+      const titre = 'Loi N°92/007 du 14 août 1992 portant Code du travail';
+      const rien = { etat: null, liens: [], lignes: [] };
+      await page.route('**/api/v1/rag/ask/stream', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: [
+            { chunk: texte, done: false },
+            {
+              chunk: '',
+              done: true,
+              session_id: 'sid-monochrome',
+              sources: [],
+              citations: [
+                {
+                  debut: texte.indexOf(cite),
+                  fin: texte.indexOf(cite) + cite.length,
+                  texte_cite: cite,
+                  law_id: 2274,
+                  article: '35',
+                  article_id: 97421,
+                  reference: 'LOI-1992-007',
+                  titre,
+                  date_du_texte: '1992-08-14',
+                  statut: rien,
+                },
+              ],
+              citations_introuvables: [],
+              articles_cites: [],
+              textes_consultes_non_cites: [],
+            },
+          ]
+            .map((e) => `data: ${JSON.stringify(e)}\n\n`)
+            .join(''),
+        }),
+      );
+      // L'aperçu de l'article : non simulé, il dirait « indisponible », en zinc lui aussi.
+      await page.route('**/api/v1/laws/2274/articles/35', repondreEnJson(404, { detail: 'Not Found' }));
+      await page.goto('/chat');
+      await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-puce'));
+      await page.getByTestId('chat-puce').click();
+      await expect(page.getByTestId('chat-preview')).toBeVisible();
+      await expect(page.getByTestId('chat-preview')).toHaveAttribute('aria-modal', 'true');
+    },
+  },
+  {
+    // Le panneau, carte ouverte : statut tamponné, passage dans son <mark>.
+    nom: 'chat--panneau-carte-ouverte',
+    taille: BUREAU,
+    ouvrir: async (page) => {
+      const texte = 'Selon l’article 35 de la loi n° 92/007, l’indemnité de licenciement reste due au travailleur après deux années de service continu.';
+      const cite = 'article 35 de la loi n° 92/007';
+      const titre = 'Loi N°92/007 du 14 août 1992 portant Code du travail';
+      const rien = { etat: null, liens: [], lignes: [] };
+      await page.route('**/api/v1/rag/ask/stream', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: [
+            { chunk: texte, done: false },
+            {
+              chunk: '',
+              done: true,
+              session_id: 'sid-monochrome',
+              sources: [],
+              citations: [
+                {
+                  debut: texte.indexOf(cite),
+                  fin: texte.indexOf(cite) + cite.length,
+                  texte_cite: cite,
+                  law_id: 2274,
+                  article: '35',
+                  article_id: 97421,
+                  reference: 'LOI-1992-007',
+                  titre,
+                  date_du_texte: '1992-08-14',
+                  statut: rien,
+                },
+              ],
+              citations_introuvables: [],
+              articles_cites: [],
+              textes_consultes_non_cites: [],
+            },
+          ]
+            .map((e) => `data: ${JSON.stringify(e)}\n\n`)
+            .join(''),
+        }),
+      );
+            await page.route(
+        '**/api/v1/laws/2274/articles/35**',
+        repondreEnJson(200, {
+          law_id: 2274,
+          texte: { id: 2274, reference: 'LOI-1992-007', nature: 'loi', numero: '92/007', titre, date_signature: '1992-08-14', annee: 1992, date_publication_jo: null, consultable: true },
+          numero: '35',
+          titre: null,
+          section: null,
+          page: null,
+          article_ids: [97421],
+          contenu: 'L’indemnité de licenciement reste due au travailleur après deux années de service continu.\nLe contrat précise par ailleurs la durée du préavis et les modalités du règlement final.',
+          tronque: false,
+          englobant: false,
+          homonymes: [],
+          statut: { releve_le: '2026-10-14', etat_du_texte: 'aucune_modification_connue', version_en_base: null, changements: [] },
+        }),
+      );
+      await page.goto('/chat');
+      await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-puce'));
+      await page.getByTestId('chat-puce').click();
+      await expect(page.getByTestId('chat-preview')).toBeVisible();
+      await expect(page.getByTestId('chat-preview').locator('mark')).toBeVisible();
     },
   },
   {

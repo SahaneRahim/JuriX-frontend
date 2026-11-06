@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CitationPositionnee } from '$lib/types';
+import type { CitationPositionnee, SourceCitee } from '$lib/types';
 import { paragraphesDeLArticle, passageLePlusProche } from './citations';
 import {
   articleDeLaCitation,
+  carteDeLaCitation,
+  cartesDeLaReponse,
   citationsDeLArticle,
   paragraphesAvecPassages,
   passagesDeLArticle,
@@ -188,5 +190,37 @@ describe('paragraphesAvecPassages', () => {
     expect(decoupe[0].filter((m) => m.actif).map((m) => m.texte)).toEqual(['phrase de l’article.']);
     expect(decoupe[1].filter((m) => m.actif).map((m) => m.texte)).toEqual(['(2) Seconde phrase']);
     expect(decoupe[2]).toEqual([{ texte: '(3) Troisième alinéa.', passages: [], actif: false }]);
+  });
+});
+
+describe('cartesDeLaReponse', () => {
+  const citation = (debut: number, fin: number, article: string | null, law_id = 1): CitationPositionnee =>
+    ({ debut, fin, texte_cite: '', law_id, article, article_id: null, reference: 'R', titre: `Texte ${law_id}`, date_du_texte: null, statut: { etat: null, liens: [], lignes: [] } }) as CitationPositionnee;
+  const source = (article_number: string | null, law_id = 1) =>
+    ({ law_id, law_reference: 'R', law_title: `Texte ${law_id}`, article_number, article_id: null, excerpt: '', relevance_score: 1, date_du_texte: null, statut: { etat: null, liens: [], lignes: [] } }) as SourceCitee;
+  const TEXTE = 'Une phrase qui cite. Une autre phrase. Une troisième.';
+
+  it('une carte par article cité, avec ses citations, dans l’ordre de la liste', () => {
+    const cartes = cartesDeLaReponse(TEXTE, [citation(0, 3, '35'), citation(21, 24, '37'), citation(39, 42, '35')], [source('35'), source('37')]);
+
+    expect(cartes.map((c) => c.numero)).toEqual(['35', '37']);
+    expect(cartes[0].citations.map((c) => c.indexCitation)).toEqual([0, 2]);
+    expect(carteDeLaCitation(cartes, 1)).toBe(1);
+    expect(carteDeLaCitation(cartes, 9)).toBe(-1);
+  });
+
+  it('une citation d’un texte entier, ou absente de la liste, a tout de même sa carte', () => {
+    const cartes = cartesDeLaReponse(TEXTE, [citation(0, 3, null, 2), citation(21, 24, null, 2)], [source('35')]);
+
+    expect(cartes).toHaveLength(2);
+    expect(cartes[1]).toMatchObject({ lawId: 2, numero: null, titre: 'Texte 2' });
+    expect(cartes[1].citations.map((c) => c.indexCitation)).toEqual([0, 1]);
+  });
+
+  it('une entrée de la liste sans numéro reçoit les citations sans article du même texte', () => {
+    const cartes = cartesDeLaReponse(TEXTE, [citation(0, 3, null)], [source(null)]);
+
+    expect(cartes).toHaveLength(1);
+    expect(cartes[0].citations).toHaveLength(1);
   });
 });

@@ -530,3 +530,19 @@ export function annonceDeFin(listes: CitationsDeLaReponse | null | undefined, t:
   }
   return annonce;
 }
+
+/**
+ * La clé de la pastille de statut d'une carte fermée (décision C7), d'après
+ * le même relevé que `lignesDuStatutDeLArticle` : un changement en cours ou un
+ * texte abrogé, une version consolidée, sinon la version d'origine. Jamais de
+ * statut inventé : sans aperçu, pas de pastille (`null`).
+ */
+export function cleDeLaPastille(apercu: ArticleApercu | null): string | null {
+  if (!apercu) return null;
+  const statut = apercu.statut;
+  const change = statut.changements.some((c) => c.sens === 'modifie_par' && !c.depasse && !c.integre_au_texte);
+  if (change || statut.etat_du_texte === 'abroge' || statut.etat_du_texte === 'remplace') {
+    return 'chat.carte.statutModifie';
+  }
+  return statut.version_en_base?.consolidee ? 'chat.carte.statutConsolide' : 'chat.carte.statutOrigine';
+}

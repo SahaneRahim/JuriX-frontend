@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArticleApercu, Changement, CitationPositionnee, StatutProuve, TexteLie } from '$lib/types';
 import {
   annonceDeFin,
+  cleDeLaPastille,
   designationDuTexte,
   designationDuTexteCite,
   enPhrase,
@@ -497,5 +498,27 @@ describe('puces de citation', () => {
       [0, 0],
       [1, 1],
     ]);
+  });
+});
+
+describe('cleDeLaPastille (C7)', () => {
+  const avec = (statut: Record<string, unknown>) =>
+    ({ statut: { releve_le: '2026-10-14', etat_du_texte: 'aucune_modification_connue', version_en_base: null, changements: [], ...statut } }) as unknown as ArticleApercu;
+
+  it('sans aperçu, pas de pastille : jamais de statut inventé', () => {
+    expect(cleDeLaPastille(null)).toBeNull();
+  });
+
+  it('origine, consolidé, modifié (un changement actuel ou un texte abrogé)', () => {
+    expect(cleDeLaPastille(avec({}))).toBe('chat.carte.statutOrigine');
+    expect(cleDeLaPastille(avec({ version_en_base: { consolidee: true, textes_integres: [] } }))).toBe('chat.carte.statutConsolide');
+    expect(cleDeLaPastille(avec({ etat_du_texte: 'abroge' }))).toBe('chat.carte.statutModifie');
+    expect(
+      cleDeLaPastille(avec({ changements: [{ sens: 'modifie_par', depasse: false, integre_au_texte: false }] })),
+    ).toBe('chat.carte.statutModifie');
+    // Un changement dépassé n'est pas actuel.
+    expect(cleDeLaPastille(avec({ changements: [{ sens: 'modifie_par', depasse: true, integre_au_texte: false }] }))).toBe(
+      'chat.carte.statutOrigine',
+    );
   });
 });

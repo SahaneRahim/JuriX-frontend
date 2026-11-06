@@ -267,11 +267,11 @@
   @media (min-width: 1280px) and (prefers-reduced-motion: no-preference) {
     .ancree::before {
       transform-origin: left;
-      animation: mv-tracer 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.45s backwards;
+      animation: mv-tracer 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.9s backwards;
     }
 
     .ancree::after {
-      animation: mv-ressort 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) 0.8s backwards;
+      animation: mv-ressort 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) 1s backwards;
     }
   }
 </style>

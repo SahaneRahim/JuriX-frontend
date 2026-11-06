@@ -160,6 +160,18 @@ async function simuler(page: Page, options: Options = {}): Promise<Record<string
   return questions;
 }
 
+/** Le dernier événement, décalé du préambule ajouté devant le texte (test de la feuille). */
+const DECALAGE = `${'Un long préambule pour remplir le fil. '.repeat(40)}\n\n`.length;
+const FIN_DECALEE = {
+  ...FIN_NOUVELLE_API,
+  citations: FIN_NOUVELLE_API.citations.map((c) => ({ ...c, debut: c.debut + DECALAGE, fin: c.fin + DECALAGE })),
+  citations_introuvables: FIN_NOUVELLE_API.citations_introuvables.map((c) => ({
+    ...c,
+    debut: c.debut + DECALAGE,
+    fin: c.fin + DECALAGE,
+  })),
+};
+
 async function poser(page: Page, effet = page.getByTestId('chat-citation')) {
   await page.goto('/chat');
   await saisirJusqualEffet(saisieDuChat(page), QUESTION, effet);
@@ -270,10 +282,11 @@ test.describe('P3 : les citations, sur téléphone', () => {
 
     await citation.click();
 
-    const feuille = page.getByRole('dialog', { name: 'Art. 35 — Code du travail' });
+    const feuille = page.getByRole('dialog', { name: 'Articles cités' });
     await expect(feuille).toHaveAttribute('aria-modal', 'true');
     await expect(feuille.getByTestId('chat-preview-text')).toContainText('a droit à une indemnité de licenciement');
-    await expect(feuille.locator('strong')).toContainText('durée de service continue');
+    await expect(feuille.locator('mark')).toContainText('durée de service continue');
+    await expect(feuille.getByTestId('chat-carte-legende')).toContainText('Souligné');
     await expect(feuille.getByTestId('chat-preview-status')).toContainText('Version d’origine, non consolidée.');
     await expect(feuille.getByTestId('chat-preview-status')).not.toContainText('vigueur');
     await expect(feuille.getByTestId('chat-preview-close')).toBeFocused();
@@ -281,7 +294,7 @@ test.describe('P3 : les citations, sur téléphone', () => {
 
     // « Fermer » : la feuille part, l'adresse ne change pas, le focus revient.
     await feuille.getByTestId('chat-preview-close').click();
-    await expect(page.getByTestId('chat-preview')).toHaveCount(0);
+    await expect(page.getByTestId('chat-preview')).toBeHidden();
     await expect(page).toHaveURL(/\/chat$/);
     await expect(citation).toBeFocused();
   });
@@ -304,7 +317,7 @@ test.describe('P3 : les citations, sur téléphone', () => {
 
     await puce.click();
 
-    const feuille = page.getByRole('dialog', { name: 'Art. 35 — Code du travail' });
+    const feuille = page.getByRole('dialog', { name: 'Articles cités' });
     await expect(feuille).toHaveAttribute('aria-modal', 'true');
     await expect(feuille.getByTestId('chat-preview-close')).toBeFocused();
     // Ouverte, elle s'inverse (zinc-950) ; le renvoi garde sa mise en évidence (zinc-100).
@@ -312,7 +325,7 @@ test.describe('P3 : les citations, sur téléphone', () => {
     await expect(page.getByTestId('chat-citation')).toHaveCSS('background-color', 'rgb(244, 244, 245)');
 
     await feuille.getByTestId('chat-preview-close').click();
-    await expect(page.getByTestId('chat-preview')).toHaveCount(0);
+    await expect(page.getByTestId('chat-preview')).toBeHidden();
     await expect(puce).toBeFocused();
     await expect(puce).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   });
@@ -338,14 +351,49 @@ test.describe('P3 : les citations, sur téléphone', () => {
     await page.getByTestId('chat-citation').click();
     await expect(page.getByTestId('chat-preview')).toBeVisible();
     await page.goBack();
-    await expect(page.getByTestId('chat-preview')).toHaveCount(0);
+    await expect(page.getByTestId('chat-preview')).toBeHidden();
     await expect(page).toHaveURL(/\/chat$/);
     await expect(page.getByRole('log')).toContainText('indemnité de licenciement');
 
-    await page.getByTestId('chat-article-cite').click();
+    // La barre « N articles cités » : Échap ferme, et elle reprend le focus.
+    const barre = page.getByTestId('chat-barre-articles');
+    await expect(barre).toHaveText('1 article cité');
+    await barre.click();
     await expect(page.getByTestId('chat-preview')).toBeVisible();
+    await expect(page.getByTestId('chat-preview-close')).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(page.getByTestId('chat-preview')).toHaveCount(0);
+    await expect(page.getByTestId('chat-preview')).toBeHidden();
+    await expect(barre).toBeFocused();
+  });
+
+  test('la phrase citée reste visible au-dessus de la feuille', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 640 });
+    await simuler(page, { flux: [{ chunk: `${'Un long préambule pour remplir le fil. '.repeat(40)}\n\n${TEXTE}`, done: false }, FIN_DECALEE] });
+    await poser(page);
+    await page.getByTestId('chat-citation').evaluate((a) => a.scrollIntoView({ block: 'end' }));
+
+    await page.getByTestId('chat-puce').click();
+
+    const feuille = page.getByTestId('chat-preview');
+    await expect(feuille.getByTestId('chat-preview-close')).toBeFocused();
+    await expect
+      .poll(async () => {
+        const haut = await feuille.evaluate((f) => f.getBoundingClientRect().top);
+        const bas = await page.getByTestId('chat-puce').evaluate((p) => p.getBoundingClientRect().bottom);
+        return bas <= haut;
+      })
+      .toBe(true);
+  });
+
+  test('la feuille monte et se cache : plus rien n’y est atteignable une fois fermée', async ({ page }) => {
+    await simuler(page);
+    await poser(page);
+    const barre = page.getByTestId('chat-barre-articles');
+    await barre.click();
+    await page.getByTestId('chat-preview-close').click();
+    await expect(page.getByTestId('chat-preview')).toBeHidden();
+    await expect(page.getByTestId('chat-preview')).toHaveCSS('visibility', 'hidden');
+    await expect(barre).toBeVisible();
   });
 
   test('rechargée feuille ouverte, la page ferme l’aperçu suivant au premier « Fermer »', async ({ page }) => {
@@ -367,7 +415,7 @@ test.describe('P3 : les citations, sur téléphone', () => {
 
     await feuille.getByTestId('chat-preview-close').click();
 
-    await expect(page.getByTestId('chat-preview')).toHaveCount(0);
+    await expect(page.getByTestId('chat-preview')).toBeHidden();
     await expect(page).toHaveURL(/\/chat$/);
   });
 
@@ -407,38 +455,102 @@ test.describe('P3 : les citations, sur téléphone', () => {
   }
 });
 
-test.describe('P3 : le panneau d’aperçu, sur ordinateur', () => {
+test.describe('le panneau des preuves, sur ordinateur', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test('un panneau à droite, non modal ; une autre citation le remplace sans empiler', async ({ page }) => {
+  test('permanent : là dès l’arrivée, 520 px, état vide, sans boîte', async ({ page }) => {
+    await simuler(page);
+    await page.goto('/chat');
+
+    const panneau = page.getByTestId('chat-preview');
+    await expect(panneau).toBeVisible();
+    await expect(page.getByTestId('chat-preuves-vide')).toContainText('Les articles cités apparaîtront ici');
+    expect((await panneau.boundingBox())?.width).toBe(520);
+    await expect(panneau).not.toHaveAttribute('role', 'dialog');
+    await expect(page.getByTestId('chat-preview-close')).toBeHidden();
+  });
+
+  test('à la fin de la réponse : la première carte ouverte ; l’en-tête la replie ; aucune entrée d’historique', async ({ page }) => {
     await simuler(page);
     await poser(page);
+    const longueur = await page.evaluate(() => history.length);
 
-    await page.getByTestId('chat-citation').click();
-    const panneau = page.getByTestId('chat-preview');
-    await expect(panneau).toHaveAttribute('data-mode', 'panneau');
-    await expect(panneau).not.toHaveAttribute('aria-modal', 'true');
-    // La conversation reste utilisable à côté.
+    const carte = page.getByTestId('chat-carte').first();
+    await expect(carte).toHaveAttribute('data-ouverte', 'true');
+    await expect(page.getByTestId('chat-preuves-nombre')).toHaveText('1');
+    await expect(page.getByTestId('chat-preview-status')).toContainText('Version d’origine, non consolidée.');
+    await expect(page.getByTestId('chat-preview')).toHaveAttribute('data-mode', 'panneau');
+
     await page.getByTestId('chat-article-cite').click();
-    await expect(page.getByTestId('chat-preview')).toHaveCount(1);
+    await expect(carte).toHaveAttribute('data-ouverte', 'false');
+    await expect(page.getByTestId('chat-article-cite')).toHaveAttribute('aria-expanded', 'false');
 
-    // Un seul retour suffit à le fermer : le second aperçu a remplacé le premier.
-    await page.goBack();
-    await expect(page.getByTestId('chat-preview')).toHaveCount(0);
+    await page.getByTestId('chat-puce').click();
+    await expect(carte).toHaveAttribute('data-ouverte', 'true');
+    expect(await page.evaluate(() => history.length)).toBe(longueur);
     await expect(page).toHaveURL(/\/chat$/);
   });
 
-  test('la puce ouvre le même panneau, non modal ; elle s’inverse, le renvoi garde sa mise en évidence', async ({ page }) => {
+  test('la puce ouvre sa carte et son passage, sans prendre le focus ; elle s’inverse, le renvoi garde sa mise en évidence', async ({ page }) => {
     await simuler(page);
     await poser(page, page.getByTestId('chat-puce'));
 
-    await page.getByTestId('chat-puce').click();
+    await page.getByTestId('chat-puce').focus();
+    await page.keyboard.press('Enter');
 
     const panneau = page.getByTestId('chat-preview');
-    await expect(panneau).toHaveAttribute('data-mode', 'panneau');
     await expect(panneau).toContainText('Art. 35 — Code du travail');
+    await expect(panneau.locator('mark')).toContainText('durée de service continue');
+    await expect(page.getByTestId('chat-puce')).toBeFocused();
     await expect(page.getByTestId('chat-puce')).toHaveCSS('background-color', 'rgb(9, 9, 11)');
     await expect(page.getByTestId('chat-citation')).toHaveCSS('background-color', 'rgb(244, 244, 245)');
+  });
+
+  test('« Copier la référence » devient « Référence copiée »', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await simuler(page);
+    await poser(page);
+
+    await page.getByTestId('chat-carte-copier').click();
+
+    await expect(page.getByTestId('chat-carte-copier')).toContainText('Référence copiée');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('/laws/2274?article=35');
+  });
+
+  test('l’accueil replié, la question reste à l’écran et la saisie à sa place', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 560 });
+    await simuler(page);
+    await poser(page);
+
+    await expect(page.getByTestId('chat-accueil')).toHaveCount(0);
+    await expect(page.getByRole('log').getByText(QUESTION)).toBeInViewport();
+    await expect(saisieDuChat(page)).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
+  });
+
+  test('« Nouvelle conversation » pour un visiteur : l’accueil et le panneau vide reviennent', async ({ page }) => {
+    await simuler(page);
+    await poser(page);
+    await expect(page.getByTestId('chat-suggestion')).toHaveCount(0);
+
+    await page.getByTestId('chat-new-inline').click();
+
+    await expect(page.getByTestId('chat-suggestion')).toHaveCount(3);
+    await expect(page.getByTestId('chat-preuves-vide')).toBeVisible();
+  });
+
+  test('mouvement réduit : cartes, souligné et statut lisibles, sans geste', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await simuler(page);
+    await poser(page, page.getByTestId('chat-puce'));
+    await page.getByTestId('chat-puce').click();
+
+    const marque = page.getByTestId('chat-preview').locator('mark');
+    await expect(marque).toHaveCSS('animation-name', 'none');
+    await expect(marque).not.toHaveCSS('background-image', 'none');
+    await expect(page.getByTestId('chat-preview-status').locator('svg').first()).toHaveCSS('animation-name', 'none');
+    await expect(page.getByTestId('chat-carte').first()).toHaveCSS('opacity', '1');
+    await expect(page.getByRole('log').getByText(QUESTION)).toHaveCSS('animation-name', 'none');
   });
 });
 

@@ -193,6 +193,16 @@ test.describe('Annonces dynamiques', () => {
     // et aria-busy pendant la réponse).
     await expect(journal.getByTestId('chat-announce')).toHaveCount(0);
   });
+
+  test('/chat : le panneau des preuves est une région nommée, sans seconde annonce ni boîte', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/chat');
+    await expect(page.getByRole('complementary', { name: 'Articles cités' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const resultats = await new AxeBuilder({ page }).include('[data-testid="chat-preview"]').analyze();
+    const graves = resultats.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(graves, graves.map((v) => v.id).join('\n')).toEqual([]);
+  });
 });
 
 test.describe('Langue du document', () => {

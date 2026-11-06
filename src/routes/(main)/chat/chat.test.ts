@@ -308,15 +308,41 @@ describe('l’accueil entier à la première visite seulement (P4, variante A)',
     await waitFor(() => expect(fil().textContent).not.toContain('N’écrivez ni nom ni numéro de téléphone.'));
   });
 
-  it('la première question retient le repère, sans retirer un message de l’accueil affiché', async () => {
-    reponse = () => flux([{ chunk: 'Voici la réponse.', done: false }, { chunk: '', done: true, sources: [] }]);
+  it('la première question retient le repère, et l’accueil se replie puis quitte le fil (C8)', async () => {
+    // Le simulacre de l'API Web Animations ne finit jamais : ici, il finit.
+    const animer = Element.prototype.animate;
+    Element.prototype.animate = vi.fn(() => {
+      const animation = { cancel: vi.fn(), finished: Promise.resolve(), currentTime: 0, onfinish: null as null | (() => void) };
+      setTimeout(() => animation.onfinish?.(), 0);
+      return animation;
+    }) as unknown as typeof Element.prototype.animate;
+    try {
+      reponse = () => flux([{ chunk: 'Voici la réponse.', done: false }, { chunk: '', done: true, sources: [] }]);
+      const ecran = render(Page);
+      expect(ecran.getByTestId('chat-accueil')).toBeTruthy();
+
+      await poser('Quelles indemnités en cas de licenciement ?', ecran);
+
+      expect(await ecran.findByText('Voici la réponse.')).toBeTruthy();
+      expect(localStorage.getItem('jurix-chat-accueil-vu')).toBe('1');
+      await waitFor(() => expect(ecran.queryByTestId('chat-accueil')).toBeNull());
+      expect(ecran.queryAllByTestId('chat-suggestion')).toHaveLength(0);
+
+      // Une nouvelle conversation le ramène, pour un visiteur aussi.
+      await fireEvent.click(ecran.getByTestId('chat-new-inline'));
+      expect(await ecran.findByTestId('chat-accueil')).toBeTruthy();
+    } finally {
+      Element.prototype.animate = animer;
+    }
+  });
+
+  it('une question trop courte ne replie pas l’accueil : rien n’a été demandé', async () => {
     const ecran = render(Page);
 
-    await poser('Quelles indemnités en cas de licenciement ?', ecran);
+    await poser('Oui', ecran);
 
-    expect(await ecran.findByText('Voici la réponse.')).toBeTruthy();
-    expect(localStorage.getItem('jurix-chat-accueil-vu')).toBe('1');
-    expect(fil().textContent).toContain('N’écrivez ni nom ni numéro de téléphone.');
+    expect(await ecran.findByTestId('chat-error')).toBeTruthy();
+    expect(ecran.getByTestId('chat-accueil')).toBeTruthy();
   });
 
   it('sur l’accueil, pas de bouton « Aller au dernier message » : il n’y a rien à rejoindre', async () => {
@@ -466,15 +492,25 @@ describe('défilement du fil', () => {
 });
 
 describe('la barre du chat', () => {
-  it('sans profil choisi : « Profil : Général », le mot « profil » une seule fois', () => {
+  it('sans profil choisi : la pastille « Général », dont le nom dit ce qu’elle fait', () => {
     localStorage.removeItem('jurix-persona');
     personaStore._reinitialiser();
     const ecran = render(Page);
 
     const profil = ecran.getByTestId('chat-persona');
     expect(profil.getAttribute('data-persona')).toBe('general');
-    expect(profil.textContent?.replace(/\s+/g, ' ')).toContain('Profil : Général');
-    expect(profil.textContent).not.toContain('Profil général');
+    expect(profil.textContent?.trim()).toBe('Général');
+    expect(ecran.getByTestId('chat-persona-change').getAttribute('aria-label')).toBe('Changer de profil, actuel\u00a0: général');
+  });
+
+  it('« Nouvelle conversation » pour tous, et le bouton d’envoi sans survol qui grossit', () => {
+    const ecran = render(Page);
+
+    expect(ecran.getByTestId('chat-new-inline').getAttribute('aria-label')).toBe('Nouvelle conversation');
+    const envoi = ecran.getByTestId('chat-send');
+    expect(envoi.className).toContain('motion-safe:active:scale-[0.92]');
+    expect(envoi.className).toContain('motion-safe:ease-jx');
+    expect(envoi.className).not.toContain('hover:scale-105');
   });
 });
 
@@ -546,7 +582,8 @@ describe('le focus, quand l’envoi désactive le bouton qui l’avait', () => {
     suggestion.focus();
     await fireEvent.click(suggestion);
 
-    await waitFor(() => expect(suggestion.disabled).toBe(true));
+    // La suggestion part avec l'accueil replié (C8) : le focus ne reste pas sur elle.
+    await ecran.findByTestId('chat-stop');
     await waitFor(() => expect(document.activeElement).toBe(champ));
 
     await fireEvent.click(ecran.getByTestId('chat-stop'));
@@ -615,7 +652,7 @@ describe('citations dans la phrase et aperçu (P3)', () => {
     await fireEvent.click(ecran.getByTestId('chat-preview-close'));
 
     expect(history.back).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(ecran.queryByTestId('chat-preview')).toBeNull());
+    await waitFor(() => expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBeNull());
     expect(inerte(fil())).toBe(false);
     await waitFor(() => expect(document.activeElement).toBe(lien));
   });
@@ -629,12 +666,12 @@ describe('citations dans la phrase et aperçu (P3)', () => {
 
     // Retour système : l'entrée d'historique de l'aperçu disparaît.
     pageEnTest.update((p) => ({ ...p, state: {} }));
-    await waitFor(() => expect(ecran.queryByTestId('chat-preview')).toBeNull());
+    await waitFor(() => expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBeNull());
 
-    await fireEvent.click(ecran.getAllByTestId('chat-article-cite')[0]);
-    await ecran.findByTestId('chat-preview');
+    await fireEvent.click(ecran.getByTestId('chat-barre-articles'));
+    expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBe('true');
     await fireEvent.keyDown(window, { key: 'Escape' });
-    await waitFor(() => expect(ecran.queryByTestId('chat-preview')).toBeNull());
+    await waitFor(() => expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBeNull());
   });
 
   // L'historique garde l'état des entrées d'une vue précédente du chat : la
@@ -660,7 +697,7 @@ describe('citations dans la phrase et aperçu (P3)', () => {
       await fireEvent.click(ecran.getByTestId('chat-preview-close'));
 
       expect(history.back).toHaveBeenCalledTimes(1);
-      await waitFor(() => expect(ecran.queryByTestId('chat-preview')).toBeNull());
+      await waitFor(() => expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBeNull());
     });
   }
 
@@ -688,6 +725,121 @@ describe('citations dans la phrase et aperçu (P3)', () => {
     // Sans étape du serveur, l'attente disait « Préparation de la réponse… » : finie, plus rien.
     expect(ecran.queryByTestId('chat-progress')).toBeNull();
     await waitFor(() => expect(annonce()).toBe('Réponse terminée.'));
+  });
+});
+
+/**
+ * Refonte A, E6 étape 5 : le panneau des preuves, permanent, et ses états
+ * (C6). jsdom simule un écran étroit : forme feuille, sauf `lg` ci-dessous.
+ */
+describe('le panneau des preuves', () => {
+  /** `matchMedia` d'un écran d'ordinateur, le temps d'un test. */
+  function ecranLarge() {
+    const avant = window.matchMedia;
+    window.matchMedia = ((requete: string) => ({
+      matches: requete.includes('1024'),
+      media: requete,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    return () => (window.matchMedia = avant);
+  }
+
+  it('monté dès l’arrivée, vide ; squelettes dès `textes_trouves`, jusqu’à `done` ; puis ses cartes', async () => {
+    let pilote!: ReturnType<typeof fluxPilote>;
+    reponse = (init) => {
+      pilote = fluxPilote(init.signal);
+      return pilote.reponse;
+    };
+    const ecran = render(Page);
+    const panneau = ecran.getByTestId('chat-preview');
+    expect(panneau.getAttribute('data-etat')).toBe('vide');
+
+    await poser('Quelles indemnités en cas de licenciement ?', ecran);
+    await waitFor(() => expect(fil().getAttribute('aria-busy')).toBe('true'));
+    expect(panneau.getAttribute('data-etat')).toBe('vide');
+
+    for (const evenement of PROGRESSION) pilote.envoyer(evenement);
+    await waitFor(() => expect(panneau.getAttribute('data-etat')).toBe('recherche'));
+    expect(ecran.getByTestId('chat-preuves-squelettes')).toBeTruthy();
+
+    pilote.envoyer({ chunk: TEXTE, done: false });
+    pilote.envoyer(FIN_NOUVELLE_API);
+    pilote.fermer();
+
+    await waitFor(() => expect(panneau.getAttribute('data-etat')).toBe('pret'));
+    expect(ecran.getAllByTestId('chat-carte')).toHaveLength(1);
+    expect(ecran.getByTestId('chat-barre-articles').textContent).toContain('1 article cité');
+  });
+
+  it('une réponse sans citation, sur la nouvelle API : le panneau le dit, sans barre', async () => {
+    reponse = () =>
+      flux([
+        { chunk: 'Bonjour.', done: false },
+        { chunk: '', done: true, sources: [], citations: [], citations_introuvables: [], articles_cites: [], textes_consultes_non_cites: [] },
+      ]);
+    const ecran = render(Page);
+    await poser('Bonjour à vous', ecran);
+
+    expect((await ecran.findByTestId('chat-preuves-aucun')).textContent).toContain('ne cite aucun article');
+    expect(ecran.queryByTestId('chat-barre-articles')).toBeNull();
+  });
+
+  it('sur ordinateur : la première carte ouverte, la puce sans boîte ni historique, le focus sur la puce', async () => {
+    const remettre = ecranLarge();
+    try {
+      reponse = () => flux([{ chunk: TEXTE, done: false }, FIN_NOUVELLE_API]);
+      const ecran = render(Page);
+      await poser('Quelles indemnités en cas de licenciement ?', ecran);
+      const puce = await ecran.findByTestId('chat-puce');
+      await waitFor(() => expect(ecran.getByTestId('chat-carte').getAttribute('data-ouverte')).toBe('true'));
+
+      puce.focus();
+      await fireEvent.click(puce);
+
+      expect(simule.pushState).not.toHaveBeenCalled();
+      expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBeNull();
+      expect(inerte(fil())).toBe(false);
+      expect(document.activeElement).toBe(puce);
+      expect(puce.className).toContain('bg-zinc-950');
+    } finally {
+      remettre();
+    }
+  });
+
+  it('sous la feuille, `suivre` ne ramène pas la vue : le fil garde sa position', async () => {
+    const observateurs: ResizeObserverCallback[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(rappel: ResizeObserverCallback) {
+          observateurs.push(rappel);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    reponse = () => flux([{ chunk: TEXTE, done: false }, FIN_NOUVELLE_API]);
+    const ecran = render(Page);
+    vi.unstubAllGlobals();
+    await poser('Quelles indemnités en cas de licenciement ?', ecran);
+    const puce = await ecran.findByTestId('chat-puce');
+    const el = fil();
+    let defilement = 120;
+    Object.defineProperty(el, 'scrollTop', { configurable: true, get: () => defilement, set: (v: number) => (defilement = v) });
+    Object.defineProperty(el, 'scrollHeight', { configurable: true, value: 5000 });
+    Object.defineProperty(el, 'clientHeight', { configurable: true, value: 300 });
+
+    await fireEvent.click(puce);
+    expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBe('true');
+    await fireEvent.scroll(el);
+    const pose = defilement;
+    observateurs.forEach((rappel) => rappel([], {} as ResizeObserver));
+    expect(observateurs.length).toBeGreaterThan(0);
+    await tick();
+
+    expect(defilement).toBe(pose);
+    expect(defilement).not.toBe(5000 - 300);
   });
 });
 
@@ -759,7 +911,7 @@ describe('écriture et puces de citation (refonte A)', () => {
 
     await fireEvent.click(ecran.getByTestId('chat-preview-close'));
 
-    await waitFor(() => expect(ecran.queryByTestId('chat-preview')).toBeNull());
+    await waitFor(() => expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(puce));
     expect(puce.className).not.toContain('bg-zinc-950');
   });
@@ -831,7 +983,7 @@ describe('sous la feuille d’aperçu modale', () => {
     await waitFor(() => expect(annonceDeLaFeuille()).toBe('Réponse terminée.'));
 
     await fireEvent.click(ecran.getByTestId('chat-preview-close'));
-    await waitFor(() => expect(ecran.queryByTestId('chat-preview')).toBeNull());
+    await waitFor(() => expect(ecran.getByTestId('chat-preview').getAttribute('aria-modal')).toBeNull());
     await fireEvent.click(ecran.getAllByTestId('chat-citation')[0]);
     await ecran.findByTestId('chat-preview');
 

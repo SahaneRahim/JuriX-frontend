@@ -13,32 +13,9 @@
 
 import { lireApercuDArticle, lireChiffresDuCorpus } from '$lib/api-publique';
 import { DELAI_API_MS } from '$lib/config';
-import type { ArticleApercu, ChiffresDuCorpus, StatutProuve } from '$lib/types';
+import type { ArticleApercu, ChiffresDuCorpus } from '$lib/types';
 
 const auNavigateur = (): boolean => typeof window !== 'undefined';
-
-/**
- * Ce qu'ouvre l'aperçu (ApercuDeCitation) : un article cité, ou un texte cité
- * sans numéro d'article (« Voir aussi la loi n° 92/007 »). Tout ce qu'il faut
- * pour l'afficher AVANT la réponse de l'API, et sans elle sur l'ancienne.
- */
-export interface CibleDApercu {
-  /** Identifiant de cette ouverture : la clé de l'état d'historique (retour système). */
-  cle: string;
-  lawId: number;
-  /** Numéro de l'article ; `null` pour un texte cité sans article (pas d'appel d'aperçu). */
-  numero: string | null;
-  /** Le morceau lu par le modèle : choisit l'article parmi les homonymes. */
-  articleId: number | null;
-  /** « Art. 37 — Code du travail », titre de la feuille. */
-  libelle: string;
-  /** Intitulé complet du texte. */
-  titre: string;
-  /** Statut prouvé de la citation : affiché tant que l'aperçu n'est pas là, ou à sa place. */
-  statut: StatutProuve | null;
-  /** Les phrases de la réponse qui le citent, sans la citation : de quoi trouver le passage à mettre en gras. */
-  phrases: string[];
-}
 
 /* -------------------------------------------------------------------------- */
 /* Aperçu d'un article cité                                                    */
@@ -56,7 +33,7 @@ function cleDeLApercu(lawId: number, numero: string, articleId: number | null | 
  * L'aperçu d'un article, ou `null` (ancienne API, article introuvable, panne,
  * délai dépassé) : l'écran propose alors le texte intégral.
  *
- * `signal` annule la lecture (feuille fermée, autre citation ouverte). Il
+ * `signal` annule la lecture (carte retirée du panneau). Il
  * remplacerait le délai de $lib/api-publique : le délai est donc reposé ici,
  * sur le même contrôleur, sans `AbortSignal.any` (absent d'une partie des
  * téléphones visés).

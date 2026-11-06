@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FERME_GRAS, OUVRE_GRAS, blocsDeReponse, insecablesDuTexte } from './texte';
+import { FERME_GRAS, OUVRE_GRAS, blocsDeReponse, insecablesDuTexte, reponseDirecteEnTitre } from './texte';
 
 describe('blocsDeReponse', () => {
   it('rend une liste vide sur une entree absente', () => {
@@ -475,5 +475,18 @@ describe('texte.ts', () => {
 
     expect(source).toBeTruthy();
     expect(source).not.toMatch(/\(\?<[=!]/);
+  });
+});
+
+describe('reponseDirecteEnTitre', () => {
+  it('le libellé du début de la réponse passe sur sa ligne, où il devient un titre', () => {
+    expect(reponseDirecteEnTitre('📌 **Réponse directe** : selon la loi.')).toBe('**Réponse directe**\n\nselon la loi.');
+    expect(reponseDirecteEnTitre('**Direct answer**: under the law.')).toBe('**Direct answer**\n\nunder the law.');
+    expect(blocsDeReponse(reponseDirecteEnTitre('**Réponse directe** : oui.'), { gras: true })[0].type).toBe('titre');
+  });
+
+  it('ailleurs qu’au début, ou sans lui, rien ne change', () => {
+    expect(reponseDirecteEnTitre('Bonjour.')).toBe('Bonjour.');
+    expect(reponseDirecteEnTitre('Voir **Réponse directe** : ceci.')).toBe('Voir **Réponse directe** : ceci.');
   });
 });

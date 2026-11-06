@@ -18,6 +18,8 @@
   import { tick } from "svelte";
   import { afterNavigate, beforeNavigate, goto } from "$app/navigation";
   import { fade, scale } from "svelte/transition";
+  import BalanceAnimee from "$lib/components/BalanceAnimee.svelte";
+  import { duree } from "$lib/mouvement";
   import { API_URL } from "$lib/api";
   import Icone from "$lib/components/Icone.svelte";
   import { typographieDesNumeros } from "$lib/sources";
@@ -423,18 +425,18 @@
     <div
       class="fixed inset-0 bg-zinc-950/40 backdrop-blur-sm transition-opacity"
       on:click={() => close()}
-      transition:fade={{ duration: 150 }}
+      transition:fade={{ duration: duree(150) }}
     ></div>
 
     <!-- Boîte de dialogue flottante -->
     <div
       class="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl dark:shadow-none border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col max-h-[80vh] z-10"
-      transition:scale={{ duration: 150, start: 0.95 }}
+      transition:scale={{ duration: duree(150), start: 0.95 }}
     >
       <!-- Barre de saisie -->
       <div class="flex items-center px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800 gap-3">
         {#if loading}
-          <Icone nom="loader-circle" class="w-6 h-6 text-zinc-950 dark:text-white motion-safe:animate-spin" />
+          <BalanceAnimee etat="attente" class="text-2xl text-zinc-950 dark:text-white" />
         {:else}
           <Icone nom="search" class="text-2xl text-zinc-400 dark:text-zinc-500" />
         {/if}

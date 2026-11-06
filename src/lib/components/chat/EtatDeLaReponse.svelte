@@ -39,18 +39,7 @@
   $: t = $tr;
 </script>
 
-<!--
-  POURQUOI LA PLACE DE L'AVATAR RESTE, VIDE (à partir de sm). La réponse
-  prendra la place de l'attente, au même endroit : elle garde, jusqu'à
-  l'étape 6 de la refonte (seconde partie d'E6 : fil sans avatar ni bulle),
-  son avatar et sa bulle bordée. Les étapes s'alignent donc sur le TEXTE de
-  la réponse à venir : la colonne de l'avatar (40 px et l'écart de 16 px,
-  comme les messages de l'accueil sans avatar), puis la marge intérieure de
-  la bulle (16, puis 20 px). Sous sm, ni avatar ni colonne, comme la réponse.
--->
-<div class="flex gap-2 sm:gap-4" data-testid="chat-progress">
-  <div class="hidden h-10 w-10 shrink-0 sm:block" aria-hidden="true"></div>
-  <div class="min-w-0 flex-1 px-4 text-left sm:px-5">
+<div class="text-left" data-testid="chat-progress">
     <!-- L'étiquette de la maquette : la balance au repos, le nom propre
          (invariable, sans clé de traduction : A4 § 1). -->
     <p class="mb-2 flex items-center gap-2 text-[13px] font-bold leading-[18px] text-zinc-950 dark:text-white">
@@ -81,5 +70,4 @@
         </li>
       {/each}
     </ol>
-  </div>
 </div>

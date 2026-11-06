@@ -125,6 +125,7 @@ const TAILLES: Taille[] = [
   // son menu : il bascule à xl (1 280 px), voir SiteHeader.svelte.
   { largeur: 1024, hauteur: 768, telephone: false, pages: PAGES_SEULES_ICI },
   { largeur: 1440, hauteur: 900, telephone: false },
+  { largeur: 1600, hauteur: 900, telephone: false, pages: PAGES_SEULES_ICI },
 ];
 
 // ---------------------------------------------------------------------------
@@ -587,7 +588,8 @@ for (const taille of TAILLES) {
       }
     });
 
-    const enTiroir = taille.largeur < LARGEUR_LG;
+    // Décision C3 : tiroir jusqu'à 1 535 px, colonne à partir de 2xl.
+    const enTiroir = taille.largeur < 1536;
 
     test(`/chat, compte connecté : les conversations ${enTiroir ? 'en tiroir' : 'en colonne'}`, async ({ page }) => {
       await connecter(page, MEMBRE);

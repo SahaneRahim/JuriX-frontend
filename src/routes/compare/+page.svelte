@@ -230,7 +230,7 @@
           minlength="2"
           maxlength="200"
           placeholder={$tr("compare.placeholderA")}
-          class="block min-h-11 w-full px-4 py-2.5 rounded-xl border border-zinc-200 bg-white text-base sm:text-sm text-zinc-950 placeholder-zinc-400 transition-colors focus:outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
+          class="block min-h-11 w-full px-4 py-2.5 rounded-xl border border-zinc-500 bg-white text-base sm:text-sm text-zinc-950 placeholder-zinc-500 transition-colors focus:outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
         />
       </label>
       <label class="block">
@@ -244,7 +244,7 @@
           minlength="2"
           maxlength="200"
           placeholder={$tr("compare.placeholderB")}
-          class="block min-h-11 w-full px-4 py-2.5 rounded-xl border border-zinc-200 bg-white text-base sm:text-sm text-zinc-950 placeholder-zinc-400 transition-colors focus:outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
+          class="block min-h-11 w-full px-4 py-2.5 rounded-xl border border-zinc-500 bg-white text-base sm:text-sm text-zinc-950 placeholder-zinc-500 transition-colors focus:outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
         />
       </label>
       <button

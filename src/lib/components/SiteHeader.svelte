@@ -301,9 +301,11 @@
   13 à 21 px rendus à la page sur un téléphone ou une tablette. Téléphone en
   paysage compris : 56 px, c'est déjà moins que les 61 px qu'y prenait la
   barre réduite de l'écran court.
-  À partir de lg, la hauteur du bureau ne change pas (16 px autour des
-  boutons) : le décalage collant du sommaire de lecture (`lg:top-24`) en
-  dépend, et la maquette de bureau (64 px) sera examinée avec lui.
+  À partir de lg, la hauteur du bureau reste de 77 px (69 à partir de xl,
+  boutons de 36 px), et non les 64 px de la maquette : décision du contrôle final
+  (E8). Le dépôt fait foi pour les recettes (règle 1), le décalage collant du
+  sommaire de lecture (`lg:top-24`, L3) en dépend, et 13 px gagnés ne valaient
+  pas de resserrer des boutons de 44 px.
   Écran court à partir de lg (`lg:court:`, 500 px de haut au plus : fenêtre
   de bureau basse, écran partagé) : 8 px au lieu de 16 autour des boutons,
   61 px au lieu de 77 de lg à xl. La variante est née sur le téléphone en

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
+  import { duree } from "$lib/mouvement";
   import { page } from "$app/stores";
   import Icone from "$lib/components/Icone.svelte";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
@@ -135,7 +136,7 @@
        l'accueil, la connexion et la page d'erreur se resserrent déjà ainsi. -->
   <div
     class="min-h-app bg-background-light dark:bg-background-dark py-8 sm:py-12 court:pt-4 px-4 sm:px-6 lg:px-8 relative"
-    in:fade
+    in:fade={{ duration: duree(400) }}
   >
     <div class="max-w-6xl mx-auto space-y-10 sm:space-y-12 court:space-y-8 pt-4 sm:pt-8 court:pt-2">
       <!-- En-tête / Hero du Blog. Le surtitre dit, en texte, que les analyses

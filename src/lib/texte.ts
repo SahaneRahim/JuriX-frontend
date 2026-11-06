@@ -212,6 +212,24 @@ function emphaseEnGras(ligne: string): string {
   return sansEmphase(marquee);
 }
 
+/**
+ * « 📌 **Réponse directe** : selon … » : le libellé passe sur sa propre ligne,
+ * où `blocsDeReponse` en fait un titre (refonte A, A1 § 4, A2 § 3.3 : « le
+ * titre « Réponse directe » est un nœud à part »).
+ *
+ * POURQUOI ICI, SUR LE TEXTE. Le libellé vient du modèle (prompt du backend),
+ * il n'y a pas de champ d'API à afficher, et un titre écrit en dur mentirait
+ * sur une salutation. À appliquer après le marquage des citations : leurs
+ * bornes portent sur le texte brut, et seul le début de la réponse change.
+ * Ni pictogramme ni deux-points ne sont du contenu : aucun mot n'est retiré.
+ */
+export function reponseDirecteEnTitre(texte: string): string {
+  return texte.replace(
+    /^\s*(?:\p{Extended_Pictographic}\uFE0F?\s*)?\*\*(Réponse directe|Direct answer)\*\*\s*:\s*/u,
+    '**$1**\n\n',
+  );
+}
+
 /** Options de `blocsDeReponse`. */
 export interface OptionsDesBlocs {
   /**

@@ -46,32 +46,31 @@
   import { onMount, tick } from "svelte";
   import { prefersReducedMotion } from "svelte/motion";
   import { duree } from "$lib/mouvement";
+  import { cubicOut } from "svelte/easing";
   import { fade } from "svelte/transition";
   import { formatHeure } from "$lib/format";
-  import { blocsDeReponse, type Bloc } from "$lib/texte";
+  import { blocsDeReponse, reponseDirecteEnTitre, type Bloc } from "$lib/texte";
   import { lireEvenements, type EvenementDeFlux } from "$lib/flux";
   // `traductions` et non `tr` : la page rend des <tr> (tableaux des réponses),
   // et un identifiant du même nom fait signaler chaque balise par Svelte.
   import { language, switchLanguage, tr as traductions } from "$lib/stores/language";
   import MetaSeo from "$lib/components/MetaSeo.svelte";
   import Icone from "$lib/components/Icone.svelte";
-  import ApercuDeCitation from "$lib/components/chat/ApercuDeCitation.svelte";
+  import BalanceAnimee from "$lib/components/BalanceAnimee.svelte";
+  import BarreDesArticlesCites from "$lib/components/chat/BarreDesArticlesCites.svelte";
   import EtatDeLaReponse from "$lib/components/chat/EtatDeLaReponse.svelte";
   import QuestionDuProfil from "$lib/components/chat/QuestionDuProfil.svelte";
-  import SourcesDeLaReponse from "$lib/components/chat/SourcesDeLaReponse.svelte";
+  import PanneauDesPreuves from "$lib/components/chat/PanneauDesPreuves.svelte";
   import TexteDeReponse from "$lib/components/chat/TexteDeReponse.svelte";
-  import {
-    chargerLesChiffresDuCorpus,
-    chiffresDejaLus,
-    type CibleDApercu,
-  } from "$lib/components/chat/apercus";
+  import { chargerLesChiffresDuCorpus, chiffresDejaLus } from "$lib/components/chat/apercus";
   import { accueilDejaVu, retenirLAccueilVu } from "$lib/components/chat/accueil";
-  import { marquerLesCitations, phraseAutour, type TexteMarque } from "$lib/components/chat/citations";
+  import { marquerLesCitations, type TexteMarque } from "$lib/components/chat/citations";
+  import { annonceDeFin, libelleDeLEtape } from "$lib/components/chat/libelles";
   import {
-    annonceDeFin,
-    libelleDeLaCitation,
-    libelleDeLEtape,
-  } from "$lib/components/chat/libelles";
+    carteDeLaCitation,
+    cartesDeLaReponse,
+    type CarteDeLaReponse,
+  } from "$lib/components/chat/passages";
 
   /** Une source de l'ancienne liste « Sources » (`sources` du dernier événement). */
   interface SourceAncienne {
@@ -120,8 +119,6 @@
     question?: string;
     /** Question du profil : `undefined` tant qu'elle attend, puis le profil choisi (`null` : sans profil). */
     profil?: Persona | null;
-    /** Accueil : les messages qui suivent le premier n'ont pas d'avatar (un seul interlocuteur parle). */
-    sansAvatar?: boolean;
     timestamp: string;
   }
 
@@ -195,8 +192,8 @@
    * ensuite, le périmètre et les trois questions. Lu au montage : le serveur,
    * qui ne voit pas le stockage, rend l'accueil entier (page en cache, la même
    * pour tous), et chez un habitué il se réduit à l'hydratation. Fixé pour
-   * toute la vue : la première question écrit le repère, mais ne retire aucun
-   * message au-dessus d'elle.
+   * toute la vue : la première question écrit le repère ; l'accueil se replie
+   * alors (`questionPosee`), et une nouvelle conversation le ramène tel quel.
    */
   let accueilEntier = true;
 
@@ -246,14 +243,12 @@
             id: -1,
             type: "assistant",
             content: chiffres ? t("chat.welcome.verify") : t("chat.welcome.verifyGeneric"),
-            sansAvatar: true,
             timestamp: "",
           },
           {
             id: -2,
             type: "assistant",
             content: t("chat.welcome.privacy"),
-            sansAvatar: true,
             suggestions: questionsDeLAccueil,
             timestamp: "",
           },
@@ -268,13 +263,40 @@
           },
         ]
   ) as ChatMessage[];
-  $: messagesAffiches = conversationRestauree ? chatMessages : [...bienvenue, ...chatMessages];
+  // Une question est dans le fil : l'accueil se replie (C8). Pas pour une
+  // simple erreur (question trop courte), où l'on n'a encore rien demandé.
+  $: questionPosee = chatMessages.some((m) => m.type === "user");
   // Le profil général a son nom court, comme les autres (« Citoyen ») : la
   // barre affichait « Profil : Profil général », le mot deux fois, à chaque
   // nouveau visiteur depuis que le profil se demande dans le fil (P5).
   $: nomDuProfil = personaAffiche
     ? t(`persona.${PERSONA_SLUG[personaAffiche]}.nom`)
     : t("persona.general.nom");
+
+  /** Les suggestions de l'accueil arrivent une fois, à la première vue (voir le gabarit). */
+  let suggestionsEnArrivee = true;
+
+  /**
+   * Le repli de l'accueil à l'envoi (C8, A2 § 4) : la hauteur en 0,7 s, le fondu
+   * en 0,35 s, la courbe commune.
+   *
+   * POURQUOI UNE TRANSITION SVELTE ET NON UNE CLASSE. `max-height` ne s'anime
+   * pas depuis `none`, et une valeur fixe (640 px dans la maquette) rognerait
+   * l'accueil d'un téléphone étroit : la hauteur vraie est mesurée au départ.
+   * L'accueil quitte ensuite la page, ses boutons avec lui, sans rester
+   * focalisable à hauteur nulle. La fin relance `suivre` (`on:outroend`) : la
+   * position de la question a changé.
+   *
+   * Conversation rouverte : pas de geste, elle remplace l'accueil d'un coup.
+   */
+  function replier(noeud: HTMLElement) {
+    const hauteur = noeud.offsetHeight;
+    return {
+      duration: conversationRestauree ? 0 : duree(700),
+      css: (_t: number, u: number) =>
+        `overflow:hidden;max-height:${hauteur * (1 - cubicOut(u))}px;opacity:${Math.max(0, 1 - u * 2)}`,
+    };
+  }
 
   /** Dernière question envoyée, pour que « Réessayer » ait quelque chose à renvoyer. */
   let lastQuestion = "";
@@ -294,23 +316,28 @@
   interface Rendu {
     blocs: Bloc[];
     marque: TexteMarque | null;
+    cartes: CarteDeLaReponse[];
   }
   const rendus = new WeakMap<ChatMessage, Rendu>();
   function renduDe(message: ChatMessage): Rendu {
     let rendu = rendus.get(message);
     if (!rendu) {
       const marque = message.citations ? marquerLesCitations(message.content, message.citations) : null;
-      rendu = { marque, blocs: blocsDeReponse(marque ? marque.texte : message.content, { gras: true }) };
+      rendu = {
+        marque,
+        blocs: blocsDeReponse(reponseDirecteEnTitre(marque ? marque.texte : message.content), { gras: true }),
+        cartes: marque
+          ? cartesDeLaReponse(message.content, marque.citations, message.citations?.articles_cites ?? [])
+          : [],
+      };
       rendus.set(message, rendu);
     }
     return rendu;
   }
 
-  /** Les listes « Articles cités » et « Textes consultés » sont à montrer (nouvelle API). */
+  /** Le panneau a de quoi montrer pour cette réponse (nouvelle API). */
   function aDesListes(message: ChatMessage): boolean {
-    return Boolean(
-      message.citations?.articles_cites?.length || message.citations?.textes_consultes_non_cites?.length,
-    );
+    return Boolean(renduDe(message).cartes.length || message.citations?.textes_consultes_non_cites?.length);
   }
 
   /**
@@ -333,7 +360,7 @@
   // ---------------------------------------------------------------------------
 
   let annonce = "";
-  /** La région d'annonce de la feuille d'aperçu modale (voir `annoncer`). */
+  /** La région d'annonce de la feuille modale des preuves (voir `annoncer`). */
   let annonceDeLaFeuille = "";
   /** Celle du tiroir des conversations, sous lg (voir `annoncer`). */
   let annonceDuTiroir = "";
@@ -412,10 +439,10 @@
   // Rendu uniquement pour un compte connecté : une conversation anonyme
   // n'appartient à personne, donc aucune liste ne peut la contenir.
   //
-  // Sous lg, c'est un TIROIR qui glisse de la gauche, par-dessus la
+  // Sous 2xl, c'est un TIROIR qui glisse de la gauche, par-dessus la
   // conversation : empilé au-dessus d'elle, il repoussait la saisie sous la
   // ligne de flottaison, et déplié, il pouvait la pousser d'un écran entier. À
-  // partir de lg, c'est une colonne de la page, toujours visible.
+  // partir de 2xl, c'est une colonne de la page, toujours visible (C3).
   // ---------------------------------------------------------------------------
 
   let conversations: ConversationSummary[] = [];
@@ -425,25 +452,23 @@
   let panneau: HTMLElement;
 
   /**
-   * Écran d'au moins 1 024 px (`lg`), où les conversations sont une colonne et
-   * non un tiroir. Lu dès l'initialisation dans le navigateur, donc juste à
-   * l'hydratation. Faux au serveur, sans conséquence : il rend la version
-   * invitée, sans panneau des conversations (voir +page.ts).
+   * Écran d'au moins 1 024 px (`lg`), où le panneau des preuves est une
+   * colonne et non une feuille. Lu dès l'initialisation dans le navigateur,
+   * donc juste à l'hydratation. Faux au serveur, sans conséquence : la forme
+   * vient des classes `lg:`, ceci ne décide que du rôle de boîte modale.
    */
   const REQUETE_ECRAN_LARGE = "(min-width: 1024px)";
   let ecranLarge =
     typeof window !== "undefined" && window.matchMedia(REQUETE_ECRAN_LARGE).matches;
   /**
-   * Écran d'au moins 1 280 px (`xl`). L'aperçu d'une citation y tient en
-   * panneau à côté de la colonne des conversations : à 1 024 px, conversations
-   * (288 px), conversation et panneau (360 px) ne laissaient que 260 px à la
-   * réponse. Entre les deux, pour un compte, l'aperçu reste une feuille.
+   * Écran d'au moins 1 536 px (`2xl`), où les conversations d'un compte sont
+   * une colonne, à côté du panneau de 520 px ; en dessous, un tiroir (C3).
    */
-  const REQUETE_ECRAN_TRES_LARGE = "(min-width: 1280px)";
-  let ecranTresLarge =
-    typeof window !== "undefined" && window.matchMedia(REQUETE_ECRAN_TRES_LARGE).matches;
+  const REQUETE_COLONNE_DES_CONVERSATIONS = "(min-width: 1536px)";
+  let colonneDesConversations =
+    typeof window !== "undefined" && window.matchMedia(REQUETE_COLONNE_DES_CONVERSATIONS).matches;
 
-  $: tiroirOuvert = panneauOuvert && !ecranLarge;
+  $: tiroirOuvert = panneauOuvert && !colonneDesConversations;
   // Le tiroir suivant part d'une région vide, comme la feuille d'aperçu
   // (`terminerApercu`) : une phrase déjà dite, présente à l'ouverture,
   // pourrait l'être une seconde fois.
@@ -469,7 +494,7 @@
 
   /**
    * `piegerFocus`, mais seulement tant que le panneau est un tiroir ouvert : à
-   * partir de lg, le même <aside> est une colonne de la page, que la
+   * partir de 2xl, le même <aside> est une colonne de la page, que la
    * tabulation doit pouvoir quitter. Posé après la mise à jour du DOM : tant
    * que le tiroir porte encore `invisible`, focus() n'aurait aucun effet. À la
    * fermeture, `piegerFocus` rend le focus au bouton qui a ouvert le tiroir.
@@ -527,24 +552,32 @@
   });
 
   // ---------------------------------------------------------------------------
-  // Aperçu d'une citation (P3)
+  // Le panneau des preuves (refonte A, C2, C6)
   //
-  // Une feuille modale en bas d'écran, ou un panneau à droite à partir de lg
-  // (xl pour un compte, voir REQUETE_ECRAN_TRES_LARGE). Jamais deux aperçus :
-  // une autre citation remplace le contenu.
+  // Une colonne permanente à partir de lg, une feuille modale en dessous. Il
+  // montre les articles de la dernière réponse qui en a ; une puce d'une
+  // réponse plus ancienne le bascule sur celle-ci (`idPorteurChoisi`).
   //
-  // RETOUR SYSTÈME. L'ouverture ajoute une entrée d'historique sans changer
-  // d'adresse (routage « shallow » de SvelteKit) : le retour d'Android, ou du
-  // navigateur, referme l'aperçu au lieu de quitter le chat. « Fermer » et
-  // Échap reviennent en arrière pour consommer cette entrée. Une autre citation
-  // remplace l'entrée au lieu d'en empiler une.
+  // RETOUR SYSTÈME, SUR LA FEUILLE SEULE. Son ouverture ajoute une entrée
+  // d'historique sans changer d'adresse (routage « shallow » de SvelteKit) :
+  // le retour d'Android, ou du navigateur, la referme au lieu de quitter le
+  // chat. « Fermer » et Échap reviennent en arrière pour consommer cette
+  // entrée. La colonne, toujours là, n'a rien à fermer ni à consommer.
   // ---------------------------------------------------------------------------
 
-  let cibleApercu: CibleDApercu | null = null;
-  /** Ce qui l'a ouvert, pour le mettre en évidence dans le fil. */
-  let sourceApercu: { idMessage: number; genre: "citation" | "article"; index: number } | null = null;
-  /** L'élément qui reprendra le focus à la fermeture. */
+  /** La réponse choisie par une puce ; `null` : la dernière qui a des articles. */
+  let idPorteurChoisi: number | null = null;
+  /** Le rang de la carte ouverte (une seule à la fois). */
+  let carteOuverte: number | null = null;
+  /** La citation touchée, dans la réponse montrée : sa puce s'inverse, son passage se souligne. */
+  let citationActive: number | null = null;
+  let feuilleOuverte = false;
+  /** Le panneau lui-même (hauteur de la feuille, focus). */
+  let boitePreuves: HTMLElement | undefined;
+  /** L'élément qui reprendra le focus à la fermeture de la feuille. */
   let declencheurApercu: HTMLElement | null = null;
+  /** La clé de l'entrée d'historique de la feuille. */
+  let cleFeuille = "";
   /** L'entrée d'historique a été ajoutée, puis vue dans l'état de la page. */
   let apercuDansLHistorique = false;
   let apercuVuDansLHistorique = false;
@@ -558,42 +591,56 @@
    * fallait deux appuis, ou deux retours.
    */
   const vueDesApercus = Math.random().toString(36).slice(2, 10);
+  /** La réponse en cours a reçu son dernier événement : plus de squelettes. */
+  let reponseFinie = false;
 
-  $: apercuEnPanneau = ecranLarge && (!$authStore.isAuthenticated || ecranTresLarge);
-  $: apercuModal = cibleApercu !== null && !apercuEnPanneau;
-  $: avecPanneau = cibleApercu !== null && apercuEnPanneau;
+  function choisirLePorteur(messages: ChatMessage[], choisi: number | null): ChatMessage | null {
+    const reponses = messages.filter((m) => m.type === "assistant");
+    return (
+      reponses.find((m) => m.id === choisi) ?? [...reponses].reverse().find((m) => aDesListes(m)) ?? null
+    );
+  }
+
+  $: porteur = choisirLePorteur(chatMessages, idPorteurChoisi);
+  $: cartes = porteur ? renduDe(porteur).cartes : [];
+  $: consultesDuPorteur = porteur?.citations?.textes_consultes_non_cites ?? [];
+  $: textesTrouves = progressions.find((p) => p.etape === "textes_trouves");
+  // C6 et C11 : des squelettes dès que des textes sont trouvés, jusqu'à `done`.
+  $: etatDesPreuves = (
+    envoiEnCours && !reponseFinie && textesTrouves
+      ? "recherche"
+      : porteur
+        ? "pret"
+        : chatMessages.findLast((m) => m.type === "assistant")?.citations
+          ? "aucun"
+          : "vide"
+  ) as "recherche" | "pret" | "aucun" | "vide";
+  $: nombreDeSquelettes = textesTrouves?.nb_textes ?? 2;
+  $: apercuModal = feuilleOuverte && !ecranLarge;
   $: bloquerLeDefilement(tiroirOuvert || apercuModal);
 
-  function ouvrirApercu(
-    cible: Omit<CibleDApercu, "cle">,
-    source: { idMessage: number; genre: "citation" | "article"; index: number },
-    declencheur: HTMLElement | null,
-  ) {
-    const remplace = cibleApercu !== null;
-    numeroDApercu += 1;
-    const cle = `${vueDesApercus}-${numeroDApercu}`;
-    cibleApercu = { ...cible, cle };
-    sourceApercu = source;
+  /** Ouvre la feuille (sous lg) ; `declencheur` : la puce ou la barre qui reprendra le focus. */
+  function ouvrirFeuille(declencheur: HTMLElement | null) {
     declencheurApercu = declencheur ?? declencheurApercu;
+    if (feuilleOuverte) return;
+    numeroDApercu += 1;
+    cleFeuille = `${vueDesApercus}-${numeroDApercu}`;
+    feuilleOuverte = true;
     apercuVuDansLHistorique = false;
     // Une variable et non un littéral : `App.PageState` n'est pas déclaré
     // dans ce dépôt, et un littéral y serait refusé pour ses champs en trop.
-    const etat = { apercuCitation: cle };
+    const etat = { apercuCitation: cleFeuille };
     try {
-      if (remplace && apercuDansLHistorique) {
-        replaceState("", etat);
-      } else {
-        pushState("", etat);
-        apercuDansLHistorique = true;
-      }
+      pushState("", etat);
+      apercuDansLHistorique = true;
     } catch {
-      // Routeur indisponible : l'aperçu s'ouvre quand même, sans retour système.
+      // Routeur indisponible : la feuille s'ouvre quand même, sans retour système.
       apercuDansLHistorique = false;
     }
   }
 
   function fermerApercu() {
-    if (!cibleApercu) return;
+    if (!feuilleOuverte) return;
     // Consommer l'entrée d'historique : `suivreLHistorique` referme ensuite.
     if (apercuDansLHistorique && apercuVuDansLHistorique) {
       history.back();
@@ -604,80 +651,95 @@
 
   function terminerApercu() {
     const declencheur = declencheurApercu;
-    cibleApercu = null;
-    sourceApercu = null;
+    feuilleOuverte = false;
     declencheurApercu = null;
     apercuDansLHistorique = false;
     apercuVuDansLHistorique = false;
     // La feuille suivante part d'une région vide : une phrase déjà dite,
     // présente à l'ouverture, pourrait l'être une seconde fois.
     annonceDeLaFeuille = "";
-    // Le focus revient à la citation qui a ouvert l'aperçu, s'il était dans
-    // l'aperçu (retombé au <body> avec lui) ; pas s'il est déjà ailleurs.
+    // Feuille refermée, plus rien n'est montré : la puce se rétablit. La
+    // colonne, elle, reste à l'écran avec son passage.
+    if (!ecranLarge) citationActive = null;
+    // Le focus revient à ce qui a ouvert la feuille, s'il y était resté (la
+    // feuille se cache) ou retombé au <body> ; pas s'il est déjà ailleurs, ni
+    // à partir de lg, où le panneau reste à l'écran. Une puce recréée entre-
+    // temps n'existe plus : la barre prend le relais.
     void tick().then(() => {
       const actif = document.activeElement;
-      if (declencheur?.isConnected && (!actif || actif === document.body)) declencheur.focus();
+      const perdu = !actif || actif === document.body || (!ecranLarge && boitePreuves?.contains(actif));
+      if (!perdu) return;
+      const cible = declencheur?.isConnected
+        ? declencheur
+        : document.querySelector<HTMLElement>('[data-testid="chat-barre-articles"]');
+      cible?.focus();
     });
+    void tick().then(mesurerColle);
   }
 
-  /** Retour système (ou `history.back()` de `fermerApercu`) : l'entrée de l'aperçu a disparu. */
+  /** Retour système (ou `history.back()` de `fermerApercu`) : l'entrée de la feuille a disparu. */
   function suivreLHistorique(cle: string | undefined) {
-    if (!cibleApercu || !apercuDansLHistorique) return;
-    if (cle === cibleApercu.cle) apercuVuDansLHistorique = true;
+    if (!feuilleOuverte || !apercuDansLHistorique) return;
+    if (cle === cleFeuille) apercuVuDansLHistorique = true;
     else if (apercuVuDansLHistorique) terminerApercu();
   }
   $: suivreLHistorique(($page.state as { apercuCitation?: string } | undefined)?.apercuCitation);
 
-  /** Une citation dans la phrase : son aperçu, avec la phrase qui la porte. */
+  /** Oublie ce qui est ouvert dans le panneau : la conversation change. */
+  function oublierLaSelection() {
+    idPorteurChoisi = null;
+    carteOuverte = null;
+    citationActive = null;
+  }
+
+  /** Écart gardé entre la puce et le haut de la feuille (maquette). */
+  const MARGE_AU_DESSUS_DE_LA_FEUILLE = 20;
+
+  /**
+   * La phrase citée reste visible au-dessus de la feuille (critère d'E6). Le
+   * fil gagne une marge du bas de la hauteur de la feuille (voir son `style`)
+   * et `suivre` est suspendu (`apercuModal`), sans quoi il ramènerait la vue
+   * en bas. La hauteur se lit sur `offsetHeight`, pas sur la position de la
+   * feuille : à cet instant, elle est encore en train de monter.
+   */
+  async function revelerAuDessusDeLaFeuille(puce: HTMLElement) {
+    await tick();
+    const el = messagesContainer;
+    if (!el || !boitePreuves) return;
+    const hautDeLaFeuille = window.innerHeight - boitePreuves.offsetHeight;
+    const depassement = puce.getBoundingClientRect().bottom - (hautDeLaFeuille - MARGE_AU_DESSUS_DE_LA_FEUILLE);
+    if (depassement > 0) el.scrollTop += depassement;
+  }
+
+  /**
+   * Une puce, ou le renvoi de la phrase : la carte de son article s'ouvre, avec
+   * LE passage de cette citation (C10). Sur ordinateur, le focus reste sur la
+   * puce : la colonne n'est pas une boîte, et la lecture continue.
+   */
   function ouvrirLaCitation(message: ChatMessage, index: number, declencheur: HTMLElement) {
-    const citation = renduDe(message).marque?.citations[index];
-    if (!citation) return;
-    ouvrirApercu(
-      {
-        lawId: citation.law_id,
-        numero: citation.article,
-        articleId: citation.article_id,
-        libelle: libelleDeLaCitation(citation.article, citation.titre, citation.reference, t),
-        titre: citation.titre,
-        statut: citation.statut ?? null,
-        phrases: [phraseAutour(message.content, citation.debut, citation.fin)],
-      },
-      { idMessage: message.id, genre: "citation", index },
-      declencheur,
-    );
+    const rang = carteDeLaCitation(renduDe(message).cartes, index);
+    if (rang === -1) return;
+    idPorteurChoisi = message.id;
+    carteOuverte = rang;
+    citationActive = index;
+    if (!ecranLarge) {
+      ouvrirFeuille(declencheur);
+      void revelerAuDessusDeLaFeuille(declencheur);
+    }
   }
 
-  /** Un article de la liste « Articles cités » : les phrases de la réponse qui le citent. */
-  function ouvrirLArticleCite(message: ChatMessage, index: number, declencheur: HTMLElement) {
-    const article = message.citations?.articles_cites?.[index];
-    if (!article) return;
-    const citantes = (renduDe(message).marque?.citations ?? []).filter(
-      (c) =>
-        c.law_id === article.law_id &&
-        ((article.article_id != null && c.article_id === article.article_id) ||
-          (article.article_number != null && c.article === article.article_number)),
-    );
-    ouvrirApercu(
-      {
-        lawId: article.law_id,
-        numero: article.article_number,
-        articleId: article.article_id,
-        libelle: libelleDeLaCitation(article.article_number, article.law_title, article.law_reference, t),
-        titre: article.law_title,
-        statut: article.statut ?? null,
-        phrases: citantes.map((c) => phraseAutour(message.content, c.debut, c.fin)),
-      },
-      { idMessage: message.id, genre: "article", index },
-      declencheur,
-    );
+  /** L'en-tête d'une carte : elle s'ouvre, ou se referme. Aucune puce n'est active. */
+  function basculerCarte(rang: number) {
+    carteOuverte = carteOuverte === rang ? null : rang;
+    citationActive = null;
   }
 
-  // Échap ferme l'aperçu, sinon le menu, sinon le tiroir. La boîte des
+  // Échap ferme la feuille, sinon le menu, sinon le tiroir. La boîte des
   // profils, ouverte par-dessus, intercepte Échap avant nous (écoute en
   // capture) : un seul Échap ne ferme jamais deux choses.
   function surTouche(event: KeyboardEvent) {
     if (event.key !== "Escape" || event.defaultPrevented) return;
-    if (cibleApercu) {
+    if (feuilleOuverte) {
       event.preventDefault();
       fermerApercu();
     } else if (menuOuvert) {
@@ -744,6 +806,7 @@
     const detail = await reponse.json();
     abandonnerLaReponseEnCours();
     fermerApercu();
+    oublierLaSelection();
     sessionId = detail.session_id;
     // Rouverte, la conversation continue avec SON profil (`general` donne
     // le profil général), quel que soit le profil global.
@@ -817,6 +880,7 @@
   function nouvelleConversation(fermerLePanneau = true) {
     abandonnerLaReponseEnCours();
     fermerApercu();
+    oublierLaSelection();
     // « Réessayer » ne doit pas reposer, sous le nouveau profil, la question
     // de la conversation quittée.
     lastQuestion = "";
@@ -988,7 +1052,8 @@
    */
   function suivre() {
     const el = messagesContainer;
-    if (!el) return;
+    // Sous la feuille, le fil reste où `revelerAuDessusDeLaFeuille` l'a posé.
+    if (!el || apercuModal) return;
     if (colle) {
       const bas = el.scrollHeight - el.clientHeight;
       let cible = bas;
@@ -1180,7 +1245,7 @@
     }
 
     // Une première question posée : aux visites suivantes, l'accueil se
-    // réduira au périmètre (P4). Celui de cette vue ne bouge pas.
+    // réduira au périmètre (P4).
     retenirLAccueilVu();
 
     // P5 : le profil change la réponse. Sans profil choisi ni refusé, la
@@ -1257,6 +1322,7 @@
     const gen = generation;
     controleur = new AbortController();
     envoiEnCours = true;
+    reponseFinie = false;
     arretDemande = false;
     idReponseCourante = null;
     progressions = [];
@@ -1489,10 +1555,20 @@
         }
         const listes = listesDuFlux(evenement);
         if (listes) idCitationsNouvelles = idReponse;
+        reponseFinie = true;
         ajouterAuMessage({
           sources: (evenement.sources ?? []) as ChatMessage["sources"],
           ...(listes ? { citations: listes } : {}),
         });
+        // La nouvelle réponse prend le panneau, sauf sous une feuille ouverte
+        // sur une réponse d'avant : on ne change pas ce qu'on est en train de
+        // lire. Sa première carte s'ouvre sur ordinateur (maquette), jamais
+        // dans une feuille fermée.
+        const finie = chatMessages.find((m) => m.id === idReponse);
+        if (listes && finie && aDesListes(finie) && !feuilleOuverte) {
+          oublierLaSelection();
+          if (ecranLarge && renduDe(finie).cartes.length) carteOuverte = 0;
+        }
         adopterLaSession(evenement);
         // Le titre est écrit par le serveur à la première interaction : la
         // liste n'a de nouveau à montrer qu'à ce moment-là.
@@ -1537,7 +1613,9 @@
     void handleSendChatMessage(question);
     if (!auClavier) return;
     await tick();
-    if ((bouton.isConnected && !bouton.disabled) || !focusEncoreSur(bouton)) return;
+    // Une suggestion part avec l'accueil qui se replie (`questionPosee`) : le
+    // temps du geste, elle est encore là, inerte et jamais désactivée.
+    if ((bouton.isConnected && !bouton.disabled && !questionPosee) || !focusEncoreSur(bouton)) return;
     const premierProfil = messagesContainer?.querySelector<HTMLElement>(
       '[data-testid="chat-profile-question"] [role="group"] button',
     );
@@ -1595,7 +1673,7 @@
    * jamais désactivé ; sous sm, l'icône seule, nommée par son aria-label.
    */
   const CLASSE_ENVOI =
-    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 hover:bg-black text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 transition-all hover:scale-105 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 disabled:hover:scale-100 motion-reduce:transform-none shadow-sm dark:shadow-none";
+    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 hover:bg-black text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 motion-safe:transition-[background-color,transform] motion-safe:duration-150 motion-safe:ease-jx motion-safe:active:scale-[0.92] disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 shadow-sm dark:shadow-none";
   const CLASSE_ARRET =
     "flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-zinc-950 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200 sm:px-3.5";
 
@@ -1660,18 +1738,31 @@
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => suivre());
     if (messagesContainer) observateur?.observe(messagesContainer);
 
-    // La forme de l'aperçu (feuille ou panneau) et celle des conversations
-    // (tiroir ou colonne) suivent la largeur en direct.
+    // La forme du panneau des preuves (feuille ou colonne) et celle des
+    // conversations (tiroir ou colonne) suivent la largeur en direct.
     const ecran = window.matchMedia(REQUETE_ECRAN_LARGE);
-    const ecranXl = window.matchMedia(REQUETE_ECRAN_TRES_LARGE);
+    const ecranDesConversations = window.matchMedia(REQUETE_COLONNE_DES_CONVERSATIONS);
     const surChangementDEcran = () => {
+      const devenuLarge = ecran.matches && !ecranLarge;
+      const devenuEtroit = !ecran.matches && ecranLarge;
       ecranLarge = ecran.matches;
-      ecranTresLarge = ecranXl.matches;
+      colonneDesConversations = ecranDesConversations.matches;
       // Devenu colonne, le panneau n'est plus un tiroir à refermer.
-      if (ecranLarge) panneauOuvert = false;
+      if (colonneDesConversations) panneauOuvert = false;
+      // Feuille devenue colonne : plus de boîte, plus d'entrée d'historique à
+      // laisser derrière elle. Le focus reste où il est, dans le panneau.
+      if (devenuLarge) fermerApercu();
+      // Colonne devenue feuille, fermée donc cachée : le focus qui s'y
+      // trouvait tomberait dans le vide. La feuille s'ouvre et le garde.
+      if (devenuEtroit && boitePreuves?.contains(document.activeElement)) ouvrirFeuille(null);
     };
     ecran.addEventListener?.("change", surChangementDEcran);
-    ecranXl.addEventListener?.("change", surChangementDEcran);
+    ecranDesConversations.addEventListener?.("change", surChangementDEcran);
+
+    // L'arrivée des suggestions (`mv-monter`) se joue une fois : 0,6 s, plus
+    // le décalage du troisième bouton. Ensuite, plus aucun geste à rejouer.
+    const finDeLArrivee = setTimeout(() => (suggestionsEnArrivee = false), 900);
+
 
     return () => {
       desabonner();
@@ -1681,7 +1772,8 @@
       controleur?.abort();
       observateur?.disconnect();
       ecran.removeEventListener?.("change", surChangementDEcran);
-      ecranXl.removeEventListener?.("change", surChangementDEcran);
+      ecranDesConversations.removeEventListener?.("change", surChangementDEcran);
+      clearTimeout(finDeLArrivee);
       if (image) cancelAnimationFrame(image);
       bloquerLeDefilement(false);
       conversationDuChatEnCours.set(false);
@@ -1703,9 +1795,12 @@
   Toute la page tient dans la hauteur que lui laisse le layout (`h-app` sur
   /chat) : seule la conversation défile, la saisie reste en bas, au-dessus du
   clavier. Sur téléphone, ni marge ni bordure : la conversation prend tout
-  l'écran. Au-delà, une carte centrée ; à partir de lg pour un compte, la
-  colonne des conversations à sa gauche ; aperçu d'une citation ouvert, son
-  panneau à droite (maquette chat-p3a-apercu), la page s'élargissant pour lui.
+  l'écran ; à partir de sm, une carte centrée.
+
+  À PARTIR DE lg, DEUX COLONNES, PAR LE CSS SEUL : la conversation, puis le
+  panneau permanent de 520 px (une troisième, celle des conversations, à
+  partir de 2xl pour un compte : C3). Le serveur ne connaît pas la largeur :
+  un {#if} sur elle ferait sauter la page à l'hydratation (PASSATION § 8.7).
 
   `sm:court:` et non `court:` seul, ici comme plus bas : la variante `court:`
   sort AVANT les variantes de largeur dans la feuille de style, et un `sm:`
@@ -1713,16 +1808,10 @@
   640 px de large).
 
   Écran court : 8 px au-dessus et au-dessous de la carte, le pas des marges
-  courtes du site (`court:!pt-2` du layout) et de la liste (`court:py-2`). À
-  4 px, contre 16 px sur les côtés, la carte touchait presque le haut et le
-  bas de l'écran.
+  courtes du site (`court:!pt-2` du layout) et de la liste (`court:py-2`).
 -->
 <div
-  class="flex min-h-0 w-full flex-1 flex-col sm:mx-auto sm:max-w-3xl sm:pt-3 sm:pb-4 sm:court:py-2 lg:pt-0 lg:pb-6 {$authStore.isAuthenticated
-    ? `lg:max-w-6xl lg:flex-row lg:gap-6 ${avecPanneau ? 'xl:max-w-7xl' : ''}`
-    : avecPanneau
-      ? 'lg:max-w-6xl lg:flex-row lg:gap-6'
-      : ''}"
+  class="flex min-h-0 w-full flex-1 flex-col sm:mx-auto sm:max-w-3xl sm:pt-3 sm:pb-4 sm:court:py-2 lg:max-w-none lg:flex-row lg:p-0"
 >
   <!-- Le h1 du layout est masque sur cette route (le hero marketing n'a rien a
        faire au-dessus d'une conversation). La page se retrouvait sans aucun
@@ -1736,7 +1825,7 @@
       <!-- Fond du tiroir : un appui à côté le referme. -->
       <div
         role="presentation"
-        class="fixed inset-0 z-[54] bg-zinc-950/40 backdrop-blur-sm lg:hidden"
+        class="fixed inset-0 z-[54] bg-zinc-950/40 backdrop-blur-sm 2xl:hidden"
         on:click={() => (panneauOuvert = false)}
         transition:fade={{ duration: duree(150) }}
       ></div>
@@ -1748,14 +1837,14 @@
       Rendu pour un compte seulement : une conversation anonyme n'appartient a
       personne, donc aucune liste ne peut la contenir.
 
-      Fermé sous lg, il est `invisible` et non seulement poussé hors de
-      l'écran : sinon la tabulation entrait dans ses boutons cachés. z-[55] :
-      au-dessus de l'en-tête (z-50), sous la boîte des profils (z-[60]).
+      Fermé tant qu'il est un tiroir, il est `invisible` et non seulement
+      poussé hors de l'écran : sinon la tabulation entrait dans ses boutons
+      cachés. z-[55] : au-dessus de l'en-tête (z-50), sous la boîte des
+      profils (z-[60]).
 
-      En tiroir, un trait à droite : en sombre, sans ombre, seul le voile du
-      fond le séparait de la conversation, d'un gris presque identique. En
-      colonne, la même carte que la conversation (bordure, ombre légère, rien
-      en sombre), pour que les deux se lisent comme une paire.
+      Tiroir jusqu'à 1 535 px, colonne à partir de 2xl (décision C3) : à côté
+      du panneau de 520 px, ses 288 px ne laissaient au fil que 472 px à
+      1 280 px, et rien à 1 024 px.
 
       Inerte sous la feuille d'aperçu modale, comme la conversation. En
       tiroir, il porte la région d'annonce du chat (voir `annoncer`).
@@ -1771,9 +1860,9 @@
       use:piegeSiTiroir={tiroirOuvert}
       class="fixed inset-y-0 left-0 z-[55] flex h-app w-[85vw] max-w-xs flex-col border-r border-zinc-200 bg-white pt-zone-sure pb-zone-sure pl-[env(safe-area-inset-left)] shadow-xl transition-[transform,visibility] duration-200 ease-out motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none {panneauOuvert
         ? 'visible translate-x-0'
-        : 'invisible -translate-x-full'} lg:visible lg:static lg:z-auto lg:h-auto lg:w-72 lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:rounded-2xl lg:border lg:p-0 lg:shadow-sm lg:transition-none lg:dark:shadow-none"
+        : 'invisible -translate-x-full'} 2xl:visible 2xl:static 2xl:z-auto 2xl:h-auto 2xl:w-72 2xl:max-w-none 2xl:shrink-0 2xl:translate-x-0 2xl:rounded-none 2xl:border-y-0 2xl:border-l-0 2xl:border-r 2xl:p-0 2xl:shadow-none 2xl:transition-none"
     >
-      <div class="flex items-center justify-between gap-2 px-4 pt-3 lg:pt-4">
+      <div class="flex items-center justify-between gap-2 px-4 pt-3 2xl:pt-4">
         <h2 id="titre-conversations" class="text-sm font-bold text-zinc-950 dark:text-white">
           {t("chat.conversations")}
         </h2>
@@ -1781,7 +1870,7 @@
           type="button"
           aria-label={t("common.close")}
           on:click={() => (panneauOuvert = false)}
-          class="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white lg:hidden"
+          class="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white 2xl:hidden"
         >
           <Icone nom="x" class="text-2xl" />
         </button>
@@ -1791,13 +1880,13 @@
         <button
           on:click={() => nouvelleConversation()}
           data-testid="chat-new"
-          class="min-h-11 w-full rounded-xl bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 lg:min-h-0"
+          class="min-h-11 w-full rounded-xl bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-black dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 2xl:min-h-0"
         >
           {t("chat.newConversation")}
         </button>
       </div>
 
-      <!-- La liste défile seule : à partir de lg aussi, un long historique
+      <!-- La liste défile seule : en colonne aussi, un long historique
            allongeait la page entière. -->
       <div
         id="liste-conversations"
@@ -1825,7 +1914,7 @@
               <button
                 on:click={chargerConversations}
                 data-testid="conversations-retry"
-                class="-mx-2 inline-flex min-h-11 items-center px-2 font-medium underline hover:no-underline lg:mx-0 lg:mt-1 lg:min-h-0 lg:px-0"
+                class="-mx-2 inline-flex min-h-11 items-center px-2 font-medium underline hover:no-underline 2xl:mx-0 2xl:mt-1 2xl:min-h-0 2xl:px-0"
               >
                 {t("common.retry")}
               </button>
@@ -1843,7 +1932,7 @@
                   on:click={() => ouvrirConversation(conversation)}
                   data-testid="conversation-item"
                   aria-current={conversation.session_id === sessionId ? "true" : undefined}
-                  class="min-h-11 min-w-0 flex-1 truncate rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors lg:min-h-0 lg:py-1.5 lg:text-xs {conversation.session_id ===
+                  class="min-h-11 min-w-0 flex-1 truncate rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors 2xl:min-h-0 2xl:py-1.5 2xl:text-xs {conversation.session_id ===
                   sessionId
                     ? 'bg-zinc-950 font-medium text-white dark:bg-white dark:text-zinc-950'
                     : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}"
@@ -1860,9 +1949,9 @@
                   data-testid="conversation-delete"
                   aria-label="{t('chat.deleteConversation')} : {conversation.title ||
                     t('chat.untitledConversation')}"
-                  class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-950/40 dark:hover:text-red-400 lg:h-auto lg:w-auto lg:px-1.5 lg:py-1"
+                  class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-950/40 dark:hover:text-red-400 2xl:h-auto 2xl:w-auto 2xl:px-1.5 2xl:py-1"
                 >
-                  <Icone nom="trash" class="text-lg lg:text-sm" />
+                  <Icone nom="trash" class="text-lg 2xl:text-sm" />
                 </button>
               </li>
             {/each}
@@ -1893,21 +1982,18 @@
        région du tiroir (voir `ajouterUneErreur`). -->
   <div
     inert={apercuModal || tiroirOuvert}
-    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl sm:border sm:border-zinc-200 sm:shadow-sm sm:dark:border-zinc-800 sm:dark:shadow-none"
+    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl sm:border sm:border-zinc-200 sm:shadow-sm sm:dark:border-zinc-800 sm:dark:shadow-none lg:rounded-none lg:border-0 lg:shadow-none"
   >
     <!--
       Barre du haut. Sous lg, elle remplace l'en-tête du site (non rendu sur
-      cette page) : retour, titre et profil, conversations, menu. À partir de
-      lg, c'est la barre d'état de la carte. Une seule barre à toutes les
-      largeurs : un même bouton de profil y change d'aspect, plutôt que deux
-      copies dont l'une serait cachée (un data-testid ne doit désigner qu'un
-      élément).
+      cette page, C4) : retour, profil, nouvelle conversation, conversations,
+      menu. À partir de lg, profil et nouvelle conversation.
     -->
     <div
       class="shrink-0 border-b border-zinc-200 bg-zinc-50/70 pt-zone-sure dark:border-zinc-800 dark:bg-zinc-900/60 lg:pt-0"
     >
       <div
-        class="flex min-h-14 items-center gap-1 px-1 py-1 sm:gap-2 sm:px-2 lg:min-h-0 lg:px-6 lg:py-4 court:min-h-0 court:py-0"
+        class="mx-auto flex min-h-14 w-full max-w-[760px] items-center gap-1 px-1 py-1 sm:gap-2 sm:px-2 lg:px-6 court:min-h-0 court:py-0"
       >
         <a
           href="/"
@@ -1917,64 +2003,41 @@
           <Icone nom="arrow-left" class="text-2xl" />
         </a>
 
-        <!-- Le titre de la barre, le même à toutes les largeurs : ici à partir
-             de lg ; sous lg, première ligne du bouton de profil, plus bas. Un
-             seul nom, « Assistant JuriX », sans point qui pulse (P4) : la
-             pastille animée disait « en ligne » à la manière d'une personne,
-             et rien ne la justifiait. En Inter et en casse de phrase (Q5 :
-             deux voix au plus), et non plus en chasse fixe et capitales. -->
-        <span class="hidden text-sm font-medium text-zinc-500 dark:text-zinc-400 lg:inline">
-          {t("chat.barTitle")}
-        </span>
-
         <!-- Le profil auquel le chat répond : celui de la conversation en cours,
-             sinon le profil choisi. Sous lg, le bouton porte le titre de la
-             barre et le profil sur deux lignes (le tout en 44 px de haut) ; à
-             partir de lg, il redevient le lien « Changer ».
-             « Profil : » vient d'une seule clé, deux-points compris : écrit
-             « {libellé} : » dans le code, l'anglais recevait l'espace
-             française (« Profile : General »). -->
+             sinon le profil choisi. Une pastille (A1 § 4), à toutes les
+             largeurs ; son nom accessible dit ce qu'elle fait, et contient le
+             nom visible. -->
         <div
-          class="flex min-w-0 flex-1 items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300 lg:ml-auto lg:flex-none"
+          class="flex min-w-0 flex-1 items-center"
           data-testid="chat-persona"
           data-persona={personaAffiche ?? "general"}
         >
-          <Icone
-            nom={PERSONA_ICONE[personaAffiche ?? "general"]}
-            class="hidden text-base text-zinc-950 dark:text-white lg:inline-block"
-          />
-          <span class="hidden lg:inline">{t("chat.profileLabel")} <strong>{nomDuProfil}</strong></span>
-          <!-- À partir de lg, « Changer » prend l'allure des liens du site :
-               souligné discret, qui fonce au survol. -->
           <button
             type="button"
             data-testid="chat-persona-change"
             aria-haspopup="dialog"
+            aria-label={t("chat.profile.changeAria").replace("{profil}", nomDuProfil.toLocaleLowerCase($language.current))}
             on:click={() => ouvrirChoixPersona(personaAffiche)}
-            class="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-xl px-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 lg:min-h-0 lg:flex-none lg:rounded-md lg:py-0.5 lg:font-semibold lg:text-zinc-950 lg:underline lg:decoration-zinc-300 lg:underline-offset-4 lg:hover:bg-transparent lg:hover:decoration-zinc-950 lg:dark:text-white lg:dark:decoration-zinc-600 lg:dark:hover:bg-transparent lg:dark:hover:decoration-white"
+            class="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-950 transition-colors hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:border-white"
           >
-            <!-- Le titre de la barre, en demi-gras et en Inter. Les deux lignes
-                 en zinc-600 et non zinc-500 : au survol, le bouton passe sur
-                 zinc-100, où zinc-500 n'atteint plus 4,5:1 (guide § 3, règle
-                 1). Le nom du profil en gras, comme à partir de lg. -->
-            <span
-              class="block max-w-full truncate text-xs font-semibold leading-4 text-zinc-600 dark:text-zinc-400 lg:hidden"
-              >{t("chat.barTitle")}</span
-            >
-            <span
-              class="flex max-w-full items-center gap-1 leading-4 text-zinc-600 dark:text-zinc-400 lg:hidden"
-            >
-              <Icone
-                nom={PERSONA_ICONE[personaAffiche ?? "general"]}
-                class="shrink-0 text-sm text-zinc-950 dark:text-white"
-              />
-              <span class="min-w-0 truncate">{t("chat.profileLabel")} <strong>{nomDuProfil}</strong></span>
-              <Icone nom="chevron-down" class="shrink-0 text-sm" />
-              <span class="sr-only">— {t("persona.change")}</span>
-            </span>
-            <span class="hidden lg:inline">{t("persona.change")}</span>
+            <Icone nom={PERSONA_ICONE[personaAffiche ?? "general"]} class="shrink-0 text-base" />
+            <span class="min-w-0 truncate">{nomDuProfil}</span>
+            <Icone nom="chevron-down" class="shrink-0 text-sm text-zinc-500 dark:text-zinc-400" />
           </button>
         </div>
+
+
+        <!-- Pour tous (A1 § 4) : un visiteur n'avait aucun moyen de repartir à
+             zéro. Le bouton du panneau des conversations (`chat-new`) reste. -->
+        <button
+          type="button"
+          data-testid="chat-new-inline"
+          aria-label={t("chat.newConversation")}
+          on:click={() => nouvelleConversation()}
+          class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:px-3"
+        >
+          <Icone nom="plus" class="text-xl" /><span class="hidden sm:inline">{t("chat.newConversation")}</span>
+        </button>
 
         {#if $authStore.isAuthenticated}
           <button
@@ -1987,7 +2050,7 @@
               menuOuvert = false;
               panneauOuvert = !panneauOuvert;
             }}
-            class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white lg:hidden"
+            class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white 2xl:hidden"
           >
             <Icone nom="messages-square" class="text-2xl" />
           </button>
@@ -2112,11 +2175,71 @@
         aria-busy={envoiEnCours ? "true" : undefined}
         aria-label={t("chat.barTitle")}
         on:scroll={surDefilement}
-        class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:space-y-6 sm:p-6 court:py-2 sm:court:py-2 {horsDuBas
+        style={apercuModal ? "padding-bottom: min(72vh, 560px)" : undefined}
+        class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:p-6 court:py-2 sm:court:py-2 {horsDuBas
           ? 'scroll-pb-14'
           : ''}"
       >
-        {#each messagesAffiches as message (message.id)}
+        <!-- La colonne de lecture : 760 px au plus, centrée (A1 § 4). -->
+        <div class="mx-auto w-full max-w-[760px] space-y-4 sm:space-y-6">
+        <!--
+          L'accueil, à part du fil : il se replie à l'envoi (C8) et quitte la
+          page. Il n'y a rien à y garder : la question posée le remplace, et
+          une nouvelle conversation le ramène.
+        -->
+        {#if !conversationRestauree && !questionPosee}
+          <div class="space-y-3" data-testid="chat-accueil" out:replier on:outroend={suivre}>
+            <p
+              class="flex items-center gap-2 text-[13px] font-bold leading-[18px] text-zinc-950 dark:text-white"
+            >
+              <BalanceAnimee etat="repos" class="shrink-0 text-lg" />JuriX
+            </p>
+            {#each bienvenue as message (message.id)}
+              <div
+                data-message-id={message.id}
+                class="text-left text-base leading-[1.65] text-zinc-800 dark:text-zinc-200"
+              >
+                <TexteDeReponse blocs={renduDe(message).blocs} />
+                {#if message.suggestions}
+                  <!-- Trois questions validées sous l'accueil (P4), sans
+                       intitulé (maquette) ; le groupe est nommé pour les
+                       lecteurs d'écran. Pleine largeur, 48 px, flèche ↗ (A1
+                       § 4). `active:` répète le survol : sur un écran tactile,
+                       le survol n'existe pas (hoverOnlyWhenSupported), et un
+                       fond inversé sans son texte inversé laissait du zinc-800
+                       sur du noir pendant l'appui.
+
+                       `mv-monter` le temps de la première arrivée seulement
+                       (`suggestionsEnArrivee`) : un changement de langue ou de
+                       profil recrée les boutons, sans rejouer le geste. -->
+                  <div
+                    role="group"
+                    aria-label={t("chat.suggestionsGroup")}
+                    class="mt-4 flex flex-col items-stretch gap-2"
+                    data-testid="chat-suggestions"
+                  >
+                    {#each message.suggestions as suggestion, i (suggestion)}
+                      <button
+                        on:click={(event) => envoyerDepuis(event, suggestion)}
+                        data-testid="chat-suggestion"
+                        disabled={envoiEnCours || questionEnAttente !== null}
+                        style={suggestionsEnArrivee ? `--d: ${i * 90}ms` : undefined}
+                        class="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-2 text-left text-sm font-medium leading-snug text-zinc-800 transition-colors hover:border-zinc-950 hover:bg-zinc-950 hover:text-white active:border-zinc-950 active:bg-zinc-950 active:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700/60 dark:bg-zinc-800/80 dark:text-zinc-200 dark:hover:border-white dark:hover:bg-white dark:hover:text-zinc-950 dark:active:border-white dark:active:bg-white dark:active:text-zinc-950 {suggestionsEnArrivee
+                          ? 'mv-monter'
+                          : ''}"
+                      >
+                        <span class="min-w-0">{suggestion}</span>
+                        <Icone nom="arrow-up-right" class="shrink-0 text-base" />
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        {#each chatMessages as message (message.id)}
           {#if message.type === "profil"}
             <div data-message-id={message.id}>
               <QuestionDuProfil
@@ -2130,40 +2253,18 @@
               data-message-id={message.id}
               class="flex gap-2 sm:gap-4 {message.type === 'user' ? 'flex-row-reverse' : ''}"
             >
-              <!-- Avatar. Sous sm, ceux de l'utilisateur ET de l'assistant
-                   disparaissent : la bulle noire à droite et la bulle bordée à
-                   gauche suffisent à dire qui parle, et ces 40 px (32 + 8
-                   d'écart) manquaient au texte. Celui d'une erreur reste : son
-                   icône est le seul pictogramme qui la signale (guide § 4.10),
-                   et le message est court. L'utilisateur est inversé, comme sa
-                   bulle ; l'assistant est clair, comme la sienne. Le rouge
-                   reste à l'erreur seule, en red-600 : sur red-500, le blanc ne
-                   fait que 3,8:1. Les messages de l'accueil qui suivent le
-                   premier gardent la place de l'avatar, sans avatar (maquette
-                   chat-accueil-p4a) : un seul interlocuteur parle. -->
-              <div class="shrink-0 {message.type === 'error' ? '' : 'hidden sm:block'}">
-                {#if message.type === "error"}
-                  <div
-                    class="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white sm:h-10 sm:w-10"
-                  >
-                    <Icone nom="cloud-off" class="text-base sm:text-lg" />
-                  </div>
-                {:else if message.type === "user"}
-                  <div
-                    class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 sm:h-10 sm:w-10"
-                  >
-                    <Icone nom="user-round" class="text-base sm:text-lg" />
-                  </div>
-                {:else if message.sansAvatar}
-                  <div class="h-8 w-8 sm:h-10 sm:w-10"></div>
-                {:else}
-                  <div
-                    class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 sm:h-10 sm:w-10"
-                  >
-                    <Icone nom="bot" class="text-base sm:text-lg" />
-                  </div>
-                {/if}
-              </div>
+              <!-- Plus d'avatar ni de bulle pour l'assistant (refonte A, A1 § 4) :
+                   l'étiquette « JuriX » et le texte à plat. Seule l'erreur
+                   garde sa pastille : son icône est le seul pictogramme qui la
+                   signale (guide § 4.10). Le rouge reste à l'erreur seule, en
+                   red-600 : sur red-500, le blanc ne fait que 3,8:1. -->
+              {#if message.type === "error"}
+                <div
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-600 text-white sm:h-10 sm:w-10"
+                >
+                  <Icone nom="cloud-off" class="text-base sm:text-lg" />
+                </div>
+              {/if}
 
               <!-- Message Content. `min-w-0` : sans lui, la colonne ne pouvait
                    pas descendre sous la largeur de son plus long mot ou de son
@@ -2193,7 +2294,10 @@
                        en Inter à chiffres tabulaires (Q5 : la chasse fixe ne
                        garde que les codes courts). -->
                   <div
-                    class="coupe-mots inline-block max-w-[85%] rounded-2xl rounded-tr-sm bg-zinc-950 px-4 py-2.5 text-left text-white shadow-sm dark:bg-white dark:text-zinc-950 dark:shadow-none sm:max-w-md sm:px-5 sm:py-3"
+                    class="coupe-mots inline-block max-w-[85%] rounded-2xl rounded-tr-sm bg-zinc-950 px-4 py-2.5 text-left text-white shadow-sm dark:bg-white dark:text-zinc-950 dark:shadow-none sm:max-w-md sm:px-5 sm:py-3 {message.id ===
+                    idQuestion
+                      ? 'mv-envoyer'
+                      : ''}"
                   >
                     <p class="whitespace-pre-wrap">{message.content}</p>
                     {#if message.timestamp}
@@ -2222,46 +2326,29 @@
                 {:else}
                   {@const rendu = renduDe(message)}
                   <!--
-                    Bulle de l'assistant (guide § 4.15), pendant de la bulle
-                    noire de l'utilisateur : blanche et bordée, le coin du haut
-                    resserré côté avatar comme le sien. Les sources y entrent,
-                    sous un trait : elles font partie de la réponse. Les
-                    suggestions restent dehors : ce sont des questions à poser,
-                    pas du texte de l'assistant. Pleine largeur et non ajustée
-                    au texte : pendant le flux, elle aurait changé de largeur à
-                    chaque morceau.
-
-                    Le texte et ses citations : TexteDeReponse (P3). Les
-                    réponses restent en Inter : la serif est réservée au texte
-                    officiel (Q5).
+                    La réponse, à plat : l'étiquette « JuriX » (sa balance au
+                    repos, le nom propre, invariable : A4 § 1), puis le texte en
+                    Inter 16 px / 1,65, ses renvois et ses puces. La serif est
+                    réservée au texte officiel (Q5). Les articles cités ne sont
+                    plus sous la réponse : ils sont dans le panneau.
                   -->
-                  <div
-                    class="space-y-3 rounded-2xl rounded-tl-sm border border-zinc-200 bg-white px-4 py-2.5 text-left text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 sm:px-5 sm:py-3"
+                  <p
+                    class="mb-2 flex items-center gap-2 text-[13px] font-bold leading-[18px] text-zinc-950 dark:text-white"
                   >
+                    <BalanceAnimee etat="repos" class="shrink-0 text-lg" />JuriX
+                  </p>
+                  <div class="space-y-3 text-left text-base leading-[1.65] text-zinc-800 dark:text-zinc-200">
                     <TexteDeReponse
                       blocs={rendu.blocs}
                       marque={rendu.marque !== null}
                       citations={rendu.marque?.citations ?? []}
-                      citationActive={sourceApercu?.idMessage === message.id && sourceApercu.genre === "citation"
-                        ? sourceApercu.index
-                        : null}
+                      citationActive={porteur?.id === message.id ? citationActive : null}
                       surCitation={(index, declencheur) => ouvrirLaCitation(message, index, declencheur)}
                       enFlux={message.id === idEnFlux}
                       nouvelles={message.id === idCitationsNouvelles}
                     />
 
-                    {#if aDesListes(message)}
-                      <SourcesDeLaReponse
-                        idMessage={message.id}
-                        articles={message.citations?.articles_cites ?? []}
-                        consultes={message.citations?.textes_consultes_non_cites ?? []}
-                        releveLe={chiffres?.liens_releves_le ?? null}
-                        articleActif={sourceApercu?.idMessage === message.id && sourceApercu.genre === "article"
-                          ? sourceApercu.index
-                          : null}
-                        surArticle={(index, declencheur) => ouvrirLArticleCite(message, index, declencheur)}
-                      />
-                    {:else if message.sources && message.sources.length > 0}
+                    {#if !aDesListes(message) && message.sources && message.sources.length > 0}
                       <!-- Ancienne API, ou conversation rouverte : la liste
                            « Sources » d'avant, telle quelle. -->
                       <div
@@ -2347,36 +2434,6 @@
                       >
                     </p>
                   {/if}
-
-                  {#if message.suggestions}
-                    <!-- Trois questions validées sous l'accueil (P4), sans
-                         intitulé (maquette) ; le groupe est nommé pour les
-                         lecteurs d'écran. Empilées sur toute la largeur sous
-                         sm : en pastilles rondes, une suggestion de 80
-                         caractères tenait sur quatre lignes serrées contre les
-                         bords arrondis. `active:` répète le survol : sur un
-                         écran tactile, le survol n'existe pas
-                         (hoverOnlyWhenSupported), et un fond inversé sans son
-                         texte inversé laissait du zinc-800 sur du noir pendant
-                         l'appui. -->
-                    <div
-                      role="group"
-                      aria-label={t("chat.suggestionsGroup")}
-                      class="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center"
-                      data-testid="chat-suggestions"
-                    >
-                      {#each message.suggestions as suggestion (suggestion)}
-                        <button
-                          on:click={(event) => envoyerDepuis(event, suggestion)}
-                          data-testid="chat-suggestion"
-                          disabled={envoiEnCours || questionEnAttente !== null}
-                          class="min-h-11 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3.5 py-2 text-left text-xs sm:text-sm font-medium leading-snug text-zinc-800 transition-colors hover:border-zinc-950 hover:bg-zinc-950 hover:text-white active:border-zinc-950 active:bg-zinc-950 active:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700/60 dark:bg-zinc-800/80 dark:text-zinc-200 dark:hover:border-white dark:hover:bg-white dark:hover:text-zinc-950 dark:active:border-white dark:active:bg-white dark:active:text-zinc-950 sm:min-h-0 sm:w-auto sm:rounded-full sm:px-4 sm:py-1.5 sm:text-center"
-                        >
-                          {suggestion}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
                 {/if}
               </div>
             </div>
@@ -2388,6 +2445,7 @@
                rédaction. Remplacée par la réponse à son premier mot. -->
           <EtatDeLaReponse etapes={etapesAffichees} />
         {/if}
+        </div>
       </div>
 
       <!--
@@ -2437,6 +2495,14 @@
       {/if}
     </div>
 
+    <!-- Sous lg, l'accès aux articles cités : la feuille du panneau. -->
+    <BarreDesArticlesCites
+      nombre={cartes.length}
+      consultes={consultesDuPorteur.length}
+      ouverte={feuilleOuverte}
+      surOuvrir={(declencheur) => ouvrirFeuille(declencheur)}
+    />
+
     <!-- Input Area. `pb-zone-sure` : au-dessus de la barre d'accueil de
          l'iPhone, et non dessous. Marges latérales de la liste au-dessus
          (16 px, puis 24 px à partir de sm) : le cadre de saisie s'aligne sur
@@ -2457,7 +2523,7 @@
         : 'border-zinc-200 dark:border-zinc-800'}"
     >
       <div
-        class="px-4 pt-2 sm:px-6 sm:pt-4 {$authStore.isAuthenticated
+        class="mx-auto w-full max-w-[760px] px-4 pt-2 sm:px-6 sm:pt-4 {$authStore.isAuthenticated
           ? 'pb-2 sm:pb-4'
           : 'sm:pb-3'} court:pb-2.5 court:pt-3 sm:court:pb-2.5 sm:court:pt-3"
       >
@@ -2541,21 +2607,30 @@
 
   <!-- La région d'annonce du chat (P4) : étapes, fin de réponse, arrêt,
        question du profil. Hors du fil, qui porte aria-busy, et hors de la
-       carte, que la feuille d'aperçu modale et le tiroir rendent inerte. Sous
-       une boîte modale (palette, profils, feuille, tiroir), les annonces
-       passent par la sienne (voir `annoncer`). Hors du flux (sr-only) : elle
-       ne pèse pas sur la mise en page. -->
+       colonne, que la feuille modale et le tiroir rendent inerte. Sous une
+       boîte modale (palette, profils, feuille, tiroir), les annonces passent
+       par la sienne (voir `annoncer`). Hors du flux (sr-only) : elle ne pèse
+       pas sur la mise en page. -->
   <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="chat-announce">
     {annonce}
   </p>
 
-  {#if cibleApercu}
-    <ApercuDeCitation
-      cible={cibleApercu}
-      modale={!apercuEnPanneau}
-      releveLe={chiffres?.liens_releves_le ?? null}
-      annonce={annonceDeLaFeuille}
-      surFermer={fermerApercu}
-    />
-  {/if}
+  <PanneauDesPreuves
+    bind:boite={boitePreuves}
+    modale={!ecranLarge}
+    ouvert={feuilleOuverte}
+    etat={etatDesPreuves}
+    {cartes}
+    consultes={consultesDuPorteur}
+    idMessage={porteur?.id ?? null}
+    {carteOuverte}
+    {citationActive}
+    nouvelles={porteur !== null && porteur.id === idCitationsNouvelles}
+    nombreDeTextes={nombreDeSquelettes}
+    releveLe={chiffres?.liens_releves_le ?? null}
+    annonce={annonceDeLaFeuille}
+    surFermer={fermerApercu}
+    surBasculer={basculerCarte}
+    surAnnonce={annoncer}
+  />
 </div>

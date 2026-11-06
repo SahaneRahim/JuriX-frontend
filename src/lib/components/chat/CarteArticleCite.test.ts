@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
 
-const { apercuDeLArticle } = vi.hoisted(() => ({ apercuDeLArticle: vi.fn() }));
+const { apercuDeLArticle, copierDansLePressePapiers } = vi.hoisted(() => ({
+  apercuDeLArticle: vi.fn(),
+  copierDansLePressePapiers: vi.fn(),
+}));
 
 vi.mock('$app/environment', () => ({ browser: true }));
 vi.mock('$lib/stores/language', async () => {
@@ -10,18 +13,11 @@ vi.mock('$lib/stores/language', async () => {
   return { tr: readable(traduireEnTest), language: writable({ current: 'fr' }), switchLanguage: () => {} };
 });
 vi.mock('./apercus', () => ({ apercuDeLArticle }));
+vi.mock('$lib/components/loi/presse-papiers', () => ({ copierDansLePressePapiers }));
 
 import type { ArticleApercu, TexteLie } from '$lib/types';
-import type { CibleDApercu } from './apercus';
-import ApercuDeCitation from './ApercuDeCitation.svelte';
-
-// jsdom n'a pas l'API Web Animations, dont les transitions de Svelte 5 ont besoin.
-Element.prototype.animate = vi.fn(() => ({
-  onfinish: null,
-  cancel: vi.fn(),
-  finished: Promise.resolve(),
-  currentTime: 0,
-})) as unknown as typeof Element.prototype.animate;
+import type { CarteDeLaReponse } from './passages';
+import CarteArticleCite from './CarteArticleCite.svelte';
 
 const LOI_2026_002: TexteLie = {
   id: 1761,
@@ -100,44 +96,26 @@ const ARTICLE_6: ArticleApercu = {
   },
 };
 
-const CIBLE: CibleDApercu = {
-  cle: '1',
+const CARTE: CarteDeLaReponse = {
   lawId: 2143,
   numero: '6',
   articleId: 75144,
-  libelle: 'Art. 6 — Loi n° 96/06',
   titre: 'Loi N°96/06 du 18 janvier 1996 portant révision de la Constitution du 02 juin 1972.',
+  reference: 'PRC-6283',
   statut: { etat: 'modifie', liens: [], lignes: [] },
-  phrases: ["Le mandat présidentiel dure sept ans et n'est renouvelable qu'une fois ( )"],
+  citations: [{ indexCitation: 0, phrase: "Le mandat présidentiel dure sept ans et n'est renouvelable qu'une fois ( )" }],
 };
 
-describe('ApercuDeCitation (P3)', () => {
+const ouvrir = (carte: CarteDeLaReponse, autres: Record<string, unknown> = {}) =>
+  render(CarteArticleCite, { props: { carte, idCarte: 'carte-1', ouverte: true, surBasculer: vi.fn(), ...autres } });
+
+describe('CarteArticleCite : le contenu de l’article (migré d’ApercuDeCitation)', () => {
   beforeEach(() => apercuDeLArticle.mockReset());
   afterEach(() => cleanup());
 
-  it('feuille modale : nommée par son titre, focus sur « Fermer », voile', async () => {
+  it('le texte entier de l’article, le passage cité dans un <mark>, le statut de l’article', async () => {
     apercuDeLArticle.mockResolvedValue(ARTICLE_6);
-    const surFermer = vi.fn();
-    const { getByRole, getByTestId, container } = render(ApercuDeCitation, {
-      props: { cible: CIBLE, modale: true, surFermer },
-    });
-
-    const boite = getByRole('dialog');
-    expect(boite.getAttribute('aria-modal')).toBe('true');
-    expect(boite.getAttribute('data-mode')).toBe('feuille');
-    expect(document.getElementById(boite.getAttribute('aria-labelledby')!)?.textContent).toBe('Art. 6 — Loi n° 96/06');
-    await waitFor(() => expect(document.activeElement).toBe(getByTestId('chat-preview-close')));
-    expect(getByTestId('chat-preview-close').textContent).toContain('Fermer');
-
-    await fireEvent.click(container.querySelector('.bg-zinc-950\\/40') as HTMLElement);
-    expect(surFermer).toHaveBeenCalledTimes(1);
-  });
-
-  it('le texte entier de l’article, le passage cité en gras, le statut de l’article', async () => {
-    apercuDeLArticle.mockResolvedValue(ARTICLE_6);
-    const { getByTestId, findByTestId } = render(ApercuDeCitation, {
-      props: { cible: CIBLE, modale: true, surFermer: vi.fn() },
-    });
+    const { getByTestId, findByTestId } = ouvrir(CARTE, { citationActive: 0 });
 
     const texte = await findByTestId('chat-preview-text');
     expect(apercuDeLArticle).toHaveBeenCalledWith(2143, '6', 75144, expect.any(AbortSignal));
@@ -145,8 +123,9 @@ describe('ApercuDeCitation (P3)', () => {
     expect(texte.textContent).not.toContain('<<PAGE');
     expect(texte.getAttribute('lang')).toBe('fr');
     expect(texte.className).toContain('font-texte');
-    const gras = texte.querySelector('strong');
-    expect(gras?.textContent).toBe('Le Président de la République est élu pour un mandat de sept (7) ans renouvelable une fois');
+    const marque = texte.querySelector('mark');
+    expect(marque?.textContent).toBe('Le Président de la République est élu pour un mandat de sept (7) ans renouvelable une fois');
+    expect(getByTestId('chat-carte-legende').textContent).toContain('Souligné');
 
     const statut = getByTestId('chat-preview-status').textContent ?? '';
     expect(statut).toContain('Loi n°\u00A096/06 du 18 janvier 1996 portant révision');
@@ -162,59 +141,9 @@ describe('ApercuDeCitation (P3)', () => {
     expect(lien.textContent).toContain('Lire dans le texte intégral');
   });
 
-  it('feuille modale : la tabulation tourne dans la feuille', async () => {
-    apercuDeLArticle.mockResolvedValue(ARTICLE_6);
-    const { getByTestId, findByTestId } = render(ApercuDeCitation, {
-      props: { cible: CIBLE, modale: true, surFermer: vi.fn() },
-    });
-    await findByTestId('chat-preview-text');
-    const dernier = getByTestId('chat-preview-full');
-    // jsdom ne calcule pas de mise en page : chaque élément y passe pour affiché.
-    Object.defineProperty(HTMLElement.prototype, 'offsetParent', { configurable: true, get: () => document.body });
-    try {
-      dernier.focus();
-      await fireEvent.keyDown(dernier, { key: 'Tab' });
-      expect(document.activeElement).toBe(getByTestId('chat-preview-close'));
-    } finally {
-      delete (HTMLElement.prototype as unknown as { offsetParent?: unknown }).offsetParent;
-    }
-  });
-
-  it('panneau d’ordinateur : non modal, sans voile', () => {
-    apercuDeLArticle.mockResolvedValue(ARTICLE_6);
-    const { getByRole, container } = render(ApercuDeCitation, {
-      props: { cible: CIBLE, modale: false, surFermer: vi.fn() },
-    });
-
-    expect(getByRole('dialog').getAttribute('aria-modal')).toBeNull();
-    expect(getByRole('dialog').getAttribute('data-mode')).toBe('panneau');
-    expect(container.querySelector('.bg-zinc-950\\/40')).toBeNull();
-  });
-
-  it('la région d’annonce du chat est DANS la boîte : hors d’une boîte aria-modal, rien n’est lu', async () => {
-    apercuDeLArticle.mockResolvedValue(ARTICLE_6);
-    const { getByRole, getByTestId, rerender } = render(ApercuDeCitation, {
-      props: { cible: CIBLE, modale: true, surFermer: vi.fn() },
-    });
-
-    const region = getByTestId('chat-preview-announce');
-    expect(getByRole('dialog').contains(region)).toBe(true);
-    expect(region.getAttribute('role')).toBe('status');
-    expect(region.getAttribute('aria-live')).toBe('polite');
-    // Présente et vide dès l'ouverture : les lecteurs d'écran la connaissent
-    // avant sa première phrase.
-    expect(region.textContent?.trim()).toBe('');
-
-    await rerender({ cible: CIBLE, modale: true, surFermer: vi.fn(), annonce: 'Réponse terminée.' });
-
-    expect(getByTestId('chat-preview-announce').textContent?.trim()).toBe('Réponse terminée.');
-  });
-
   it('aperçu introuvable (ancienne API, 404) : le dire, garder le texte intégral', async () => {
     apercuDeLArticle.mockResolvedValue(null);
-    const { findByTestId, getByTestId } = render(ApercuDeCitation, {
-      props: { cible: CIBLE, modale: true, surFermer: vi.fn() },
-    });
+    const { findByTestId, getByTestId } = ouvrir(CARTE);
 
     expect((await findByTestId('chat-preview-unavailable')).textContent).toContain('n’est pas disponible');
     expect(getByTestId('chat-preview-full').getAttribute('href')).toBe('/laws/2143?article=6');
@@ -223,17 +152,12 @@ describe('ApercuDeCitation (P3)', () => {
   });
 
   it('un texte cité sans article : aucun appel, son statut et le texte intégral', () => {
-    const { getByTestId, queryByTestId, getByText } = render(ApercuDeCitation, {
-      props: {
-        cible: { ...CIBLE, numero: null, articleId: null, lawId: 2274, libelle: 'Code du travail', statut: { etat: null, liens: [], lignes: [] } },
-        modale: true,
-        releveLe: '2026-10-14',
-        surFermer: vi.fn(),
-      },
-    });
+    const { getByTestId, queryByTestId } = ouvrir(
+      { ...CARTE, numero: null, articleId: null, lawId: 2274, titre: 'Code du travail', statut: { etat: null, liens: [], lignes: [] } },
+      { releveLe: '2026-10-14' },
+    );
 
     expect(apercuDeLArticle).not.toHaveBeenCalled();
-    expect(getByText('Texte cité dans la réponse')).toBeTruthy();
     expect(getByTestId('chat-preview-status').textContent).toContain(
       'Aucune modification relevée par JuriX au 14 oct. 2026.',
     );
@@ -260,36 +184,35 @@ const ARTICLE_35_COLLE: ArticleApercu = {
   statut: { releve_le: '2026-10-14', etat_du_texte: 'aucune_modification_connue', version_en_base: null, changements: [] },
 };
 
-const CIBLE_35: CibleDApercu = {
-  cle: '35',
+const CARTE_35: CarteDeLaReponse = {
   lawId: 2274,
   numero: '35',
   articleId: 97421,
-  libelle: 'Art. 35 — Code du travail',
   titre: 'Loi N°92/007 du 14 août 1992 portant Code du travail',
+  reference: 'LOI-1992-007',
   statut: { etat: null, liens: [], lignes: [] },
-  phrases: ["Réponse directe : selon , l'indemnité de licenciement est due après deux ans de service continu"],
+  citations: [
+    { indexCitation: 0, phrase: "Réponse directe : selon , l'indemnité de licenciement est due après deux ans de service continu" },
+  ],
 };
 
-describe('ApercuDeCitation : l’article cité, et lui seul', () => {
+describe('CarteArticleCite : l’article cité, et lui seul', () => {
   beforeEach(() => apercuDeLArticle.mockReset());
   afterEach(() => cleanup());
 
   it('s’arrête avant l’article suivant que la base a collé au sien, et le dit', async () => {
     apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
-    const { findByTestId, getByTestId, queryByTestId, getByText } = render(ApercuDeCitation, {
-      props: { cible: CIBLE_35, modale: true, surFermer: vi.fn() },
-    });
+    const { findByTestId, getByTestId, queryByTestId } = ouvrir(CARTE_35, { citationActive: 0 });
 
     const texte = await findByTestId('chat-preview-text');
     expect(texte.textContent).toContain("qu'elle jugerait bon de demander.");
     expect(texte.textContent).not.toContain('Article 36');
     expect(texte.textContent).not.toContain('Article 37');
-    // Le passage de l'article 37 n'est plus mis en gras sous le titre « Art. 35 »,
-    // et la légende ne promet aucun gras.
-    expect(texte.querySelector('strong')).toBeNull();
+    // Le passage de l'article 37 n'est plus souligné sous le titre « Art. 35 »,
+    // et la légende ne promet aucun souligné.
+    expect(texte.querySelector('mark')).toBeNull();
     expect(queryByTestId('chat-preview-englobant')).toBeNull();
-    expect(() => getByText('En gras : le passage le plus proche de la phrase de la réponse.')).toThrow();
+    expect(queryByTestId('chat-carte-legende')).toBeNull();
     expect(getByTestId('chat-preview-cut').textContent).toContain(
       'L’aperçu s’arrête avant l’article 36, que JuriX a enregistré avec celui-ci.',
     );
@@ -299,7 +222,7 @@ describe('ApercuDeCitation : l’article cité, et lui seul', () => {
 
   it('un paragraphe par alinéa, à la mesure de lecture de 34em (feuille de tablette)', async () => {
     apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
-    const { findByTestId } = render(ApercuDeCitation, { props: { cible: CIBLE_35, modale: true, surFermer: vi.fn() } });
+    const { findByTestId } = ouvrir(CARTE_35);
 
     const texte = await findByTestId('chat-preview-text');
     // La base garde l'article sur une ligne : « … incombent. (3) La partie … ».
@@ -314,9 +237,7 @@ describe('ApercuDeCitation : l’article cité, et lui seul', () => {
 
   it('écran court : l’intitulé et le statut se suivent, séparés par un point médian masqué ailleurs', async () => {
     apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
-    const { findByTestId, getByTestId } = render(ApercuDeCitation, {
-      props: { cible: CIBLE_35, modale: true, surFermer: vi.fn() },
-    });
+    const { findByTestId, getByTestId } = ouvrir(CARTE_35);
     await findByTestId('chat-preview-text');
 
     const separateur = getByTestId('chat-preview-status').querySelector('[aria-hidden="true"]');
@@ -327,7 +248,7 @@ describe('ApercuDeCitation : l’article cité, et lui seul', () => {
 
   it('intitulé de section à la française : une espace insécable devant le deux-points', async () => {
     apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
-    const { findByTestId, container } = render(ApercuDeCitation, { props: { cible: CIBLE_35, modale: true, surFermer: vi.fn() } });
+    const { findByTestId, container } = ouvrir(CARTE_35);
     await findByTestId('chat-preview-text');
 
     const section = Array.from(container.querySelectorAll('p')).find((p) => p.textContent?.startsWith('Section III'));
@@ -340,9 +261,7 @@ describe('ApercuDeCitation : l’article cité, et lui seul', () => {
       numero: '36',
       contenu: '(1) Toute rupture de contrat emporte obligation pour la partie responsable de verser à lu se e e o n u ne out,l nature dont aurait bénéficié le travailleur.',
     });
-    const { findByTestId, getByTestId } = render(ApercuDeCitation, {
-      props: { cible: { ...CIBLE_35, cle: '36', numero: '36' }, modale: true, surFermer: vi.fn() },
-    });
+    const { findByTestId, getByTestId } = ouvrir({ ...CARTE_35, numero: '36' });
 
     expect((await findByTestId('chat-preview-text')).textContent).toContain('lu se e e o n u ne');
     expect(getByTestId('chat-preview-ocr').textContent).toContain('mal lus à la numérisation');
@@ -357,92 +276,159 @@ describe('ApercuDeCitation : l’article cité, et lui seul', () => {
       englobant: true,
       contenu: 'Fin du texte de l’article 2. Art..5- (1) Le texte de l’article 5. ARTICLE 6.- Le texte de l’article 6.',
     });
-    const { findByTestId, getByTestId, queryByTestId } = render(ApercuDeCitation, {
-      props: { cible: { ...CIBLE_35, cle: '5', numero: '5' }, modale: true, surFermer: vi.fn() },
-    });
+    const { findByTestId, getByTestId, queryByTestId } = ouvrir({ ...CARTE_35, numero: '5' });
 
     expect((await findByTestId('chat-preview-text')).textContent?.trim()).toBe('Art..5- (1) Le texte de l’article 5.');
     expect(getByTestId('chat-preview-englobant').textContent).toContain('il est tiré d’un passage qui en contient d’autres');
     expect(queryByTestId('chat-preview-cut')).toBeNull();
   });
 
-  it('amène le passage en gras dans la vue à l’ouverture, le focus restant sur « Fermer »', async () => {
-    // jsdom ne met rien en page : une zone de 400 px, un pied de 100 px, et le
-    // gras 600 px plus bas que le haut de la zone, hors de vue.
+  it('amène le passage souligné dans la vue de la zone qui défile, sans toucher au focus', async () => {
+    // jsdom ne met rien en page : une zone de 400 px, et le passage 600 px plus
+    // bas que le haut de la zone, hors de vue.
     const boite = (top: number, height: number) =>
       ({ top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
-    const estLaZone = (el: Element) => el.classList.contains('overflow-y-auto');
+    const estLaZone = (el: Element) => el.hasAttribute('data-zone-preuves');
     const rectangle = HTMLElement.prototype.getBoundingClientRect;
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      return this.tagName === 'STRONG' ? boite(700, 60) : estLaZone(this) ? boite(100, 400) : boite(0, 0);
+      return this.tagName === 'MARK' ? boite(700, 60) : estLaZone(this) ? boite(100, 400) : boite(0, 0);
     };
-    const mesures = {
-      scrollHeight: (el: HTMLElement) => (estLaZone(el) ? 1200 : 0),
-      clientHeight: (el: HTMLElement) => (estLaZone(el) ? 400 : 0),
-      offsetHeight: (el: HTMLElement) => (el.dataset.testid === 'chat-preview-footer' ? 100 : 0),
-    };
-    // jsdom définit `offsetHeight` sur HTMLElement.prototype : il est rendu tel quel après le test.
-    const originaux = Object.keys(mesures).map((nom) => [nom, Object.getOwnPropertyDescriptor(HTMLElement.prototype, nom)] as const);
-    for (const [nom, mesure] of Object.entries(mesures)) {
-      Object.defineProperty(HTMLElement.prototype, nom, { configurable: true, get: function (this: HTMLElement) { return mesure(this); } });
-    }
+    const hauteur = Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight');
+    Object.defineProperty(Element.prototype, 'clientHeight', {
+      configurable: true,
+      get: function (this: Element) {
+        return estLaZone(this) ? 400 : 0;
+      },
+    });
+    const zone = document.createElement('div');
+    zone.setAttribute('data-zone-preuves', '');
+    document.body.appendChild(zone);
     try {
       apercuDeLArticle.mockResolvedValue(ARTICLE_6);
-      const { getByTestId, findByTestId } = render(ApercuDeCitation, { props: { cible: CIBLE, modale: true, surFermer: vi.fn() } });
-      const zone = getByTestId('chat-preview').querySelector('.overflow-y-auto') as HTMLElement;
       let defilement = 0;
       Object.defineProperty(zone, 'scrollTop', { configurable: true, get: () => defilement, set: (v: number) => (defilement = v) });
-
+      const { findByTestId } = render(CarteArticleCite, {
+        target: zone,
+        props: { carte: CARTE, idCarte: 'c', ouverte: true, citationActive: 0, surBasculer: vi.fn() },
+      });
       await findByTestId('chat-preview-text');
 
-      // Le moins de défilement possible : le bas du gras (660) plus la marge
-      // (24), juste au-dessus du pied (400 - 100 = 300 px visibles).
-      await waitFor(() => expect(defilement).toBe(384));
-      expect(document.activeElement).toBe(getByTestId('chat-preview-close'));
+      // Le moins de défilement possible : le bas du passage (660) et la marge
+      // (24), sous le bord bas de la zone (400).
+      await waitFor(() => expect(defilement).toBe(284));
+      expect(document.activeElement).toBe(document.body);
     } finally {
       HTMLElement.prototype.getBoundingClientRect = rectangle;
-      for (const [nom, descripteur] of originaux) {
-        if (descripteur) Object.defineProperty(HTMLElement.prototype, nom, descripteur);
-        else delete (HTMLElement.prototype as unknown as Record<string, unknown>)[nom];
-      }
+      if (hauteur) Object.defineProperty(Element.prototype, 'clientHeight', hauteur);
+      zone.remove();
     }
-  });
-
-  it('le pied « Lire dans le texte intégral » et la mention du Journal officiel restent collés en bas', async () => {
-    apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
-    const { findByTestId, getByTestId } = render(ApercuDeCitation, { props: { cible: CIBLE_35, modale: true, surFermer: vi.fn() } });
-    await findByTestId('chat-preview-text');
-
-    const pied = getByTestId('chat-preview-footer');
-    expect(pied.className).toContain('sticky');
-    expect(pied.className).toContain('bottom-0');
-    expect(pied.contains(getByTestId('chat-preview-full'))).toBe(true);
-    expect(pied.textContent).toContain('Seul le texte publié au Journal officiel fait foi.');
-    // Hors de la zone du texte : il ne défile pas avec lui.
-    expect(getByTestId('chat-preview-text').contains(pied)).toBe(false);
   });
 });
 
-describe('ApercuDeCitation, fenêtre redimensionnée', () => {
+describe('CarteArticleCite : repliée, puis ouverte', () => {
+  beforeEach(() => {
+    apercuDeLArticle.mockReset();
+    copierDansLePressePapiers.mockReset();
+  });
   afterEach(() => cleanup());
 
-  it('devenu feuille modale, il prend le focus resté dans la conversation', async () => {
-    apercuDeLArticle.mockResolvedValue(ARTICLE_6);
-    const dehors = document.createElement('textarea');
-    document.body.appendChild(dehors);
-    try {
-      const { getByTestId, rerender } = render(ApercuDeCitation, {
-        props: { cible: CIBLE, modale: false, surFermer: vi.fn() },
-      });
-      dehors.focus();
-      expect(document.activeElement).toBe(dehors);
+  it('fermée : ni corps ni lecture ; nom, repères et statut prouvé ; l’en-tête dit son état', async () => {
+    const surBasculer = vi.fn();
+    const { getByTestId, queryByTestId } = ouvrir(CARTE_35, { ouverte: false, releveLe: '2026-10-14', surBasculer });
 
-      await rerender({ cible: CIBLE, modale: true, surFermer: vi.fn() });
+    const entete = getByTestId('chat-article-cite');
+    expect(apercuDeLArticle).not.toHaveBeenCalled();
+    expect(entete.getAttribute('aria-expanded')).toBe('false');
+    expect(entete.textContent).toContain('Art. 35 — Code du travail');
+    expect(entete.textContent).toContain('Loi n°\u00A092/007 du 14 août 1992 · aucune modification relevée par JuriX au 14 oct. 2026');
+    expect(entete.textContent).not.toMatch(/vigueur|LOI-1992/);
+    expect(queryByTestId('chat-preview-text')).toBeNull();
+    const corps = document.getElementById(entete.getAttribute('aria-controls')!) as HTMLElement & { inert: boolean };
+    expect(corps.inert || corps.hasAttribute('inert')).toBe(true);
 
-      await waitFor(() => expect(document.activeElement).toBe(getByTestId('chat-preview-close')));
-      expect(getByTestId('chat-preview').getAttribute('aria-modal')).toBe('true');
-    } finally {
-      dehors.remove();
-    }
+    await fireEvent.click(entete);
+    expect(surBasculer).toHaveBeenCalledTimes(1);
+  });
+
+  it('préchargée : la pastille de statut, jamais inventée ; pas de pastille sans aperçu', async () => {
+    apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
+    const { findByTestId } = ouvrir(CARTE_35, { ouverte: false, precharger: true });
+    expect((await findByTestId('chat-carte-statut')).textContent).toContain('Origine, non consolidée');
+    cleanup();
+
+    apercuDeLArticle.mockResolvedValue(null);
+    const { queryByTestId } = ouvrir(CARTE_35, { ouverte: false, precharger: true });
+    await waitFor(() => expect(apercuDeLArticle).toHaveBeenCalledTimes(2));
+    expect(queryByTestId('chat-carte-statut')).toBeNull();
+  });
+
+  it('à l’ouverture, le statut est tamponné ; pendant la lecture, des squelettes, sans role="status"', async () => {
+    apercuDeLArticle.mockReturnValue(new Promise(() => {}));
+    const { getByTestId, container } = ouvrir(CARTE_35);
+
+    expect(container.querySelector('.mv-squelette')).not.toBeNull();
+    expect(container.querySelector('.animate-pulse, [class*="animate-pulse"]')).toBeNull();
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(getByTestId('chat-preview-status')).toBeTruthy();
+    cleanup();
+
+    apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
+    const { findByTestId } = ouvrir(CARTE_35);
+    expect((await findByTestId('chat-preview-status')).querySelector('.mv-tamponner')).toBeNull();
+    await findByTestId('chat-preview-text');
+    expect(document.querySelector('[data-testid="chat-preview-status"] .mv-tamponner')).not.toBeNull();
+  });
+
+  it('une autre citation du même article déplace le souligné, sans changer le texte', async () => {
+    apercuDeLArticle.mockResolvedValue({
+      ...ARTICLE_6,
+      contenu: 'Le travailleur licencié reçoit une indemnité de licenciement calculée selon son ancienneté dans entreprise.\nLa faute lourde prive le salarié employeur de toute indemnité compensatrice versée pendant le préavis.',
+    });
+    const carte = {
+      ...CARTE,
+      citations: [
+        { indexCitation: 2, phrase: 'Le travailleur licencié reçoit une indemnité de licenciement selon son ancienneté' },
+        { indexCitation: 5, phrase: 'La faute lourde prive le salarié de toute indemnité compensatrice' },
+      ],
+    };
+    const { findByTestId, rerender, getByTestId } = ouvrir(carte, { citationActive: 2 });
+    const texte = await findByTestId('chat-preview-text');
+    const avant = texte.textContent;
+    expect(texte.querySelectorAll('mark')).toHaveLength(1);
+    expect(texte.querySelector('mark')?.textContent).toContain('indemnité de licenciement');
+
+    await rerender({ citationActive: 5 });
+
+    expect(getByTestId('chat-preview-text').querySelector('mark')?.textContent).toContain('faute lourde');
+    expect(getByTestId('chat-preview-text').textContent).toBe(avant);
+  });
+
+  it('« Copier la référence » : la forme de la page d’un texte, « copiée » 1,8 s, annoncée', async () => {
+    apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
+    copierDansLePressePapiers.mockResolvedValue(true);
+    const surAnnonce = vi.fn();
+    const { findByTestId, getByTestId } = ouvrir(CARTE_35, { surAnnonce });
+    await findByTestId('chat-preview-text');
+
+    await fireEvent.click(getByTestId('chat-carte-copier'));
+
+    await waitFor(() => expect(getByTestId('chat-carte-copier').textContent).toContain('Référence copiée'));
+    const copie = copierDansLePressePapiers.mock.calls[0][0] as string;
+    expect(copie).toMatch(/^Art\. 35, /);
+    expect(copie).toContain('92/007');
+    expect(copie.split('\n')[1]).toMatch(/\/laws\/2274\?article=35$/);
+    expect(surAnnonce).toHaveBeenCalledWith('Référence copiée');
+  });
+
+  it('copie refusée : le dire, sans faux « copiée »', async () => {
+    apercuDeLArticle.mockResolvedValue(ARTICLE_35_COLLE);
+    copierDansLePressePapiers.mockResolvedValue(false);
+    const { findByTestId, getByTestId } = ouvrir(CARTE_35);
+    await findByTestId('chat-preview-text');
+
+    await fireEvent.click(getByTestId('chat-carte-copier'));
+
+    expect((await findByTestId('chat-carte-copie-echec')).textContent).toContain('Copie impossible');
+    expect(getByTestId('chat-carte-copier').textContent).not.toContain('copiée');
   });
 });

@@ -735,7 +735,7 @@ test.describe('états à travers un redimensionnement', () => {
     expect.soft(await defilementLibre(page), `${etroit} : le défilement reste verrouillé`).toBe(true);
   });
 
-  test('tiroir des conversations ouvert à 390 px, puis 1 280 et retour', async ({ page }) => {
+  test('tiroir des conversations ouvert à 390 px, puis 1 600 et retour', async ({ page }) => {
     await themeClair(page);
     await connecter(page, MEMBRE);
     await simulerLeChat(page);
@@ -747,8 +747,8 @@ test.describe('états à travers un redimensionnement', () => {
     await cliquerJusqualEffet(bascule, page.locator('[data-testid="conversations-toggle"][aria-expanded="true"]'));
     await expect(premiere).toBeInViewport();
 
-    await redimensionner(page, 1280, 900);
-    const ou = '/chat 1280x900, tiroir ouvert à 390 px';
+    await redimensionner(page, 1600, 900);
+    const ou = '/chat 1600x900, tiroir ouvert à 390 px';
     // Le tiroir devient la colonne : à l'écran, sans voile, sans piège.
     await expect.soft(premiere, `${ou} : la liste des conversations n'est plus à l'écran`).toBeInViewport();
     await expect.soft(panneau, `${ou} : la colonne est encore une fenêtre modale`).not.toHaveAttribute('role', 'dialog');
@@ -872,6 +872,76 @@ test.describe('états à travers un redimensionnement', () => {
     await expect.soft(sommaire, `${retour} : le sommaire couvre la page`).not.toHaveCSS('position', 'fixed');
     expect.soft(await voileAffiche(page), `${retour} : un voile couvre la page`).toBeNull();
     expect.soft(await defilementLibre(page), `${retour} : le défilement reste verrouillé`).toBe(true);
+  });
+});
+
+test.describe('/chat : la feuille des articles cités, entre 1 023 et 1 024 px', () => {
+  test.use(reglages({ largeur: 1023, hauteur: 768, telephone: false }));
+
+  /** Une réponse citée, à 1 023 px : la feuille s'ouvre par sa barre. */
+  async function feuilleOuverte(page: Page): Promise<void> {
+    await themeClair(page);
+    await simulerLeChat(page);
+    // La doublure commune parle l'ancienne API : ici, une réponse qui cite.
+    const texte = 'Selon l’article 35 de la loi n° 92/007, l’indemnité est due.';
+    const cite = 'article 35 de la loi n° 92/007';
+    const statut = { etat: null, liens: [], lignes: [] };
+    const titre = 'Loi N°92/007 du 14 août 1992 portant Code du travail';
+    await page.route('**/api/v1/rag/ask/stream', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          { chunk: texte, done: false },
+          {
+            chunk: '',
+            done: true,
+            sources: [],
+            citations: [
+              { debut: texte.indexOf(cite), fin: texte.indexOf(cite) + cite.length, texte_cite: cite, law_id: 2274, article: '35', article_id: 97421, reference: 'LOI-1992-007', titre, date_du_texte: '1992-08-14', statut },
+            ],
+            citations_introuvables: [],
+            articles_cites: [],
+            textes_consultes_non_cites: [],
+          },
+        ]
+          .map((e) => `data: ${JSON.stringify(e)}\n\n`)
+          .join(''),
+      }),
+    );
+    await page.goto('/chat');
+    await attendreLeRepos(page);
+    await saisirJusqualEffet(saisieDuChat(page), 'Quelles indemnités en cas de licenciement ?', page.getByTestId('chat-barre-articles'));
+    await page.getByTestId('chat-barre-articles').click();
+    await expect(page.getByTestId('chat-preview')).toHaveAttribute('aria-modal', 'true');
+  }
+
+  test('feuille ouverte à 1 023 px, puis 1 024 : ni voile, ni inertie, ni entrée d’historique', async ({ page }) => {
+    await feuilleOuverte(page);
+    const panneau = page.getByTestId('chat-preview');
+
+    await redimensionner(page, 1024, 768);
+
+    await expect(panneau).not.toHaveAttribute('role', 'dialog');
+    await expect(panneau).toBeVisible();
+    expect(await voileAffiche(page)).toBeNull();
+    expect(await defilementLibre(page)).toBe(true);
+    await expect(page.locator('[inert]:has([role="log"])')).toHaveCount(0);
+    expect((await panneau.boundingBox())?.width).toBe(520);
+  });
+
+  test('colonne à 1 024 px, focus dedans, puis 1 023 : la feuille s’ouvre et le garde', async ({ page }) => {
+    await feuilleOuverte(page);
+    await redimensionner(page, 1024, 768);
+    const entete = page.getByTestId('chat-article-cite').first();
+    await entete.focus();
+
+    await redimensionner(page, 1023, 768);
+
+    await expect(page.getByTestId('chat-preview')).toHaveAttribute('aria-modal', 'true');
+    await expect(entete).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('chat-preview')).toBeHidden();
   });
 });
 

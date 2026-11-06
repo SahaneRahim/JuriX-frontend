@@ -165,8 +165,7 @@ répond en **profil général**, et la requête omet le champ `persona`.
   chaque langue. Chacune a été vérifiée contre le corpus avec
   `scripts/eval/comparer_mistral.py --dry-run --questions-libres` (dépôt
   backend), qui interroge la recherche sans appeler le modèle de langue. Une
-  suggestion sans extrait pertinent a été remplacée : le corpus n'a ni Code du
-  travail ni Actes uniformes OHADA.
+  suggestion sans extrait pertinent a été remplacée.
 - **Le tableau de bord** d'administration compte les conversations par profil.
   La ligne « Profil général » regroupe les refus de la question et le choix
   explicite de ce profil.

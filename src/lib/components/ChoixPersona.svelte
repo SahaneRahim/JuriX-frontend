@@ -15,6 +15,7 @@
    */
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
+  import { duree } from "$lib/mouvement";
   import { piegerFocus } from "$lib/actions/pieger-focus";
   import { lireSessionChat } from "$lib/chat-session";
   import Icone from "$lib/components/Icone.svelte";
@@ -106,7 +107,7 @@
   role="presentation"
   on:pointerdown={(e) => (pressionSurLeFond = e.target === e.currentTarget)}
   on:click={surLeFond}
-  in:fade={{ duration: 120 }}
+  in:fade={{ duration: duree(120) }}
 >
   <div
     role="dialog"

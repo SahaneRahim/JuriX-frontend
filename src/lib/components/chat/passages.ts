@@ -1,16 +1,14 @@
 /**
  * Un passage par citation (refonte A, décision C10 de docs/refonte/PASSATION.md) :
- * la logique, sans écran. Le panneau des articles cités (E6, seconde partie)
- * s'en servira pour souligner, dans la carte d'un article, le passage qui
- * soutient LA phrase de la citation touchée, et non plus un passage fusionné
- * de toutes les phrases qui citent l'article.
+ * la logique, sans écran. Le panneau des articles cités (PanneauDesPreuves,
+ * CarteArticleCite) s'en sert pour souligner, dans la carte d'un article, le
+ * passage qui soutient LA phrase de la citation touchée, et non plus un
+ * passage fusionné de toutes les phrases qui citent l'article.
  *
- * AUJOURD'HUI, UN PASSAGE PAR ARTICLE. L'aperçu (ApercuDeCitation) reçoit soit
- * la phrase de la citation touchée, soit, depuis la liste « Articles cités »,
- * les phrases de TOUTES les citations de l'article, que `passageLePlusProche`
- * fusionne en un seul passage. Deux phrases qui citent l'article 37 pour deux
- * raisons (l'indemnité, puis la faute lourde) n'en donnaient qu'un, qui ne
- * soutenait ni l'une ni l'autre tout à fait. Ici, chaque citation a le sien,
+ * AVANT, UN PASSAGE PAR ARTICLE. L'ancien aperçu fusionnait les phrases de
+ * toutes les citations d'un article : deux phrases qui citent l'article 37
+ * pour deux raisons (l'indemnité, puis la faute lourde) n'en donnaient qu'un,
+ * qui ne soutenait ni l'une ni l'autre tout à fait. Ici, chaque citation a le sien,
  * calculé côté navigateur, sans rien demander à l'API (cartes/assistant-preuves.md
  * § 4.4) ; une carte en garde plusieurs, un seul actif à la fois.
  *
@@ -30,7 +28,7 @@
  * Fonctions pures, sans store ni traduction : passages.test.ts.
  */
 
-import type { CitationPositionnee, SourceCitee } from '$lib/types';
+import type { CitationPositionnee, SourceCitee, StatutProuve } from '$lib/types';
 import { paragraphesDeLArticle, passageLePlusProche, phraseAutour, type Passage } from './citations';
 
 /** Une citation d'un article, réduite à ce qu'il faut pour trouver son passage. */
@@ -82,6 +80,71 @@ export function citationsDeLArticle(
  */
 export function articleDeLaCitation(citation: CitationPositionnee, articles: readonly ArticleCite[]): number {
   return articles.findIndex((article) => designe(citation, article));
+}
+
+/** Une carte du panneau : un article (ou un texte) cité, et les citations qui le désignent. */
+export interface CarteDeLaReponse {
+  lawId: number;
+  /** Numéro de l'article ; `null` : un texte cité sans article (pas d'aperçu à lire). */
+  numero: string | null;
+  /** Le morceau lu par le modèle : choisit l'article parmi les homonymes. */
+  articleId: number | null;
+  titre: string;
+  reference: string;
+  statut: StatutProuve | null;
+  citations: CitationDeLArticle[];
+}
+
+/**
+ * Les cartes d'une réponse : `articles_cites`, dans leur ordre, puis une carte
+ * pour toute citation restée sans article de la liste.
+ *
+ * POURQUOI CE COMPLÉMENT. Une citation d'un texte entier (« Voir aussi la loi
+ * n° 92/007 ») ne désigne aucun article (`designe`), mais sa puce ouvrait son
+ * aperçu : sans carte, elle ne mènerait plus nulle part. La carte en question
+ * se forme avec les champs de la citation, sans rien inventer. Une entrée
+ * sans numéro de `articles_cites` reçoit les citations sans article du même
+ * texte.
+ */
+export function cartesDeLaReponse(
+  texte: string,
+  citations: readonly CitationPositionnee[],
+  articles: readonly SourceCitee[],
+): CarteDeLaReponse[] {
+  const cartes: CarteDeLaReponse[] = articles.map((article) => ({
+    lawId: article.law_id,
+    numero: article.article_number,
+    articleId: article.article_id,
+    titre: article.law_title,
+    reference: article.law_reference,
+    statut: article.statut ?? null,
+    citations: citationsDeLArticle(texte, citations, article),
+  }));
+  const rangees = new Set(cartes.flatMap((carte) => carte.citations.map((c) => c.indexCitation)));
+  citations.forEach((citation, indexCitation) => {
+    if (rangees.has(indexCitation)) return;
+    const entree = { indexCitation, phrase: phraseAutour(texte, citation.debut, citation.fin) };
+    const memeCarte = cartes.find((c) => c.lawId === citation.law_id && c.numero === citation.article);
+    if (memeCarte) {
+      memeCarte.citations.push(entree);
+      return;
+    }
+    cartes.push({
+      lawId: citation.law_id,
+      numero: citation.article,
+      articleId: citation.article_id,
+      titre: citation.titre,
+      reference: citation.reference,
+      statut: citation.statut ?? null,
+      citations: [entree],
+    });
+  });
+  return cartes;
+}
+
+/** Le rang de la carte qui porte cette citation, ou -1. */
+export function carteDeLaCitation(cartes: readonly CarteDeLaReponse[], indexCitation: number): number {
+  return cartes.findIndex((carte) => carte.citations.some((c) => c.indexCitation === indexCitation));
 }
 
 /**

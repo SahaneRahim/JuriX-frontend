@@ -82,6 +82,10 @@ async function intercepter(page: Page) {
 }
 
 test.describe('Conversations', () => {
+  // La colonne (décision C3) : à partir de 2xl ; en dessous, elle est un tiroir,
+  // couvert par redimensionnement.spec.ts et responsif.spec.ts.
+  test.use({ viewport: { width: 1600, height: 900 } });
+
   test('la liste s’affiche pour un compte connecté', async ({ page }) => {
     await connecter(page);
     await intercepter(page);
@@ -102,6 +106,8 @@ test.describe('Conversations', () => {
     await page.goto('/chat');
 
     await expect(page.getByTestId('conversations-panel')).toHaveCount(0);
+    // « Nouvelle conversation » reste là : c'est le seul moyen de repartir à zéro.
+    await expect(page.getByTestId('chat-new-inline')).toBeVisible();
     // Et le chat reste utilisable : le compte n'ajoute que la mémoire.
     await expect(page.locator('input[type="text"], textarea').first()).toBeVisible();
     await expect(page.getByTestId('chat-signup-link')).toBeVisible();

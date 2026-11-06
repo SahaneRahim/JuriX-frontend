@@ -570,7 +570,7 @@ test.describe('P3 : la feuille d’aperçu sur téléphone', () => {
     const lien = page.getByTestId('chat-preview-full');
     await expect(lien).toHaveAttribute('href', '/laws/2274?article=35');
 
-    // Un NOUVEL onglet (ApercuDeCitation.svelte) : revenu sur /chat, la page
+    // Un NOUVEL onglet (CarteArticleCite.svelte) : revenu sur /chat, la page
     // ne réafficherait pas la conversation. Elle reste donc là, aperçu ouvert.
     const [onglet] = await Promise.all([page.waitForEvent('popup'), lien.click()]);
     await expect(onglet).toHaveURL(/\/laws\/2274\?article=35(#.*)?$/);
@@ -584,7 +584,7 @@ test.describe('P3 : la feuille d’aperçu sur téléphone', () => {
 test.describe('P3 : « Textes consultés, non cités »', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test('replié sous la réponse, il s’ouvre et nomme le texte lu', async ({ page }) => {
+  test('replié au pied du panneau, il s’ouvre et nomme le texte lu', async ({ page }) => {
     await simulerLeChat(page);
     await page.goto('/chat');
     await saisirJusqualEffet(saisieDuChat(page), QUESTION, page.getByTestId('chat-citation'));
