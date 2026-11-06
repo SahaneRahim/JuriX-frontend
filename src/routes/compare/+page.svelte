@@ -18,9 +18,10 @@
    *   tourne ;
    * - la grille est une carte à filets, ses en-têtes sur le fond `fill`, et
    *   le texte cité est en Literata Texte (`font-texte`).
-   * Le gréement de la maquette (les deux champs suspendus à un fléau : le
-   * niveau B) n'est PAS repris : il change la structure du formulaire, et
-   * reste à valider à 768 et 1 024 px, que la maquette ne montre pas (R2).
+   *
+   * NIVEAU B (R2, validé à 768 et 1 024 px). Le formulaire est le gréement de
+   * la maquette : montant, pivot, fléau, deux cartes suspendues qui portent
+   * les champs, bouton sur la base. Voir la feuille de style en bas de page.
    * En mouvement réduit, rien ne bouge : la balance reste droite, la grille
    * est là d'un coup, le texte se déplie sans glisser.
    */
@@ -39,6 +40,10 @@
   import { language } from "$lib/stores/language";
   import { duree } from "$lib/mouvement";
   import type { ComparisonCell, ComparisonResponse, ComparisonRow, SourceRef } from "$lib/types";
+
+  // POURQUOI TOUT S'EFFACE SUR ÉCRAN COURT : voir la feuille de style.
+  const CARTE =
+    "block rounded-2xl border border-zinc-200 bg-white p-4 shadow-feuille dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-feuille-sombre court:rounded-none court:border-0 court:bg-transparent court:p-0 court:shadow-none court:dark:bg-transparent court:dark:shadow-none";
 
   let sujetA = "";
   let sujetB = "";
@@ -205,21 +210,31 @@
       du label. Champs en text-base sous sm seulement (pas de zoom d'iOS),
       text-sm ensuite, et bouton principal du guide (§ 4.4, text-sm) : en
       16 px, les champs faisaient 46 px et le bouton 44.
-      Sur une ligne dès 768 px, et sur écran court dès 480 px : un téléphone
-      en paysage gardait les trois rangées du portrait, et le bouton passait
-      sous le bas de l'écran. Les champs y gardent 190 px au moins (en
+      En gréement dès 640 px (voir la feuille de style), sauf sur écran court :
+      dès 480 px, tout y tient sur une ligne. Un téléphone en paysage gardait
+      les trois rangées du portrait, et le bouton passait sous le bas de
+      l'écran. Les champs y gardent 190 px au moins (en
       568×320) ; plus étroit, c'est un écran en portrait, où l'empilement a
       la hauteur qu'il lui faut. Sous sm, sur cette ligne, le bouton prend
       les 46 px des champs en 16 px : à 44, il en dépassait de 2 px en haut.
     -->
     <form
       data-hors-du-bouton
-      class="grid gap-4 md:grid-cols-[1fr_1fr_auto] items-end mb-8 sm:mb-10 court:mb-6 court:min-[480px]:grid-cols-[1fr_1fr_auto]"
+      class="greement grid gap-4 items-end mb-8 sm:mb-10 court:mb-6 court:min-[480px]:grid-cols-[1fr_1fr_auto]"
       on:submit|preventDefault={comparer}
       data-testid="compare-form"
       novalidate
     >
-      <label class="block">
+      <!-- Décor seul : tout le sens est dans les champs et le bouton. Il n'est
+           affiché que sur le gréement (voir la feuille de style). -->
+      <div class="greement__decor" aria-hidden="true" data-testid="compare-greement">
+        <span class="greement__montant mv-greement-montant bg-zinc-950 dark:bg-white"></span>
+        <span class="greement__fleau mv-greement-fleau bg-zinc-950 dark:bg-white"></span>
+        <span class="greement__pivot mv-greement-pivot bg-zinc-950 ring-4 ring-zinc-50 dark:bg-white dark:ring-zinc-950"></span>
+        <span class="greement__chaine greement__chaine--a mv-greement-chaine bg-zinc-500 dark:bg-zinc-400"></span>
+        <span class="greement__chaine greement__chaine--b mv-greement-chaine bg-zinc-500 dark:bg-zinc-400"></span>
+      </div>
+      <label class={CARTE}>
         <span class="block text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-1">
           {$tr("compare.subjectA")}
         </span>
@@ -233,7 +248,7 @@
           class="block min-h-11 w-full px-4 py-2.5 rounded-xl border border-zinc-500 bg-white text-base sm:text-sm text-zinc-950 placeholder-zinc-500 transition-colors focus:outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
         />
       </label>
-      <label class="block">
+      <label class={CARTE}>
         <span class="block text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-1">
           {$tr("compare.subjectB")}
         </span>
@@ -251,7 +266,7 @@
         type="submit"
         disabled={enCours || !monte}
         data-testid="compare-submit"
-        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold bg-zinc-950 text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200 court:max-sm:min-h-[2.875rem]"
+        class="greement__bouton inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold bg-zinc-950 text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:shadow-none dark:hover:bg-zinc-200 court:max-sm:min-h-[2.875rem]"
       >
         {enCours ? $tr("compare.loading") : $tr("compare.submit")}
       </button>
@@ -635,3 +650,108 @@
   <ChatFab eviter="[data-hors-du-bouton]" />
   <SiteFooter reserverBouton />
 </div>
+
+<style>
+  /*
+   * Le gréement de /compare (Comparer.dc.html, niveau B de R2).
+   *
+   * POURQUOI UNE GRILLE ET NON LES CARTES ABSOLUES DE LA MAQUETTE. Ses cartes
+   * de 340 px (300 sous 1 024) centrées sur un fléau à 15 % de chaque bord ne
+   * tiennent qu'à 1 440 px : à 1 024, elles sortent de 31 px de chaque côté ;
+   * à 768, de 42. Ici, les cartes et le bouton restent dans le flux, dans une
+   * grille de deux colonnes d'au plus 340 px : elles ne peuvent pas déborder,
+   * et un libellé qui passe à la ligne agrandit le gréement au lieu de
+   * chevaucher le bouton. Seul le décor est absolu ; le fléau va du milieu
+   * d'une carte au milieu de l'autre, soit la moitié de la colonne de chaque
+   * côté : min(170 px, 25 % moins le quart de l'écart de 1 rem).
+   *
+   * POURQUOI 640 PX ET 501 PX DE HAUT. Sous 640 px, deux cartes ne tiennent
+   * plus : elles s'empilent et le décor disparaît, ses animations avec lui.
+   * Un téléphone en paysage (écran `court:`) garde sa ligne compacte : 312 px
+   * de gréement mettraient le bouton sous le bas de l'écran.
+   *
+   * POURQUOI LE FLÉAU NE PÈSE PAS PENDANT L'ATTENTE. BalanceAnimee pèse déjà
+   * dans `compare-loading` : un second geste irait contre « une seule chose
+   * animée à la fois » (A2 § 1), et les cartes bougeraient sous le pointeur
+   * alors que les champs restent modifiables.
+   */
+  .greement__decor {
+    display: none;
+  }
+
+  @media (min-width: 640px) and (min-height: 501px) {
+    .greement {
+      --greement-bras: min(10.625rem, calc(25% - 0.25rem));
+      position: relative;
+      grid-template-columns: repeat(2, minmax(0, 21.25rem));
+      justify-content: space-between;
+      gap: 4rem 1rem;
+      padding-top: 6.5rem;
+    }
+
+    .greement__decor {
+      display: block;
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .greement__montant,
+    .greement__fleau,
+    .greement__pivot,
+    .greement__chaine {
+      position: absolute;
+      display: block;
+    }
+
+    .greement__montant {
+      left: 50%;
+      top: 3rem;
+      bottom: 2.5rem;
+      width: 2px;
+      margin-left: -1px;
+    }
+
+    .greement__fleau {
+      left: var(--greement-bras);
+      right: var(--greement-bras);
+      top: calc(3rem - 2px);
+      height: 4px;
+      border-radius: 4px;
+    }
+
+    .greement__pivot {
+      left: 50%;
+      top: 3rem;
+      width: 1rem;
+      height: 1rem;
+      margin: -0.5rem 0 0 -0.5rem;
+      border-radius: 50%;
+    }
+
+    .greement__chaine {
+      top: 3rem;
+      width: 2px;
+      height: 3.5rem;
+    }
+
+    .greement__chaine--a {
+      left: var(--greement-bras);
+      margin-left: -1px;
+    }
+
+    .greement__chaine--b {
+      right: var(--greement-bras);
+      margin-right: -1px;
+    }
+
+    /* Au-dessus du montant, qui s'arrête derrière lui : la base du gréement. */
+    .greement__bouton {
+      position: relative;
+      grid-column: 1 / -1;
+      justify-self: center;
+      min-width: 11rem;
+      min-height: 3rem;
+    }
+  }
+</style>

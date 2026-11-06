@@ -458,6 +458,38 @@
   }
 
   /* -------------------------------------------------------------------------
+   * Le gréement de /compare (Comparer.dc.html, niveau B de R2) : le montant
+   * pousse, le fléau s'étend depuis le pivot, puis les chaînes descendent.
+   * Le décor seul : les cartes et le bouton n'ont aucune entrée, le formulaire
+   * sert dès l'affichage (A2 § 2.4 : pas de délai sur les champs).
+   * ----------------------------------------------------------------------- */
+  .mv-greement-montant {
+    transform-origin: top;
+    animation: mv-greement-grandir 0.8s var(--mv-courbe) 0.2s backwards;
+  }
+
+  .mv-greement-fleau {
+    animation: mv-greement-etendre 0.9s var(--mv-courbe) 0.25s backwards;
+  }
+
+  .mv-greement-pivot {
+    animation: mv-fondre 0.4s var(--mv-courbe) 0.3s backwards;
+  }
+
+  .mv-greement-chaine {
+    transform-origin: top;
+    animation: mv-greement-grandir 0.7s var(--mv-courbe) 0.9s backwards;
+  }
+
+  @keyframes mv-greement-grandir {
+    from { transform: scaleY(0); }
+  }
+
+  @keyframes mv-greement-etendre {
+    from { transform: scaleX(0); }
+  }
+
+  /* -------------------------------------------------------------------------
    * Tracer : le trait qui relie la note de lecture à son passage (A2 § 4),
    * dessiné depuis le passage ; délai sous 1 s (D9 : la maquette disait
    * 1,2 s).
