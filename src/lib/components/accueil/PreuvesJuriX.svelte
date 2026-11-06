@@ -53,21 +53,39 @@
     return entree.intersectionRatio >= PART_VISIBLE || entree.intersectionRect.height >= PART_VISIBLE * window.innerHeight;
   }
 
+  /**
+   * POURQUOI LITERATA TEXTE N'EST DEMANDÉE QU'APRÈS LE MONTAGE, À L'ARRIVÉE. Une classe
+   * `font-texte` rendue au serveur fait télécharger ses 19 Kio dès le premier
+   * rendu, pour des démonstrations sous le premier écran : le chemin critique
+   * de l'accueil n'en veut pas (PASSATION § 7). Jusque-là, le repli ajusté de
+   * src/app.css, de même chasse : le passage à Literata ne déplace rien, et
+   * sans JavaScript le repli reste, lisible.
+   */
+  let proche = false;
+  $: serif = proche ? "font-texte" : "font-texte-repli";
+
   let etat: Etat = "repos";
   let grille: HTMLDivElement | undefined;
   let observateur: IntersectionObserver | null = null;
   let minuterie: ReturnType<typeof setTimeout> | null = null;
 
   onMount(() => {
-    if (prefersReducedMotion.current || typeof IntersectionObserver === "undefined" || !grille) return;
+    if (prefersReducedMotion.current || typeof IntersectionObserver === "undefined" || !grille) {
+      proche = true;
+      return;
+    }
     const boite = grille.getBoundingClientRect();
-    if (boite.top < window.innerHeight && boite.bottom > 0) return;
+    if (boite.top < window.innerHeight && boite.bottom > 0) {
+      proche = true;
+      return;
+    }
     etat = "arme";
     observateur = new IntersectionObserver(
       (entrees) => {
         if (!entrees.some(estArrivee)) return;
         observateur?.disconnect();
         observateur = null;
+        proche = true;
         etat = "joue";
         minuterie = setTimeout(() => (etat = "repos"), DUREE_DU_JEU);
       },
@@ -115,7 +133,7 @@
   >
     <article class={CARTE}>
       <div class={DEMO}>
-        <div class="grid justify-items-center gap-2.5 px-4 text-center font-texte text-sm/normal text-zinc-700 dark:text-zinc-300">
+        <div class="grid justify-items-center gap-2.5 px-4 text-center text-sm/normal text-zinc-700 dark:text-zinc-300 {serif}">
           <span>{$tr("accueil.preuves.demo.extrait1")}</span>
           <span
             class="demo-puce rounded-full border border-zinc-300 bg-white px-2.5 font-sans text-xs/[26px] font-semibold text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
@@ -150,7 +168,7 @@
         <!-- Le passage : fond de marqueur ET soulignement de 2 px de l'encre
              (`mv-surligne`, A2 § 3.2) ; le fond seul (1,5:1) ne porterait pas
              le sens. Un <mark>, pour sa sémantique. -->
-        <p class="px-[18px] text-center font-texte text-base/[1.7] text-zinc-950 dark:text-white">
+        <p class="px-[18px] text-center text-base/[1.7] text-zinc-950 dark:text-white {serif}">
           {avantLePassage}<mark class="mv-surligne demo-passage">{$tr("accueil.preuves.demo.passage")}</mark
           >{apresLePassage}
         </p>

@@ -74,6 +74,9 @@ export default {
         // Tailwind pour un poste qui n'aurait ni l'une ni l'autre.
         titre: ["Literata Titre", "Literata Titre repli Noto", "Literata Titre repli Georgia", ...defaultTheme.fontFamily.serif],
         texte: ["Literata Texte", "Literata Texte repli Noto", "Literata Texte repli Georgia", ...defaultTheme.fontFamily.serif],
+        // Le repli seul, sans demander Literata : démonstrations de l'accueil, sous
+        // le premier écran (PreuvesJuriX.svelte).
+        "texte-repli": ["Literata Texte repli Noto", "Literata Texte repli Georgia", ...defaultTheme.fontFamily.serif],
       },
       boxShadow: {
         'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',

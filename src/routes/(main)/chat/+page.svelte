@@ -1990,10 +1990,10 @@
       menu. À partir de lg, profil et nouvelle conversation.
     -->
     <div
-      class="shrink-0 border-b border-zinc-200 bg-zinc-50/70 pt-zone-sure dark:border-zinc-800 dark:bg-zinc-900/60 lg:pt-0"
+      class="shrink-0 border-b border-zinc-200 bg-zinc-50/70 pt-zone-sure dark:border-zinc-800 dark:bg-zinc-900/60 lg:border-b-0 lg:bg-transparent lg:pt-0 lg:dark:bg-transparent"
     >
       <div
-        class="mx-auto flex min-h-14 w-full max-w-[760px] items-center gap-1 px-1 py-1 sm:gap-2 sm:px-2 lg:px-6 court:min-h-0 court:py-0"
+        class="mx-auto flex min-h-14 w-full max-w-[760px] items-center gap-1 px-1 py-1 sm:gap-2 sm:px-2 lg:px-6 lg:pb-2 lg:pt-4 xl:px-10 court:min-h-0 court:py-0"
       >
         <a
           href="/"
@@ -2176,12 +2176,16 @@
         aria-label={t("chat.barTitle")}
         on:scroll={surDefilement}
         style={apercuModal ? "padding-bottom: min(72vh, 560px)" : undefined}
-        class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:p-6 court:py-2 sm:court:py-2 {horsDuBas
+        class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:p-6 lg:px-0 lg:pb-2 lg:pt-3 court:py-2 sm:court:py-2 {horsDuBas
           ? 'scroll-pb-14'
           : ''}"
       >
-        <!-- La colonne de lecture : 760 px au plus, centrée (A1 § 4). -->
-        <div class="mx-auto w-full max-w-[760px] space-y-4 sm:space-y-6">
+        <!-- La colonne de lecture : 760 px au plus, centrée (A1 § 4). POURQUOI
+             LA MÊME RECETTE PARTOUT à partir de lg (760 px et 40 px de marge,
+             `.bar`, `.msgs`, `.cmp` de la maquette ; 24 px à 1 024 px, où la
+             colonne n'en fait que 504) : la barre, le fil et la saisie
+             tombent sur les mêmes bords. -->
+        <div class="mx-auto w-full max-w-[760px] space-y-4 sm:space-y-6 lg:px-6 xl:px-10">
         <!--
           L'accueil, à part du fil : il se replie à l'envoi (C8) et quitte la
           page. Il n'y a rien à y garder : la question posée le remplace, et
@@ -2518,12 +2522,12 @@
          Filet transparent sous la bande « Aller au dernier message » : elle
          porte alors le filet de la zone, dont elle prolonge le fond. -->
     <div
-      class="shrink-0 border-t bg-zinc-50/70 pb-zone-sure dark:bg-zinc-900/60 {bandeDuDernierMessage
+      class="shrink-0 border-t bg-zinc-50/70 pb-zone-sure dark:bg-zinc-900/60 lg:border-t-0 lg:bg-transparent lg:dark:bg-transparent {bandeDuDernierMessage
         ? 'border-transparent'
         : 'border-zinc-200 dark:border-zinc-800'}"
     >
       <div
-        class="mx-auto w-full max-w-[760px] px-4 pt-2 sm:px-6 sm:pt-4 {$authStore.isAuthenticated
+        class="mx-auto w-full max-w-[760px] px-4 pt-2 sm:px-6 sm:pt-4 lg:pt-2 xl:px-10 {$authStore.isAuthenticated
           ? 'pb-2 sm:pb-4'
           : 'sm:pb-3'} court:pb-2.5 court:pt-3 sm:court:pb-2.5 sm:court:pt-3"
       >

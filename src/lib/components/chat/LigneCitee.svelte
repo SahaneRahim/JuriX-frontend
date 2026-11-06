@@ -114,13 +114,16 @@
    * lien pris dans une phrase, en ligne : la maquette dessinait la puce en
    * `inline-block` (24 px), qui échouerait à cette règle. En ligne, sa marge
    * verticale ne compte pas dans la hauteur de la ligne : `py-0.5` la dessine
-   * à 20 px dans une ligne de 26, sans écarter les lignes. Coupée en fin de
-   * ligne (un nom long, un écran de 320 px), chaque morceau garde sa bordure
-   * arrondie (`box-decoration-break: clone`) ; l'espace insécable de « Art. 37 »
-   * et celle d'avant le point médian ne la coupent jamais là.
+   * à 20 px dans une ligne de 26, sans écarter les lignes.
+   *
+   * POURQUOI `whitespace-nowrap`. Au téléphone, une puce coupée en deux lignes
+   * se lisait comme deux pastilles. Elle passe entière à la ligne suivante, et
+   * tient dans la colonne : son nom est déjà raccourci (`etiquetteDeLaPuce`,
+   * une quarantaine de signes au plus, moins de 288 px à 320 px de large).
+   * `box-decoration-break: clone` reste pour un zoom extrême du texte.
    */
   const CLASSE_PUCE =
-    "mx-0.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors [-webkit-box-decoration-break:clone] [box-decoration-break:clone]";
+    "mx-0.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors [-webkit-box-decoration-break:clone] [box-decoration-break:clone]";
   const CLASSE_PUCE_REPOS =
     "border-zinc-300 bg-white text-zinc-950 hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:border-white";
   const CLASSE_PUCE_ACTIVE = "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950";

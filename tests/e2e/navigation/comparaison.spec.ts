@@ -505,6 +505,34 @@ test.describe('Mode comparaison : le gréement (refonte A, niveau B)', () => {
     await expect(carte).toHaveCSS('animation-name', 'none');
   });
 
+  /** Chaque trait a une vraie boîte, opaque : le conteneur seul ne prouve rien. */
+  const traitsVisibles = async (page: Page) => {
+    const traits = await decor(page).evaluate((racine) =>
+      [...racine.children].map((el) => {
+        const boite = el.getBoundingClientRect();
+        return boite.width > 0 && boite.height > 0 && getComputedStyle(el).opacity === '1';
+      }),
+    );
+    expect(traits).toEqual(Array(5).fill(true));
+  };
+
+  test('le fléau, le pivot, le montant et les chaînes restent dessinés avec la grille de résultats', async ({ page }) => {
+    await page.route(ROUTE, (route) => route.fulfill({ json: REPONSE }));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/compare');
+    await expect(page.getByTestId('compare-submit')).toBeEnabled();
+    await expect.poll(() => traitsVisibles(page).then(() => true, () => false)).toBe(true);
+
+    await page.getByTestId('compare-a').fill('permis de recherche');
+    await page.getByTestId('compare-b').fill("permis d'exploitation");
+    await cliquerJusqualEffet(page.getByTestId('compare-submit'), page.getByTestId('compare-result'));
+    await traitsVisibles(page);
+
+    // La capture pleine page rejouait l'entrée : les traits repartaient de zéro.
+    await page.screenshot({ fullPage: true, animations: 'disabled' });
+    await traitsVisibles(page);
+  });
+
   test('en mouvement réduit, le gréement est là, immobile', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 1440, height: 900 });

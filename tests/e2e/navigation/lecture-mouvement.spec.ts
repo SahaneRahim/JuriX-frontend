@@ -278,6 +278,21 @@ test.describe('La note de l’IA, calée sur son passage', () => {
     expect(Math.abs((trait as number) - ligne)).toBeLessThanOrEqual(2);
   });
 
+  test('le trait et le point sont bien peints à côté de la note, animation finie', async ({ page }) => {
+    await ouvrirAvecUnPassage(page);
+    await cliquerJusqualEffet(page.getByTestId('law-explain'), page.locator('mark.passage-cle'));
+    await expect(page.locator('.ai-explanation')).toHaveClass(/\bancree\b/);
+    const peints = () =>
+      page.locator('.ai-explanation').evaluate((note) => {
+        const lire = (pseudo: string) => {
+          const s = getComputedStyle(note, pseudo);
+          return [s.content !== 'none', s.width, s.height, s.transform, s.opacity].join(' ');
+        };
+        return [lire('::before'), lire('::after')];
+      });
+    await expect.poll(peints, { timeout: 4000 }).toEqual(['true 44px 1px none 1', 'true 9px 9px none 1']);
+  });
+
   test('sous 1 280 px, la note passe sous le texte, sans trait ; elle retrouve son passage au retour', async ({ page }) => {
     await ouvrirAvecUnPassage(page);
     await cliquerJusqualEffet(page.getByTestId('law-explain'), page.locator('mark.passage-cle'));

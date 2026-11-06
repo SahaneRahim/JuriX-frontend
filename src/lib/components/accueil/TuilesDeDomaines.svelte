@@ -31,6 +31,13 @@
    * domaine (`gesteCategorie` : la balance pèse, le marteau frappe…), avec
    * une souris seulement (`hover: hover`, src/lib/mouvement.css). Rien de cela
    * en mouvement réduit.
+   *
+   * POURQUOI DES CLASSES NOMMÉES (`tuile-domaine…`, src/app.css). Quinze tuiles
+   * répétaient leurs longues listes d'utilitaires dans le HTML de l'accueil :
+   * environ 20 Ko de plus sur le chemin critique du téléphone, et du LCP perdu
+   * (PASSATION § 7). Écrites une fois dans la feuille de style, elles
+   * ne pèsent plus qu'une fois. `group` et les `mv-` restent ici : les
+   * variantes `group-hover:` et mouvement.css les lisent sur l'élément.
    */
   import CategoryIcon from "$lib/components/CategoryIcon.svelte";
   import Icone from "$lib/components/Icone.svelte";
@@ -63,8 +70,7 @@
    * toute la tuile. Le survol n'existe qu'avec une souris
    * (`hoverOnlyWhenSupported`, tailwind.config.js).
    */
-  const TUILE =
-    "mv-geste mv-monter group relative flex h-11 shrink-0 snap-start items-center gap-2 rounded-full border pl-3.5 pr-4 text-zinc-700 dark:text-zinc-300 sm:h-auto sm:min-h-[148px] sm:flex-col sm:items-stretch sm:gap-3.5 sm:rounded-2xl sm:p-5 sm:text-zinc-950 dark:sm:text-white hover:border-zinc-950 hover:shadow-feuille dark:hover:border-zinc-200 dark:hover:shadow-feuille-sombre motion-safe:transition-[transform,border-color,box-shadow] motion-safe:duration-[350ms] motion-safe:ease-jx motion-safe:hover:-translate-y-1";
+  const TUILE = "mv-geste mv-monter group relative tuile-domaine";
 
   /**
    * Carte pleine et filet des domaines ; « Tous les textes », sans fond, en
@@ -81,19 +87,16 @@
    * de la pastille, et la zone d'appui n'aurait fait que 42 px de haut. Il
    * recouvre donc aussi cette bordure : 44 px (redimensionnement.spec.ts).
    */
-  const LIEN =
-    "after:absolute after:-inset-px after:rounded-full after:content-[''] sm:after:rounded-2xl focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:-outline-offset-4 focus-visible:after:outline-zinc-950 dark:focus-visible:after:outline-white";
+  const LIEN = "tuile-domaine__lien after:absolute after:-inset-px focus-visible:after:outline";
 
   /** L'icône du domaine : 17 px dans une pastille, 24 px sur une tuile. */
-  const ICONE =
-    "mv-geste__icone text-[17px] text-zinc-600 motion-safe:transition-colors motion-safe:duration-200 group-hover:text-zinc-950 dark:text-zinc-400 dark:group-hover:text-white sm:text-2xl";
+  const ICONE = "mv-geste__icone tuile-domaine__icone";
 
   /** La flèche ↗ des tuiles (pas des pastilles) : décorative, le lien est nommé. */
-  const FLECHE =
-    "absolute right-[18px] top-5 hidden text-lg text-zinc-400 group-hover:text-zinc-950 dark:text-zinc-500 dark:group-hover:text-white sm:block motion-safe:transition-[color,transform] motion-safe:duration-[350ms] motion-safe:ease-jx motion-safe:group-hover:-translate-y-[3px] motion-safe:group-hover:translate-x-[3px]";
+  const FLECHE = "tuile-domaine__fleche";
 
-  const NOM = "text-[13px] font-semibold leading-5 sm:text-base/[22px]";
-  const LIGNE = "mt-0.5 hidden text-[13px] leading-[19px] text-zinc-500 dark:text-zinc-400 sm:block";
+  const NOM = "tuile-domaine__nom";
+  const LIGNE = "tuile-domaine__ligne";
 </script>
 
 <!--

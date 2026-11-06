@@ -48,6 +48,16 @@
   let sujetA = "";
   let sujetB = "";
   let resultat: ComparisonResponse | null = null;
+  /**
+   * Le gréement a fini d'arriver : ses classes d'entrée sont retirées dès la
+   * première comparaison. POURQUOI. Un élément en `backwards` repart de zéro
+   * si son animation est rejouée : quand la grille allonge la page, un
+   * changement de taille de la fenêtre de rendu rejouait l'entrée, et le fléau,
+   * le pivot et les chaînes restaient à zéro pendant leur délai (trou blanc
+   * dans les captures en pleine page). Sans classe, il n'y a plus rien à
+   * rejouer : l'état final est le style statique (A2 § 2.1).
+   */
+  let greementPose = false;
   let enCours = false;
   // Envoi inactif jusqu'au montage : voir login/+page.svelte. Un Entrée avant
   // l'hydratation rechargeait la page en GET et vidait les deux champs.
@@ -140,6 +150,7 @@
     enCours = true;
     erreur = "";
     resultat = null;
+    greementPose = true;
     depliees = new Set();
 
     try {
@@ -228,11 +239,11 @@
       <!-- Décor seul : tout le sens est dans les champs et le bouton. Il n'est
            affiché que sur le gréement (voir la feuille de style). -->
       <div class="greement__decor" aria-hidden="true" data-testid="compare-greement">
-        <span class="greement__montant mv-greement-montant bg-zinc-950 dark:bg-white"></span>
-        <span class="greement__fleau mv-greement-fleau bg-zinc-950 dark:bg-white"></span>
-        <span class="greement__pivot mv-greement-pivot bg-zinc-950 ring-4 ring-zinc-50 dark:bg-white dark:ring-zinc-950"></span>
-        <span class="greement__chaine greement__chaine--a mv-greement-chaine bg-zinc-500 dark:bg-zinc-400"></span>
-        <span class="greement__chaine greement__chaine--b mv-greement-chaine bg-zinc-500 dark:bg-zinc-400"></span>
+        <span class="greement__montant bg-zinc-950 dark:bg-white" class:mv-greement-montant={!greementPose}></span>
+        <span class="greement__fleau bg-zinc-950 dark:bg-white" class:mv-greement-fleau={!greementPose}></span>
+        <span class="greement__pivot bg-zinc-950 ring-4 ring-zinc-50 dark:bg-white dark:ring-zinc-950" class:mv-greement-pivot={!greementPose}></span>
+        <span class="greement__chaine greement__chaine--a bg-zinc-500 dark:bg-zinc-400" class:mv-greement-chaine={!greementPose}></span>
+        <span class="greement__chaine greement__chaine--b bg-zinc-500 dark:bg-zinc-400" class:mv-greement-chaine={!greementPose}></span>
       </div>
       <label class={CARTE}>
         <span class="block text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-1">

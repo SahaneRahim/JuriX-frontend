@@ -232,7 +232,9 @@
     tombe ainsi sous le logo. Elles valaient 16 puis 24 px à partir de md,
     plus 16 px du bloc du hero à partir de sm : le contenu commençait à 40 px
     en 768 et en 1 024, sous un logo à 24 puis à 48 px. Sur /chat, aucune
-    marge sous sm : la conversation prend toute la largeur du téléphone.
+    marge sous sm : la conversation prend toute la largeur du téléphone ;
+    aucune non plus à partir de lg : ses colonnes vont d'un bord à l'autre de
+    l'écran, comme la maquette (`.split`), le filet du panneau compris.
 
     Marge haute : 32 px à partir de sm, plus celle du hero ci-dessous. Elle
     passait à 80 px à partir de md (`md:pt-20`) : avec le hero, 190 px de
@@ -242,7 +244,7 @@
   <main
     id="contenu"
     class="relative flex w-full flex-col overflow-x-hidden overflow-x-clip {isChat
-      ? 'min-h-0 flex-1 sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] lg:px-6 lg:pt-6'
+      ? 'min-h-0 flex-1 sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] lg:p-0'
       : 'flex-grow items-center justify-start pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-4 sm:pt-8 sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] lg:px-12 court:!pt-2'}"
   >
     <!-- Background Subtle Glow (Noir & Blanc) -->
