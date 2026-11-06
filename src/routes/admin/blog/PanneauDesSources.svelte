@@ -11,17 +11,23 @@
    * lignes. Au bureau, le panneau est une colonne qui défile seule, à droite
    * du texte ; au téléphone, un volet qui se déplie au-dessus.
    *
-   * Les extraits ne sont connus que pendant la visite où l'article a été
-   * généré : l'API ne les garde pas. Sans eux, le panneau montre les textes
-   * cités de l'article (extrait vérifié et lien vers le texte), et le dit.
+   * Les extraits sont GARDÉS AVEC L'ARTICLE (avenant du tour 4) : le panneau
+   * les montre à chaque ouverture, le lendemain comme pendant la visite de la
+   * génération. Au tour 3, l'API ne les rendait pas : un brouillon rouvert
+   * affichait « Contredite par l'extrait 5 » sans l'extrait 5 nulle part, et
+   * disait à tort qu'ils n'étaient gardés que pendant la visite. Un article
+   * qui n'en a pas (d'avant la vérification, ou écrit à la main) montre ici
+   * les textes qu'il cite, et dit de reconstruire les sources (parcours de
+   * reprise de la fenêtre).
    */
   import Icone from "$lib/components/Icone.svelte";
   import { adresseDeCitation, citationBruteVerifiee } from "$lib/data/blog";
   import { tr } from "$lib/stores/language";
   import { dejaCitee, nomDeCitation, type Formulaire, type SourceDeGeneration } from "./relecture";
 
+  /** Les sources de l'article, gardées avec lui (`ArticleAdmin.sources`). */
   export let sources: SourceDeGeneration[] = [];
-  /** Les citations de l'article : ce que le panneau montre sans les sources de la génération. */
+  /** Les citations de l'article : ce que le panneau montre quand il n'a pas de sources. */
   export let citations: Record<string, unknown>[] = [];
   /** Le volet ouvert, au téléphone (au bureau, le panneau est toujours visible). */
   export let ouvert = false;
@@ -132,10 +138,10 @@
         {/each}
       </ol>
     {:else}
-      <!-- Sans les extraits de la génération (rechargement de la page, article
-           ancien) : les textes cités, extrait vérifié et lien compris. Les
-           numéros des verdicts ne renvoient alors à rien ici. -->
-      <p class={AIDE}>{$tr("admin.blog.sourcesMissing")}</p>
+      <!-- Sans sources enregistrées (article d'avant la vérification, ou écrit
+           à la main) : les textes cités, extrait vérifié et lien compris, et
+           de quoi en sortir (« Reconstruire les sources »). -->
+      <p class={AIDE} data-testid="blog-sources-absentes">{$tr("admin.blog.sourcesMissing")}</p>
       {#if citations.length > 0}
         <ol class="space-y-3">
           {#each citations as citation, i (i)}

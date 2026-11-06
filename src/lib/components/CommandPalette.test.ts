@@ -112,8 +112,8 @@ describe('CommandPalette', () => {
     for (const titre of AFFICHES) expect(texte).toContain(titre);
     // Plus d'intitulé brut, « N » capital collé au numéro.
     expect(texte).not.toMatch(/N°\s*\d/);
-    // L'article de blog « Travail » : le point médian des listes, plus la puce.
-    expect(texte).toContain('Article de blog\u00a0· Travail');
+    // Les articles écrits à la main sont cachés du public : la palette non plus ne les propose pas.
+    expect(texte).not.toContain('Article de blog');
     expect(texte).not.toContain('•');
   });
 
@@ -215,9 +215,9 @@ describe('CommandPalette au clavier', () => {
   it('Entrée sur « Effacer » efface la saisie, sans lancer la recherche', async () => {
     const { getAllByRole, getByRole } = await chercherTravail();
     vi.mocked(goto).mockClear();
-    // La sélection sur la sixième ligne, au-delà des quatre raccourcis.
+    // La sélection sur la dernière ligne, loin de la première.
     const champDeSaisie = getByRole('textbox');
-    for (let i = 0; i < 5; i++) await fireEvent.keyDown(champDeSaisie, { key: 'ArrowDown' });
+    for (let i = 0; i < 4; i++) await fireEvent.keyDown(champDeSaisie, { key: 'ArrowDown' });
     expect(surlignee(getByRole('button', { name: /^Rechercher « travail »/ }))).toBe(false);
     expect(getAllByRole('button').filter(surlignee)).toHaveLength(1);
     const effacer = getByRole('button', { name: 'Effacer' });
@@ -313,7 +313,7 @@ describe('CommandPalette au clavier', () => {
     const { getAllByRole, getByRole } = await chercherTravail();
     vi.mocked(goto).mockClear();
     const champ = getByRole('textbox');
-    // La sélection sur la sixième ligne, au-delà des quatre raccourcis.
+    // La sélection sur la dernière ligne, loin de la première.
     for (let i = 0; i < 5; i++) await fireEvent.keyDown(champ, { key: 'ArrowDown' });
     // Ctrl A, puis Retour arrière : le champ vide, sans passer par « Effacer ».
     await fireEvent.input(champ, { target: { value: '' } });

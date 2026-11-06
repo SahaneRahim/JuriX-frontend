@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { API_URL, DELAI_API_MS } from '$lib/config';
-import { articleDepuisLApi, getPostBySlug, servableAuPublic, type BlogPost } from '$lib/data/blog';
+import { articleDepuisLApi, servableAuPublic, type BlogPost } from '$lib/data/blog';
 import { leverIndisponible } from '$lib/panne';
 import type { PageServerLoad } from './$types';
 
@@ -31,9 +31,9 @@ async function absenceDansLApi(reponse: Response): Promise<boolean> {
 }
 
 /**
- * Un article du blog : celui de l'API s'il est publié, sinon celui de la
- * rédaction de même adresse, sinon 404 ; 503 si l'API est en panne et que
- * l'adresse n'est pas celle d'un article de la rédaction.
+ * Un article du blog : celui de l'API s'il est publié, sinon 404 ; 503 si
+ * l'API est en panne. Les articles écrits à la main (BLOG_POSTS) ne sont plus
+ * servis, à aucune adresse (décision du propriétaire).
  *
  * POURQUOI 503 ET NON 404 EN PANNE. Le repli sur les articles statiques
  * servait pour TOUTE réponse en échec : pendant une panne, un article de
@@ -60,10 +60,8 @@ async function absenceDansLApi(reponse: Response): Promise<boolean> {
  */
 export const load: PageServerLoad = async ({ fetch, params }): Promise<{ post: BlogPost }> => {
   const slug = params.slug;
-  const deLaRedaction = getPostBySlug(slug);
   // Pas d'appel pour une adresse qu'aucun article ne peut porter.
   if (!slug || slug.length > LONGUEUR_MAX_SLUG) {
-    if (deLaRedaction) return { post: deLaRedaction };
     error(404, 'Article introuvable');
   }
   // Pour le journal : l'adresse vient de l'extérieur, encodée et bornée.
@@ -75,8 +73,6 @@ export const load: PageServerLoad = async ({ fetch, params }): Promise<{ post: B
       signal: AbortSignal.timeout(DELAI_API_MS),
     });
   } catch (e) {
-    // Les articles de la rédaction restent servis pendant une panne.
-    if (deLaRedaction) return { post: deLaRedaction };
     return leverIndisponible(chemin, e);
   }
 
@@ -85,21 +81,17 @@ export const load: PageServerLoad = async ({ fetch, params }): Promise<{ post: B
     try {
       brut = await reponse.json();
     } catch (e) {
-      if (deLaRedaction) return { post: deLaRedaction };
       return leverIndisponible(chemin, e);
     }
     const post = articleDepuisLApi(brut);
     if (post && !servableAuPublic(post)) {
-      if (deLaRedaction) return { post: deLaRedaction };
       error(404, 'Article introuvable');
     }
     if (post) return { post };
     // Un 200 qui n'est pas un article : l'API répond mal, ce n'est pas une absence.
-    if (deLaRedaction) return { post: deLaRedaction };
     return leverIndisponible(chemin, new Error('article illisible'));
   }
 
-  if (deLaRedaction) return { post: deLaRedaction };
   if (reponse.status === 404 && (await absenceDansLApi(reponse))) {
     error(404, 'Article introuvable');
   }

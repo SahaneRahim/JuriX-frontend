@@ -1,18 +1,18 @@
 import { API_URL, DELAI_API_MS } from '$lib/config';
-import { BLOG_POSTS, articlesDepuisLApi, avecLesArticlesDeLaRedaction, type BlogPost } from '$lib/data/blog';
+import { articlesDepuisLApi, duPlusRecentAuPlusAncien, type BlogPost } from '$lib/data/blog';
 import { decrirePanne } from '$lib/panne';
 import type { PageServerLoad } from './$types';
 
 /**
  * La liste du blog : les articles publiés ET publiables de l'API
  * (`articlesDepuisLApi` : un article publié avant la vérification n'y entre
- * jamais), et TOUJOURS les trois articles de la rédaction, du plus récent au
- * plus ancien (`avecLesArticlesDeLaRedaction`).
+ * jamais), du plus récent au plus ancien, et RIEN d'autre : les trois articles
+ * écrits à la main (BLOG_POSTS) sont cachés du public (décision du
+ * propriétaire) ; sans article de l'API, la page le dit.
  *
  * POURQUOI SERVEUR, AVEC UN DÉLAI. Le `load` était universel et sans délai :
  * à chaque navigation, c'est le téléphone qui appelait l'API, et une API
- * figée retenait la page 45 s (revue du 29/10) au lieu de servir les
- * articles de la rédaction. Comme les autres pages publiques, il tourne au
+ * figée retenait la page 45 s (revue du 29/10). Comme les autres pages publiques, il tourne au
  * serveur et attend l'API au plus DELAI_API_MS ($lib/config, qui n'importe
  * aucun store : $lib/api en charge, à éviter dans un `load`).
  *
@@ -22,9 +22,8 @@ import type { PageServerLoad } from './$types';
  * Le but du propriétaire est qu'aucun contenu juridique faux n'atteigne un
  * lecteur : un retrait doit valoir tout de suite.
  *
- * PANNE DE L'API : les articles de la rédaction seuls, en 200, et la cause
- * dans le journal. Ils sont toujours justes (extraits relevés mot pour mot) ;
- * une liste momentanément plus courte vaut mieux qu'une page d'erreur. Un 404
+ * PANNE DE L'API : une liste vide, en 200, et la cause dans le journal ; une
+ * liste momentanément vide vaut mieux qu'une page d'erreur. Un 404
  * est le cas normal d'une API sans route /blog (la production du 29/10) : rien
  * à journaliser.
  */
@@ -33,23 +32,23 @@ export const load: PageServerLoad = async ({ fetch }): Promise<{ posts: BlogPost
   try {
     reponse = await fetch(`${API_URL}/blog`, { signal: AbortSignal.timeout(DELAI_API_MS) });
   } catch (e) {
-    console.warn(`[blog] /blog : API indisponible (${decrirePanne(e)}), articles de la rédaction seuls`);
-    return { posts: BLOG_POSTS };
+    console.warn(`[blog] /blog : API indisponible (${decrirePanne(e)}), liste vide`);
+    return { posts: [] };
   }
 
   if (!reponse.ok) {
     if (reponse.status !== 404) {
-      console.warn(`[blog] /blog : API en erreur (${decrirePanne(reponse)}), articles de la rédaction seuls`);
+      console.warn(`[blog] /blog : API en erreur (${decrirePanne(reponse)}), liste vide`);
     }
-    return { posts: BLOG_POSTS };
+    return { posts: [] };
   }
 
   let brut: unknown;
   try {
     brut = await reponse.json();
   } catch (e) {
-    console.warn(`[blog] /blog : réponse illisible (${decrirePanne(e)}), articles de la rédaction seuls`);
-    return { posts: BLOG_POSTS };
+    console.warn(`[blog] /blog : réponse illisible (${decrirePanne(e)}), liste vide`);
+    return { posts: [] };
   }
-  return { posts: avecLesArticlesDeLaRedaction(articlesDepuisLApi(brut)) };
+  return { posts: duPlusRecentAuPlusAncien(articlesDepuisLApi(brut)) };
 };

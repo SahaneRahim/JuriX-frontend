@@ -9,7 +9,6 @@
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { ICONE_DOMAINE_INCONNU, iconeCategorie } from "$lib/categories";
   import {
-    BLOG_POSTS,
     citationsNonVerifiees,
     cleRubrique,
     insecables,
@@ -21,11 +20,9 @@
   import type { NomIcone } from "$lib/icones";
   import { language, tr, type Language } from "$lib/stores/language";
 
-  // Les articles de l'API et ceux de la rédaction, déjà réunis par le
-  // chargeur (+page.server.ts, `avecLesArticlesDeLaRedaction`). Le repli sur
-  // ceux de la rédaction reste pour des données vides.
+  // Les articles de l'API, seuls (+page.server.ts) : une liste vide se dit.
   export let data: { posts?: BlogPost[] } = {};
-  $: posts = data?.posts && data.posts.length > 0 ? data.posts : BLOG_POSTS;
+  $: posts = data?.posts ?? [];
 
   // « Toutes les rubriques » vaut `null`, et non la chaîne « Tous » : ce
   // libellé est maintenant traduit, et une rubrique de l'API qui
@@ -171,6 +168,7 @@
              aussi au doigt, et `sm:min-h-0` y ramenait les puces à 38 px.
              Rubriques traduites (`nomRubrique`) : l'API les donne en
              français, et seul « Tous » suivait l'interface anglaise. -->
+        {#if posts.length > 0}
         <div class="flex flex-wrap items-center justify-center gap-2 pt-4">
           {#each dynamicCategories as cat (cat ?? "")}
             <button
@@ -185,6 +183,9 @@
             </button>
           {/each}
         </div>
+        {:else}
+          <p class="pt-4 text-base text-zinc-600 dark:text-zinc-300" data-testid="blog-vide">{$tr("blog.empty")}</p>
+        {/if}
       </div>
 
       <!-- Article à la Une (Featured). Lien étendu depuis le titre (Q3 A,

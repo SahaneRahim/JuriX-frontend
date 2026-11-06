@@ -29,9 +29,8 @@
     commandPaletteOpen,
     closeCommandPalette,
   } from "$lib/stores/commandPalette";
-  import { language, tr } from "$lib/stores/language";
+  import { tr } from "$lib/stores/language";
   import { choixPersonaOuvert } from "$lib/stores/persona";
-  import { BLOG_POSTS, nomRubrique } from "$lib/data/blog";
   import { typeDuTitre } from "$lib/type-de-texte";
 
   let query = "";
@@ -240,30 +239,7 @@
       action: () => allerA(`/chat?q=${encodeURIComponent(q)}`),
     });
 
-    // 3. Articles du blog correspondants
-    const blogMatches = BLOG_POSTS.filter(
-      (b) =>
-        b.title.toLowerCase().includes(q.toLowerCase()) ||
-        b.category.toLowerCase().includes(q.toLowerCase()) ||
-        b.tags.some((t) => t.toLowerCase().includes(q.toLowerCase()))
-    );
-
-    for (const b of blogMatches.slice(0, 2)) {
-      resultats.push({
-        title: b.title,
-        // Rubrique traduite, comme sur /blog : la valeur est en français.
-        // Point médian, le séparateur des repères des listes (P11) et de
-        // l'accueil, et non la puce « • », que seuls la palette et le blog
-        // employaient. L'espace insécable qui le précède le garde en fin de
-        // ligne.
-        subtitle: `${$tr("palette.blogPost")}\u00a0· ${nomRubrique(b.category, $language.current)}`,
-        icon: "newspaper",
-        badge: $tr("palette.badge.news"),
-        action: () => allerA(`/blog/${b.slug}`),
-      });
-    }
-
-    // 4. Suggestions de l'API backend
+    // 3. Suggestions de l'API backend
     try {
       const resp = await fetch(
         `${API_URL}/search/suggest?q=${encodeURIComponent(q)}&limit=4`

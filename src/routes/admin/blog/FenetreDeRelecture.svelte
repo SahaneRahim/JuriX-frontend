@@ -25,6 +25,57 @@
    * « Retirer du site » envoie exactement `{"is_published": false}`, toujours
    * accepté : les modifications en cours restent dans le formulaire.
    *
+   * AVENANT DU TOUR 4 (revue du tour 3, trois défauts) :
+   * - le TITRE est une partie relue et contrôlée : il s'affiche en tête de la
+   *   vue Relecture avec ses verdicts et sa case, et le changer sur un
+   *   article en ligne demande de le retirer, de relancer le contrôle et de
+   *   le relire ;
+   * - les SOURCES sont gardées avec l'article (`article.sources`) : le panneau
+   *   les montre à chaque ouverture, et les numéros des verdicts y mènent ;
+   * - un article SANS SOURCES (publié avant la vérification, ou écrit à la
+   *   main) a son parcours de reprise (ParcoursDeReprise) : « Reconstruire les
+   *   sources » (`POST /blog/{id}/sources`), citer au moins un article des
+   *   sources, « Relancer le contrôle IA », relire, publier ; chaque étape dit
+   *   ce qui bloque ;
+   * - une case de relecture atteste les verdicts de sa partie (API du tour
+   *   4) : après un contrôle ou une reconstruction des sources, les cases
+   *   sont celles que le serveur compte encore, jamais celles d'avant.
+   *
+   * AVENANT DU TOUR 5 (revue du tour 4 : un contrôle relancé dans un autre
+   * onglet, ou dont la réponse s'était perdue, passait pour relu) :
+   * - une case cochée part avec `relecture.controle`, le `fait_le` du contrôle
+   *   affiché ; l'API refuse (422 `relecture_perimee`, rien d'appliqué) si
+   *   elle en a enregistré un autre. La fenêtre relit alors l'article et dit
+   *   quelles parties relire ;
+   * - CHAQUE lecture de l'article qui apporte un autre contrôle (relecture
+   *   après un refus ou un échec, contrôle relancé, retrait, enregistrement)
+   *   refait les cases depuis le serveur (`casesApresUnAutreControle`), saisie
+   *   en cours ou non, et la fenêtre nomme les parties à relire de nouveau ;
+   * - relancer le contrôle d'un article PUBLIÉ se confirme d'abord (le
+   *   serveur répond 409 `article_en_ligne` sans `{"confirmer": true}`) : un
+   *   verdict qui change retire l'article du public jusqu'à la relecture de
+   *   sa partie, et la fenêtre le dit une fois le contrôle fini.
+   * Revue du front du tour 5 : un article caché par un contrôle revenait en
+   * ligne au contrôle suivant, la case de la partie revivant avec les
+   * verdicts d'avant. L'API efface désormais cette case ; la fenêtre, elle,
+   * garde la partie à relire tant que personne ne l'a recochée contre le
+   * contrôle enregistré (`casesSansRetourDesPartiesARelire`), et dit après
+   * chaque contrôle si l'article a quitté le public, s'il reste caché ou s'il
+   * y revient.
+   * AVENANT DU TOUR 7 (décision du propriétaire du 04/11, « Confirmer phrase
+   * par phrase ») : une phrase de règle « À vérifier » ou « Hors des
+   * sources » se réécrit (un nouveau contrôle la juge) ou se confirme une à
+   * une (VueDuControle). Les confirmations partent avec le formulaire
+   * (`relecture.phrases_confirmees`, toujours avec `relecture.controle`) ;
+   * « Publier » dit combien il en manque ; un autre contrôle les refait
+   * depuis le serveur, sans jamais passer une confirmation d'une phrase à une
+   * autre (`confirmationsApresUnAutreControle`). Le contrôle seul attend
+   * 175 s au plus (`DELAI_DU_CONTROLE_MS`) : 40 à 105 s mesurées.
+   * Un article publié dans la base mais CACHÉ du public (non publiable) se
+   * reprend comme un brouillon : « Enregistrer le brouillon » le garde hors
+   * ligne, « Publier » le remet en ligne. « Retirer du site » et « Publier
+   * les modifications » ne valent que pour un article que le public lit.
+   *
    * Hérité des revues du 29/10 : les erreurs s'affichent dans le pied, au
    * premier plan ; le voile ne ferme que si l'appui ET le relâchement ont eu
    * lieu sur lui ; une fermeture avec des modifications non enregistrées
@@ -41,9 +92,18 @@
   import { language, tr } from "$lib/stores/language";
   import CorpsDeLArticle from "../../blog/CorpsDeLArticle.svelte";
   import BadgeDePublication from "./BadgeDePublication.svelte";
-  import { PARTIES_DE_RELECTURE, compteDesVerdicts, type PartieDeRelecture } from "./controle";
   import {
-    DELAI_DE_GENERATION_MS,
+    PARTIES_DE_RELECTURE,
+    compteDesVerdicts,
+    confirmationsValables,
+    identiteDuControle,
+    phrasesAConfirmer,
+    type PartieDeRelecture,
+  } from "./controle";
+  import {
+    ATTENTE_LONGUE_DU_CONTROLE_S,
+    DELAI_DES_SOURCES_MS,
+    DELAI_DU_CONTROLE_MS,
     erreurDeReponse,
     erreurDExecution,
     messageDErreur,
@@ -51,30 +111,47 @@
     type ErreurDuBlog,
   } from "./erreurs";
   import PanneauDesSources from "./PanneauDesSources.svelte";
+  import ParcoursDeReprise from "./ParcoursDeReprise.svelte";
   import {
     articleAdminDepuis,
     articleDuFormulaire,
+    autreControle,
+    avertissementsDeGenerationValables,
+    avertissementsDeRepriseValables,
     blocagesDePublication,
+    casesApresUnAutreControle,
+    casesSansRetourDesPartiesARelire,
     champsManquants,
+    confirmationsApresUnAutreControle,
     citationDepuisSource,
     controleAJour,
     corpsDeLaModification,
     empreinte,
+    estAncien,
+    etapesDeReprise,
     formulaireDepuis,
     nomDeCitation,
     partieRelue,
     partiesModifiees,
+    partiesRelues,
     pointsAVerifier,
+    resultatDeReconstruction,
+    sansSources,
     visibleDuPublic,
     type ArticleAdmin,
     type Blocage,
     type ChampDuFormulaire,
+    type Formulaire,
     type SourceDeGeneration,
   } from "./relecture";
   import VueDuControle from "./VueDuControle.svelte";
 
   export let article: ArticleAdmin;
-  /** Les extraits retrouvés à la génération (vide pour un article plus ancien, ou après un rechargement). */
+  /**
+   * Les extraits rendus par la génération pendant cette visite : un repli,
+   * pour une réponse qui ne les porterait pas dans l'article. Les sources de
+   * l'article (`article.sources`, gardées avec lui) passent avant.
+   */
   export let sources: SourceDeGeneration[] = [];
   /**
    * Ce que seule la génération a relevé (passage qui porte d'autres articles,
@@ -139,7 +216,7 @@
 
   let form = formulaireDepuis(article);
   let empreinteEnregistree = empreinte(form);
-  let occupe: "" | "enregistrement" | "publication" | "retrait" | "controle" = "";
+  let occupe: "" | "enregistrement" | "publication" | "retrait" | "controle" | "sources" = "";
   let erreur = "";
   let statut = "";
   let invalides: ChampDuFormulaire[] = [];
@@ -150,25 +227,61 @@
   let sourcesOuvertes = false;
   /** Les extraits dépliés en entier dans le panneau des sources. */
   let sourcesDepliees: number[] = [];
-  /** Le contrôle IA en cours : temps écoulé, requête, délai du client. */
-  let ecouleControle = 0;
-  let minuterieControle: ReturnType<typeof setInterval> | undefined;
-  let delaiControle: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * L'attente en cours (contrôle IA ou reconstruction des sources, jamais les
+   * deux à la fois) : temps écoulé, requête, délai du client.
+   */
+  let ecoule = 0;
+  let minuterie: ReturnType<typeof setInterval> | undefined;
+  let delaiDuClient: ReturnType<typeof setTimeout> | undefined;
   let controleur: AbortController | null = null;
   let raisonDArret: "admin" | "delai" | null = null;
+  /** Ce que la reconstruction des sources a relevé (une citation retirée), pour la durée de la fenêtre. */
+  let avertissementsDeReprise: string[] = [];
+  /**
+   * Les parties dont la case est tombée parce qu'une lecture de l'article a
+   * apporté un AUTRE contrôle (avenant du tour 5) : à relire de nouveau,
+   * contre ses verdicts. Une partie quitte la liste dès qu'elle compte de
+   * nouveau comme relue : recochée ici, ou ailleurs contre le contrôle
+   * enregistré (`casesSansRetourDesPartiesARelire`), jamais parce que le
+   * serveur ferait revivre sa case.
+   */
+  let aRelire: PartieDeRelecture[] = [];
+  /** Le refus du dernier PUT : après lui, la fenêtre sait s'il faut refaire les cases. */
+  let derniereErreur: ErreurDuBlog | null = null;
+
+  /**
+   * Le parcours de reprise, montré pour un article qui s'ouvre SANS SOURCES
+   * ou publié avant la vérification, et jusqu'à la fermeture de la fenêtre :
+   * les étapes faites restent dites faites (les sources reconstruites, le
+   * brouillon enregistré) jusqu'à la publication.
+   */
+  const enReprise = sansSources(article, article.sources.length > 0 ? article.sources : sources) || estAncien(article);
+  const ancien = estAncien(article);
 
   $: modifie = empreinte(form) !== empreinteEnregistree;
   $: modifiees = partiesModifiees(form, article);
-  $: blocages = blocagesDePublication(form, article);
-  $: raisons = blocages.map((b) => phraseDuBlocage(b, $tr, article.isPublished));
+  // Les sources de l'article, gardées avec lui ; à défaut, celles que la
+  // génération a rendues pendant la visite.
+  $: sourcesAffichees = article.sources.length > 0 ? article.sources : sources;
+  $: sansLesSources = sansSources(article, sourcesAffichees);
+  $: blocages = blocagesDePublication(form, article, sourcesAffichees);
+  $: etapes = etapesDeReprise(blocages);
+  $: enLigne = visibleDuPublic(article);
+  $: raisons = blocages.map((b) => phraseDuBlocage(b, $tr, enLigne));
   $: aJour = controleAJour(article);
   $: compte = compteDesVerdicts(article.controleIa);
   $: relues = PARTIES_DE_RELECTURE.filter((p: PartieDeRelecture) => partieRelue(form, p, modifiees)).length;
+  // Les phrases de règle à confirmer du contrôle à jour (avenant du tour 7) :
+  // combien, et combien sont confirmées dans la fenêtre.
+  $: aConfirmerEnTout = aJour ? phrasesAConfirmer(article.controleIa).length : 0;
+  $: confirmeesEnTout = aJour ? confirmationsValables(form.confirmees, article.controleIa).length : 0;
   $: points = pointsAVerifier(
     article.avertissements,
     form.citations.map((c) => c.origine),
     $tr,
-    avertissementsDeGeneration,
+    avertissementsDeGenerationValables(avertissementsDeGeneration, article),
+    avertissementsDeRepriseValables(avertissementsDeReprise, article),
   );
   $: apercu = articleDuFormulaire(form, article);
   $: titreFenetre =
@@ -177,31 +290,47 @@
       : vue === "apercu"
         ? $tr("admin.blog.previewDialogTitle")
         : $tr("admin.blog.editTitle");
-  $: enLigne = visibleDuPublic(article);
   $: adressePublique = `/blog/${encodeURIComponent(article.slug)}`;
   // Le panneau des sources accompagne la relecture et l'édition ; l'aperçu
   // montre l'article comme le public, sans lui.
   $: avecPanneau = vue !== "apercu";
-  $: sourcesConnues = sources.map((s) => s.n);
-  // Un article en ligne dont la saisie change le texte relu : le contrôle
-  // porterait sur l'ancien texte, et l'enregistrer le retirerait du site.
-  $: controleBloque = article.isPublished && modifiees.length > 0;
-  $: chronoControle = `${Math.floor(ecouleControle / 60)}:${String(ecouleControle % 60).padStart(2, "0")}`;
+  $: sourcesConnues = sourcesAffichees.map((s) => s.n);
+  // Pourquoi « Relancer le contrôle IA » ne part pas :
+  // - « sources » : sans sources, le contrôle n'a rien contre quoi juger
+  //   (reconstruire d'abord ; la reconstruction peut aussi retirer des
+  //   citations, ce qui périmerait le contrôle) ;
+  // - « en_ligne » : un article que le public lit et dont la saisie change le
+  //   texte relu : le contrôle porterait sur l'ancien texte, et l'enregistrer
+  //   le retirerait du site.
+  $: controleBloque = sansLesSources ? "sources" : enLigne && modifiees.length > 0 ? "en_ligne" : null;
+  $: chrono = `${Math.floor(ecoule / 60)}:${String(ecoule % 60).padStart(2, "0")}`;
+  // Les parties à relire de nouveau, tant qu'elles ne comptent pas comme relues.
+  $: partiesARelire = aRelire.filter((p: PartieDeRelecture) => !partieRelue(form, p, modifiees));
 
   const libelle = (champ: ChampDuFormulaire) => $tr(CHAMPS[champ].cle);
   const invalide = (champ: ChampDuFormulaire, liste: ChampDuFormulaire[]) => (liste.includes(champ) ? "true" : undefined);
 
-  /** Ce qui empêche de publier, en une phrase qui dit quoi faire. */
-  function phraseDuBlocage(blocage: Blocage, t: (cle: string) => string, publieDansLaBase: boolean): string {
+  /**
+   * Ce qui empêche de publier, en une phrase qui dit quoi faire.
+   * `lisibleDuPublic` : un article en ligne ne s'enregistre pas sans quitter
+   * le site, il faut d'abord l'en retirer.
+   */
+  function phraseDuBlocage(blocage: Blocage, t: (cle: string) => string, lisibleDuPublic: boolean): string {
     switch (blocage.code) {
+      case "sources_absentes":
+        return t("admin.blog.blocked.sources");
+      case "aucune_citation":
+        return t("admin.blog.blocked.noCitation");
       case "citations_non_verifiees":
         return t("admin.blog.blocked.citations").replace("{n}", String(blocage.n));
       case "controle_a_relancer":
         if (blocage.cause === "absent") return t("admin.blog.blocked.checkMissing");
         if (blocage.cause === "perime") return t("admin.blog.blocked.checkStale");
-        return t(publieDansLaBase ? "admin.blog.blocked.checkEditedPublished" : "admin.blog.blocked.checkEdited");
+        return t(lisibleDuPublic ? "admin.blog.blocked.checkEditedPublished" : "admin.blog.blocked.checkEdited");
       case "phrases_contredites":
         return t("admin.blog.blocked.contradicted").replace("{n}", String(blocage.n));
+      case "phrases_a_confirmer":
+        return t("admin.blog.blocked.toConfirm").replace("{n}", String(blocage.n));
       case "relecture_incomplete":
         return t("admin.blog.blocked.review").replace("{n}", String(blocage.n)).replace("{total}", String(blocage.total));
       case "serveur":
@@ -282,7 +411,9 @@
 
   /** Affiche une erreur de l'API, et désigne le champ en cause quand elle le nomme. */
   async function montrerErreur(cause: ErreurDuBlog, action: Action = "generation") {
-    if (cause.code === "slug_pris") return signalerChamps(["slug"], messageDErreur(cause, $tr, action));
+    // Une adresse prise ne vient que d'un enregistrement : un 409 de la
+    // reconstruction des sources n'a rien à voir avec le champ Adresse.
+    if (cause.code === "slug_pris" && action !== "sources") return signalerChamps(["slug"], messageDErreur(cause, $tr, action));
     if (cause.code === "introuvable") onDisparu();
     const champs = cause.champs
       .map((c) => c.champ.split(".").reverse().map((m) => DEPUIS_L_API[m]).find(Boolean))
@@ -296,21 +427,70 @@
    * formulaire repart de lui, sauf avec `garderLaSaisie` quand une saisie est
    * en cours : elle reste, non enregistrée (retrait du site, contrôle relancé,
    * relecture après un refus).
+   *
+   * UN AUTRE CONTRÔLE (avenant du tour 5) : si l'article relu porte un autre
+   * contrôle que celui affiché (ou `refaireLesCases`, après une relecture
+   * périmée), les cases sont refaites depuis le serveur même quand la saisie
+   * reste : une case cochée contre l'ancien contrôle ne compte plus pour le
+   * nouveau, et « Publier » l'aurait renvoyée. Les parties qui comptaient
+   * comme relues et ne le sont plus rejoignent celles à relire de nouveau.
+   *
+   * UNE PARTIE À RELIRE LE RESTE jusqu'à ce qu'on la recoche (revue du front
+   * du tour 5) : ici, ou ailleurs contre le contrôle que le serveur garde
+   * (`relecture.controle`). Un serveur qui la compterait de nouveau sans cela
+   * (sa case, cochée contre un contrôle plus ancien, revit quand un contrôle
+   * suivant redonne les verdicts d'avant : l'API d'avant ce correctif) ne la
+   * recoche pas dans la fenêtre : l'article caché revenait en ligne sans que
+   * personne ait lu ce que le contrôle intermédiaire avait trouvé.
    */
-  function appliquer(relu: ArticleAdmin, garderLaSaisie: boolean) {
+  function appliquer(relu: ArticleAdmin, garderLaSaisie: boolean, refaireLesCases = false) {
     const saisieEnCours = garderLaSaisie && empreinte(form) !== empreinteEnregistree;
+    const changement = refaireLesCases || autreControle(article, relu);
+    const reluesAvant = partiesRelues(form, article);
+    const cocheesAvant = { ...form.relecture };
+    const confirmeesAvant = [...form.confirmees];
+    const avant = article;
     const formulaireEnregistre = formulaireDepuis(relu);
+    formulaireEnregistre.relecture = casesSansRetourDesPartiesARelire(formulaireEnregistre.relecture, aRelire, relu);
+    // Une confirmation ne passe jamais d'une phrase à une autre (avenant du
+    // tour 7) : après un autre contrôle, seules restent celles que les deux
+    // contrôles jugent de même sous le même identifiant.
+    if (changement) formulaireEnregistre.confirmees = confirmationsApresUnAutreControle(formulaireEnregistre.confirmees, avant, relu);
     article = relu;
     if (!saisieEnCours) form = formulaireEnregistre;
+    else if (changement) {
+      form.relecture = casesApresUnAutreControle(cocheesAvant, relu);
+      form.confirmees = confirmationsApresUnAutreControle(confirmeesAvant, avant, relu);
+    }
     empreinteEnregistree = empreinte(formulaireEnregistre);
     invalides = [];
+    if (changement) {
+      const reluesApres = partiesRelues(form, relu);
+      const tombees = reluesAvant.filter((p) => !reluesApres.includes(p));
+      aRelire = PARTIES_DE_RELECTURE.filter(
+        (p) => tombees.includes(p) || (aRelire.includes(p) && !reluesApres.includes(p)),
+      );
+    }
+  }
+
+  /** Les parties à relire de nouveau, nommées (« Titre, Contexte »). */
+  function nomsDesParties(parties: readonly PartieDeRelecture[], t: (cle: string) => string): string {
+    return parties.map((p) => t(`admin.blog.part.${p}`)).join(", ");
+  }
+
+  /** Les parties à relire de nouveau, d'après l'état de la fenêtre à cet instant. */
+  function partiesARelireMaintenant(f: Formulaire, lu: ArticleAdmin): PartieDeRelecture[] {
+    const relues = partiesRelues(f, lu);
+    return aRelire.filter((p) => !relues.includes(p));
   }
 
   /**
    * `PUT /blog/{id}` avec `corps`. Rend l'article enregistré, ou `null` après
-   * avoir affiché l'erreur DANS la fenêtre.
+   * avoir affiché l'erreur DANS la fenêtre (et l'avoir gardée dans
+   * `derniereErreur`).
    */
   async function envoyer(corps: Record<string, unknown>, garderLaSaisie = false): Promise<ArticleAdmin | null> {
+    derniereErreur = null;
     try {
       const reponse = await apiFetch(`/blog/${article.id}`, {
         method: "PUT",
@@ -318,7 +498,8 @@
         body: JSON.stringify(corps),
       });
       if (!reponse.ok) {
-        await montrerErreur(await erreurDeReponse(reponse));
+        derniereErreur = await erreurDeReponse(reponse);
+        await montrerErreur(derniereErreur);
         return null;
       }
       const enregistre = articleAdminDepuis(await reponse.json());
@@ -341,24 +522,55 @@
    * affiché « Publié » dans la fenêtre et dans la liste. Le contrat du 30/10
    * valide tout avant de rien changer ; la relecture le vérifie au lieu de le
    * supposer. En échec, elle ne dit rien : l'erreur affichée suffit.
+   * `refaireLesCases` : après une relecture périmée, les cases sont refaites
+   * depuis le serveur même s'il dit le même contrôle (`appliquer`). Vrai si
+   * l'article a été relu.
    */
-  async function relire() {
+  async function relire(refaireLesCases = false): Promise<boolean> {
     try {
       const reponse = await apiFetch(`/blog/admin/${article.id}`);
-      if (!reponse.ok) return;
+      if (!reponse.ok) return false;
       const relu = articleAdminDepuis(await reponse.json());
-      if (!relu || relu.id !== article.id) return;
+      if (!relu || relu.id !== article.id) return false;
       const etaitPublie = article.isPublished;
-      appliquer(relu, true);
+      appliquer(relu, true, refaireLesCases);
       if (etaitPublie && !relu.isPublished) {
         statut = $tr("admin.blog.unpublishedKeepEdits");
         onMisAJour(relu, "retire");
       } else {
         onMisAJour(relu, "enregistre");
       }
+      return true;
     } catch {
       // Rien de plus à dire que l'erreur déjà affichée.
+      return false;
     }
+  }
+
+  /**
+   * Après un PUT refusé : l'article relu, le serveur faisant foi. Pour une
+   * relecture périmée (422 `relecture_perimee`, avenant du tour 5), les cases
+   * sont refaites depuis le serveur et l'erreur nomme les parties à relire :
+   * sans cela, le PUT suivant renverrait les mêmes cases, contre le même
+   * ancien contrôle, et serait refusé de nouveau.
+   */
+  async function apresUnRefus() {
+    const perimee = derniereErreur?.code === "relecture_perimee";
+    const relu = await relire(perimee);
+    // Relecture impossible (réseau) : l'erreur du refus reste seule, sans
+    // prétendre les cases refaites.
+    if (!perimee || !relu) return;
+    // Le pied de la fenêtre est court au téléphone : « toutes les parties »
+    // plutôt que les sept noms, que la liste en tête de la fenêtre détaille.
+    const parties = partiesARelireMaintenant(form, article);
+    erreur = [
+      $tr("admin.blog.err.reviewStale"),
+      parties.length === PARTIES_DE_RELECTURE.length
+        ? $tr("admin.blog.reread.all")
+        : parties.length > 0
+          ? $tr("admin.blog.reread.list").replace("{parties}", () => nomsDesParties(parties, $tr))
+          : $tr("admin.blog.reread.none"),
+    ].join(" ");
   }
 
   function heure(): string {
@@ -375,15 +587,18 @@
     statut = "";
     if (champsVides()) return;
     occupe = "enregistrement";
+    let perimee = false;
     try {
       const enregistre = await envoyer(corpsDeLaModification(form, article, false));
       if (enregistre) {
         statut = $tr("admin.blog.saved").replace("{heure}", heure());
         onMisAJour(enregistre, "enregistre");
       }
+      perimee = derniereErreur?.code === "relecture_perimee";
     } finally {
       occupe = "";
     }
+    if (perimee) await apresUnRefus();
   }
 
   /**
@@ -404,7 +619,9 @@
       blocDesRaisons?.focus();
       return;
     }
-    if (article.isPublished && !modifie) {
+    // Rien à publier pour un article que le public lit déjà, tel quel. Un
+    // article caché du public, lui, se publie (il redevient lisible).
+    if (enLigne && !modifie) {
       statut = $tr("admin.blog.nothingToPublish");
       return;
     }
@@ -427,7 +644,7 @@
     } finally {
       occupe = "";
     }
-    if (refuse) await relire();
+    if (refuse) await apresUnRefus();
   }
 
   /**
@@ -459,59 +676,111 @@
     }
   }
 
-  function arreterLeControle() {
-    clearInterval(minuterieControle);
-    clearTimeout(delaiControle);
-    minuterieControle = undefined;
-    delaiControle = undefined;
+  function arreterLAttente() {
+    clearInterval(minuterie);
+    clearTimeout(delaiDuClient);
+    minuterie = undefined;
+    delaiDuClient = undefined;
     controleur = null;
+  }
+
+  /** Lance la minuterie visible et le délai du client ; rend le signal de la requête. */
+  function attendre(delaiMs: number): AbortSignal {
+    ecoule = 0;
+    const debut = Date.now();
+    minuterie = setInterval(() => {
+      ecoule = Math.floor((Date.now() - debut) / 1000);
+    }, 1000);
+    const actuel = new AbortController();
+    controleur = actuel;
+    raisonDArret = null;
+    delaiDuClient = setTimeout(() => {
+      raisonDArret = "delai";
+      actuel.abort();
+    }, delaiMs);
+    return actuel.signal;
+  }
+
+  /**
+   * Enregistre la saisie en brouillon avant une action qui porte sur le texte
+   * ENREGISTRÉ (contrôle IA, reconstruction des sources) ; vrai si rien
+   * n'était à enregistrer ou si l'enregistrement a réussi.
+   */
+  async function enregistrerAvant(): Promise<boolean> {
+    if (!modifie) return true;
+    if (champsVides()) return false;
+    occupe = "enregistrement";
+    let enregistre: ArticleAdmin | null = null;
+    try {
+      enregistre = await envoyer(corpsDeLaModification(form, article, false));
+    } finally {
+      occupe = "";
+    }
+    if (!enregistre) {
+      if (derniereErreur?.code === "relecture_perimee") await apresUnRefus();
+      return false;
+    }
+    onMisAJour(enregistre, "enregistre");
+    return true;
   }
 
   /**
    * « Relancer le contrôle IA » : `POST /blog/{id}/controle`, qui juge le
-   * texte ENREGISTRÉ et rend l'article. Un brouillon modifié est donc
-   * enregistré d'abord (« Enregistrer et relancer ») ; un article en ligne
-   * modifié ne l'est pas, puisque l'enregistrer le retirerait du site : le
-   * bouton dit d'abord de le retirer. Pendant l'attente, le formulaire est
-   * figé et le temps écoulé s'affiche ; le client abandonne au bout de 160 s.
-   * Un échec ne perd rien (contrat) : l'erreur s'affiche et l'article est
-   * relu, le serveur faisant foi sur ce qu'il garde du contrôle.
+   * texte ENREGISTRÉ et rend l'article. Un brouillon modifié (ou un article
+   * caché du public) est donc enregistré d'abord (« Enregistrer et
+   * relancer ») ; un article en ligne modifié ne l'est pas, puisque
+   * l'enregistrer le retirerait du site : le bouton dit d'abord de le
+   * retirer. Sans sources, le bouton dit de les reconstruire d'abord. Pendant
+   * l'attente, le formulaire est figé et le temps écoulé s'affiche ; le
+   * client abandonne au bout de 175 s (`DELAI_DU_CONTROLE_MS`, 10 s après le
+   * serveur). Un échec ne perd rien (contrat) :
+   * l'erreur s'affiche et l'article est relu, le serveur faisant foi sur ce
+   * qu'il garde du contrôle.
+   *
+   * UN ARTICLE PUBLIÉ (avenant du tour 5). Un verdict qui change décoche sa
+   * partie, et l'article quitte le public jusqu'à ce qu'elle soit relue :
+   * l'essai réel du 04/11 a vu des verdicts s'inverser d'un contrôle à l'autre,
+   * à température 0. La fenêtre demande donc confirmation, en le disant, puis
+   * envoie `{"confirmer": true}` ; sans lui, le serveur répond 409
+   * `article_en_ligne` sans appeler le modèle (un article publié entre-temps
+   * ailleurs : la fenêtre le relit, et la confirmation sera demandée au
+   * prochain appui). Fini, le contrôle dit si l'article a quitté le public,
+   * s'il reste caché, ou s'il y revient : jamais en silence.
+   *
+   * LES CASES APRÈS LE CONTRÔLE : un contrôle neuf est un autre contrôle, ses
+   * cases sont refaites depuis le serveur (`appliquer`) ; et si la réponse
+   * s'est perdue alors que le serveur l'a enregistré (proxy, réseau), la
+   * relecture qui suit l'échec le trouve, refait les cases et le dit, au lieu
+   * de « rien n'est perdu ».
    */
   async function lancerLeControle() {
     if (occupe || controleBloque) return;
     erreur = "";
     statut = "";
-    if (!article.isPublished && modifie) {
-      if (champsVides()) return;
-      occupe = "enregistrement";
-      let enregistre: ArticleAdmin | null = null;
-      try {
-        enregistre = await envoyer(corpsDeLaModification(form, article, false));
-      } finally {
-        occupe = "";
-      }
-      if (!enregistre) return;
-      onMisAJour(enregistre, "enregistre");
+    if (!enLigne && !(await enregistrerAvant())) return;
+    // Après l'enregistrement : un article caché du public y est redevenu un
+    // brouillon, sans rien à confirmer.
+    const confirme = article.isPublished;
+    if (confirme && !confirm($tr(enLigne ? "admin.blog.check.confirmOnline" : "admin.blog.check.confirmHidden"))) {
+      statut = $tr("admin.blog.check.notRun");
+      return;
     }
 
+    const etaitEnLigne = enLigne;
+    const controleAvant = identiteDuControle(article.controleIa);
     occupe = "controle";
     statut = $tr("admin.blog.check.announceStart");
-    ecouleControle = 0;
-    const debut = Date.now();
-    minuterieControle = setInterval(() => {
-      ecouleControle = Math.floor((Date.now() - debut) / 1000);
-    }, 1000);
-    const actuel = new AbortController();
-    controleur = actuel;
-    raisonDArret = null;
-    delaiControle = setTimeout(() => {
-      raisonDArret = "delai";
-      actuel.abort();
-    }, DELAI_DE_GENERATION_MS);
+    const signal = attendre(DELAI_DU_CONTROLE_MS);
 
     let echec = false;
     try {
-      const reponse = await apiFetch(`/blog/${article.id}/controle`, { method: "POST", signal: actuel.signal });
+      const reponse = await apiFetch(`/blog/${article.id}/controle`, {
+        method: "POST",
+        signal,
+        ...(confirme
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmer: true }) }
+          : {}),
+      });
       if (!reponse.ok) {
         statut = "";
         await montrerErreur(await erreurDeReponse(reponse), "controle");
@@ -526,9 +795,24 @@
           erreur = $tr("admin.blog.err.unexpected");
           echec = true;
         } else {
-          appliquer(relu, true);
+          // Un contrôle neuf : les cases sont refaites depuis le serveur,
+          // même si son `fait_le` (à la seconde) égalait le précédent.
+          appliquer(relu, true, true);
           onMisAJour(relu, "enregistre");
-          statut = $tr("admin.blog.check.announceDone").replace("{heure}", heure());
+          const fini = $tr("admin.blog.check.announceDone").replace("{heure}", heure());
+          // Ce que le contrôle a fait de la publication, dit dans tous les cas
+          // (revue du front du tour 5 : un article caché revenait en ligne au
+          // contrôle suivant, et la fenêtre ne disait que « terminé »).
+          const lisible = visibleDuPublic(relu);
+          const suite =
+            etaitEnLigne && !lisible
+              ? "admin.blog.check.leftThePublic"
+              : !etaitEnLigne && lisible
+                ? "admin.blog.check.backOnline"
+                : !etaitEnLigne && relu.isPublished
+                  ? "admin.blog.check.stillHidden"
+                  : null;
+          statut = suite ? `${fini} ${$tr(suite)}` : fini;
         }
       }
     } catch (e) {
@@ -536,10 +820,99 @@
       erreur = messageDErreur(erreurDExecution(e, raisonDArret), $tr, "controle");
       echec = true;
     } finally {
-      arreterLeControle();
+      arreterLAttente();
+      occupe = "";
+    }
+    if (!echec) return;
+    await relire();
+    // Le serveur a pourtant enregistré un contrôle (réponse perdue en route) :
+    // ses verdicts sont là, l'erreur n'est plus vraie.
+    if (identiteDuControle(article.controleIa) !== controleAvant && article.controleIa !== null) {
+      erreur = "";
+      statut = $tr("admin.blog.check.savedDespiteError");
+    }
+  }
+
+  /**
+   * « Reconstruire les sources » (avenant du tour 4) : `POST
+   * /blog/{id}/sources` refait la recherche de la génération à partir du titre
+   * et du contexte ENREGISTRÉS, garde les citations qu'une source
+   * reconstruite porte et retire les autres, avec un avertissement. Une
+   * saisie en cours est donc enregistrée d'abord (« Enregistrer et
+   * reconstruire ») ; puis le formulaire repart de l'article reconstruit, ses
+   * citations ayant pu changer. C'est la première étape du parcours de
+   * reprise d'un article d'avant la vérification. Un échec ne perd rien :
+   * l'erreur s'affiche et l'article est relu.
+   *
+   * L'API du tour 4 rend l'article TOUJOURS en brouillon, ses citations que
+   * les sources ne portent pas retirées et, si les sources changent, son
+   * contrôle effacé : le formulaire repart de lui, cases comprises (aucune
+   * ne compte plus contre des sources nouvelles).
+   *
+   * Réussie, l'étape « sources » est faite et son bouton disparaît : le focus
+   * passe à l'étape suivante du parcours, celle qui est désormais en cours
+   * (il tombait sur <body>).
+   */
+  async function reconstruireLesSources() {
+    if (occupe) return;
+    erreur = "";
+    statut = "";
+    if (!(await enregistrerAvant())) return;
+
+    const citeesAvant = article.citations.length;
+    occupe = "sources";
+    statut = $tr("admin.blog.sources.announceStart");
+    const signal = attendre(DELAI_DES_SOURCES_MS);
+    let echec = false;
+    let reussie = false;
+    try {
+      const reponse = await apiFetch(`/blog/${article.id}/sources`, { method: "POST", signal });
+      if (!reponse.ok) {
+        statut = "";
+        await montrerErreur(await erreurDeReponse(reponse), "sources");
+        echec = true;
+      } else {
+        const resultat = resultatDeReconstruction(await reponse.json());
+        if (!resultat || resultat.article.id !== article.id) {
+          statut = "";
+          erreur = $tr("admin.blog.err.unexpected");
+          echec = true;
+        } else {
+          appliquer(resultat.article, false);
+          avertissementsDeReprise = resultat.avertissements;
+          onMisAJour(resultat.article, "enregistre");
+          const retirees = Math.max(0, citeesAvant - resultat.article.citations.length);
+          statut = [
+            $tr("admin.blog.sources.done")
+              .replace("{heure}", heure())
+              .replace("{n}", String(resultat.article.sources.length)),
+            retirees > 0 ? $tr("admin.blog.sources.dropped").replace("{n}", String(retirees)) : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          reussie = true;
+        }
+      }
+    } catch (e) {
+      statut = "";
+      erreur = messageDErreur(erreurDExecution(e, raisonDArret), $tr, "sources");
+      echec = true;
+    } finally {
+      arreterLAttente();
       occupe = "";
     }
     if (echec) await relire();
+    if (reussie) await focaliserLEtapeEnCours();
+  }
+
+  /**
+   * Le focus sur l'étape en cours du parcours de reprise (ParcoursDeReprise :
+   * `etape-<nom>`, `tabindex="-1"`), une fois la fenêtre redessinée.
+   */
+  async function focaliserLEtapeEnCours() {
+    await tick();
+    const enCours = etapes.find((e) => e.statut === "en_cours");
+    if (enCours) document.getElementById(`etape-${enCours.etape}`)?.focus();
   }
 
   onDestroy(() => {
@@ -547,7 +920,7 @@
       raisonDArret = "admin";
       controleur.abort();
     }
-    arreterLeControle();
+    arreterLAttente();
   });
 
   // Pendant un envoi, rien ne change dans le formulaire (champs désactivés,
@@ -568,6 +941,20 @@
   function cocher(partie: PartieDeRelecture, valeur: boolean) {
     if (occupe) return;
     form.relecture = { ...form.relecture, [partie]: valeur };
+    // Relue contre les nouveaux verdicts : elle n'est plus « à relire de nouveau ».
+    if (valeur) aRelire = aRelire.filter((p) => p !== partie);
+  }
+
+  /**
+   * « J'ai vérifié cette phrase dans le texte » (avenant du tour 7) : la
+   * phrase de règle confirmée, ou plus, dans l'ordre de l'article
+   * (`confirmationsValables`), pour qu'aller et revenir ne compte pas comme
+   * une modification. Enregistrée avec le formulaire.
+   */
+  function confirmer(id: string, valeur: boolean) {
+    if (occupe) return;
+    const ids = valeur ? [...form.confirmees, id] : form.confirmees.filter((c) => c !== id);
+    form.confirmees = confirmationsValables(ids, article.controleIa);
   }
 
   /** Le numéro d'un extrait, dans un verdict : l'extrait s'ouvre en entier dans le panneau et prend le focus. */
@@ -584,6 +971,18 @@
 
   function changerDeVue(nouvelle: "relecture" | "apercu" | "edition") {
     vue = nouvelle;
+  }
+
+  /**
+   * Le bouton d'une étape du parcours de reprise : la vue où elle se fait.
+   * Pour citer, le volet des sources s'ouvre aussi au téléphone (fermé, ses
+   * boutons « Citer » ne se voyaient pas).
+   */
+  async function allerA(nouvelle: "relecture" | "edition") {
+    vue = nouvelle;
+    if (nouvelle === "edition") sourcesOuvertes = true;
+    await tick();
+    document.getElementById("titre-relecture")?.focus();
   }
 </script>
 
@@ -687,7 +1086,7 @@
           aria-labelledby="titre-des-sources"
         >
           <PanneauDesSources
-            {sources}
+            sources={sourcesAffichees}
             citations={article.citations}
             ouvert={sourcesOuvertes}
             deplies={sourcesDepliees}
@@ -727,6 +1126,51 @@
           </section>
         {/if}
 
+        <!-- Un autre contrôle est arrivé (relancé ici ou ailleurs, ou effacé
+             avec les sources) : les parties dont la case est tombée, à relire
+             de nouveau contre ses verdicts (avenant du tour 5). Dans les trois
+             vues, comme les points à vérifier ; noir et blanc, cadre épais. -->
+        {#if partiesARelire.length > 0}
+          <section
+            class="space-y-1 rounded-xl border-2 border-zinc-950 bg-white p-4 dark:border-white dark:bg-zinc-950"
+            aria-labelledby="titre-a-relire"
+            data-testid="blog-a-relire"
+          >
+            <h3 id="titre-a-relire" class="flex items-start gap-2 text-sm font-bold text-zinc-950 dark:text-white">
+              <Icone nom="eye" class="mt-0.5 shrink-0 text-base" />
+              {$tr("admin.blog.reread.title").replace("{n}", String(partiesARelire.length))}
+            </h3>
+            <p class="coupe-mots text-sm text-zinc-800 dark:text-zinc-200">
+              {$tr("admin.blog.reread.list").replace("{parties}", () => nomsDesParties(partiesARelire, $tr))}
+            </p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-400">
+              {#if article.controleIa}
+                {$tr("admin.blog.reread.help").replace("{date}", () => dateEtHeure(article.controleIa?.faitLe ?? "", $language.current))}
+              {:else}
+                {$tr("admin.blog.reread.helpErased")}
+              {/if}
+            </p>
+          </section>
+        {/if}
+
+        <!-- Un article sans sources (publié avant la vérification, ou écrit à
+             la main) : le parcours qui le remet en ligne, étape par étape,
+             en relecture comme en édition. -->
+        {#if enReprise && vue !== "apercu"}
+          <ParcoursDeReprise
+            {etapes}
+            {ancien}
+            {vue}
+            occupe={occupe !== ""}
+            reconstructionEnCours={occupe === "sources"}
+            {chrono}
+            {modifie}
+            phrase={(b) => phraseDuBlocage(b, $tr, enLigne)}
+            onReconstruire={reconstruireLesSources}
+            onVue={allerA}
+          />
+        {/if}
+
         {#if vue === "relecture"}
           <!-- Le contrôle IA : quand, par quel modèle, ce qu'il a trouvé, et
                le bouton pour le relancer, avec son attente. -->
@@ -758,6 +1202,19 @@
                       .replace("{c}", String(compte.contredite))
                       .replace("{d}", String(compte.hors_sources))}
                   </p>
+                  {#if aConfirmerEnTout > 0}
+                    <!-- Les phrases de règle à confirmer une à une (avenant du
+                         tour 7) : ce qu'il en reste, avant « Publier ». -->
+                    <p
+                      class="flex items-center gap-1.5 text-xs font-semibold text-zinc-950 dark:text-white"
+                      data-testid="blog-a-confirmer"
+                    >
+                      <Icone nom={confirmeesEnTout < aConfirmerEnTout ? "triangle-alert" : "circle-check"} class="shrink-0 text-sm" />
+                      {$tr("admin.blog.check.toConfirm")
+                        .replace("{c}", String(confirmeesEnTout))
+                        .replace("{n}", String(aConfirmerEnTout))}
+                    </p>
+                  {/if}
                 {:else if article.controleIa}
                   <p class="text-xs font-medium text-zinc-800 dark:text-zinc-200" data-testid="blog-controle-perime">
                     {article.etatPublication === "controle_a_relancer" ? $tr("admin.blog.check.stale") : $tr("admin.blog.check.unsure")}
@@ -768,25 +1225,40 @@
                 type="button"
                 class="{BOUTON_SECONDAIRE} sm:shrink-0"
                 aria-disabled={occupe || controleBloque ? "true" : undefined}
-                aria-describedby={controleBloque ? "controle-bloque" : undefined}
+                aria-describedby={controleBloque
+                  ? "controle-bloque"
+                  : article.isPublished && occupe !== "controle"
+                    ? "controle-publie"
+                    : undefined}
                 data-testid="blog-relancer-controle"
                 on:click={lancerLeControle}
               >
                 {#if occupe === "controle"}
                   <Icone nom="loader-circle" class="h-4 w-4 motion-safe:animate-spin" />
                   {$tr("admin.blog.check.running")}
-                  <span class="font-normal tabular-nums" data-testid="blog-controle-chrono">{chronoControle}</span>
+                  <span class="font-normal tabular-nums" data-testid="blog-controle-chrono">{chrono}</span>
                 {:else}
                   <Icone nom="sparkles" class="text-base" />
-                  {!article.isPublished && modifie ? $tr("admin.blog.check.saveAndRun") : $tr("admin.blog.check.run")}
+                  {!enLigne && modifie && controleBloque === null ? $tr("admin.blog.check.saveAndRun") : $tr("admin.blog.check.run")}
                 {/if}
               </button>
             </div>
             {#if occupe === "controle"}
               <p class={AIDE}>{$tr("admin.blog.check.waitHint")}</p>
+              {#if ecoule >= ATTENTE_LONGUE_DU_CONTROLE_S}
+                <p class="text-xs font-medium text-zinc-800 dark:text-zinc-200" data-testid="blog-controle-long">{$tr("admin.blog.waitLong")}</p>
+              {/if}
             {/if}
             {#if controleBloque}
-              <p id="controle-bloque" class={AIDE}>{$tr("admin.blog.check.blockedPublished")}</p>
+              <p id="controle-bloque" class={AIDE}>
+                {controleBloque === "sources" ? $tr("admin.blog.check.blockedSources") : $tr("admin.blog.check.blockedPublished")}
+              </p>
+            {:else if article.isPublished && occupe !== "controle"}
+              <!-- Dit AVANT l'appui (avenant du tour 5) : relancer le contrôle
+                   d'un article publié peut le retirer du public. -->
+              <p id="controle-publie" class={AIDE} data-testid="blog-controle-publie">
+                {enLigne ? $tr("admin.blog.check.onlineHint") : $tr("admin.blog.check.hiddenHint")}
+              </p>
             {/if}
           </section>
 
@@ -807,8 +1279,11 @@
             {modifiees}
             {aJour}
             {sourcesConnues}
+            sources={sourcesAffichees}
+            aRelire={partiesARelire}
             desactive={occupe !== ""}
             onCocher={cocher}
+            onConfirmer={confirmer}
             onMontrerSource={montrerSource}
           />
         {:else if vue === "apercu"}
@@ -945,16 +1420,19 @@
                     {:else if !verifiee}
                       <p class={AIDE}>{$tr("admin.blog.citationUnverifiedHint")}</p>
                     {/if}
-                    <!-- 300 caractères : au-delà, une phrase coupée par le
-                         serveur (« … sauf en cas de ») pourrait dire le
-                         contraire de ce qu'on a écrit. -->
+                    <!-- 500 caractères, la limite du serveur (génération et
+                         CitationIn) : au-delà, une phrase coupée (« … sauf en
+                         cas de ») pourrait dire le contraire de ce qu'on a
+                         écrit. À 300 (tour 2), une explication générée de 301
+                         à 500 caractères ne se complétait plus sans être
+                         raccourcie d'abord (revue du tour 3). -->
                     <div>
                       <label for="expl-{citation.cle}" class={LIBELLE}>{$tr("admin.blog.citationExplanation")}</label>
                       <textarea
                         id="expl-{citation.cle}"
                         bind:value={citation.explication}
                         rows="2"
-                        maxlength={300}
+                        maxlength={500}
                         aria-describedby="nom-{citation.cle}"
                         class="{CHAMP} resize-y"
                       ></textarea>
@@ -1027,7 +1505,7 @@
               {/each}
             </ul>
           </div>
-        {:else if !article.isPublished || modifie}
+        {:else if !enLigne || modifie}
           <!-- Plus rien n'empêche de publier : le dire, pour que le bouton
                qui s'active ne surprenne pas. -->
           <p class="flex items-start gap-2 text-xs font-medium text-zinc-800 dark:text-zinc-200" data-testid="blog-publiable">
@@ -1041,7 +1519,7 @@
             {#if statut}
               {statut}
             {:else if modifie}
-              {article.isPublished ? $tr("admin.blog.unsavedPublished") : $tr("admin.blog.unsaved")}
+              {enLigne ? $tr("admin.blog.unsavedPublished") : $tr("admin.blog.unsaved")}
             {:else}
               <!-- Au téléphone, le badge de l'en-tête dit déjà l'état : la
                    phrase y prendrait deux lignes au corps de la fenêtre. -->
@@ -1054,8 +1532,15 @@
               </span>
             {/if}
           </p>
+          <!-- Un article que le public lit : le retirer, ou publier ses
+               modifications en un envoi. Tout autre article, brouillon ou
+               caché du public (publié dans la base mais non publiable, comme
+               ceux d'avant la vérification) : l'enregistrer en brouillon, ou
+               le publier. « Retirer du site » ne voulait rien dire d'un
+               article que le site ne montre pas, et y obligeait pourtant
+               avant toute correction. -->
           <div class="flex gap-2 sm:shrink-0 sm:gap-3">
-            {#if article.isPublished}
+            {#if enLigne}
               <button type="button" class={BOUTON_SECONDAIRE} aria-disabled={occupe ? "true" : undefined} on:click={retirer}>
                 {#if occupe === "retrait"}<Icone nom="loader-circle" class="h-4 w-4 motion-safe:animate-spin" />{/if}
                 {$tr("admin.blog.unpublish")}

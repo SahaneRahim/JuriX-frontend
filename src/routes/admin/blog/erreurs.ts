@@ -32,6 +32,8 @@ export type CodeDErreur =
   | 'slug_pris'
   | 'introuvable'
   | EtatRefuse
+  | 'relecture_perimee'
+  | 'article_en_ligne'
   | 'non_active'
   | 'interdit'
   | 'reseau'
@@ -43,17 +45,30 @@ export type CodeDErreur =
 /**
  * Les refus de publication du contrat du 30/10 : une 422 dont le code est
  * l'état de publication de l'article (« publiable » seul permet de publier).
+ * « sources_absentes » : avenant du tour 4 ; « phrases_a_confirmer » : avenant
+ * du tour 7 (une phrase de règle ni réécrite ni confirmée).
  */
-export type EtatRefuse = 'relecture_incomplete' | 'controle_a_relancer' | 'phrases_contredites' | 'citations_non_verifiees';
+export type EtatRefuse =
+  | 'relecture_incomplete'
+  | 'phrases_a_confirmer'
+  | 'controle_a_relancer'
+  | 'phrases_contredites'
+  | 'citations_non_verifiees'
+  | 'sources_absentes';
 export const ETATS_REFUSES: readonly EtatRefuse[] = [
   'relecture_incomplete',
+  'phrases_a_confirmer',
   'controle_a_relancer',
   'phrases_contredites',
   'citations_non_verifiees',
+  'sources_absentes',
 ];
 
-/** L'appel en cause : la génération d'un article, ou le contrôle IA d'un article enregistré. */
-export type Action = 'generation' | 'controle';
+/**
+ * L'appel en cause : la génération d'un article, le contrôle IA d'un article
+ * enregistré, ou la reconstruction de ses sources (`POST /blog/{id}/sources`).
+ */
+export type Action = 'generation' | 'controle' | 'sources';
 
 export interface ErreurDeChamp {
   /** Le chemin du champ dans le corps (« topic », « bot_analysis.citations.0 »). */
@@ -74,9 +89,55 @@ export interface ErreurDuBlog {
   reessayerDans: number | null;
 }
 
-/** Délai du client pour une génération : au-delà du délai du serveur (150 s, code `delai`). */
-export const DELAI_DE_GENERATION_MS = 160_000;
+/**
+ * Délai du client pour une génération et son contrôle automatique : au-delà
+ * du délai du serveur (190 s pour les deux, code `delai`). Mesuré avec
+ * mistral-large-4 pour le contrôle (essai réel du 04/11) : 121,7 et 124,4 s
+ * côté client ; le panneau dit « plus long que d'habitude » passé
+ * `ATTENTE_LONGUE_DE_GENERATION_S`.
+ */
+export const DELAI_DE_GENERATION_MS = 200_000;
+export const ATTENTE_LONGUE_DE_GENERATION_S = 130;
 
+/**
+ * Passé ce délai, le panneau de génération parle du contrôle et non plus de la
+ * rédaction. POURQUOI : `/blog/generate` est UNE requête, qui ne dit pas où elle
+ * en est ; mais la rédaction dure 10 à 20 s mesurées, et le contrôle jusqu'à
+ * 105 s : « Rédaction du brouillon… » restait affiché pendant tout le contrôle.
+ * Le message suit donc l'horloge, et dit « en principe ».
+ */
+export const FIN_PROBABLE_DE_LA_REDACTION_S = 20;
+
+/**
+ * Délai du client pour un contrôle IA seul (`POST /blog/{id}/controle`) : au-delà
+ * du délai du serveur (`DELAI_CONTROLE_S`, 165 s, code `delai`), avec la même
+ * marge de 10 s que la génération et les sources. POURQUOI pas 200 s comme la
+ * génération (jusqu'au tour 6) : un contrôle seul n'a pas de rédaction avant
+ * lui ; mesuré avec mistral-large-4, 40 à 105 s pour un article en un appel.
+ * Passé `ATTENTE_LONGUE_DU_CONTROLE_S`, la fenêtre dit « plus long que
+ * d'habitude ».
+ */
+export const DELAI_DU_CONTROLE_MS = 175_000;
+export const ATTENTE_LONGUE_DU_CONTROLE_S = 110;
+
+/**
+ * Délai du client pour reconstruire les sources : la recherche de la
+ * génération, sans le modèle (2,6 à 3,8 s mesurées le 30/10 sur jurix_dev).
+ * Au-delà du délai du serveur (`DELAI_SOURCES_S`, 60 s, code `delai`, « rien
+ * n'est changé »), comme pour la génération (190 s, puis 200 côté client) :
+ * à 60 s des deux côtés, le client abandonnait parfois au moment où le
+ * serveur répondait, et sa phrase remplaçait celle, plus exacte, du serveur.
+ */
+export const DELAI_DES_SOURCES_MS = 70_000;
+
+/**
+ * Avenant du tour 5 :
+ * - `relecture_perimee` (422) : des cases cochées contre un autre contrôle
+ *   que celui que le serveur a enregistré (relancé ailleurs entre-temps) ;
+ *   rien n'est appliqué ;
+ * - `article_en_ligne` (409) : relancer le contrôle d'un article publié
+ *   demande `{"confirmer": true}` ; le modèle n'est pas appelé.
+ */
 const CODES_DU_CONTRAT: ReadonlySet<string> = new Set([
   'entree_invalide',
   'sans_source',
@@ -88,6 +149,8 @@ const CODES_DU_CONTRAT: ReadonlySet<string> = new Set([
   'slug_pris',
   'introuvable',
   ...ETATS_REFUSES,
+  'relecture_perimee',
+  'article_en_ligne',
 ]);
 
 type Objet = Record<string, unknown>;
@@ -254,16 +317,44 @@ function avecDelai(erreur: ErreurDuBlog, cle: string, t: (cle: string) => string
  *
  * Un refus de publication (422 dont le code est l'état de l'article) montre
  * la raison donnée par le serveur, en français ; sans elle, celle de l'état.
+ * Le serveur ouvre sa raison par « Publication refusée : » : retiré, pour ne
+ * pas lire « Publication refusée par le serveur : Publication refusée : … »
+ * (revue du tour 3).
+ *
+ * `action` « sources » : reconstruire les sources d'un article (avenant du
+ * tour 4). Rien n'est perdu en cas d'échec ; « aucun texte ne couvre ce
+ * sujet » dit quoi changer (le titre et le contexte guident la recherche).
+ *
+ * Le contrôle d'un article SANS SOURCES répond 422 `sources_absentes` (API du
+ * tour 4, `SourcesAbsentesError`) : le même code que le refus de publier un
+ * tel article. Pour un contrôle, ce n'est pas une publication refusée : le
+ * contrôle n'a pas été lancé, et il faut reconstruire les sources d'abord.
+ *
+ * Avenant du tour 5 : une relecture périmée (422 `relecture_perimee`) dit que
+ * rien n'est enregistré et pourquoi ; la fenêtre y ajoute les parties à
+ * relire, une fois l'article relu. Un contrôle refusé faute de place (422
+ * `entree_invalide` : « raccourcissez-le ») dit que le contrôle n'a pas été
+ * lancé, avec la raison du serveur, et non « Saisie refusée ».
  */
 export function messageDErreur(erreur: ErreurDuBlog, t: (cle: string) => string, action: Action = 'generation'): string {
+  if (action === 'controle' && erreur.code === 'sources_absentes') return t('admin.blog.err.checkNoSources');
+  if (erreur.code === 'relecture_perimee') return t('admin.blog.err.reviewStale');
   if ((ETATS_REFUSES as readonly string[]).includes(erreur.code)) {
-    const raison = erreur.detail || t(`admin.blog.etat.${erreur.code}`);
+    // « Publication refusée : <raison> », ou « Publication refusée. » seul
+    // (motif_du_refus, sans raison) : alors la raison de l'état.
+    const raison =
+      erreur.detail.replace(/^Publication refusée\s*(?::\s*|\.\s*$)/i, '').trim() || t(`admin.blog.etat.${erreur.code}`);
     return t('admin.blog.err.notPublishable').replace('{detail}', () => raison);
   }
   if (action === 'controle') {
     switch (erreur.code) {
       case 'sans_source':
-        return t('admin.blog.err.checkNoSource');
+        // Ce que le serveur dit de faire (« Citez au moins un article de la
+        // base… »), à la suite de la phrase du front : au tour 3, seule
+        // celle-ci s'affichait, sans dire comment en sortir.
+        return erreur.detail
+          ? `${t('admin.blog.err.checkNoSource')} ${t('admin.blog.err.serverSays').replace('{detail}', () => erreur.detail)}`
+          : t('admin.blog.err.checkNoSource');
       case 'reponse_invalide':
         return t('admin.blog.err.checkBadOutput');
       case 'delai':
@@ -272,6 +363,34 @@ export function messageDErreur(erreur: ErreurDuBlog, t: (cle: string) => string,
         return t('admin.blog.err.checkClientTimeout');
       case 'non_active':
         return t('admin.blog.err.checkUnavailable');
+      case 'article_en_ligne':
+        return t('admin.blog.err.checkOnline');
+      case 'entree_invalide':
+        if (erreur.champs.length === 0 && erreur.detail) {
+          return t('admin.blog.err.checkRefused').replace('{detail}', () => erreur.detail);
+        }
+    }
+  }
+  if (action === 'sources') {
+    switch (erreur.code) {
+      case 'sans_source':
+        return t('admin.blog.err.sourcesNone');
+      case 'delai':
+        return t('admin.blog.err.sourcesTimeout');
+      case 'delai_client':
+        return t('admin.blog.err.sourcesClientTimeout');
+      case 'non_active':
+        return t('admin.blog.err.sourcesUnavailable');
+      case 'reponse_invalide':
+        return t('admin.blog.err.sourcesBadOutput');
+      case 'entree_invalide':
+      case 'slug_pris':
+        // Le serveur peut refuser de reconstruire (un article qui a déjà ses
+        // sources, par exemple, en 422 ou en 409) : sa raison, en clair. Un
+        // 409 sans code n'est pas ici une adresse prise.
+        return erreur.detail
+          ? t('admin.blog.err.sourcesRefused').replace('{detail}', () => erreur.detail)
+          : t('admin.blog.err.server').replace('{status}', String(erreur.statut ?? '?'));
     }
   }
   switch (erreur.code) {

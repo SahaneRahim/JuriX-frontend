@@ -32,6 +32,7 @@
   import Generateur from "./Generateur.svelte";
   import {
     articlesAdminDepuis,
+    avertissementsDeGenerationValables,
     estAncien,
     pointsAVerifier,
     visibleDuPublic,
@@ -74,9 +75,10 @@
   /** La fenêtre de relecture ouverte, et sur quelle vue. */
   let relecture: { article: ArticleAdmin; vue: "relecture" | "apercu" | "edition" } | null = null;
   /**
-   * Les sources de chaque article généré pendant cette visite : l'API ne
-   * les garde pas avec l'article, la réponse de la génération seule les
-   * donne. Rouvrir le brouillon les montre encore.
+   * Les sources rendues par chaque génération de cette visite. L'API les
+   * garde désormais avec l'article et les rend à chaque lecture (avenant du
+   * tour 4, `article.sources`), que la fenêtre prend d'abord : celles-ci ne
+   * sont qu'un repli, pour une réponse qui ne les porterait pas.
    */
   let sourcesParArticle = new Map<number, SourceDeGeneration[]>();
   /**
@@ -93,7 +95,12 @@
    * pour un même article (revue du 29/10).
    */
   function nombreDePoints(article: ArticleAdmin, t: (cle: string) => string, parArticle: Map<number, string[]>): number {
-    return pointsAVerifier(article.avertissements, article.citations, t, parArticle.get(article.id) ?? []).length;
+    return pointsAVerifier(
+      article.avertissements,
+      article.citations,
+      t,
+      avertissementsDeGenerationValables(parArticle.get(article.id) ?? [], article),
+    ).length;
   }
 
   let titreDeLaListe: HTMLElement;

@@ -21,7 +21,6 @@
  * vraie API, jamais du code : un jeu figé pourrit à la première réingestion.
  */
 
-import fs from 'node:fs';
 
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
@@ -98,16 +97,9 @@ async function categorieFournie(request: APIRequestContext): Promise<number | nu
 }
 
 /**
- * Le premier article publié du blog : celui de l'API, sinon le premier des
- * articles statiques ($lib/data/blog), que la page sert quand l'API ne connaît
- * pas l'article.
- *
- * POURQUOI LE REPLI. Aucune API d'aujourd'hui (origin/main, feat/ux-api) n'a
- * de route /blog : sans repli, les quatorze tests de /blog/[slug]
- * (monochrome, redimensionnement) étaient toujours sautés, alors que la page
- * est servie en production, avec ses articles statiques. Le slug est lu dans
- * le fichier source : le module importe $lib/stores/language, que la spec ne
- * sait pas résoudre (même procédé que monochrome.spec.ts pour language.ts).
+ * Le premier article publiable du blog, ou rien : les articles écrits à la
+ * main sont cachés du public (décision du propriétaire), et les tests de
+ * /blog/[slug] sont alors sautés (`exiger`).
  */
 async function articleDuBlog(request: APIRequestContext): Promise<string | null> {
   const reponse = await request.get(`${API}/api/v1/blog`, { failOnStatusCode: false }).catch(() => null);
@@ -119,16 +111,13 @@ async function articleDuBlog(request: APIRequestContext): Promise<string | null>
     }[];
     // POURQUOI : l'API locale ou les bases de test peuvent contenir les
     // articles non consolidés du 26/10, que `+page.server.ts` écarte en 404
-    // (décision du 30/10, `servableAuPublic`). On n'ouvre que les articles
-    // explicitement « publiable » ; sinon on se replie sur l'article de la
-    // rédaction, toujours servi en 200 par la route.
+    // (décision du 30/10, `servableAuPublic`).
     const publiable = Array.isArray(articles)
       ? articles.find((a) => a.slug && (a.etat_publication === 'publiable' || a.etatPublication === 'publiable'))
       : undefined;
     if (publiable?.slug) return publiable.slug;
   }
-  const source = fs.readFileSync(new URL('../../src/lib/data/blog.ts', import.meta.url), 'utf8');
-  return /\bslug:\s*'([^']+)'/.exec(source)?.[1] ?? null;
+  return null;
 }
 
 /** Une adresse qu'aucune route ne sert : la page d'erreur du site, en 404. */
@@ -254,7 +243,8 @@ export const PAGES: PageDuSite[] = [
       return '/blog';
     },
     principal: titre,
-    action: (page) => contenu(page).locator('a[href^="/blog/"]').first(),
+    // La suite que la page propose toujours, même sans article.
+    action: (page) => contenu(page).locator('a[href^="/chat"]').first(),
   },
   {
     nom: '/blog/[slug]',

@@ -6,7 +6,14 @@
  * partie relue, « Publier » désactivé tant que l'article n'est pas publiable,
  * un seul PUT pour publier, « Retirer du site » réduit à
  * `{"is_published": false}`, les articles d'avant la vérification « À
- * reprendre ».
+ * reprendre ». Et l'avenant du tour 4 : le titre relu et contrôlé comme les
+ * autres parties, les sources gardées avec l'article (un brouillon rouvert se
+ * relit contre elles), et le parcours de reprise d'un article d'avant
+ * (« Reconstruire les sources » → citer → « Relancer le contrôle IA » →
+ * relecture → publier). Et l'avenant du tour 7 (décision du propriétaire du
+ * 04/11, « Confirmer phrase par phrase ») : une phrase de règle « À vérifier »
+ * ou « Hors des sources » porte un badge plein et sa case « J'ai vérifié cette
+ * phrase dans le texte » (44 px), et « Publier » attend chacune.
  *
  * L'API. L'administration est rendue dans le navigateur : ses appels sont
  * interceptés (`page.route`), aucun modèle n'est appelé. Ceux d'un article
@@ -15,7 +22,8 @@
  * Les pages publiques sont rendues par le serveur, dont `page.route` ne voit
  * pas les appels : elles lisent l'API des tests (VITE_API_URL), qui n'a pas de
  * route /blog à ce jour, comme la production du 29/10. C'est le cas vérifié
- * ici : les trois articles de la rédaction restent servis. Le serveur de :4174
+ * ici : la liste est vide et le dit, les articles écrits à la main ne sont plus
+ * servis (décision du propriétaire). Le serveur de :4174
  * (API injoignable) donne la panne. Les autres cas des pages publiques
  * (article de l'API publiable ou non, brouillon, article d'avant la
  * vérification en 404, 503 sur un article de l'API) sont couverts par
@@ -31,17 +39,21 @@ import {
   BROUILLON,
   CITATION_VERIFIEE,
   PARTIES,
+  PHRASES,
   PHRASES_AVEC_CONTRADICTION,
+  PHRASES_A_CONFIRMER,
   PUBLIE,
   SOURCES,
+  avecLeControleAJour,
   phrase,
+  phrasesDe,
   serveurDuBlog,
 } from '../../../src/routes/admin/blog/donnees-de-test';
 import { SUPERADMIN, connecter, intercepterLApi, ouvrirAuServeur } from '../doublures';
 
 const EN_PANNE = 'http://localhost:4174';
 
-/** Le premier article de la rédaction, lu dans le fichier source (comme pages-du-site.ts). */
+/** Les articles écrits à la main, lus dans le fichier source : cachés du public. */
 const SLUG_DE_LA_REDACTION = (() => {
   const source = fs.readFileSync(new URL('../../../src/lib/data/blog.ts', import.meta.url), 'utf8');
   return [...source.matchAll(/\bslug:\s*'([^']+)'/g)].map((m) => m[1]);
@@ -50,18 +62,27 @@ const SLUG_DE_LA_REDACTION = (() => {
 /**
  * La ligne 1 de jurix_dev (26/10, publiée avant la vérification) telle que la
  * rend l'administration : citations écrites par le modèle, jamais vérifiées,
- * ni contrôle IA ni relecture ; cachée du public.
+ * ni contrôle IA ni relecture ; cachée du public. Ses avertissements sont ceux
+ * de l'API du tour 4, « Sources absentes » compris (le front le dit déjà, et
+ * ne le compte pas parmi les points à vérifier).
  */
 const ANCIEN_ADMIN = {
   ...ARTICLE_ANCIEN,
   avertissements: [
-    'Citation 1 : non vérifiée (écrite avant la vérification par le serveur). Retirez-la, ou remplacez-la par un article de la base.',
-    'Citation 2 : non vérifiée (écrite avant la vérification par le serveur). Retirez-la, ou remplacez-la par un article de la base.',
+    "Citation 1 : non vérifiée (écrite avant la vérification par le serveur). L'article ne peut pas être publié tant qu'elle y est : retirez-la, ou remplacez-la par un article de la base.",
+    "Citation 2 : non vérifiée (écrite avant la vérification par le serveur). L'article ne peut pas être publié tant qu'elle y est : retirez-la, ou remplacez-la par un article de la base.",
+    "Sources absentes : l'article n'a pas les extraits sur lesquels il a été écrit (article d'avant le contrôle IA, ou écrit à la main). Reconstruisez ses sources, citez des articles parmi elles, puis lancez le contrôle IA et relisez chaque partie : il n'est pas publiable avant.",
   ],
   controle_ia: null,
   relecture: { parties: {}, par: null, le: null },
   etat_publication: 'citations_non_verifiees',
 };
+
+/**
+ * La même ligne pour la doublure du serveur (avenant du tour 4) : sans
+ * sources ni état, que la doublure calcule (« sources_absentes »).
+ */
+const A_REPRENDRE = { ...ANCIEN_ADMIN, etat_publication: undefined };
 
 /**
  * L'administration en superadmin, avec la liste donnée. Les appels non
@@ -77,11 +98,12 @@ async function administration(page: Page, liste: unknown, statutDeLaListe = 200)
 }
 
 /**
- * Les appels d'un article (PUT, contrôle, relecture de l'article) passent par
- * la doublure du serveur du contrat ; la liste aussi. Rend la doublure.
+ * Les appels d'un article (PUT, contrôle, reconstruction des sources,
+ * relecture de l'article) passent par la doublure du serveur du contrat ; la
+ * liste aussi. Rend la doublure.
  */
 async function brancherLeServeur(page: Page, serveur: ReturnType<typeof serveurDuBlog>, id: number) {
-  await page.route(new RegExp(`/api/v1/blog/(${id}(/controle)?|admin/${id}|admin/all)$`), async (route) => {
+  await page.route(new RegExp(`/api/v1/blog/(${id}(/controle|/sources)?|admin/${id}|admin/all)$`), async (route) => {
     const requete = route.request();
     const chemin = new URL(requete.url()).pathname.replace(/^.*?\/api\/v1/, '');
     const reponse = serveur.repondre(requete.method(), chemin, requete.postData() ? requete.postDataJSON() : undefined);
@@ -104,7 +126,7 @@ async function ouvrirLeGenerateur(page: Page) {
   await page.getByLabel(/Sujet ou question d’actualité/).fill('Un bailleur peut-il expulser sans juge ?');
 }
 
-/** Coche les six cases « J'ai relu cette partie contre les sources ». */
+/** Coche les sept cases « J'ai relu cette partie contre les sources », titre compris. */
 async function toutRelire(page: Page) {
   for (const partie of PARTIES) await page.getByTestId(`blog-case-${partie}`).check();
 }
@@ -115,32 +137,18 @@ test.afterEach(async ({ page }) => {
 });
 
 test.describe('Pages publiques, API sans route /blog (production du 29/10)', () => {
-  test('/blog liste les trois articles de la rédaction', async ({ page }) => {
+  test('/blog ne montre aucun article écrit à la main, et dit qu’il n’y a rien', async ({ page }) => {
     await ouvrirAuServeur(page, '/blog');
+    await expect(page.getByTestId('blog-vide')).toBeVisible();
+    await expect(page.locator('main a[href^="/blog/"]')).toHaveCount(0);
+  });
+
+  test('l’adresse d’un article écrit à la main : 404', async ({ request }) => {
+    expect(SLUG_DE_LA_REDACTION.length).toBeGreaterThan(0);
     for (const slug of SLUG_DE_LA_REDACTION) {
-      await expect(page.locator(`main a[href="/blog/${slug}"]`), slug).toHaveCount(1);
+      const reponse = await request.get(`/blog/${slug}`, { failOnStatusCode: false });
+      expect(reponse.status(), slug).toBe(404);
     }
-  });
-
-  test('un article de la rédaction : métadonnées d’article, partage depuis l’adresse de la page', async ({ page }) => {
-    const [slug] = SLUG_DE_LA_REDACTION;
-    await ouvrirAuServeur(page, `/blog/${slug}`);
-    await expect(page.locator('meta[property="og:type"]')).toHaveAttribute('content', 'article');
-    const description = await page.locator('meta[name="description"]').getAttribute('content');
-    expect((description ?? '').length).toBeGreaterThan(0);
-    expect((description ?? '').length).toBeLessThanOrEqual(155);
-    for (const nom of ['Partager sur WhatsApp', 'Partager sur LinkedIn', 'Partager sur X (Twitter)']) {
-      const lien = decodeURIComponent((await page.getByTitle(nom).getAttribute('href')) ?? '');
-      expect(lien, nom).toContain(`http://localhost:4173/blog/${slug}`);
-      expect(lien, nom).not.toContain('jurix.cm');
-    }
-  });
-
-  test('le HTML du serveur porte déjà les bons liens de partage (avant le JavaScript)', async ({ request }) => {
-    const [slug] = SLUG_DE_LA_REDACTION;
-    const html = await (await request.get(`/blog/${slug}`)).text();
-    expect(html).not.toContain('jurix.cm');
-    expect(html).toContain(encodeURIComponent(`http://localhost:4173/blog/${slug}`));
   });
 
   test('une adresse inconnue : 404 ; celle d’un article d’avant la vérification aussi', async ({ request }) => {
@@ -151,26 +159,16 @@ test.describe('Pages publiques, API sans route /blog (production du 29/10)', () 
     expect(ancien.status()).toBe(404);
     for (const ecrit of ECRIT_PAR_LE_MODELE) expect(await ancien.text(), ecrit).not.toContain(ecrit);
   });
-
-  test('un article de la rédaction : des citations vérifiées, ni encart ni carte « non vérifiée »', async ({ page }) => {
-    const [slug] = SLUG_DE_LA_REDACTION;
-    await ouvrirAuServeur(page, `/blog/${slug}`);
-    await expect(page.locator('main blockquote.font-texte').first()).toBeVisible();
-    await expect(page.locator('main a[href^="/laws/"]').first()).toBeVisible();
-    await expect(page.getByTestId('blog-avis-non-verifie')).toHaveCount(0);
-    await expect(page.getByTestId('citation-non-verifiee')).toHaveCount(0);
-    await expect(page.getByText('Citation non vérifiée')).toHaveCount(0);
-  });
 });
 
 test.describe('Pages publiques, API injoignable (:4174)', () => {
-  test('/blog et les articles de la rédaction restent servis', async ({ request }) => {
+  test('/blog répond 200, vide ; un article écrit à la main, 503 comme les autres', async ({ request }) => {
     const liste = await request.get(`${EN_PANNE}/blog`, { failOnStatusCode: false });
     expect(liste.status()).toBe(200);
     const html = await liste.text();
-    for (const slug of SLUG_DE_LA_REDACTION) expect(html).toContain(`href="/blog/${slug}"`);
+    for (const slug of SLUG_DE_LA_REDACTION) expect(html).not.toContain(`href="/blog/${slug}"`);
     const article = await request.get(`${EN_PANNE}/blog/${SLUG_DE_LA_REDACTION[0]}`, { failOnStatusCode: false });
-    expect(article.status()).toBe(200);
+    expect(article.status()).toBe(503);
   });
 
   test('un autre article : 503 « momentanément indisponible », et non 404', async ({ request }) => {
@@ -201,7 +199,8 @@ test.describe('Administration du blog', () => {
     };
     const serveur = serveurDuBlog(contredit, {
       phrasesDuControle: (article) => [
-        phrase('n1', 'contexte', 0, String(article.context), 'hors_sources', [], 'Le décor de l’article.'),
+        // Un fait de la situation du lecteur : rien à confirmer (tour 7).
+        phrase('n1', 'contexte', 0, String(article.context), 'hors_sources', [], 'Le décor de l’article.', 'autre'),
         phrase('n2', 'resume', 0, String((article.botAnalysis as { summary: string }).summary), 'soutenue', [3], 'Conforme à l’extrait 3.'),
       ],
     });
@@ -218,7 +217,7 @@ test.describe('Administration du blog', () => {
 
     // L'attente : durée honnête, contrôle compris, chronomètre, « Arrêter » qui a le focus.
     const attente = page.getByTestId('blog-generation-en-cours');
-    await expect(attente).toContainText('contrôle IA de chaque phrase compris');
+    await expect(attente).toContainText('le contrôle IA juge chaque phrase');
     await expect(attente.getByRole('button', { name: 'Arrêter' })).toBeFocused();
     await expect(page.getByTestId('blog-chrono')).toHaveText(/0:0[1-9]/);
 
@@ -234,6 +233,10 @@ test.describe('Administration du blog', () => {
     expect(panneau.x).toBeGreaterThan(texte.x + texte.width - 1);
     await expect(sources).toBeInViewport();
 
+    // Le titre d'abord, avec son verdict (avenant du tour 4).
+    const titre = fenetre.getByTestId('blog-partie-titre');
+    await expect(titre).toContainText(BROUILLON.title);
+    await expect(titre.getByTestId('blog-verdict')).toHaveText('Soutenue par l’extrait 3');
     const resume = fenetre.getByTestId('blog-partie-resume');
     const verdict = resume.getByTestId('blog-verdict');
     await expect(verdict).toHaveText('Contredite par l’extrait 3');
@@ -291,7 +294,7 @@ test.describe('Administration du blog', () => {
     expect(serveur.envois.filter((e) => e.methode === 'PUT')).toHaveLength(2);
     expect(publication.corps).toMatchObject({
       is_published: true,
-      relecture: { parties: { contexte: true, resume: true, points_cles: true, impact: true, explications: true, question: true } },
+      relecture: { parties: { titre: true, contexte: true, resume: true, points_cles: true, impact: true, explications: true, question: true } },
     });
     expect(serveur.article()).toMatchObject({ isPublished: true, etat_publication: 'publiable' });
     await expect(page.getByTestId('blog-avis')).toContainText('est publié sur /blog');
@@ -368,8 +371,9 @@ test.describe('Administration du blog', () => {
     await fenetre.getByTestId('blog-relancer-controle').click();
     await expect(fenetre.getByRole('alert')).toContainText('Le serveur a abandonné le contrôle IA (délai dépassé). Rien n’est perdu');
     await expect(fenetre.getByTestId('blog-relancer-controle')).toHaveText(/Relancer le contrôle IA/);
-    // Le contrôle précédent reste affiché, rien n'a bougé.
-    await expect(fenetre.getByTestId('blog-phrase')).toHaveCount(7);
+    // Le contrôle précédent reste affiché, rien n'a bougé : chacune de ses
+    // phrases, titre compris (avenant du tour 4 : 8 et non plus 7).
+    await expect(fenetre.getByTestId('blog-phrase')).toHaveCount(PHRASES.length);
   });
 
   test('« Arrêter » coupe l’attente et prévient que le brouillon peut apparaître', async ({ page }) => {
@@ -385,7 +389,7 @@ test.describe('Administration du blog', () => {
     await expect(page.getByTestId('blog-generation-en-cours')).toHaveCount(0);
   });
 
-  test('sans réponse, le client abandonne à 160 s', async ({ page }) => {
+  test('sans réponse, le client abandonne à 200 s', async ({ page }) => {
     await page.clock.install();
     await administration(page, []);
     await page.route('**/api/v1/blog/generate', () => {
@@ -395,10 +399,13 @@ test.describe('Administration du blog', () => {
     await ouvrirLeGenerateur(page);
     await page.getByRole('button', { name: /Générer le brouillon/ }).click();
     await expect(page.getByTestId('blog-generation-en-cours')).toBeVisible();
-    await page.clock.runFor(95_000);
+    // 120 à 125 s mesurées avec mistral-large-4 : pas « plus long » avant 130 s.
+    await page.clock.runFor(125_000);
+    await expect(page.getByTestId('blog-generation-en-cours')).not.toContainText('Plus long que d’habitude');
+    await page.clock.runFor(6_000);
     await expect(page.getByTestId('blog-generation-en-cours')).toContainText('Plus long que d’habitude');
-    await page.clock.runFor(66_000);
-    await expect(page.getByTestId('blog-generation-erreur')).toContainText('au bout de 160 secondes');
+    await page.clock.runFor(70_000);
+    await expect(page.getByTestId('blog-generation-erreur')).toContainText('au bout de 200 secondes');
   });
 
   test('« Voir » d’un brouillon ouvre l’aperçu de l’administration, jamais l’adresse publique', async ({ page }) => {
@@ -472,8 +479,13 @@ test.describe('Administration : articles d’avant la vérification, retrait, ar
     for (const ecrit of ECRIT_PAR_LE_MODELE.filter((e) => !e.startsWith('Obligations'))) {
       await expect(fenetre.getByText(ecrit, { exact: false }), ecrit).toHaveCount(0);
     }
-    await expect(fenetre.getByRole('button', { name: 'Publier les modifications' })).toHaveAttribute('aria-disabled', 'true');
+    // Caché du public, il se reprend comme un brouillon : « Publier », et le
+    // parcours de reprise, sources d'abord.
+    await expect(fenetre.getByRole('button', { name: 'Publier', exact: true })).toHaveAttribute('aria-disabled', 'true');
+    await expect(fenetre.getByRole('button', { name: 'Retirer du site' })).toHaveCount(0);
+    await expect(fenetre.getByTestId('blog-blocages')).toContainText('Sources absentes');
     await expect(fenetre.getByTestId('blog-blocages')).toContainText('2 citation(s) non vérifiée(s)');
+    await expect(fenetre.getByTestId('blog-reprise')).toBeVisible();
 
     await fenetre.getByRole('button', { name: /Aperçu/ }).click();
     const apercu = page.getByTestId('blog-apercu');
@@ -501,6 +513,111 @@ test.describe('Administration : articles d’avant la vérification, retrait, ar
     await expect(page.locator('li', { has: page.locator('#titre-article-13') })).toContainText('Brouillon');
     // La correction reste dans le formulaire.
     await expect(fenetre.getByLabel(/^Analyse juridique/)).toHaveValue('Résumé en cours de correction.');
+  });
+
+  test('article d’avant la vérification : reconstruire les sources, citer, relancer le contrôle, relire, publier (1440 px)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await administration(page, [A_REPRENDRE]);
+    const serveur = await brancherLeServeur(page, serveurDuBlog(A_REPRENDRE, { phrasesDuControle: (article) => phrasesDe(article) }), 1);
+    await page.goto('/admin/blog');
+    const ligne = page.locator('li', { has: page.locator('#titre-article-1') });
+    await expect(ligne.getByTestId('blog-a-reprendre')).toBeVisible();
+    await ligne.getByRole('button', { name: 'Modifier', exact: true }).click();
+    const fenetre = page.getByRole('dialog');
+    const reprise = fenetre.getByTestId('blog-reprise');
+    await expect(reprise).toContainText('Remettre l’article en ligne');
+    await expect(fenetre.getByTestId('blog-etape-sources')).toHaveAttribute('data-statut', 'en_cours');
+    await expect(fenetre.getByTestId('blog-sources-absentes')).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('reprise-1440-depart.png') });
+
+    // 1. Reconstruire les sources : les deux citations du modèle sont retirées.
+    await fenetre.getByTestId('blog-reconstruire-sources').click();
+    await expect(fenetre.getByTestId('blog-fenetre-statut')).toContainText('2 citation(s) retirée(s)');
+    await expect(fenetre.getByTestId('blog-sources')).toContainText('Sources retrouvées (3)');
+    await expect(fenetre.getByTestId('blog-etape-sources')).toHaveAttribute('data-statut', 'faite');
+    await expect(fenetre.getByTestId('blog-etape-citations')).toHaveAttribute('data-statut', 'en_cours');
+    await expect(fenetre.getByTestId('blog-etape-citations')).toContainText('citez au moins un article des sources');
+    // Le bouton est parti avec son étape : le focus passe à l'étape suivante, pas sur <body>.
+    await expect(fenetre.getByTestId('blog-etape-citations')).toBeFocused();
+    // L'API du tour 4 repasse l'article en brouillon, et le dit.
+    expect(serveur.article().isPublished).toBe(false);
+    await expect(fenetre.getByTestId('blog-points-a-verifier')).toContainText('L\'article repasse en brouillon');
+    // Les sources à droite du texte, au bureau.
+    const texte = (await fenetre.getByTestId('blog-edition').boundingBox())!;
+    const panneau = (await fenetre.getByTestId('blog-sources').boundingBox())!;
+    expect(panneau.x).toBeGreaterThan(texte.x + texte.width - 1);
+    await page.screenshot({ path: test.info().outputPath('reprise-1440-sources.png') });
+
+    // 2. Citer l'article 299 du Code pénal, avec son explication.
+    await fenetre.getByTestId('blog-source').first().getByRole('button', { name: 'Citer' }).click();
+    await fenetre.getByTestId('blog-citation').first().getByLabel('Explication').fill('Entrer chez autrui contre son gré est puni.');
+
+    // 3. « Enregistrer et relancer le contrôle IA ».
+    await fenetre.getByRole('button', { name: /Relecture/ }).click();
+    await expect(fenetre.getByTestId('blog-relecture-attend')).toBeVisible();
+    await expect(fenetre.getByTestId('blog-case-titre')).toBeDisabled();
+    await fenetre.getByTestId('blog-relancer-controle').click();
+    await expect(fenetre.getByTestId('blog-fenetre-statut')).toContainText('Contrôle IA terminé à');
+    await expect(fenetre.getByTestId('blog-partie-titre').getByTestId('blog-verdict')).toHaveText('Soutenue par l’extrait 1');
+    await expect(fenetre.getByTestId('blog-etape-relecture')).toHaveAttribute('data-statut', 'en_cours');
+
+    // 4. Relire les sept parties, puis publier : un seul PUT.
+    await toutRelire(page);
+    await expect(fenetre.getByTestId('blog-etape-publication')).toHaveAttribute('data-statut', 'en_cours');
+    await page.screenshot({ path: test.info().outputPath('reprise-1440-prete.png') });
+    await fenetre.getByRole('button', { name: 'Publier', exact: true }).click();
+    await expect(fenetre).toBeHidden();
+    expect(serveur.envois.filter((e) => e.methode !== 'GET').map((e) => `${e.methode} ${e.chemin}`)).toEqual([
+      'POST /blog/1/sources',
+      'PUT /blog/1',
+      'POST /blog/1/controle',
+      'PUT /blog/1',
+    ]);
+    expect(serveur.article()).toMatchObject({ isPublished: true, etat_publication: 'publiable' });
+    await expect(ligne).toContainText('Publié');
+    await expect(ligne.getByRole('link', { name: 'Voir sur le site' })).toHaveAttribute('href', `/blog/${A_REPRENDRE.slug}`);
+  });
+
+  test('un brouillon rouvert (sans génération dans la visite) : ses sources gardées, et les numéros des verdicts y mènent', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await administration(page, [BROUILLON]);
+    await brancherLeServeur(page, serveurDuBlog(BROUILLON), BROUILLON.id);
+    await page.goto('/admin/blog');
+    await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+    const fenetre = page.getByRole('dialog');
+    await fenetre.getByRole('button', { name: /Relecture/ }).click();
+    await expect(fenetre.getByTestId('blog-sources')).toContainText('Sources retrouvées (3)');
+    await expect(fenetre.getByTestId('blog-reprise')).toHaveCount(0);
+    await fenetre.getByTestId('blog-partie-resume').getByRole('button', { name: 'Afficher l’extrait 3' }).click();
+    await expect(page.locator('#source-3')).toBeFocused();
+    await expect(page.locator('#source-3')).toContainText('La juridiction compétente statuant à bref délai');
+    await fenetre.getByRole('button', { name: /Édition/ }).click();
+    await expect(fenetre.getByTestId('blog-sources').getByRole('button', { name: 'Citer' })).toHaveCount(1);
+  });
+
+  test('article en ligne : changer le SEUL titre bloque « Publier les modifications » ; rien ne part', async ({ page }) => {
+    await administration(page, [PUBLIE]);
+    const serveur = await brancherLeServeur(page, serveurDuBlog(PUBLIE), PUBLIE.id);
+    await page.goto('/admin/blog');
+    await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Modifier l’article' })).toBeVisible();
+    // La fenêtre change de nom avec la vue (« Relecture de l’article » plus
+    // bas) : la suite la désigne par son rôle.
+    const fenetre = page.getByRole('dialog');
+    await fenetre.getByLabel(/^Titre/).fill('Expulsion locative sans jugement : quels cas au Cameroun ?');
+    const publier = fenetre.getByRole('button', { name: 'Publier les modifications' });
+    await expect(publier).toHaveAttribute('aria-disabled', 'true');
+    await expect(fenetre.getByTestId('blog-blocages')).toContainText('retirez l’article du site, enregistrez le brouillon');
+    // Au clavier : Playwright n'appuie pas sur un bouton `aria-disabled` (il
+    // attendrait qu'il s'active). Activé quand même, il ne part pas et montre
+    // ses raisons, qui prennent le focus.
+    await publier.focus();
+    await page.keyboard.press('Enter');
+    await expect(fenetre.getByTestId('blog-blocages')).toBeFocused();
+    expect(serveur.envois.filter((e) => e.methode === 'PUT')).toHaveLength(0);
+    await fenetre.getByRole('button', { name: /Relecture/ }).click();
+    await expect(fenetre.getByTestId('blog-partie-titre')).toContainText('Modifié, non enregistré');
+    await expect(fenetre.getByTestId('blog-case-titre')).toBeDisabled();
   });
 
   test('article en ligne : le texte relu changé bloque « Publier les modifications » ; la rubrique seule part en un seul PUT', async ({ page }) => {
@@ -532,6 +649,225 @@ test.describe('Administration : articles d’avant la vérification, retrait, ar
   });
 });
 
+/**
+ * Avenant du tour 5 : une case cochée nomme le contrôle relu
+ * (`relecture.controle`), le serveur refuse les cases cochées contre un autre
+ * contrôle (422 `relecture_perimee`), et relancer le contrôle d'un article
+ * publié se confirme (409 `article_en_ligne` sans `{"confirmer": true}`).
+ */
+test.describe('Administration : la relecture liée au contrôle relu (avenant du tour 5)', () => {
+  /** Un contrôle relancé qui juge le contexte « À vérifier », les autres phrases telles quelles. */
+  const contexteAVerifier = (article: Record<string, unknown>) =>
+    ((article.controle_ia as { phrases: Record<string, unknown>[] } | null)?.phrases ?? PHRASES).map((p) =>
+      p.partie === 'contexte'
+        ? { ...p, verdict: 'non_soutenue', extraits: [], raison: 'À vérifier : le contrôle la disait soutenue, sans pouvoir copier un passage des extraits qui le dise.' }
+        : p,
+    );
+
+  test('article en ligne : « Relancer le contrôle IA » se confirme ; refusé, rien ne part ; confirmé, l’article quitte le public et la fenêtre le dit', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await administration(page, [PUBLIE]);
+    const serveur = await brancherLeServeur(page, serveurDuBlog(PUBLIE, { phrasesDuControle: contexteAVerifier }), PUBLIE.id);
+    await page.goto('/admin/blog');
+    await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+    const fenetre = page.getByRole('dialog');
+    await fenetre.getByRole('button', { name: /Relecture/ }).click();
+    // Dit avant l'appui.
+    await expect(fenetre.getByTestId('blog-controle-publie')).toContainText('si le contrôle change un verdict, l’article quitte le site');
+    const relancer = fenetre.getByTestId('blog-relancer-controle');
+
+    // Refusé : rien ne part.
+    const refus = new Promise<string>((fin) =>
+      page.once('dialog', async (dialogue) => {
+        fin(dialogue.message());
+        await dialogue.dismiss();
+      }),
+    );
+    await relancer.click();
+    expect(await refus).toMatch(/^Cet article est en ligne\. .*l’article quittera le site jusqu’à ce qu’elle le soit/);
+    await expect(fenetre.getByTestId('blog-fenetre-statut')).toContainText('Contrôle IA non relancé');
+    expect(serveur.envois.filter((e) => e.methode === 'POST')).toHaveLength(0);
+
+    // Confirmé : {"confirmer": true}, et le contexte jugé autrement fait quitter le public.
+    page.once('dialog', (dialogue) => dialogue.accept());
+    await relancer.click();
+    await expect(fenetre.getByTestId('blog-fenetre-statut')).toContainText('Contrôle IA terminé à');
+    await expect(fenetre.getByTestId('blog-fenetre-statut')).toContainText('l’article est caché du public');
+    expect(serveur.envois.filter((e) => e.methode === 'POST').map((e) => e.corps)).toEqual([{ confirmer: true }]);
+    const aRelire = fenetre.getByTestId('blog-a-relire');
+    await expect(aRelire).toContainText('À relire de nouveau');
+    await expect(aRelire).toContainText('Contexte');
+    await expect(fenetre.getByTestId('blog-a-relire-contexte')).toBeVisible();
+    await expect(fenetre.getByTestId('blog-case-contexte')).not.toBeChecked();
+    await page.screenshot({ path: test.info().outputPath('controle-en-ligne-a-relire-1440.png') });
+
+    // Relu contre le nouveau verdict : republié, contre le contrôle qui vient d'être fait.
+    await fenetre.getByTestId('blog-case-contexte').check();
+    await expect(aRelire).toBeHidden();
+    await fenetre.getByRole('button', { name: 'Publier', exact: true }).click();
+    await expect(fenetre).toBeHidden();
+    const publication = serveur.envois.filter((e) => e.methode === 'PUT').at(-1)!;
+    expect(publication.corps).toMatchObject({ is_published: true, relecture: { controle: '2026-10-30T10:10:00+00:00' } });
+    expect(serveur.article()).toMatchObject({ isPublished: true, etat_publication: 'publiable' });
+  });
+
+  test('caché par un contrôle, puis un second aux verdicts d’avant : il reste caché, la partie à relire, et la fenêtre le dit (revue du front du tour 5)', async ({ page }) => {
+    // Reproduit contre la vraie API : la case du contexte, cochée contre X,
+    // revivait au contrôle Z, et l'article revenait en ligne sans relecture ni
+    // « Publier », la fenêtre ne disant que « Contrôle IA terminé ».
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await administration(page, [PUBLIE]);
+    const verdictsDeX = (PUBLIE.controle_ia as { phrases: Record<string, unknown>[] }).phrases;
+    let prochain: (article: Record<string, unknown>) => unknown[] = contexteAVerifier;
+    const serveur = await brancherLeServeur(page, serveurDuBlog(PUBLIE, { phrasesDuControle: (article) => prochain(article) }), PUBLIE.id);
+    await page.goto('/admin/blog');
+    await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+    const fenetre = page.getByRole('dialog');
+    await fenetre.getByRole('button', { name: /Relecture/ }).click();
+    const confirmations: string[] = [];
+    page.on('dialog', async (dialogue) => {
+      confirmations.push(dialogue.message());
+      await dialogue.accept();
+    });
+    const relancer = fenetre.getByTestId('blog-relancer-controle');
+
+    await relancer.click();
+    await expect(fenetre.getByTestId('blog-fenetre-statut')).toContainText('l’article est caché du public');
+    prochain = () => verdictsDeX;
+    await relancer.click();
+    await expect(fenetre.getByTestId('blog-fenetre-statut')).toContainText('L’article reste caché du public');
+    expect(confirmations[1]).toMatch(/celles déjà à relire le restent, même si le contrôle les juge comme avant/);
+    await expect(fenetre.getByTestId('blog-a-relire')).toContainText('Contexte');
+    await expect(fenetre.getByTestId('blog-case-contexte')).not.toBeChecked();
+    await expect(fenetre.getByRole('button', { name: 'Retirer du site' })).toHaveCount(0);
+    expect(serveur.article()).toMatchObject({ isPublished: true, etat_publication: 'relecture_incomplete' });
+    expect(serveur.envois.filter((e) => e.methode === 'PUT')).toHaveLength(0);
+    await page.screenshot({ path: test.info().outputPath('controle-relance-reste-cache-1440.png') });
+
+    // Relue par une personne, contre Z : « Publier » le remet en ligne.
+    await fenetre.getByTestId('blog-case-contexte').check();
+    await fenetre.getByRole('button', { name: 'Publier', exact: true }).click();
+    await expect(fenetre).toBeHidden();
+    expect(serveur.envois.filter((e) => e.methode === 'PUT').at(-1)!.corps).toMatchObject({
+      is_published: true,
+      relecture: { controle: '2026-10-30T10:11:00+00:00' },
+    });
+    expect(serveur.article()).toMatchObject({ isPublished: true, etat_publication: 'publiable' });
+  });
+
+  test('deux onglets : « Publier » contre l’ancien contrôle est refusé (422 relecture_perimee), la fenêtre dit quoi relire, puis publie contre le nouveau', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await administration(page, [BROUILLON]);
+    const serveur = await brancherLeServeur(page, serveurDuBlog(BROUILLON, { phrasesDuControle: contexteAVerifier }), BROUILLON.id);
+    await page.goto('/admin/blog');
+    await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+    const fenetre = page.getByRole('dialog');
+    await fenetre.getByRole('button', { name: /Relecture/ }).click();
+    await toutRelire(page);
+    // L'autre onglet relance le contrôle.
+    serveur.repondre('POST', '/blog/12/controle');
+    await fenetre.getByRole('button', { name: 'Publier', exact: true }).click();
+    const alerte = fenetre.getByRole('alert');
+    await expect(alerte).toContainText('Rien n’a été enregistré');
+    // Les cases n'étaient pas enregistrées : aucune ne compte pour le nouveau contrôle.
+    await expect(alerte).toContainText('toutes les parties');
+    await expect(fenetre.getByTestId('blog-a-relire')).toContainText('Contexte');
+    expect(serveur.article().isPublished).toBe(false);
+    const refusee = serveur.envois.filter((e) => e.methode === 'PUT').at(-1)!;
+    expect(refusee.corps).toMatchObject({ relecture: { controle: BROUILLON.controle_ia.fait_le }, is_published: true });
+    await expect(fenetre.getByTestId('blog-partie-contexte').getByTestId('blog-verdict')).toHaveText('À vérifier');
+    await expect(fenetre.getByTestId('blog-case-contexte')).not.toBeChecked();
+    await expect(fenetre.getByTestId('blog-a-relire')).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('relecture-perimee-1440.png') });
+
+    // Relues contre les nouveaux verdicts : publié, contre le nouveau contrôle.
+    await toutRelire(page);
+    await fenetre.getByRole('button', { name: 'Publier', exact: true }).click();
+    await expect(fenetre).toBeHidden();
+    expect(serveur.envois.filter((e) => e.methode === 'PUT').at(-1)!.corps).toMatchObject({ relecture: { controle: '2026-10-30T10:10:00+00:00' } });
+    expect(serveur.article()).toMatchObject({ isPublished: true, etat_publication: 'publiable' });
+  });
+});
+
+test.describe('Administration : les phrases de règle se confirment une à une (avenant du tour 7)', () => {
+  /** Le bail de l'essai réel du 04/11 : le résumé « À vérifier » et le point clé « Hors des sources », deux règles. */
+  const AVEC_REGLES = avecLeControleAJour({ ...BROUILLON, controle_ia: { ...BROUILLON.controle_ia, phrases: PHRASES_A_CONFIRMER } });
+
+  for (const [largeur, hauteur, theme] of [
+    [1440, 900, 'light'],
+    [390, 844, 'dark'],
+  ] as const) {
+    test(`${largeur}×${hauteur}, ${theme === 'dark' ? 'sombre' : 'clair'} : badge plein, raison lisible, case de 44 px ; « Publier » attend chaque règle, puis un seul PUT`, async ({ page }) => {
+      await page.setViewportSize({ width: largeur, height: hauteur });
+      await page.addInitScript((valeur) => localStorage.setItem('jurix-theme', valeur), theme);
+      await administration(page, [AVEC_REGLES]);
+      const serveur = await brancherLeServeur(page, serveurDuBlog(AVEC_REGLES), AVEC_REGLES.id);
+      await page.goto('/admin/blog');
+      await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+      const fenetre = page.getByRole('dialog');
+      await fenetre.getByRole('button', { name: /Relecture/ }).click();
+
+      const resume = fenetre.getByTestId('blog-partie-resume').getByTestId('blog-phrase');
+      const badge = resume.getByTestId('blog-verdict');
+      await expect(badge).toHaveText('Règle à vérifier');
+      // Plein : un fond peint (noir en clair, blanc en sombre), jamais le
+      // pointillé gris d'une simple remarque ; et pas de rouge (réservé aux
+      // phrases contredites).
+      const style = await badge.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { fond: s.backgroundColor, trait: s.borderStyle };
+      });
+      expect(style.fond).not.toBe('rgba(0, 0, 0, 0)');
+      expect(style.fond).not.toMatch(/185, 28, 28|220, 38, 38/);
+      expect(style.trait).toBe('solid');
+      const conseil = fenetre.getByTestId('blog-partie-impact').getByTestId('blog-verdict');
+      await expect(conseil).toHaveText('À vérifier');
+      expect(await conseil.evaluate((el) => getComputedStyle(el).borderStyle)).toBe('dashed');
+      // La raison se lit sans la demander.
+      await expect(resume.getByTestId('blog-raison')).toBeVisible();
+      await expect(resume.getByTestId('blog-raison')).toContainText('Raison du contrôle');
+
+      const caseDuResume = resume.getByRole('checkbox', { name: 'J’ai vérifié cette phrase dans le texte' });
+      // `has` se résout DANS le label : un localisateur ancré sur `resume` n'y
+      // trouverait rien.
+      const cible = resume.locator('label', { has: page.getByRole('checkbox', { name: 'J’ai vérifié cette phrase dans le texte' }) });
+      await cible.scrollIntoViewIfNeeded();
+      await expect(cible).toBeInViewport();
+      expect((await cible.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await resume.screenshot({ path: test.info().outputPath(`regle-carte-${largeur}-${theme}.png`) });
+      const deborde = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+      expect(deborde).toBe(false);
+
+      await toutRelire(page);
+      const publier = fenetre.getByRole('button', { name: 'Publier', exact: true });
+      await expect(publier).toHaveAttribute('aria-disabled', 'true');
+      await expect(fenetre.getByTestId('blog-blocages')).toContainText('2 phrase(s) de règle à confirmer');
+      await page.screenshot({ path: test.info().outputPath(`regles-a-confirmer-${largeur}-${theme}.png`) });
+      // Au clavier (Playwright n'appuie pas sur un bouton `aria-disabled`) :
+      // rien ne part, et les raisons prennent le focus.
+      await publier.focus();
+      await page.keyboard.press('Enter');
+      await expect(fenetre.getByTestId('blog-blocages')).toBeFocused();
+      expect(serveur.envois.filter((e) => e.methode === 'PUT')).toHaveLength(0);
+
+      await caseDuResume.check();
+      await expect(fenetre.getByTestId('blog-blocages')).toContainText('1 phrase(s) de règle à confirmer');
+      await fenetre.getByTestId('blog-partie-points_cles').getByRole('checkbox', { name: 'J’ai vérifié cette phrase dans le texte' }).check();
+      await expect(fenetre.getByTestId('blog-blocages')).toHaveCount(0);
+      await expect(fenetre.getByTestId('blog-a-confirmer')).toContainText('2 confirmée(s) sur 2');
+      await publier.click();
+      await expect(fenetre).toBeHidden();
+      const puts = serveur.envois.filter((e) => e.methode === 'PUT');
+      expect(puts).toHaveLength(1);
+      expect(puts[0].corps).toMatchObject({
+        is_published: true,
+        relecture: { controle: BROUILLON.controle_ia.fait_le, phrases_confirmees: ['p2', 'p3'] },
+      });
+      expect(serveur.article()).toMatchObject({ isPublished: true, etat_publication: 'publiable' });
+    });
+  }
+});
+
 test.describe('Fenêtre de relecture au téléphone', () => {
   for (const [largeur, hauteur] of [
     [390, 844],
@@ -560,6 +896,41 @@ test.describe('Fenêtre de relecture au téléphone', () => {
       expect((await caseALaMain.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     });
 
+    test(`${largeur}×${hauteur} : un article d’avant la vérification, son parcours de reprise tient à l’écran`, async ({ page }) => {
+      await page.setViewportSize({ width: largeur, height: hauteur });
+      await administration(page, [A_REPRENDRE]);
+      await brancherLeServeur(page, serveurDuBlog(A_REPRENDRE), 1);
+      await page.goto('/admin/blog');
+      await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+      const fenetre = page.getByRole('dialog');
+      for (const vue of ['Relecture', 'Édition']) {
+        await fenetre.getByRole('button', { name: new RegExp(vue) }).click();
+        await expect(fenetre.getByTestId('blog-reprise')).toBeVisible();
+        const deborde = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+        expect(deborde, vue).toBe(false);
+        for (const nom of ['Enregistrer le brouillon', 'Publier']) {
+          await expect(fenetre.getByRole('button', { name: nom, exact: true })).toBeInViewport();
+        }
+      }
+      // Le bouton de l'étape en cours se touche au doigt (44 px).
+      const reconstruire = fenetre.getByTestId('blog-reconstruire-sources');
+      await reconstruire.scrollIntoViewIfNeeded();
+      await expect(reconstruire).toBeInViewport();
+      expect((await reconstruire.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await page.screenshot({ path: test.info().outputPath(`reprise-${largeur}.png`) });
+      // Reconstruites, les sources s'affichent dans le volet ; « Ouvrir
+      // l'édition » l'ouvre pour citer.
+      await reconstruire.click();
+      await expect(fenetre.getByTestId('blog-etape-citations')).toHaveAttribute('data-statut', 'en_cours');
+      await fenetre.getByRole('button', { name: /Relecture/ }).click();
+      await fenetre.getByTestId('blog-etape-citations').getByRole('button', { name: 'Ouvrir l’édition' }).click();
+      const citer = fenetre.getByTestId('blog-source').first().getByRole('button', { name: 'Citer' });
+      await citer.scrollIntoViewIfNeeded();
+      await expect(citer).toBeInViewport();
+      const deborde = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+      expect(deborde).toBe(false);
+    });
+
     test(`${largeur}×${hauteur} : un article en ligne, « Retirer du site » et « Publier les modifications » restent à l’écran`, async ({ page }) => {
       await page.setViewportSize({ width: largeur, height: hauteur });
       await administration(page, [PUBLIE]);
@@ -576,6 +947,28 @@ test.describe('Fenêtre de relecture au téléphone', () => {
         expect((await bouton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
       await page.screenshot({ path: test.info().outputPath(`relecture-${largeur}-en-ligne.png`) });
+    });
+
+    test(`${largeur}×${hauteur} : une relecture périmée, son erreur et les parties à relire tiennent à l’écran`, async ({ page }) => {
+      await page.setViewportSize({ width: largeur, height: hauteur });
+      await administration(page, [BROUILLON]);
+      const serveur = await brancherLeServeur(page, serveurDuBlog(BROUILLON), BROUILLON.id);
+      await page.goto('/admin/blog');
+      await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+      const fenetre = page.getByRole('dialog');
+      await fenetre.getByRole('button', { name: /Relecture/ }).click();
+      await toutRelire(page);
+      serveur.repondre('POST', '/blog/12/controle');
+      await fenetre.getByRole('button', { name: 'Publier', exact: true }).click();
+      await expect(fenetre.getByRole('alert')).toContainText('À relire de nouveau');
+      await expect(fenetre.getByRole('alert')).toBeInViewport();
+      await expect(fenetre.getByRole('button', { name: 'Publier', exact: true })).toBeInViewport();
+      const deborde = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+      expect(deborde).toBe(false);
+      const aRelire = fenetre.getByTestId('blog-a-relire');
+      await aRelire.scrollIntoViewIfNeeded();
+      await expect(aRelire).toBeInViewport();
+      await page.screenshot({ path: test.info().outputPath(`relecture-perimee-${largeur}.png`) });
     });
   }
 });

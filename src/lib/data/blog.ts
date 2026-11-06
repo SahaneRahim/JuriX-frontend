@@ -60,17 +60,37 @@ export interface BlogCitation {
 
 /**
  * L'état de publication d'un article de l'API (contrat du 30/10), calculé par
- * le serveur. Seul « publiable » permet de publier : toutes les citations
- * vérifiées, un contrôle IA à jour sans phrase « contredite », et chaque
- * partie relue par une personne. Les routes publiques ne servent que les
- * articles publiés ET publiables.
+ * le serveur. Seul « publiable » permet de publier : des sources enregistrées,
+ * toutes les citations vérifiées (au moins une), un contrôle IA à jour sans
+ * phrase « contredite », et chaque partie relue par une personne, titre
+ * compris. Les routes publiques ne servent que les articles publiés ET
+ * publiables.
+ *
+ * « sources_absentes » (avenant du tour 4) : l'article n'a pas de sources
+ * enregistrées, contre lesquelles le contrôle IA juge et la personne relit.
+ * C'est le cas des articles d'avant la vérification (lignes 1 à 3 du 26/10) :
+ * l'administration les reconstruit (`POST /blog/{id}/sources`) avant tout le
+ * reste.
+ *
+ * « phrases_a_confirmer » (avenant du tour 7, décision du propriétaire du
+ * 04/11) : une phrase qui énonce une règle de droit, jugée « non soutenue »
+ * ou « hors des sources », n'est ni réécrite ni confirmée une à une par
+ * l'administrateur. Il vient après « phrases_contredites » et avant
+ * « relecture_incomplete ».
+ *
+ * L'ÉTAT N'EST RENDU QU'À L'ADMINISTRATION (avenant du tour 7) : les réponses
+ * publiques ne portent plus ni `etat_publication`, ni `controle_ia`, ni
+ * `relecture`, ni rien de la relecture. Les pages publiques n'en ont pas
+ * besoin (`articleDepuisLApi`).
  */
 export const ETATS_DE_PUBLICATION = [
   'publiable',
   'relecture_incomplete',
+  'phrases_a_confirmer',
   'controle_a_relancer',
   'phrases_contredites',
   'citations_non_verifiees',
+  'sources_absentes',
 ] as const;
 export type EtatDePublication = (typeof ETATS_DE_PUBLICATION)[number];
 
@@ -134,8 +154,10 @@ export interface BlogPost {
    */
   publie?: boolean;
   /**
-   * Article de l'API que le serveur dit « publiable » (`etat_publication`),
-   * et dont toutes les citations sont vérifiées. Les pages publiques ne
+   * Article de l'API servi par la route publique (qui ne sert que les
+   * articles publiés ET publiables ; une API d'avant le tour 7 le disait aussi
+   * par `etat_publication`, encore lu s'il est là), et dont toutes les
+   * citations, une au moins, sont vérifiées. Les pages publiques ne
    * servent QUE ceux-là (décision du propriétaire du 30/10) : un article
    * publié avant la vérification (lignes 1 à 3 de jurix_dev), dont la prose
    * écrite de mémoire disait « plafonnée entre 1 et 12 mois de salaire » quand
@@ -381,10 +403,6 @@ export const BLOG_POSTS: BlogPost[] = [
     tags: ['Cybercriminalité', 'Mobile Money', 'Fraude', 'E-commerce', 'ANTIC'],
   },
 ];
-
-export function getPostBySlug(slug: string): BlogPost | undefined {
-  return BLOG_POSTS.find((p) => p.slug === slug);
-}
 
 /**
  * Rubrique d'un article dans la langue de l'interface.
@@ -801,14 +819,34 @@ export function articleDepuisLApi(brut: unknown): BlogPost | null {
     // publication, mais l'API ne nomme pas le relecteur (`reluPar`).
     genereParIA: true,
     publie: !(brut.isPublished === false || brut.is_published === false),
-    // Les deux conditions du contrat du 30/10 que le front sait relire : l'état
-    // du serveur (contrôle IA à jour, relecture complète, aucune phrase
-    // contredite) et des citations toutes vérifiées. Un état absent n'est
-    // jamais un accord : dans le doute, l'article n'est pas servi.
-    publiable:
-      etatDePublication(brut.etat_publication ?? brut.etatPublication) === 'publiable' &&
-      citations.every((c) => c.verifie === true),
+    // Les conditions du contrat du 30/10 que le front sait relire : des
+    // citations TOUTES vérifiées, AU MOINS UNE, et l'état du serveur s'il le
+    // rend (`etatPublicAccepte` : les réponses publiques du tour 7 ne le
+    // portent plus, la route publique ne servant que des articles publiables).
+    // « Au moins une » : la règle du correctif public du 04/11 (dépôt du
+    // backend, 5bdcb4f, `servable_au_public`), que le front tient aussi de son
+    // côté, quoi que dise l'état. Un article sans citation n'a aucun texte de
+    // la base pour l'appuyer : sa prose aurait pu être écrite de mémoire.
+    publiable: etatPublicAccepte(brut) && citations.length > 0 && citations.every((c) => c.verifie === true),
   };
+}
+
+/**
+ * L'état de publication d'une réponse publique, s'il y en a un.
+ *
+ * AVENANT DU TOUR 7 : les réponses publiques (`GET /blog`, `GET
+ * /blog/{slug}`) ne portent plus l'état, ni le contrôle, ni la relecture, et
+ * la route publique ne sert que des articles publiés ET publiables. Un état
+ * ABSENT ne cache donc plus l'article : avant, il ne se servait jamais sans
+ * lui, et les pages publiques en dépendaient. POURQUOI garder la défense
+ * quand il est là : une API d'avant (tour 6) le rend encore, et un état
+ * présent autre que « publiable », ou illisible, n'est jamais un accord.
+ * Les citations, elles, se vérifient toujours (`verifie`, au moins une).
+ */
+function etatPublicAccepte(brut: Objet): boolean {
+  const valeur = brut.etat_publication ?? brut.etatPublication;
+  if (valeur === undefined || valeur === null) return true;
+  return etatDePublication(valeur) === 'publiable';
 }
 
 /** Vrai si un article de l'API peut être servi au public : publié ET publiable. */
@@ -843,24 +881,9 @@ function horodatage(post: BlogPost): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-/**
- * La liste de /blog : les articles de l'API ET ceux de la rédaction, une
- * fois chacun, du plus récent au plus ancien.
- *
- * À adresse égale, celui de l'API l'emporte : c'est celui que la page de
- * l'article sert quand l'API répond (blog/[slug]/+page.server.ts), et un
- * administrateur peut avoir repris un article de la rédaction dans la base
- * pour le corriger. À date égale, l'API passe devant (tri stable).
- */
-export function avecLesArticlesDeLaRedaction(articlesDeLApi: readonly BlogPost[]): BlogPost[] {
-  const vus = new Set<string>();
-  const tous: BlogPost[] = [];
-  for (const post of [...articlesDeLApi, ...BLOG_POSTS]) {
-    if (vus.has(post.slug)) continue;
-    vus.add(post.slug);
-    tous.push(post);
-  }
-  return tous.sort((a, b) => horodatage(b) - horodatage(a));
+/** Les articles du plus récent au plus ancien ; à date égale, l'ordre reçu (tri stable). */
+export function duPlusRecentAuPlusAncien(articles: readonly BlogPost[]): BlogPost[] {
+  return [...articles].sort((a, b) => horodatage(b) - horodatage(a));
 }
 
 /* -------------------------------------------------------------------------- */

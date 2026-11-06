@@ -6,10 +6,13 @@
    * L'ATTENTE DIT LA VÉRITÉ. Le libellé promettait « 15-30s » ; un appel au
    * modèle peut durer bien plus (relevé de la revue du 29/10 : jusqu'à 95 s
    * pour Mistral, plus une seconde tentative). Le panneau d'attente montre le
-   * temps écoulé, annonce 30 à 90 secondes, et dit quand c'est plus long que
-   * d'habitude. Le client abandonne à 160 s (`DELAI_DE_GENERATION_MS`), au-delà
-   * du délai du serveur (150 s, code `delai`) : sans borne, une API figée
-   * laissait la roue tourner indéfiniment.
+   * temps écoulé, annonce la durée mesurée (environ deux minutes, contrôle IA
+   * par mistral-large-4 compris : 121,7 et 124,4 s à l'essai réel du 04/11),
+   * et dit quand c'est plus long que d'habitude
+   * (`ATTENTE_LONGUE_DE_GENERATION_S`). Le client abandonne à 200 s
+   * (`DELAI_DE_GENERATION_MS`), au-delà du délai du serveur (190 s, code
+   * `delai`) : sans borne, une API figée laissait la roue tourner
+   * indéfiniment.
    *
    * ARRÊTER. Le bouton « Arrêter » coupe la requête (AbortController). Le
    * serveur, lui, peut aller au bout et enregistrer le brouillon : la page
@@ -25,7 +28,14 @@
   import { apiFetch } from "$lib/api";
   import Icone from "$lib/components/Icone.svelte";
   import { tr } from "$lib/stores/language";
-  import { DELAI_DE_GENERATION_MS, erreurDeReponse, erreurDExecution, messageDErreur } from "./erreurs";
+  import {
+    ATTENTE_LONGUE_DE_GENERATION_S,
+    DELAI_DE_GENERATION_MS,
+    FIN_PROBABLE_DE_LA_REDACTION_S,
+    erreurDeReponse,
+    erreurDExecution,
+    messageDErreur,
+  } from "./erreurs";
   import { resultatDeGeneration, type ResultatDeGeneration } from "./relecture";
 
   /** Vrai pendant une génération (lu par la page : elle masque alors le bouton d'en-tête). */
@@ -266,11 +276,11 @@
           <Icone nom="loader-circle" class="mt-0.5 h-5 w-5 shrink-0 text-zinc-950 motion-safe:animate-spin dark:text-white" />
           <div class="min-w-0 space-y-1">
             <p class="text-sm font-semibold text-zinc-950 dark:text-white">
-              {$tr("admin.blog.generating")}
+              {$tr(ecoule >= FIN_PROBABLE_DE_LA_REDACTION_S ? "admin.blog.generatingCheck" : "admin.blog.generating")}
               <span class="ml-1 font-normal tabular-nums text-zinc-600 dark:text-zinc-300" data-testid="blog-chrono">{chrono}</span>
             </p>
             <p class="text-pretty text-xs text-zinc-600 dark:text-zinc-300">{$tr("admin.blog.waitHint")}</p>
-            {#if ecoule >= 90}
+            {#if ecoule >= ATTENTE_LONGUE_DE_GENERATION_S}
               <p class="text-pretty text-xs font-medium text-zinc-800 dark:text-zinc-200">{$tr("admin.blog.waitLong")}</p>
             {/if}
           </div>

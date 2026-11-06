@@ -1,6 +1,6 @@
 import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BLOG_POSTS, articleDepuisLApi, avecLesArticlesDeLaRedaction, type BlogPost } from '$lib/data/blog';
+import { BLOG_POSTS, articleDepuisLApi, type BlogPost } from '$lib/data/blog';
 import { ARTICLE_ANCIEN, ECRIT_PAR_LE_MODELE } from '$lib/data/blog-anciens-de-test';
 import Page from './+page.svelte';
 
@@ -117,6 +117,15 @@ describe('/blog : revue du 29/10', () => {
   });
 });
 
+describe('/blog sans article', () => {
+  it('le dit, sans filtres ni article écrit à la main', () => {
+    const { container, getByTestId } = render(Page, { props: { data: { posts: [] } } });
+    expect(getByTestId('blog-vide')).toHaveTextContent('Aucun article à afficher');
+    expect(container.querySelector('main a[href^="/blog/"]')).toBeNull();
+    expect(container.querySelector('[aria-pressed]')).toBeNull();
+  });
+});
+
 describe('/blog : article publié avant le contrat (revue croisée du 29/10)', () => {
   // La ligne 1 de jurix_dev, du 26/10 : plus récente que les articles de la
   // rédaction, elle prenait la carte « À la une ». Depuis le 30/10, le
@@ -126,7 +135,7 @@ describe('/blog : article publié avant le contrat (revue croisée du 29/10)', (
   const ancien = articleDepuisLApi(ARTICLE_ANCIEN)!;
 
   it('il n’est pas à la une ; il reste listé, étiqueté « Citations non vérifiées »', () => {
-    const posts = avecLesArticlesDeLaRedaction([ancien]);
+    const posts = [ancien, ...BLOG_POSTS];
     expect(posts[0].slug).toBe(ancien.slug);
     const { container } = render(Page, { props: { data: { posts } } });
 

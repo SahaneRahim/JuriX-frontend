@@ -6,7 +6,7 @@ import {
   articleDepuisLApi,
   articleNomme,
   articlesDepuisLApi,
-  avecLesArticlesDeLaRedaction,
+  duPlusRecentAuPlusAncien,
   BLOG_POSTS,
   citationBruteVerifiee,
   citationDepuisLApi,
@@ -252,35 +252,14 @@ describe('articleDepuisLApi : une sortie mal formée ne fait plus planter la pag
   });
 });
 
-describe('avecLesArticlesDeLaRedaction : les trois articles vérifiés restent listés', () => {
-  const api = (slug: string, date: string) => articleDepuisLApi({ slug, title: slug, publishedAt: date })!;
+describe('duPlusRecentAuPlusAncien', () => {
+  const api = (slug: string, date: string) => ({ ...BLOG_POSTS[0], slug, date });
 
-  it('le premier article publié ne fait plus disparaître ceux de la rédaction', () => {
-    const liste = avecLesArticlesDeLaRedaction([api('nouveau', '2026-10-29')]);
-    expect(liste.map((p) => p.slug)).toEqual([
-      'nouveau',
-      'litiges-locatifs-resiliation-bail-expulsion-abusive',
-      'rupture-contrat-travail-preavis-indemnites-licenciement',
-      'arnaques-mobile-money-e-commerce-recours-legaux',
-    ]);
-  });
-
-  it('du plus récent au plus ancien, une adresse une seule fois (celle de l’API l’emporte)', () => {
-    const repris = { ...api(BLOG_POSTS[1].slug, '2026-10-18'), title: 'Version corrigée par l’administrateur' };
-    const liste = avecLesArticlesDeLaRedaction([api('ancien', '2026-01-02'), repris, api('sans-date', '')]);
-    expect(liste.map((p) => p.slug)).toEqual([
-      BLOG_POSTS[0].slug,
-      BLOG_POSTS[1].slug,
-      BLOG_POSTS[2].slug,
-      'ancien',
-      'sans-date',
-    ]);
-    expect(liste.filter((p) => p.slug === BLOG_POSTS[1].slug)).toHaveLength(1);
-    expect(liste[1].title).toBe('Version corrigée par l’administrateur');
-  });
-
-  it('sans article de l’API, les trois de la rédaction', () => {
-    expect(avecLesArticlesDeLaRedaction([]).map((p) => p.slug)).toEqual(BLOG_POSTS.map((p) => p.slug));
+  it('trie par date, sans rien ajouter, et ne touche pas à la liste reçue', () => {
+    const recus = [api('ancien', '2026-01-02'), api('recent', '2026-10-18'), api('sans-date', '')];
+    expect(duPlusRecentAuPlusAncien(recus).map((p) => p.slug)).toEqual(['recent', 'ancien', 'sans-date']);
+    expect(recus[0].slug).toBe('ancien');
+    expect(duPlusRecentAuPlusAncien([])).toEqual([]);
   });
 });
 
@@ -432,26 +411,49 @@ describe('pages publiques : un article de l’API n’est servi que publié ET p
   };
 
   it('l’état du contrat, ou null', () => {
-    for (const etat of ['publiable', 'relecture_incomplete', 'controle_a_relancer', 'phrases_contredites', 'citations_non_verifiees']) {
+    for (const etat of [
+      'publiable',
+      'relecture_incomplete',
+      'controle_a_relancer',
+      'phrases_contredites',
+      // Avenant du tour 7 : une phrase de règle ni réécrite ni confirmée.
+      'phrases_a_confirmer',
+      'citations_non_verifiees',
+      // Avenant du tour 4 : l'article n'a pas de sources enregistrées.
+      'sources_absentes',
+    ]) {
       expect(etatDePublication(etat)).toBe(etat);
     }
     expect(etatDePublication('publie')).toBeNull();
     expect(etatDePublication(undefined)).toBeNull();
   });
 
-  it('publiable : l’état du serveur ET toutes les citations vérifiées', () => {
+  it('publiable : toutes les citations vérifiées, et l’état du serveur quand il le rend', () => {
     expect(servableAuPublic(articleDepuisLApi(PUBLIABLE))).toBe(true);
     expect(servableAuPublic(articleDepuisLApi({ ...PUBLIABLE, etatPublication: 'publiable', etat_publication: undefined }))).toBe(true);
+    // Avenant du tour 7 : la réponse publique ne porte plus ni l'état, ni le
+    // contrôle, ni la relecture (la route publique ne sert que des articles
+    // publiables). Sans eux, l'article se sert : les pages n'en ont pas besoin.
+    const { etat_publication: _etat, ...SANS_ETAT } = PUBLIABLE;
+    expect(servableAuPublic(articleDepuisLApi(SANS_ETAT))).toBe(true);
+    expect(servableAuPublic(articleDepuisLApi({ ...PUBLIABLE, etat_publication: null }))).toBe(true);
     for (const [nom, variante] of [
       ['relecture incomplète', { ...PUBLIABLE, etat_publication: 'relecture_incomplete' }],
       ['contrôle à relancer', { ...PUBLIABLE, etat_publication: 'controle_a_relancer' }],
-      ['état absent (jamais un accord)', { ...PUBLIABLE, etat_publication: undefined }],
-      ['état inconnu', { ...PUBLIABLE, etat_publication: 'ok' }],
+      ['phrases de règle à confirmer (tour 7)', { ...PUBLIABLE, etat_publication: 'phrases_a_confirmer' }],
+      ['état inconnu (présent, jamais un accord)', { ...PUBLIABLE, etat_publication: 'ok' }],
+      ['citations vérifiées, sans état, mais brouillon', { ...SANS_ETAT, isPublished: false }],
+      ['sans état, une citation non vérifiée', { ...SANS_ETAT, botAnalysis: { ...PUBLIABLE.botAnalysis, citations: [{ law_id: 1, article_number: '299', verifie: false }] } }],
+      ['sans état, aucune citation', { ...SANS_ETAT, botAnalysis: { ...PUBLIABLE.botAnalysis, citations: [] } }],
       ['brouillon', { ...PUBLIABLE, isPublished: false }],
       [
         'citation non vérifiée, même si le serveur dit publiable',
         { ...PUBLIABLE, botAnalysis: { ...PUBLIABLE.botAnalysis, citations: [{ law_id: 1, article_number: '299', verifie: false }] } },
       ],
+      // La règle du correctif public du 04/11 (5bdcb4f) : au moins une
+      // citation, toutes vérifiées, quoi que dise l'état.
+      ['aucune citation, même si le serveur dit publiable', { ...PUBLIABLE, botAnalysis: { ...PUBLIABLE.botAnalysis, citations: [] } }],
+      ['sources absentes', { ...PUBLIABLE, etat_publication: 'sources_absentes' }],
     ] as const) {
       expect(servableAuPublic(articleDepuisLApi(variante)), nom).toBe(false);
     }
@@ -461,7 +463,8 @@ describe('pages publiques : un article de l’API n’est servi que publié ET p
     const liste = articlesDepuisLApi([
       PUBLIABLE,
       { ...ARTICLE_ANCIEN, etat_publication: 'citations_non_verifiees' },
-      // Une API qui oublierait l'état, ou dirait « publiable » d'un article ancien.
+      // Une API qui ne rendrait pas l'état (tour 7), ou dirait « publiable »
+      // d'un article ancien : ses citations jamais vérifiées suffisent.
       ARTICLE_ANCIEN,
       { ...ARTICLE_ANCIEN, slug: 'ancien-dit-publiable', etat_publication: 'publiable' },
       { ...PUBLIABLE, slug: 'a-relire', etat_publication: 'relecture_incomplete' },

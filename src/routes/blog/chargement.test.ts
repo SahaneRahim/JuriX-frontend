@@ -12,6 +12,8 @@ import { load as chargerLArticle } from './[slug]/+page.server';
  * - un brouillon n'est jamais servi, ni un article qui n'est pas
  *   « publiable » (contrat du 30/10 : publié avant la vérification, contrôle
  *   à relancer, relecture incomplète…) ;
+ * - la réponse publique du tour 7, sans `controle_ia`, `relecture` ni
+ *   `etat_publication` : les pages n'en ont pas besoin ;
  * - les trois articles de la rédaction toujours listés, et servis pendant une
  *   panne ;
  * - l'API sans route /blog (la production du 29/10) : tout continue de marcher.
@@ -19,6 +21,18 @@ import { load as chargerLArticle } from './[slug]/+page.server';
 
 const json = (corps: unknown, statut = 200, entetes: Record<string, string> = {}) =>
   new Response(JSON.stringify(corps), { status: statut, headers: { 'content-type': 'application/json', ...entetes } });
+
+/** Une citation construite par le serveur et vérifiée (contrat du 30/10). */
+const CITATION_VERIFIEE = {
+  law_id: 2236,
+  article_id: 501,
+  article_number: '299',
+  reference: 'Code pénal (loi n° 2016/007)',
+  title: 'Violation de domicile',
+  excerpt: 'Est puni d’un emprisonnement de dix (10) jours à un (01) an…',
+  url: '/laws/2236?article=299',
+  verifie: true,
+};
 
 const ARTICLE_API = {
   id: 9,
@@ -28,7 +42,7 @@ const ARTICLE_API = {
   publishedAt: '2026-10-29',
   readingTime: '4 min',
   context: 'Un locataire de Yaoundé…',
-  botAnalysis: { summary: 'Non.', keyPoints: [{ point: 'objet' }, 'Texte'], citations: [null], citizenImpact: 'Agir.' },
+  botAnalysis: { summary: 'Non.', keyPoints: [{ point: 'objet' }, 'Texte'], citations: [null, CITATION_VERIFIEE], citizenImpact: 'Agir.' },
   suggestedQuestion: 'Que faire ?',
   tags: [],
   isPublished: true,
@@ -54,10 +68,10 @@ const lireArticle = (fetch: Fetch, slug: string) =>
 afterEach(() => vi.restoreAllMocks());
 
 describe('/blog (liste)', () => {
-  it('API sans route /blog (production du 29/10) : les articles de la rédaction', async () => {
+  it('API sans route /blog (production du 29/10) : liste vide', async () => {
     const fetch = vi.fn(async () => json({ detail: 'Not Found' }, 404));
     const { posts } = await lireListe(fetch as unknown as Fetch);
-    expect(posts.map((p) => p.slug)).toEqual(BLOG_POSTS.map((p) => p.slug));
+    expect(posts).toEqual([]);
   });
 
   it('chaque appel porte un délai (DELAI_API_MS)', async () => {
@@ -68,13 +82,13 @@ describe('/blog (liste)', () => {
     expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('les articles de l’API ET ceux de la rédaction, du plus récent au plus ancien', async () => {
+  it('les articles de l’API seuls : ceux écrits à la main sont cachés du public (décision du propriétaire)', async () => {
     const fetch = vi.fn(async () => json([ARTICLE_API, { ...ARTICLE_API, slug: 'brouillon', isPublished: false }]));
     const { posts } = await lireListe(fetch as unknown as Fetch);
-    expect(posts.map((p) => p.slug)).toEqual(['coupure-eau-locataire', ...BLOG_POSTS.map((p) => p.slug)]);
+    expect(posts.map((p) => p.slug)).toEqual(['coupure-eau-locataire']);
   });
 
-  it('API en panne, figée ou illisible : les articles de la rédaction, sans erreur', async () => {
+  it('API en panne, figée ou illisible : liste vide, sans erreur', async () => {
     const avertir = vi.spyOn(console, 'warn').mockImplementation(() => {});
     for (const reponse of [
       () => Promise.reject(new TypeError('fetch failed')),
@@ -83,7 +97,7 @@ describe('/blog (liste)', () => {
       () => Promise.resolve(new Response('<html>proxy</html>', { status: 200 })),
     ]) {
       const { posts } = await lireListe(vi.fn(reponse) as unknown as Fetch);
-      expect(posts.map((p) => p.slug)).toEqual(BLOG_POSTS.map((p) => p.slug));
+      expect(posts).toEqual([]);
     }
     // La panne laisse une trace dans le journal.
     expect(avertir).toHaveBeenCalled();
@@ -98,6 +112,7 @@ describe('/blog/[slug] (article)', () => {
     const { post } = await lireArticle(fetch as unknown as Fetch, 'coupure-eau-locataire');
     expect(post.title).toBe(ARTICLE_API.title);
     expect(post.botAnalysis.keyPoints).toEqual(['Texte']);
+    expect((post as unknown as { botAnalysis: { citations: unknown[] } }).botAnalysis.citations).toHaveLength(1);
     const [{ init }] = appelsDe(fetch);
     expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
   });
@@ -138,16 +153,13 @@ describe('/blog/[slug] (article)', () => {
     }
   });
 
-  it('les articles de la rédaction restent servis pendant une panne, et sans route /blog', async () => {
-    for (const reponse of [
-      () => Promise.reject(new TypeError('fetch failed')),
-      () => Promise.resolve(json({ detail: 'boom' }, 503)),
-      () => Promise.resolve(json({ detail: 'Not Found' }, 404)),
-    ]) {
-      const { post } = await lireArticle(vi.fn(reponse) as unknown as Fetch, STATIQUE);
-      expect(post.slug).toBe(STATIQUE);
-      expect(post.title).toBe(BLOG_POSTS[0].title);
-    }
+  it('un article écrit à la main n’est plus servi : 404 sans lui dans l’API, 503 en panne', async () => {
+    const absent = vi.fn(async () => json({ detail: 'Article introuvable' }, 404));
+    expect(await statutDeLErreur(lireArticle(absent as unknown as Fetch, STATIQUE))).toBe(404);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const panne = vi.fn(() => Promise.reject(new TypeError('fetch failed')));
+    expect(await statutDeLErreur(lireArticle(panne as unknown as Fetch, STATIQUE))).toBe(503);
   });
 
   it('une adresse trop longue pour la base ne coûte aucun appel', async () => {
@@ -175,8 +187,7 @@ describe('article publié avant la vérification : caché du public (décision d
     expect(liste.posts.map((p) => p.slug)).not.toContain(ligne.slug);
     const donnees = JSON.stringify(liste);
     for (const ecrit of [...ECRIT_PAR_LE_MODELE, ligne.botAnalysis.summary, ligne.context]) expect(donnees, ecrit).not.toContain(ecrit);
-    // La liste garde les articles de la rédaction.
-    expect(liste.posts.map((p) => p.slug)).toEqual(BLOG_POSTS.map((p) => p.slug));
+    expect(liste.posts).toEqual([]);
   });
 });
 
@@ -185,7 +196,8 @@ describe('article de l’API qui n’est pas « publiable » : jamais servi (con
     ['relecture incomplète', 'relecture_incomplete'],
     ['contrôle IA à relancer', 'controle_a_relancer'],
     ['phrase contredite', 'phrases_contredites'],
-    ['état absent', undefined],
+    ['phrase de règle à confirmer (tour 7)', 'phrases_a_confirmer'],
+    ['état illisible', 'publie'],
   ])('%s : 404, absent de la liste', async (_nom, etat) => {
     const ligne = { ...ARTICLE_API, etat_publication: etat };
     expect(await statutDeLErreur(lireArticle(vi.fn(async () => json(ligne)) as unknown as Fetch, ligne.slug))).toBe(404);
@@ -193,11 +205,37 @@ describe('article de l’API qui n’est pas « publiable » : jamais servi (con
     expect(posts.map((p) => p.slug)).not.toContain(ligne.slug);
   });
 
-  it('à l’adresse d’un article de la rédaction, c’est celui de la rédaction qui est servi', async () => {
-    const STATIQUE = BLOG_POSTS[0];
-    const ligne = { ...ARTICLE_API, slug: STATIQUE.slug, etat_publication: 'relecture_incomplete' };
-    const { post } = await lireArticle(vi.fn(async () => json(ligne)) as unknown as Fetch, STATIQUE.slug);
-    expect(post.title).toBe(STATIQUE.title);
+  it('sans aucune citation, même dit « publiable » : 404, absent de la liste (règle du correctif public du 04/11)', async () => {
+    // Le correctif du propriétaire (dépôt du backend, 5bdcb4f) ne sert qu'un
+    // article qui a au moins une citation, toutes vérifiées : le front tient
+    // la même règle, quoi que dise l'état du serveur.
+    for (const citations of [[], [null]]) {
+      const ligne = { ...ARTICLE_API, botAnalysis: { ...ARTICLE_API.botAnalysis, citations } };
+      expect(await statutDeLErreur(lireArticle(vi.fn(async () => json(ligne)) as unknown as Fetch, ligne.slug))).toBe(404);
+      const { posts } = await lireListe(vi.fn(async () => json([ligne])) as unknown as Fetch);
+      expect(posts.map((p) => p.slug)).not.toContain(ligne.slug);
+    }
+  });
+
+  it('à l’adresse d’un article écrit à la main, non publiable : 404', async () => {
+    const ligne = { ...ARTICLE_API, slug: BLOG_POSTS[0].slug, etat_publication: 'relecture_incomplete' };
+    expect(await statutDeLErreur(lireArticle(vi.fn(async () => json(ligne)) as unknown as Fetch, ligne.slug))).toBe(404);
+  });
+
+  it('la réponse publique du tour 7, sans rien de la relecture : servie, à son adresse et dans la liste', async () => {
+    // Avenant du tour 7 : `GET /blog` et `GET /blog/{slug}` ne rendent plus
+    // `controle_ia`, `relecture` ni `etat_publication` ; la route publique ne
+    // sert que des articles publiés ET publiables. Les pages n'en dépendent pas.
+    const { etat_publication: _etat, ...ligne } = ARTICLE_API;
+    const { post } = await lireArticle(vi.fn(async () => json(ligne)) as unknown as Fetch, ligne.slug);
+    expect(post.title).toBe(ARTICLE_API.title);
+    const { posts } = await lireListe(vi.fn(async () => json([ligne])) as unknown as Fetch);
+    expect(posts.map((p) => p.slug)).toContain(ligne.slug);
+    // Toujours pas sans citations vérifiées, ni en brouillon.
+    const brouillon = { ...ligne, isPublished: false };
+    expect(await statutDeLErreur(lireArticle(vi.fn(async () => json(brouillon)) as unknown as Fetch, ligne.slug))).toBe(404);
+    const sansCitation = { ...ligne, botAnalysis: { ...ligne.botAnalysis, citations: [] } };
+    expect(await statutDeLErreur(lireArticle(vi.fn(async () => json(sansCitation)) as unknown as Fetch, ligne.slug))).toBe(404);
   });
 
   it('publiable : servi, sans renvoi « (extrait N) » dans ses données', async () => {
