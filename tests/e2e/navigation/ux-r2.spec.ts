@@ -51,6 +51,7 @@ import {
   ouvrirAuServeur,
   saisieDuChat,
   simulerLaRecherche,
+  attendreLeRepos,
 } from '../doublures';
 import { cliquerJusqualEffet, saisirJusqualEffet } from '../hydratation';
 import { loiAvecArticles } from '../pages-du-site';
@@ -491,6 +492,12 @@ test.describe('P10 : le sommaire d’un texte', () => {
     // colonne n'a que « Art. N » et son repère qui glisse, décision L4).
     await cliquerJusqualEffet(page.getByTestId('law-toc-tout'), page.getByRole('dialog', { name: 'Table des matières' }));
     await expect(sommaire.getByText(/·\s*art\.\s*\d+(er)?\s*(à\s*\d+)?$/).first()).toBeVisible();
+
+    // POURQUOI : le pointeur reste où « Tout le sommaire » a été cliqué, et le
+    // sommaire s'ouvre sous lui. L'entrée survolée prenait sa barre de survol
+    // (zinc-300), que ce test lisait comme celle d'une entrée au repos.
+    await page.mouse.move(0, 0);
+    await attendreLeRepos(page);
 
     const liens = sommaire.getByRole('link');
     expect(await liens.count()).toBeGreaterThan(1);
