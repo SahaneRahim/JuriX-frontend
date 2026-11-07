@@ -16,7 +16,7 @@
    * propre `<title>` produirait DEUX titres. Retirer l'ancien en même temps que
    * l'on pose celui-ci.
    */
-  import { titreDePage } from "$lib/seo";
+  import { imageDePartage, titreDePage } from "$lib/seo";
 
   /** Partie spécifique du titre. `titreDePage` y ajoute le suffixe du site. */
   export let titre: string;
@@ -38,6 +38,7 @@
   export let indexable = true;
 
   $: titreComplet = titreDePage(titre);
+  $: image = imageDePartage(canonique);
 </script>
 
 <svelte:head>
@@ -66,4 +67,11 @@
     <meta property="og:url" content={canonique} />
   {/if}
   <meta property="og:site_name" content="JuriX" />
+  {#if image}
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="JuriX : que dit la loi camerounaise ?" />
+    <meta name="twitter:card" content="summary_large_image" />
+  {/if}
 </svelte:head>

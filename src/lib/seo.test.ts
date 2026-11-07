@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { descriptionDepuis, titreDePage, urlCanonique } from './seo';
+import { descriptionDepuis, imageDePartage, titreDePage, urlCanonique } from './seo';
 
 describe('descriptionDepuis', () => {
   it('rend une chaine vide sur une entree absente', () => {
@@ -113,5 +113,15 @@ describe('urlCanonique', () => {
     expect(urlCanonique(new URL('http://localhost:5173/categories/7'))).toBe(
       'http://localhost:5173/categories/7',
     );
+  });
+});
+
+describe('imageDePartage', () => {
+  it("donne une adresse absolue sur l'origine de la page", () => {
+    expect(imageDePartage('https://jurix.example/laws/12')).toBe('https://jurix.example/og-image.png');
+  });
+
+  it('reste vide sans canonique', () => {
+    expect(imageDePartage('')).toBe('');
   });
 });

@@ -155,3 +155,13 @@ export function titreDePage(titre: string | null | undefined, suffixe = 'JuriX')
 export function urlCanonique(url: URL): string {
   return `${url.origin}${url.pathname}`;
 }
+
+/**
+ * Adresse absolue de l'image d'aperçu, déduite de la canonique de la page.
+ *
+ * LinkedIn, X et les messageries refusent une adresse relative dans `og:image`.
+ * Sans canonique, on ne connaît pas l'origine : pas de balise.
+ */
+export function imageDePartage(canonique: string): string {
+  return canonique ? new URL('/og-image.png', canonique).href : '';
+}
