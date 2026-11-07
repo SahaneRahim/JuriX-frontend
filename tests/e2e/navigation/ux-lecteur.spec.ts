@@ -271,7 +271,13 @@ test.describe('Page d’un texte', () => {
     await attendreLaFinDuDefilement(page);
 
     // Retour à la lecture article par article, sur l'article lu.
-    await page.getByTestId('law-mode-article').click();
+    // POURQUOI `dispatchEvent` : la bascule est en haut de la page, 320 px
+    // au-dessus de l'écran après le saut. `click()` défilait d'abord jusqu'à
+    // elle (770 → 108 px) : l'article lu redevenait, à bon droit, l'article 1er,
+    // et le test ne passait que si le clic devançait la mesure de l'image
+    // suivante. Sur une machine chargée, il échouait. Ce test vérifie la bascule
+    // depuis l'article atteint, sans défilement entre les deux.
+    await page.getByTestId('law-mode-article').dispatchEvent('click');
     await expect(page.locator('article.article h2')).toContainText(`Article ${cible.replace(/^#art-(\d+).*$/, '$1')}`);
     await expect(page).toHaveURL(/[?&]article=/);
   });
