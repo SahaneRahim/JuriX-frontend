@@ -106,7 +106,14 @@
   const BASCULE =
     "relative z-10 flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold motion-safe:transition-colors motion-safe:duration-200 sm:min-h-[34px] sm:min-w-[6.5rem] [@media(pointer:coarse)]:min-h-11";
   const BASCULE_ETEINTE = "text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white";
-  const BASCULE_ALLUMEE = "text-white dark:text-zinc-950";
+  /*
+   * POURQUOI `forced-colors:` (P6). Le mode actif se lit par l'inversion
+   * (pastille zinc-950 sous un texte blanc : 18:1 contre la piste zinc-100).
+   * En contraste élevé de Windows, la pastille, un fond, disparaît : le mode
+   * actif y est souligné, à la couleur du texte gardée par le système.
+   */
+  const BASCULE_ALLUMEE =
+    "text-white dark:text-zinc-950 forced-colors:underline forced-colors:decoration-2 forced-colors:underline-offset-4";
 </script>
 
 <form

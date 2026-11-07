@@ -151,6 +151,13 @@
    */
   const SOULIGNEMENT =
     "relative before:absolute before:inset-x-0 before:-bottom-1.5 before:h-0.5 before:origin-left before:rounded-full before:bg-zinc-950 dark:before:bg-white forced-colors:before:!bg-[CanvasText] motion-safe:before:transition-transform motion-safe:before:duration-[350ms] motion-safe:before:ease-jx";
+  /**
+   * La langue active de l'en-tête (P6) : noir, demi-gras et un trait de 2 px
+   * sous l'abréviation, un repère qui ne dépend pas de la couleur ; même
+   * `CanvasText` forcé que SOULIGNEMENT en contraste élevé.
+   */
+  const LANGUE_ACTIVE =
+    "relative font-semibold text-zinc-950 dark:text-white before:absolute before:inset-x-2 before:bottom-1 before:h-0.5 before:rounded-full before:bg-zinc-950 dark:before:bg-white forced-colors:before:!bg-[CanvasText]";
   /** Le trait de la page courante : tracé, sans attendre le survol. */
   const SOULIGNEMENT_COURANT = "before:scale-x-100";
   /** Le trait des autres liens : replié, déroulé au survol ou au focus clavier du lien. */
@@ -465,15 +472,23 @@
     <!-- Langue : la langue active en noir et en demi-gras, l'autre en
          zinc-500, comme le lien de la page courante et ses voisins. Les deux
          boutons gardent 36 px de large quelle que soit la graisse : rien ne
-         bouge quand la langue change. -->
+         bouge quand la langue change.
+         POURQUOI LE TRAIT ET `aria-pressed` (P6). La couleur seule ne suffit
+         pas : blanc contre zinc-400 en sombre ne fait que 2,56:1 (il en faut
+         3), et la graisse 600 contre 500 se devine à peine. La langue active
+         porte donc le trait de 2 px de la page courante (LANGUE_ACTIVE, gardé
+         en contraste élevé), et `aria-pressed` le dit aux lecteurs d'écran.
+         `lang` sur l'abréviation : « EN » se lit en anglais. -->
     <div class="flex shrink-0 items-center">
       <button
         on:click={() => switchLanguage("fr")}
         data-testid="lang-fr"
         aria-label="{$tr('a11y.switchTo')} français"
+        aria-pressed={$language.current === "fr"}
+        lang="fr"
         class="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm transition-all duration-150 motion-safe:active:scale-95 {$language.current ===
         'fr'
-          ? 'font-semibold text-zinc-950 dark:text-white'
+          ? LANGUE_ACTIVE
           : 'font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}"
         >FR</button
       >
@@ -482,9 +497,11 @@
         on:click={() => switchLanguage("en")}
         data-testid="lang-en"
         aria-label="{$tr('a11y.switchTo')} English"
+        aria-pressed={$language.current === "en"}
+        lang="en"
         class="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm transition-all duration-150 motion-safe:active:scale-95 {$language.current ===
         'en'
-          ? 'font-semibold text-zinc-950 dark:text-white'
+          ? LANGUE_ACTIVE
           : 'font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}"
         >EN</button
       >
@@ -801,18 +818,22 @@
           on:click={() => switchLanguage("fr")}
           data-testid="lang-fr-mobile"
           aria-label="{$tr('a11y.switchTo')} français"
+          aria-pressed={$language.current === "fr"}
+          lang="fr"
           class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {$language.current ===
           'fr'
-            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
+            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none forced-colors:underline forced-colors:decoration-2 forced-colors:underline-offset-4'
             : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">FR</button
         >
         <button
           on:click={() => switchLanguage("en")}
           data-testid="lang-en-mobile"
           aria-label="{$tr('a11y.switchTo')} English"
+          aria-pressed={$language.current === "en"}
+          lang="en"
           class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors {$language.current ===
           'en'
-            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none'
+            ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-sm dark:shadow-none forced-colors:underline forced-colors:decoration-2 forced-colors:underline-offset-4'
             : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'}">EN</button
         >
       </div>

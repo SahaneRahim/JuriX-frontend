@@ -2,8 +2,9 @@
   /**
    * « Article par article | Texte entier » (P10, variante A) : deux boutons
    * à bascule (`aria-pressed`), le mode choisi inversé (fond zinc-950), comme
-   * sur la maquette loi-p10a. Le texte entier ne coûte aucun octet de plus :
-   * `law.content` est déjà chargé en entier.
+   * sur la maquette loi-p10a. En contraste élevé de Windows, où ce fond
+   * disparaît, le mode choisi est souligné (P6). Le texte entier ne coûte
+   * aucun octet de plus : `law.content` est déjà chargé en entier.
    *
    * Le mode par défaut reste « article par article » : la proposition le
    * laisse à un test auprès des lecteurs, et les liens profonds (`?article=`)
@@ -40,7 +41,7 @@
       aria-pressed={actif}
       data-testid={choix.testid}
       class="min-h-11 rounded-[10px] px-2 py-1.5 text-sm leading-tight transition-colors sm:px-4 lg:[@media(pointer:fine)]:min-h-9 {actif
-        ? 'bg-zinc-950 font-semibold text-white dark:bg-white dark:text-zinc-950'
+        ? 'bg-zinc-950 font-semibold text-white dark:bg-white dark:text-zinc-950 forced-colors:underline forced-colors:decoration-2 forced-colors:underline-offset-4'
         : 'font-medium text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white'}"
       on:click={() => choisir(choix.valeur)}
     >

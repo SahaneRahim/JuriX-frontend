@@ -262,6 +262,24 @@ describe('SiteHeader monté', () => {
     expect(document.activeElement).toBe(loupe);
   });
 
+  it('la langue active se dit sans la couleur : aria-pressed, lang et le trait (P6)', async () => {
+    const { getByTestId } = render(SiteHeader);
+    const fr = getByTestId('lang-fr');
+    const en = getByTestId('lang-en');
+    expect(fr.getAttribute('aria-pressed')).toBe('true');
+    expect(en.getAttribute('aria-pressed')).toBe('false');
+    expect(fr.getAttribute('lang')).toBe('fr');
+    expect(en.getAttribute('lang')).toBe('en');
+    // Le trait de 2 px sous la langue active, gardé en contraste élevé.
+    expect(fr.className).toContain('before:h-0.5');
+    expect(fr.className).toContain('forced-colors:before:!bg-[CanvasText]');
+    expect(en.className).not.toContain('before:h-0.5');
+    await fireEvent.click(getByTestId('nav-mobile-toggle'));
+    expect(getByTestId('lang-fr-mobile').getAttribute('aria-pressed')).toBe('true');
+    expect(getByTestId('lang-en-mobile').getAttribute('aria-pressed')).toBe('false');
+    expect(getByTestId('lang-en-mobile').getAttribute('lang')).toBe('en');
+  });
+
   it('range FR et EN dans la ligne « Langue » du menu mobile, nommée par son libellé', async () => {
     const { getByTestId } = render(SiteHeader);
     await fireEvent.click(getByTestId('nav-mobile-toggle'));

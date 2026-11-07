@@ -155,12 +155,17 @@
         <li>
           <!-- Barre de 3 px à gauche pour l'article lu, au lieu d'une
                pastille noire : elle se voit sans la couleur, et le texte
-               garde son contraste. 44 px de haut au doigt (deux lignes). -->
+               garde son contraste. 44 px de haut au doigt (deux lignes).
+               POURQUOI `forced-colors:` (P6). En contraste élevé de Windows,
+               le système repeint TOUTES les bordures, transparentes
+               comprises, à la couleur du texte : chaque ligne aurait sa
+               barre. Les autres lignes la prennent couleur du fond
+               (`Canvas`), l'article lu en `Highlight`. -->
           <a
             href="#{ancreDeLArticle(article)}"
             class="block rounded-r-lg border-l-[3px] py-1.5 pl-3 pr-2 text-[0.9375rem] transition-colors lg:text-sm {actif
-              ? 'border-zinc-950 font-semibold text-zinc-950 dark:border-white dark:text-white'
-              : 'border-transparent text-zinc-600 hover:border-zinc-300 hover:text-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-white'}"
+              ? 'border-zinc-950 font-semibold text-zinc-950 dark:border-white dark:text-white forced-colors:border-[Highlight]'
+              : 'border-transparent forced-colors:border-[Canvas] text-zinc-600 hover:border-zinc-300 hover:text-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-white'}"
             aria-current={actif ? "location" : undefined}
             on:click={(evenement) => dispatch("choisir", { rang: article.rang, evenement })}
           >
@@ -242,7 +247,7 @@
             href="#{ancreDeLArticle(article)}"
             title={libelle}
             class="flex h-11 min-w-[4.5rem] items-center justify-center whitespace-nowrap rounded-xl border px-4 text-sm transition-colors lg:block lg:h-[var(--ligne)] lg:w-full lg:min-w-0 lg:truncate lg:rounded-none lg:rounded-r-lg lg:border-0 lg:leading-[var(--ligne)] {actif
-              ? 'border-zinc-950 bg-zinc-950 font-semibold text-white dark:border-white dark:bg-white dark:text-zinc-950 lg:bg-zinc-100 lg:text-zinc-950 lg:dark:bg-zinc-800 lg:dark:text-white'
+              ? 'border-zinc-950 bg-zinc-950 font-semibold text-white dark:border-white dark:bg-white dark:text-zinc-950 lg:bg-zinc-100 lg:text-zinc-950 lg:dark:bg-zinc-800 lg:dark:text-white forced-colors:border-2 forced-colors:border-[Highlight] forced-colors:underline forced-colors:decoration-2 forced-colors:underline-offset-4'
               : 'border-zinc-300 text-zinc-600 hover:border-zinc-950 hover:text-zinc-950 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-200 dark:hover:text-white lg:hover:bg-zinc-50 lg:dark:hover:bg-zinc-800/50'}"
             aria-current={actif ? "location" : undefined}
             on:click={(evenement) => dispatch("choisir", { rang: article.rang, evenement })}
@@ -291,6 +296,14 @@
   .repere {
     height: var(--ligne);
     transform: translateY(calc(var(--rang) * var(--ligne)));
+  }
+
+  /* Contraste élevé (P6) : le repère est un fond, que le système efface ;
+     la couleur système de la sélection le rend visible. */
+  @media (forced-colors: active) {
+    .repere {
+      background-color: Highlight;
+    }
   }
 
   /* Le repère glisse vers l'article lu ; rien en mouvement réduit. */

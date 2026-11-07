@@ -216,9 +216,15 @@ test.describe('Langue du document', () => {
     // `app/app.html` fixait lang="fr" en dur : tout le contenu anglais était
     // annoncé avec la prononciation française.
     await cliquerJusqualEffet(page.getByTestId('lang-en'), page.locator('html[lang="en"]'));
+    // P6 : la langue active se dit sans la couleur (`aria-pressed`), et
+    // chaque abréviation porte sa langue.
+    await expect(page.getByTestId('lang-en')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('lang-fr')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('lang-en')).toHaveAttribute('lang', 'en');
 
     await page.getByTestId('lang-fr').click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+    await expect(page.getByTestId('lang-fr')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
