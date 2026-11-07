@@ -398,7 +398,7 @@
             value={pageNum}
             on:change={(e) => goToPage((e.currentTarget as HTMLInputElement).value)}
             disabled={pageLoading}
-            class="h-11 w-14 rounded-lg border-zinc-300 bg-white px-1 text-center text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 sm:w-16 lg:[@media(pointer:fine)]:h-9 sm:text-sm dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
+            class="h-11 w-14 rounded-lg border-zinc-500 bg-white px-1 text-center text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 sm:w-16 lg:[@media(pointer:fine)]:h-9 sm:text-sm dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
           />
           {$tr("pdf.of")} {totalPages}
         </span>

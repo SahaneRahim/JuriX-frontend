@@ -310,7 +310,7 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
             aria-autocomplete="list"
             aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
             enterkeyhint="search"
-            class="h-11 min-w-0 flex-1 text-ellipsis rounded-none border-0 bg-transparent px-1 py-0 text-lg text-zinc-950 placeholder-zinc-500 outline-none focus:outline-none focus:ring-0 dark:bg-transparent dark:text-zinc-100 dark:placeholder-zinc-400"
+            class="h-11 min-w-0 flex-1 text-ellipsis rounded-none border-0 bg-transparent px-1 py-0 text-lg text-zinc-950 outline-none focus:outline-none focus:ring-0 dark:bg-transparent dark:text-zinc-100"
             placeholder={indicatif}
             {value}
             on:input={handleInput}
@@ -449,7 +449,7 @@ let suggestions: Array<{id: number, title: string, reference: string}> = [];
         aria-autocomplete="list"
         aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
         enterkeyhint="search"
-        class="w-full text-ellipsis rounded-xl border border-zinc-200 bg-white text-zinc-950 shadow-sm placeholder-zinc-400 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:shadow-none dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 transition-all outline-none {size === 'large'
+        class="w-full text-ellipsis rounded-xl border border-zinc-500 bg-white text-zinc-950 shadow-sm focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:shadow-none dark:focus:border-zinc-200 dark:focus:ring-zinc-200 transition-all outline-none {size === 'large'
           ? `py-3.5 pl-11 text-base md:pr-48 ${value ? 'pr-[6.5rem] sm:pr-28' : 'pr-14'}`
           : 'py-4 pl-12 pr-28 text-base md:pr-48'}"
         placeholder={indicatif}

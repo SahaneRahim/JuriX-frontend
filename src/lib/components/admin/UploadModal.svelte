@@ -23,7 +23,7 @@
     // téléphone en paysage compris. Le retrait horizontal reste à chaque
     // champ : une liste garde la place de son chevron à droite.
     const CHAMP =
-        "min-h-11 w-full rounded-xl border border-zinc-200 bg-white py-2 text-base text-zinc-950 placeholder-zinc-400 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm";
+        "min-h-11 w-full rounded-xl border border-zinc-500 bg-white py-2 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm";
     const LIBELLE = "mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200";
 
 let files: FileList | null = null;
@@ -366,7 +366,7 @@ let files: FileList | null = null;
                 <div>
                     <label
                         for="file-upload"
-                        class="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 py-8 sm:py-10 court:py-4 text-center hover:border-zinc-950 cursor-pointer transition-colors focus-within:border-zinc-950 focus-within:ring-2 focus-within:ring-zinc-950/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-zinc-400 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200/20"
+                        class="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-500 bg-zinc-50 px-6 py-8 sm:py-10 court:py-4 text-center hover:border-zinc-950 cursor-pointer transition-colors focus-within:border-zinc-950 focus-within:ring-2 focus-within:ring-zinc-950/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-zinc-400 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200/20"
                     >
                         <span
                             class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 court:mb-2 court:h-9 court:w-9"

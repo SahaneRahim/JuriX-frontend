@@ -153,7 +153,7 @@
       value={language}
       aria-label={$tr("a11y.filterLanguage")}
       on:change={(e) => changerFiltre({ lang: e.currentTarget.value })}
-      class="min-h-11 w-full min-w-0 truncate rounded-xl border border-zinc-200 bg-white py-2.5 pl-4 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:w-auto sm:flex-1 sm:text-sm md:flex-none"
+      class="min-h-11 w-full min-w-0 truncate rounded-xl border border-zinc-500 bg-white py-2.5 pl-4 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:w-auto sm:flex-1 sm:text-sm md:flex-none"
     >
       <option value="all">{$tr("laws.allLanguages")}</option>
       <option value="fr">Français</option>
@@ -168,7 +168,7 @@
       value={categoryId}
       aria-label={$tr("a11y.filterDomain")}
       on:change={(e) => changerFiltre({ category: e.currentTarget.value })}
-      class="min-h-11 w-full min-w-0 truncate rounded-xl border border-zinc-200 bg-white py-2.5 pl-4 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:w-auto sm:flex-1 sm:text-sm md:max-w-xs"
+      class="min-h-11 w-full min-w-0 truncate rounded-xl border border-zinc-500 bg-white py-2.5 pl-4 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:w-auto sm:flex-1 sm:text-sm md:max-w-xs"
     >
       <option value="all">{$tr("laws.allCategories")}</option>
       {#each categories as category (category.id)}

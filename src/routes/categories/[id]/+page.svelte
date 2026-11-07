@@ -203,7 +203,7 @@
           autocomplete="off"
           aria-label={remplir($tr("categories.searchInDomain"), { domaine: categoryTitle })}
           placeholder={$tr("categories.searchPlaceholderShort")}
-          class="min-h-11 w-full pl-12 pr-4 py-2.5 text-base sm:text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-500 rounded-xl focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 text-zinc-950 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 transition-colors"
+          class="min-h-11 w-full pl-12 pr-4 py-2.5 text-base sm:text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-500 dark:border-zinc-500 rounded-xl focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 text-zinc-950 dark:text-zinc-100 transition-colors"
         />
         <input type="hidden" name="perimetre" value={String(data.categorie.id)} />
         <button
@@ -227,7 +227,7 @@
           value={selectedLanguage}
           aria-label={$tr("a11y.filterLanguage")}
           on:change={surChoixDeLangue}
-          class="min-h-11 w-full min-w-0 truncate rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-4 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:w-auto sm:text-sm"
+          class="min-h-11 w-full min-w-0 truncate rounded-xl border border-zinc-500 bg-zinc-50 py-2.5 pl-4 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:w-auto sm:text-sm"
         >
           <option value="all">{$tr("laws.allLanguages")}</option>
           <option value="fr">Français</option>

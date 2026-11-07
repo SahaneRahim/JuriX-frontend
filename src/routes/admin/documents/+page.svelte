@@ -285,13 +285,13 @@ let documents: Law[] = [];
     <input
       type="text"
       placeholder={$tr("admin.searchDoc")}
-      class="min-h-11 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-10 pr-3 text-base text-zinc-950 placeholder-zinc-400 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
+      class="min-h-11 w-full rounded-xl border border-zinc-500 bg-white py-2 pl-10 pr-3 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
       bind:value={searchQuery}
           aria-label={$tr("a11y.searchField")}
     />
   </div>
   <select
-    class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm xl:w-auto xl:max-w-[14rem]"
+    class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-500 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm xl:w-auto xl:max-w-[14rem]"
     bind:value={selectedCategoryId}
           aria-label={$tr("a11y.filterCategory")}
     on:change={applyFilters}
@@ -306,7 +306,7 @@ let documents: Law[] = [];
        l'autre (Windows l'affiche en deux lettres). Chaque langue garde son
        nom dans sa propre langue, comme dans EditModal : il ne se traduit pas. -->
   <select
-    class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm xl:w-auto xl:max-w-[14rem]"
+    class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-500 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm xl:w-auto xl:max-w-[14rem]"
     bind:value={selectedLanguage}
           aria-label={$tr("a11y.filterLanguage")}
     on:change={applyFilters}
@@ -316,7 +316,7 @@ let documents: Law[] = [];
     <option value="en">English</option>
   </select>
   <select
-    class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm xl:w-auto xl:max-w-[14rem]"
+    class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-500 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm xl:w-auto xl:max-w-[14rem]"
     bind:value={selectedStatus}
           aria-label={$tr("a11y.filterStatus")}
     on:change={applyFilters}

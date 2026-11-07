@@ -2535,7 +2535,7 @@
              fond zinc-950 et bordure zinc-500. En zinc-900 bordé de zinc-700,
              il ressemblait aux suggestions de question posées au-dessus. -->
         <div
-          class="flex items-end gap-2 rounded-xl border border-zinc-300 bg-white py-1 pl-3 pr-1 transition-colors focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 sm:gap-3 sm:pl-4"
+          class="flex items-end gap-2 rounded-xl border border-zinc-500 bg-white py-1 pl-3 pr-1 transition-colors focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 sm:gap-3 sm:pl-4"
         >
           <!--
             Une zone de texte et non un champ d'une ligne : une question
@@ -2553,7 +2553,7 @@
             aria-label={t("a11y.chatInput")}
             on:keydown={handleChatKeydown}
             placeholder={t("chat.placeholder")}
-            class="block max-h-40 w-full min-w-0 flex-1 resize-none overflow-y-auto border-none bg-transparent px-0 py-2.5 text-base leading-6 text-zinc-950 placeholder-zinc-400 [field-sizing:content] focus:ring-0 dark:text-zinc-100 dark:placeholder-zinc-500"
+            class="block max-h-40 w-full min-w-0 flex-1 resize-none overflow-y-auto border-none bg-transparent px-0 py-2.5 text-base leading-6 text-zinc-950 [field-sizing:content] focus:ring-0 dark:text-zinc-100"
           ></textarea>
           <!-- Le trombone est retiré : aucun endpoint n'accepte de pièce jointe
                conversationnelle (/upload et /batch-upload sont réservés à l'admin

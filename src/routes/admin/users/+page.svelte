@@ -321,14 +321,14 @@
       aria-label={$tr("a11y.searchField")}
       data-testid="user-search"
       placeholder={indicatifComplet ? $tr("admin.users.searchPlaceholder") : $tr("a11y.searchField")}
-      class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-200 bg-white py-2 pl-10 pr-3 text-base text-zinc-950 placeholder-zinc-400 outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
+      class="min-h-11 w-full min-w-0 text-ellipsis rounded-xl border border-zinc-500 bg-white py-2 pl-10 pr-3 text-base text-zinc-950 outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
     />
   </div>
   <select
     bind:value={filtreRole}
           aria-label={$tr("a11y.filterRole")}
     data-testid="user-filter-role"
-    class="min-h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm lg:w-auto"
+    class="min-h-11 w-full min-w-0 rounded-xl border border-zinc-500 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm lg:w-auto"
   >
     <option value="all">{$tr("admin.users.allRoles")}</option>
     <option value="user">{$tr("admin.role.user")}</option>
@@ -339,7 +339,7 @@
     bind:value={filtreStatut}
           aria-label={$tr("a11y.filterStatus")}
     data-testid="user-filter-status"
-    class="min-h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm lg:w-auto"
+    class="min-h-11 w-full min-w-0 rounded-xl border border-zinc-500 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm lg:w-auto"
   >
     <option value="all">{$tr("admin.allStatuses")}</option>
     <option value="active">{$tr("admin.users.activePlural")}</option>

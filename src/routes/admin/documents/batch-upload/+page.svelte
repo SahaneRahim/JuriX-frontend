@@ -494,7 +494,7 @@
 				<select
 					bind:value={statusFilter}
           aria-label={$tr("a11y.filterStatus")}
-					class="min-h-11 rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
+					class="min-h-11 rounded-xl border border-zinc-500 bg-white py-2 pl-3 pr-10 text-base text-zinc-950 focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-200 dark:focus:ring-zinc-200 sm:[@media(pointer:fine)]:text-sm"
 				>
 					<option value="all">{$tr("admin.allStatuses")}</option>
 					<option value="pending">{$tr("admin.pending")}</option>

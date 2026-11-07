@@ -456,7 +456,7 @@
           on:input={onInput}
           placeholder={$tr("palette.placeholder")}
           aria-label={$tr("palette.placeholder")}
-          class="w-full border-none bg-transparent px-0 text-zinc-950 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 text-base focus:outline-none focus:ring-0"
+          class="w-full border-none bg-transparent px-0 text-zinc-950 dark:text-zinc-100 text-base focus:outline-none focus:ring-0"
         />
         {#if query}
           <!-- Effacée, la saisie rend les raccourcis, le premier surligné

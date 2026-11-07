@@ -160,7 +160,7 @@
     {#if introuvable}
       <form action="/search" method="get" role="search" class="mt-6 court:mt-4 w-full max-w-md">
         <div
-          class="flex items-center gap-1 rounded-xl border border-zinc-200 bg-white p-1 pl-3 focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 transition-colors"
+          class="flex items-center gap-1 rounded-xl border border-zinc-500 bg-white p-1 pl-3 focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 transition-colors"
         >
           <Icone nom="search" class="shrink-0 text-lg text-zinc-400 dark:text-zinc-500" />
           <input
@@ -170,7 +170,7 @@
             autocomplete="off"
             aria-label={$tr("a11y.searchField")}
             placeholder={$tr(champLarge ? "search.placeholder" : "categories.searchPlaceholderShort")}
-            class="min-h-11 min-w-0 flex-1 border-none bg-transparent px-2 text-base text-ellipsis text-zinc-950 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-0"
+            class="min-h-11 min-w-0 flex-1 border-none bg-transparent px-2 text-base text-ellipsis text-zinc-950 dark:text-zinc-100 focus:outline-none focus:ring-0"
           />
           <button
             type="submit"
