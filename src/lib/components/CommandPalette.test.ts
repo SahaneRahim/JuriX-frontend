@@ -91,6 +91,22 @@ describe('CommandPalette', () => {
     vi.unstubAllGlobals();
   });
 
+  it('une réponse arrivée après la destruction ne lit plus le document', async () => {
+    const differee = reponseDifferee(SUGGESTIONS);
+    const appels = vi.fn(() => differee.promesse);
+    vi.stubGlobal('fetch', appels);
+    const rendu = render(CommandPalette);
+    await fireEvent.input(rendu.getByRole('textbox'), { target: { value: 'travail' } });
+    await waitFor(() => expect(appels).toHaveBeenCalled(), { timeout: 2000 });
+    rendu.unmount();
+
+    const lecture = vi.spyOn(document, 'activeElement', 'get');
+    differee.repondre();
+    await new Promise((fini) => setTimeout(fini));
+    expect(lecture).not.toHaveBeenCalled();
+    lecture.mockRestore();
+  });
+
   it('nomme chaque texte par sa nature, sans cote interne', async () => {
     const { container } = await chercherTravail();
     const lignes = Array.from(container.querySelectorAll('[role="dialog"] button')).filter((b) =>

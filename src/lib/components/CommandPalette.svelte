@@ -15,7 +15,7 @@
    * touches (« Échap », ↑ ↓ ↵). Le surtitre et les pastilles étaient en
    * capitales à chasse fixe, une troisième voix sous les titres en Literata.
    */
-  import { tick } from "svelte";
+  import { onDestroy, tick } from "svelte";
   import { afterNavigate, beforeNavigate, goto } from "$app/navigation";
   import { fade, scale } from "svelte/transition";
   import BalanceAnimee from "$lib/components/BalanceAnimee.svelte";
@@ -50,6 +50,18 @@
    */
   let ouvreur: HTMLElement | null = null;
   let ouverte = false;
+
+  /**
+   * POURQUOI : la réponse de /search/suggest peut arriver après la destruction
+   * du composant. La suite de `chercherSuggestions` lit `document.activeElement` :
+   * sans ce drapeau, elle travaillait pour un composant disparu, et levait
+   * « document is not defined » quand l'environnement de test était déjà démonté.
+   */
+  let detruite = false;
+  onDestroy(() => {
+    detruite = true;
+    clearTimeout(debounceTimer);
+  });
 
   interface SuggestionItem {
     id?: number;
@@ -279,7 +291,7 @@
     // champ, ou les raccourcis, par celle d'une autre saisie, et ramenait la
     // sélection en tête, loin de la ligne qui avait le focus. La recherche
     // de la saisie actuelle, si elle en a une, arrêtera le sablier.
-    if (q !== query.trim()) return;
+    if (detruite || q !== query.trim()) return;
 
     // Une ligne a le focus (Tab) : la liste change sous elle, ses lignes
     // étant rangées par position, et Entrée y ouvrait le texte venu prendre
