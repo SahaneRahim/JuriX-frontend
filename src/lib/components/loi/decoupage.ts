@@ -926,6 +926,20 @@ export function paragraphesDeLArticle(article: Pick<ArticleDuTexte, 'titre' | 'l
   return lignesDuTexte(article).map((paragraphe) => paragraphe.replace(PUCE_D_ALINEA, ''));
 }
 
+/**
+ * Un paragraphe qui ouvre une énumération : « 1° », « 2 ° », « 1) », « a) »,
+ * « (b) », « iv) » ou un tiret (« - », « – », « — », « • »). La page lui donne
+ * un retrait suspendu (P9, `RETRAIT_D_ENUMERATION`) : le repère sort dans la
+ * marge, et la suite du point s'aligne sous son premier mot, comme sur
+ * legislation.gov.uk ou EUR-Lex. Les alinéas numérotés « (1) » ne sont pas
+ * des énumérations : ce sont les paragraphes de l'article, sans retrait.
+ */
+const DEBUT_D_ENUMERATION = /^\s*(?:\d{1,3}\s?°|\d{1,3}\)|\(?[a-z]\)|\(?[ivx]{1,5}\)|[-–—•])\s/;
+
+export function estUneEnumeration(paragraphe: string): boolean {
+  return DEBUT_D_ENUMERATION.test(paragraphe);
+}
+
 /** Le texte de l'article, un paragraphe par ligne. */
 export function texteDeLArticle(article: Pick<ArticleDuTexte, 'titre' | 'lignes'>): string {
   return paragraphesDeLArticle(article).join('\n');

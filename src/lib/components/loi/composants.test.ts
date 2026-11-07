@@ -341,6 +341,14 @@ describe('ListeDuSommaire', () => {
     expect(texte(liens[2])).toContain('· modifié');
   });
 
+  it('garde l’article lu distinct en contraste élevé : la barre des autres prend le fond (P6)', () => {
+    render(ListeDuSommaire, { props: { decoupe, rangCourant: 1, marques: new Map(), filtre: '' } });
+    const liens = screen.getAllByRole('link');
+    expect(liens[1].className).toContain('forced-colors:border-[Highlight]');
+    expect(liens[0].className).toContain('forced-colors:border-[Canvas]');
+    expect(liens[0].className).not.toContain('forced-colors:border-[Highlight]');
+  });
+
   it('filtre sans accents et met l’occurrence en gras', () => {
     render(ListeDuSommaire, { props: { decoupe, rangCourant: 0, marques: new Map(), filtre: 'securite' } });
     const liens = screen.getAllByRole('link');
@@ -650,6 +658,18 @@ describe('TexteEntier', () => {
     expect(document.getElementById('art-2')?.tagName).toBe('ARTICLE');
     expect(screen.getByLabelText('Lien vers l’article 1er').getAttribute('href')).toBe('#art-1');
     expect(screen.getByText('Haut de page').closest('a')?.getAttribute('href')).toBe('#contenu');
+  });
+
+  it('met les énumérations en retrait suspendu, avec césure et 17 px au téléphone (P9)', () => {
+    const decoupe = decouperLeTexte('Article 1er.- Sont exclus :\n1° les biens publics ;\na) les routes ;\n- les ports.\nLe reste suit.');
+    render(TexteEntier, { props: { decoupe, changements: new Map() } });
+    const paragraphes = [...document.querySelectorAll('#art-1 [lang] p')];
+    const enRetrait = paragraphes.filter((p) => p.className.includes('-indent-[1.5em]')).map(texte);
+    expect(enRetrait).toEqual(['1° les biens publics ;', 'a) les routes ;', '- les ports.']);
+    const corps = document.querySelector('#art-1 [lang]') as HTMLElement;
+    expect(corps.className).toContain('hyphens-auto');
+    expect(corps.className).toContain('text-[17px]');
+    expect(corps.getAttribute('lang')).toBe('fr');
   });
 
   it('replie l’ouverture (visas) sous un titre, et s’ouvre sur le premier chapitre', () => {

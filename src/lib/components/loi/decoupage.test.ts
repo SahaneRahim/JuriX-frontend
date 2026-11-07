@@ -4,6 +4,7 @@ import {
   divisionsPrincipales,
   enTetePrincipal,
   enTetesDuSommaire,
+  estUneEnumeration,
   extraitDeLArticle,
   filtrerLArticle,
   intituleDeLArticle,
@@ -700,5 +701,19 @@ describe('filtre du sommaire', () => {
   it('cherche aussi le numéro d’un article', () => {
     expect(filtrerLArticle(douze, '12')).toBe(true);
     expect(filtrerLArticle(securite, '  ')).toBe(true);
+  });
+});
+
+describe('estUneEnumeration (P9 : retrait suspendu)', () => {
+  it('reconnaît « 1° », « a) », « (b) », « iv) » et les tirets', () => {
+    for (const debut of ['1° la nationalité', '12 ° les biens', '2) le recours', 'a) l’intérim', '(b) la saisie', 'iv) le délai', '- la participation', '– les recettes', '• les dépenses']) {
+      expect(estUneEnumeration(debut), debut).toBe(true);
+    }
+  });
+
+  it('laisse sans retrait les alinéas « (1) » et le texte courant', () => {
+    for (const texte of ['(1) La République du Cameroun…', 'Le présent décret…', 'Article 3 - Le ministre', '1er janvier 2020', 'a-t-il', '-5 %']) {
+      expect(estUneEnumeration(texte), texte).toBe(false);
+    }
   });
 });

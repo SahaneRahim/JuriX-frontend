@@ -24,6 +24,13 @@ export const POLICE_DES_TITRES = 'font-titre font-semibold';
 export const POLICE_DU_TEXTE_OFFICIEL = 'font-texte';
 
 /**
+ * Retrait suspendu d'un point d'énumération (« 1° », « a) », « - » : P9) :
+ * la première ligne sort de 1,5 em, les suivantes s'alignent sous le texte.
+ * En `em`, il suit la taille du texte (17 px au téléphone, 19 au-delà).
+ */
+export const RETRAIT_D_ENUMERATION = 'pl-[1.5em] -indent-[1.5em]';
+
+/**
  * Lien dans une phrase (encadrés de statut, historique) : souligné zinc-400,
  * comme sur les maquettes P1 et P3. Le soulignement, et non la couleur, dit
  * que c'est un lien : la page est en noir et blanc.

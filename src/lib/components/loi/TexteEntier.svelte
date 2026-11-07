@@ -37,10 +37,10 @@
   import Icone from "$lib/components/Icone.svelte";
   import { language, tr } from "$lib/stores/language";
   import StatutDeLArticle from "./StatutDeLArticle.svelte";
-  import { intituleDeLArticle, libelleDeDivision, paragraphesDeLArticle, type TexteDecoupe } from "./decoupage";
+  import { estUneEnumeration, intituleDeLArticle, libelleDeDivision, paragraphesDeLArticle, type TexteDecoupe } from "./decoupage";
   import { ancreDeLArticle, numeroDArticleEcrit } from "./reference";
   import type { ChangementsDeLArticle } from "./statut";
-  import { LIEN_DANS_LE_TEXTE, POLICE_DES_TITRES, POLICE_DU_TEXTE_OFFICIEL } from "./typographie";
+  import { LIEN_DANS_LE_TEXTE, POLICE_DES_TITRES, POLICE_DU_TEXTE_OFFICIEL, RETRAIT_D_ENUMERATION } from "./typographie";
 
   export let decoupe: TexteDecoupe;
   export let changements: Map<number, ChangementsDeLArticle>;
@@ -108,9 +108,10 @@
   /**
    * Texte officiel hors des articles (ouverture, lignes d'une division) : la
    * taille et la police du corps des articles. L'ouverture était en 16 px
-   * sous des articles en 18 (vérification r1 du 29/10/2026).
+   * sous des articles en 18 (vérification r1 du 29/10/2026). 17 px au
+   * téléphone (P9) : la lecture y est longue, comme article par article.
    */
-  const TEXTE_OFFICIEL = `max-w-[36em] space-y-3 text-base leading-relaxed text-zinc-700 coupe-mots dark:text-zinc-300 sm:text-lg ${POLICE_DU_TEXTE_OFFICIEL}`;
+  const TEXTE_OFFICIEL = `max-w-[36em] space-y-3 text-left text-[17px] leading-relaxed text-zinc-700 coupe-mots hyphens-auto dark:text-zinc-300 sm:text-lg ${POLICE_DU_TEXTE_OFFICIEL}`;
 
   $: langue = $language.current;
   $: total = decoupe.articles.length;
@@ -247,7 +248,7 @@
   }
 
   /**
-   * Amène un article en haut de l'écran (sous le fil d'Ariane, `scroll-mt-*`),
+   * Amène un article en haut de l'écran (sous le fil d'Ariane : `scroll-padding-top` de la page),
    * en le rendant d'abord s'il ne l'est pas encore. Défilement doux sur une
    * courte distance seulement, et jamais pour qui a demandé moins de
    * mouvement. `focus` : le titre de l'article reçoit le focus (choix au
@@ -355,7 +356,7 @@
                en-tête en h2 : la page ne saute aucun niveau de titre. -->
           <h2
             id={j === division.entetes.length - 1 ? `division-${division.rang}` : undefined}
-            class="mb-3 scroll-mt-16 border-b border-zinc-200 pb-2 dark:border-zinc-800 sm:mb-4 sm:scroll-mt-20 sm:pb-3 sm:court:scroll-mt-14 lg:scroll-mt-[4.5rem] {j
+            class="mb-3 border-b border-zinc-200 pb-2 dark:border-zinc-800 sm:mb-4 sm:scroll-mt-2 sm:pb-3 sm:court:scroll-mt-0 lg:scroll-mt-0 {j
               ? 'mt-6'
               : ''}"
           >
@@ -379,13 +380,14 @@
           {#if article.rang < limite}
             {@const ancre = ancreDeLArticle(article)}
             {@const intitule = intituleDeLArticle(article)}
-            <!-- `lg:scroll-mt-[4.5rem]` : sous le fil d'Ariane de 53 px, la
-                 marge haute de l'article (20 px) cache la fin du précédent. -->
+            <!-- Le `scroll-padding-top` de la page (fil d'Ariane collant)
+                 fait l'essentiel ; `sm:scroll-mt-2` rend les 8 px d'air que
+                 l'article avait entre `sm` et `lg`, sauf sur écran court. -->
             <article
               id={ancre}
               bind:this={elements[article.rang]}
               aria-labelledby="titre-{ancre}"
-              class="article-entier scroll-mt-16 border-b border-zinc-100 py-4 last:border-0 dark:border-zinc-800/80 sm:scroll-mt-20 sm:py-5 sm:court:scroll-mt-14 lg:scroll-mt-[4.5rem]"
+              class="article-entier border-b border-zinc-100 py-4 last:border-0 dark:border-zinc-800/80 sm:scroll-mt-2 sm:py-5 sm:court:scroll-mt-0 lg:scroll-mt-0"
             >
               <div class="mb-2 flex items-center justify-between gap-3 sm:mb-3">
                 <!-- Focusable par le script seulement (choix au clavier dans
@@ -419,11 +421,11 @@
               {/if}
               <StatutDeLArticle changements={changements.get(article.rang)} {historique} {consolide} compact on:historique />
               <div
-                class="max-w-[36em] space-y-4 text-base leading-relaxed text-zinc-700 coupe-mots dark:text-zinc-300 sm:text-lg {POLICE_DU_TEXTE_OFFICIEL}"
+                class="max-w-[36em] space-y-4 text-left text-[17px] leading-relaxed text-zinc-700 coupe-mots hyphens-auto dark:text-zinc-300 sm:text-lg {POLICE_DU_TEXTE_OFFICIEL}"
                 lang={langueDuTexte}
               >
                 {#each paragraphesDeLArticle(article) as paragraphe, k (k)}
-                  <p>{paragraphe}</p>
+                  <p class={estUneEnumeration(paragraphe) ? RETRAIT_D_ENUMERATION : undefined}>{paragraphe}</p>
                 {/each}
               </div>
             </article>

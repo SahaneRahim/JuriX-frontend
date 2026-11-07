@@ -62,6 +62,7 @@
     intituleDeLArticle,
     libelleDeDivision,
     paragraphesACopier,
+    estUneEnumeration,
     paragraphesDeLArticle,
     type ArticleDuTexte,
     type EnTeteDeDivision,
@@ -85,7 +86,7 @@
     type MarqueDuSommaire,
   } from "$lib/components/loi/statut";
   import { lirePassages, segmenter, type Passage } from "$lib/components/loi/surlignage";
-  import { BOUTON_SECONDAIRE, POLICE_DES_TITRES, POLICE_DU_TEXTE_OFFICIEL } from "$lib/components/loi/typographie";
+  import { BOUTON_SECONDAIRE, POLICE_DES_TITRES, POLICE_DU_TEXTE_OFFICIEL, RETRAIT_D_ENUMERATION } from "$lib/components/loi/typographie";
   import { formatDate } from "$lib/format";
   import { descriptionDepuis, urlCanonique } from "$lib/seo";
   import { language, tr } from "$lib/stores/language";
@@ -759,8 +760,8 @@
   let texteEntier: TexteEntier | undefined;
 
   /**
-   * Amène le début de l'article juste sous le fil d'Ariane collant (marge
-   * `scroll-mt-*` de la barre), au lieu de remonter tout en haut de la page.
+   * Amène le début de l'article juste sous le fil d'Ariane collant
+   * (`scroll-padding-top` de la page), au lieu de remonter tout en haut de la page.
    * Après `tick()` : le panneau du sommaire a pu se fermer. Animation douce,
    * sauf pour qui a demandé moins de mouvement, et pour un lien profond.
    */
@@ -1347,7 +1348,7 @@
     « Article N », que les tests lisent), restylé : plus d'ombre, et la
     largeur du texte (1 320 px au plus) pour que le fil commence à l'aplomb
     du titre. Sa hauteur ne change pas : le sommaire reste collé à
-    `lg:top-24`, et les marges de défilement (`scroll-mt-*`) la suivent.
+    `lg:top-24`, et le `scroll-padding-top` de la page (<style>) la suit.
   -->
   <div
     class="breadcrumb bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 py-1 sm:py-4 sm:court:py-1.5 px-0 sticky top-0 z-40"
@@ -1741,12 +1742,12 @@
                          16 px sous `lg`, là où il vit dans le panneau tactile :
                          en dessous, iOS zoome sur la page au focus. -->
                     <div
-                      class="search-box mx-4 mb-3 mt-1 flex min-h-11 shrink-0 items-center rounded-xl border border-zinc-200 bg-zinc-50 pl-4 focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 lg:mx-6 lg:mb-6 lg:mt-0"
+                      class="search-box mx-4 mb-3 mt-1 flex min-h-11 shrink-0 items-center rounded-xl border border-zinc-500 bg-zinc-50 pl-4 focus-within:border-zinc-950 focus-within:ring-1 focus-within:ring-zinc-950 dark:border-zinc-500 dark:bg-zinc-950 dark:focus-within:border-zinc-200 dark:focus-within:ring-zinc-200 lg:mx-6 lg:mb-6 lg:mt-0"
                     >
                       <Icone nom="search" class="h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400" />
                       <input
                         type="text"
-                        class="w-full min-w-0 self-stretch border-none bg-transparent py-2.5 pl-3 pr-4 text-base text-zinc-950 placeholder-zinc-400 outline-none focus:ring-0 dark:text-zinc-100 dark:placeholder-zinc-500 lg:text-sm"
+                        class="w-full min-w-0 self-stretch border-none bg-transparent py-2.5 pl-3 pr-4 text-base text-zinc-950 outline-none focus:ring-0 dark:text-zinc-100 lg:text-sm"
                         placeholder={$tr("loi.sommaire.filtre")}
                         bind:value={saisieDuFiltre}
                         aria-label={$tr("loi.sommaire.filtre")}
@@ -1953,12 +1954,12 @@
                           <!-- Ce qui glisse d'un article à l'autre (`feuillete`) :
                                le surtitre, « Article N » et le texte ; ni les
                                actions, ni la navigation, ni la note. Cible du
-                               défilement à chaque changement d'article :
-                               `scroll-mt-*` suit la hauteur du fil d'Ariane
-                               collant (53 px, 33 en paysage sur téléphone). -->
+                               défilement à chaque changement d'article ; il
+                               s'arrête sous le fil d'Ariane collant grâce au
+                               `scroll-padding-top` de la page (voir <style>). -->
                           <div
                             bind:this={debutArticle}
-                            class="feuille scroll-mt-16 sm:scroll-mt-[4.5rem] sm:court:scroll-mt-14 {feuillete}"
+                            class="feuille {feuillete}"
                           >
                             <div class="article-header mb-5">
                               {#if chaine}
@@ -2013,17 +2014,21 @@
                             <!--
                               Texte officiel en Literata texte (Q5), 17 px sur
                               téléphone, 19 au-dessus, interligne de 1,8, couleur
-                              pleine, 34 em au plus (maquette : 646 px en 19 px).
+                              pleine, 34 em au plus (maquette : 646 px en 19 px),
+                              soit 65 à 75 caractères par ligne (P9) ; graisse
+                              400, aligné à gauche, césure (`hyphens-auto`, que
+                              le `lang` du texte rend juste) et retrait suspendu
+                              des énumérations (« 1° », « a) », « - »).
                               Les passages surlignés sont des NŒUDS (`segmenter`,
                               surlignage.ts : <mark> ou texte), jamais du HTML ;
                               sans passage, le paragraphe tel quel (L2).
                             -->
                             <div
-                              class="article-content max-w-[34em] space-y-4 text-[17px] leading-[1.8] text-zinc-950 coupe-mots dark:text-zinc-100 sm:space-y-5 sm:text-[19px] {POLICE_DU_TEXTE_OFFICIEL}"
+                              class="article-content max-w-[34em] space-y-4 text-left text-[17px] leading-[1.8] text-zinc-950 coupe-mots hyphens-auto dark:text-zinc-100 sm:space-y-5 sm:text-[19px] {POLICE_DU_TEXTE_OFFICIEL}"
                               lang={langueDuTexte}
                             >
                               {#each paragraphesDeLArticle(articleCourant) as paragraphe, i (i)}
-                                <p>{#each segmenter(paragraphe, passages) as segment, rang (rang)}{#if segment.passage}<mark class="passage mv-surligne mv-surligner" class:passage-cle={segment.passage.role === "cle"} style="--d: {segment.passage.role === 'cle' ? 0 : 150}ms">{segment.texte}</mark>{:else}{segment.texte}{/if}{/each}</p>
+                                <p class={estUneEnumeration(paragraphe) ? RETRAIT_D_ENUMERATION : undefined}>{#each segmenter(paragraphe, passages) as segment, rang (rang)}{#if segment.passage}<mark class="passage mv-surligne mv-surligner" class:passage-cle={segment.passage.role === "cle"} style="--d: {segment.passage.role === 'cle' ? 0 : 150}ms">{segment.texte}</mark>{:else}{segment.texte}{/if}{/each}</p>
                               {/each}
                             </div>
                           </div>
@@ -2268,6 +2273,31 @@
     }
     to {
       opacity: 1;
+    }
+  }
+  /*
+   * POURQUOI `scroll-padding-top` (P6). Le fil d'Ariane reste collé en haut
+   * (53 px, 33 en paysage sur téléphone, 40 au téléphone) : une ancre
+   * (`#article-12`), un `scrollIntoView` ou le focus clavier (Tab) s'arrêtait
+   * dessous. Les cibles portaient chacune leur `scroll-mt-*`, qui ne couvrait
+   * ni le focus ni les autres ancres ; la marge est désormais celle du
+   * document, une seule fois (elle s'ajouterait à un `scroll-mt`). Mêmes
+   * paliers que l'ancienne marge : 4 rem, 4,5 rem dès `sm`, 3,5 rem sur un
+   * écran court.
+   */
+  :global(html:has(.breadcrumb)) {
+    scroll-padding-top: 4rem;
+  }
+
+  @media (min-width: 640px) {
+    :global(html:has(.breadcrumb)) {
+      scroll-padding-top: 4.5rem;
+    }
+  }
+
+  @media (min-width: 640px) and (max-height: 500px) {
+    :global(html:has(.breadcrumb)) {
+      scroll-padding-top: 3.5rem;
     }
   }
 </style>

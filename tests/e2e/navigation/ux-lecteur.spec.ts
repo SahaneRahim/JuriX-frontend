@@ -291,6 +291,85 @@ test.describe('Page d’un texte', () => {
     expect(await police('article.article .article-content')).toContain('Literata Texte');
     expect(await police('.ai-explanation')).not.toContain('Literata');
   });
+
+  test('P9 : 65 à 80 caractères par ligne, graisse 400, à gauche, césure dans la langue du texte', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await ouvrirAuServeur(page, `/laws/${id}`);
+    const corps = page.locator('article.article .article-content');
+    const style = await corps.evaluate((element) => {
+      const calcule = getComputedStyle(element);
+      return { graisse: calcule.fontWeight, alignement: calcule.textAlign, cesure: calcule.hyphens, lang: element.getAttribute('lang') };
+    });
+    expect(style.graisse).toBe('400');
+    expect(['left', 'start']).toContain(style.alignement);
+    expect(style.cesure).toBe('auto');
+    expect(['fr', 'en']).toContain(style.lang);
+    // Les caractères de la première ligne pleine d'un paragraphe long : la
+    // mesure de P9 (107 avant la refonte). Lettre par lettre, jusqu'au saut.
+    const parLigne = await corps.evaluate((element) => {
+      for (const p of element.querySelectorAll('p')) {
+        const texte = p.textContent ?? '';
+        if (texte.length < 200) continue;
+        const marcheur = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+        let compte = 0;
+        let haut: number | null = null;
+        for (let noeud = marcheur.nextNode(); noeud; noeud = marcheur.nextNode()) {
+          for (let k = 0; k < (noeud.textContent ?? '').length; k += 1) {
+            const plage = document.createRange();
+            plage.setStart(noeud, k);
+            plage.setEnd(noeud, k + 1);
+            const boite = plage.getClientRects()[0];
+            if (!boite) continue;
+            if (haut === null) haut = boite.top;
+            else if (boite.top > haut + 2) return compte;
+            compte += 1;
+          }
+        }
+      }
+      return null;
+    });
+    test.skip(parLigne === null, 'aucun paragraphe de plus de 200 caractères dans le premier article');
+    expect(parLigne).toBeGreaterThanOrEqual(60);
+    expect(parLigne).toBeLessThanOrEqual(82);
+  });
+
+  test('P6 : en contraste élevé, l’article lu du sommaire reste distinct', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ forcedColors: 'active' });
+    await ouvrirAuServeur(page, `/laws/${id}`);
+    const liens = page.getByTestId('law-toc').getByRole('link');
+    test.skip((await liens.count()) < 2, 'texte d’un seul article');
+    const bordures = await liens.evaluateAll((elements) =>
+      elements
+        .filter((a) => a.getBoundingClientRect().width > 0)
+        .map((a) => ({
+          courant: a.getAttribute('aria-current') === 'location',
+          bordure: `${getComputedStyle(a).borderLeftColor} ${getComputedStyle(a).borderLeftWidth} ${getComputedStyle(a).borderTopColor} ${getComputedStyle(a).textDecorationLine}`,
+        })),
+    );
+    const courant = bordures.filter((b) => b.courant);
+    const autres = bordures.filter((b) => !b.courant);
+    expect(courant).toHaveLength(1);
+    test.skip(!autres.length, 'un seul article visible dans la colonne');
+    for (const autre of autres) expect(autre.bordure).not.toBe(courant[0].bordure);
+  });
+
+  test('P6 : une ancre s’arrête sous le fil d’Ariane collant (`scroll-padding-top`)', async ({ page }) => {
+    await ouvrirAuServeur(page, `/laws/${id}`);
+    const marge = await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingTop);
+    expect(parseFloat(marge)).toBeGreaterThan(0);
+    const texteEntier = page.getByTestId('law-mode-texte');
+    await cliquerJusqualEffet(texteEntier, page.getByTestId('law-full-text'));
+    const articles = page.getByTestId('law-full-text').locator('article[id^="art-"]');
+    test.skip((await articles.count()) < 3, 'texte de moins de trois articles');
+    const cible = articles.nth(2);
+    await cible.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+    const { haut, fil } = await cible.evaluate((element) => ({
+      haut: element.getBoundingClientRect().top,
+      fil: (document.querySelector('.breadcrumb') as HTMLElement).getBoundingClientRect().bottom,
+    }));
+    expect(haut).toBeGreaterThanOrEqual(fil - 1);
+  });
 });
 
 test.describe('Page d’un texte sur téléphone (320 px)', () => {
