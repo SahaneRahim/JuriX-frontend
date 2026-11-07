@@ -913,6 +913,8 @@ export const translations = {
     'palette.sectionResults': 'Résultats et actions',
     'palette.sectionShortcuts': 'Raccourcis',
     'palette.noResults': 'Aucun résultat pour « {q} »',
+    'palette.announceResults': 'Résultats : {n}',
+    'palette.announceRow': '{q}, {n} sur {total}',
     'palette.noResultsHint': 'Essayez avec d’autres mots-clés ou posez directement votre question dans le chat.',
     'palette.navigate': 'Naviguer',
     'palette.select': 'Ouvrir',
@@ -1080,6 +1082,8 @@ export const translations = {
     'entete.pageDeRecherche': 'Ouvrir la page de recherche',
     // La barre d'onglets du bas, sous md (BarreDOnglets.svelte).
     'entete.navigationMobile': 'Navigation',
+    'entete.navigationPrincipale': 'Navigation principale',
+    'pied.navigation': 'Liens du site',
     // La ligne FR / EN du panneau du menu mobile (SiteHeader.svelte).
     'entete.langue': 'Langue',
 
@@ -2207,6 +2211,8 @@ export const translations = {
     'palette.sectionResults': 'Results and actions',
     'palette.sectionShortcuts': 'Shortcuts',
     'palette.noResults': 'No results for “{q}”',
+    'palette.announceResults': 'Results: {n}',
+    'palette.announceRow': '{q}, {n} of {total}',
     'palette.noResultsHint': 'Try other keywords, or ask your question directly in the chat.',
     'palette.navigate': 'Navigate',
     'palette.select': 'Open',
@@ -2345,6 +2351,8 @@ export const translations = {
     'accueil.preuves.demo.statutAbroge': 'Repealed',
     'entete.pageDeRecherche': 'Open the search page',
     'entete.navigationMobile': 'Navigation',
+    'entete.navigationPrincipale': 'Main navigation',
+    'pied.navigation': 'Site links',
     'entete.langue': 'Language',
 
     // Law page (P1, P2, P10, Q5).

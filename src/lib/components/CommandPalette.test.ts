@@ -107,6 +107,14 @@ describe('CommandPalette', () => {
     lecture.mockRestore();
   });
 
+  it('dit le nombre de résultats, puis la ligne surlignée par ↓ depuis le champ', async () => {
+    const { getByRole, getByTestId } = await chercherTravail();
+    const annonce = getByTestId('palette-liste-announce');
+    expect(annonce.textContent?.trim()).toBe('Résultats : 5');
+    await fireEvent.keyDown(getByRole('textbox'), { key: 'ArrowDown' });
+    expect(annonce.textContent?.trim()).toBe('Demander à l’assistant : « travail », 2 sur 5');
+  });
+
   it('nomme chaque texte par sa nature, sans cote interne', async () => {
     const { container } = await chercherTravail();
     const lignes = Array.from(container.querySelectorAll('[role="dialog"] button')).filter((b) =>

@@ -72,7 +72,7 @@
   <!-- Chiffres tabulaires (guide § 4.2, les nombres) : en chiffres
        proportionnels et `tracking-tight`, le « 1 » étroit avalait l'espace
        fine qui le suit, et « 1 284 » se lisait « 1284 » à côté de « 3 480 ». -->
-  <h3 class="coupe-mots col-start-1 row-start-2 mt-2 min-w-0 text-xl font-bold tabular-nums tracking-tight text-zinc-950 dark:text-white sm:text-2xl">{value}</h3>
+  <p class="coupe-mots col-start-1 row-start-2 mt-2 min-w-0 text-xl font-bold tabular-nums tracking-tight text-zinc-950 dark:text-white sm:text-2xl">{value}</p>
   <div
     class="col-start-2 row-span-2 row-start-1 ml-3 hidden h-12 w-12 items-center justify-center self-start rounded-xl border border-zinc-200/70 bg-zinc-100 text-zinc-800 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-200 sm:flex lg:hidden lg:[@container(min-width:65rem)]:flex"
   >

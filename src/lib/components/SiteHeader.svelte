@@ -365,8 +365,11 @@
        atteignables par la loupe et par le pied de page. Liens de 44 px de
        haut jusqu'à xl, comme les boutons voisins : une tablette en paysage
        s'en sert au doigt. -->
+  <!-- Nommée : la barre et le pied portent chacun un repère de navigation, et
+       un lecteur d'écran ne pouvait pas les distinguer dans sa liste. -->
   <nav
     class="hidden shrink-0 lg:ml-2 lg:flex items-center gap-6 2xl:gap-7 min-[1800px]:gap-8 text-sm font-medium text-secondary-text-light dark:text-secondary-text-dark"
+    aria-label={$tr("entete.navigationPrincipale")}
   >
     {#each NAV_LINKS as lien (lien.href)}
       <!-- L'état actif n'était signalé QUE par la couleur : invisible aux

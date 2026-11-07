@@ -137,7 +137,7 @@
          la colonne du milieu prend la largeur des liens : c'est le
          copyright qui passe à la ligne, pas la navigation. -->
     {#if navigation}
-      <nav class="grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:items-center sm:justify-center xl:col-start-2">
+      <nav aria-label={$tr("pied.navigation")} class="grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:items-center sm:justify-center xl:col-start-2">
         {#each LIENS as lien (lien.href)}
           <a
             href={lien.href}

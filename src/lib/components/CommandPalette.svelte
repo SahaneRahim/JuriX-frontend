@@ -58,6 +58,15 @@
    * « document is not defined » quand l'environnement de test était déjà démonté.
    */
   let detruite = false;
+
+  /**
+   * POURQUOI : depuis le champ, ↑ ↓ ne déplacent que la surbrillance, et le
+   * focus reste dans le champ. Un lecteur d'écran n'en disait rien, pas plus
+   * que de l'arrivée des résultats : la liste changeait en silence. Cette
+   * phrase, dite par une région polie, porte la ligne surlignée et le nombre
+   * de résultats. Région à part de `annonceDansLaPalette`, qui appartient au chat.
+   */
+  let annonceDeLaListe = "";
   onDestroy(() => {
     detruite = true;
     clearTimeout(debounceTimer);
@@ -157,6 +166,7 @@
   function revenirAuxRaccourcis() {
     clearTimeout(debounceTimer);
     suggestions = [];
+    annonceDeLaListe = "";
     loading = false;
     selectedIndex = 0;
   }
@@ -302,6 +312,7 @@
     suggestions = resultats;
     loading = false;
     selectedIndex = 0;
+    annonceDeLaListe = $tr("palette.announceResults").replace("{n}", String(resultats.length));
   }
 
   function onInput(e: Event) {
@@ -354,6 +365,10 @@
       const pas = e.key === "ArrowDown" ? 1 : -1;
       selectedIndex = ((depuis >= 0 ? depuis : selectedIndex) + pas + total) % total;
       if (e.target !== inputElement && dansLaPalette(e.target)) lignes[selectedIndex]?.focus();
+      else
+        annonceDeLaListe = avecSaisie($tr("palette.announceRow"), displayedItems[selectedIndex].title)
+          .replace("{n}", String(selectedIndex + 1))
+          .replace("{total}", String(total));
     } else if (e.key === "Enter") {
       // Entrée n'ouvre la ligne surlignée que depuis le champ, ou quand rien
       // n'a le focus. Sur un autre bouton de la palette (une ligne atteinte à
@@ -440,6 +455,7 @@
           value={query}
           on:input={onInput}
           placeholder={$tr("palette.placeholder")}
+          aria-label={$tr("palette.placeholder")}
           class="w-full border-none bg-transparent px-0 text-zinc-950 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 text-base focus:outline-none focus:ring-0"
         />
         {#if query}
@@ -578,6 +594,9 @@
            Hors du flux (sr-only). -->
       <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="palette-announce">
         {$annonceDansLaPalette}
+      </p>
+      <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="palette-liste-announce">
+        {annonceDeLaListe}
       </p>
     </div>
   </div>
