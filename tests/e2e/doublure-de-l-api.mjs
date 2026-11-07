@@ -31,6 +31,8 @@
 
 import http from 'node:http';
 
+import { ARTICLE_DE_TEST, SLUG_DE_L_ARTICLE_DE_TEST } from './article-de-test.mjs';
+
 // 4175 par défaut, jamais 4190 : un « bad port » de la norme Fetch, que le
 // `fetch` de Node refuse (voir playwright.config.ts).
 const PORT = Number(process.argv[2]) || 4175;
@@ -151,6 +153,12 @@ const serveur = http.createServer(async (requete, reponse) => {
       }
       const enregistree = recherches.get(cleDe(question));
       if (enregistree) return repondre(reponse, 200, enregistree);
+    }
+
+    // L'article de test (article-de-test.mjs) : la seule adresse de blog
+    // gardée ici, le reste du blog va à la vraie API.
+    if (requete.method === 'GET' && pathname === `/api/v1/blog/${SLUG_DE_L_ARTICLE_DE_TEST}`) {
+      return repondre(reponse, 200, ARTICLE_DE_TEST);
     }
 
     return await relayer(requete, reponse, corps);

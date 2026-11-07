@@ -17,8 +17,10 @@
  *  - `entete` : la barre de navigation de la page (site public, chat,
  *    administration), dont un seul mode doit se montrer à la fois.
  *
- * DONNÉES. Les identifiants (loi, catégorie, article du blog) viennent de la
+ * DONNÉES. Les identifiants (loi, catégorie) viennent de la
  * vraie API, jamais du code : un jeu figé pourrit à la première réingestion.
+ * Seul l'article du blog est figé (article-de-test.mjs) : une base de test n'en
+ * publie aucun.
  */
 
 
@@ -26,7 +28,6 @@ import { expect, type APIRequestContext, type Locator, type Page } from '@playwr
 
 import type { Category } from '../../src/lib/types';
 import {
-  API,
   ARTICLES_DU_BLOG_ADMIN,
   COMPARAISON,
   DEBUT_REPONSE,
@@ -47,6 +48,7 @@ import {
   simulerLeChat,
   visible,
 } from './doublures';
+import { SLUG_DE_L_ARTICLE_DE_TEST } from './article-de-test.mjs';
 import { cliquerJusqualEffet, saisirJusqualEffet } from './hydratation';
 
 /** La barre de navigation d'une page : un seul de ses deux modes se montre. */
@@ -94,30 +96,6 @@ async function categorieFournie(request: APIRequestContext): Promise<number | nu
   const categories = await lireListe<Category>(request, '/categories');
   const [premiere] = [...categories].sort((a, b) => (b.law_count ?? 0) - (a.law_count ?? 0));
   return premiere?.id ?? null;
-}
-
-/**
- * Le premier article publiable du blog, ou rien : les articles écrits à la
- * main sont cachés du public (décision du propriétaire), et les tests de
- * /blog/[slug] sont alors sautés (`exiger`).
- */
-async function articleDuBlog(request: APIRequestContext): Promise<string | null> {
-  const reponse = await request.get(`${API}/api/v1/blog`, { failOnStatusCode: false }).catch(() => null);
-  if (reponse?.ok()) {
-    const articles = (await reponse.json().catch(() => [])) as {
-      slug?: string;
-      etat_publication?: string;
-      etatPublication?: string;
-    }[];
-    // POURQUOI : l'API locale ou les bases de test peuvent contenir les
-    // articles non consolidés du 26/10, que `+page.server.ts` écarte en 404
-    // (décision du 30/10, `servableAuPublic`).
-    const publiable = Array.isArray(articles)
-      ? articles.find((a) => a.slug && (a.etat_publication === 'publiable' || a.etatPublication === 'publiable'))
-      : undefined;
-    if (publiable?.slug) return publiable.slug;
-  }
-  return null;
 }
 
 /** Une adresse qu'aucune route ne sert : la page d'erreur du site, en 404. */
@@ -249,11 +227,10 @@ export const PAGES: PageDuSite[] = [
   {
     nom: '/blog/[slug]',
     entete: 'site',
-    ouvrir: async (page, request) => {
-      const slug = await articleDuBlog(request);
-      exiger(slug, 'aucun article publié dans le blog');
-      await ouvrirAuServeur(page, `/blog/${slug}`);
-      return `/blog/${slug}`;
+    ouvrir: async (page) => {
+      // L'article de la doublure, et non celui d'une base : voir article-de-test.mjs.
+      await ouvrirAuServeur(page, `/blog/${SLUG_DE_L_ARTICLE_DE_TEST}`);
+      return `/blog/${SLUG_DE_L_ARTICLE_DE_TEST}`;
     },
     principal: titre,
     // « Poser la question à l'assistant » : la suite que propose l'article.
