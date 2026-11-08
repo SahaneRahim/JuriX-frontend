@@ -26,6 +26,17 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
   preprocess: vitePreprocess(),
   kit: {
+    /*
+     * POURQUOI LE CSS EST DANS LE HTML. Mesuré le 08/11 sur la production
+     * (Lighthouse mobile) : la feuille principale (27 Ko compressés) arrivait
+     * à 2,6 s, car elle partageait la bande passante avec les ~35 scripts
+     * préchargés ; rien ne s'affichait avant elle (FCP 2,5 s). Intégrée à la
+     * réponse du serveur, elle arrive avec le HTML, sans aller-retour.
+     * Contrepartie : elle n'est plus mise en cache d'une page à l'autre,
+     * mais seuls les chargements complets la reçoivent (la navigation
+     * interne ne redemande pas le HTML).
+     */
+    inlineStyleThreshold: 256 * 1024,
     adapter: adapter({
       runtime: 'nodejs22.x',
       // Région des fonctions : fra1 (Francfort). L'API tourne chez Railway en
