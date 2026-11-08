@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LigneAffichee } from '$lib/components/listes/lots';
 import { corpsDeRecherche } from '$lib/api-publique';
 import { demandeAffinee, lireParametres } from '../../search/parametres';
+import { goto } from '$app/navigation';
+import { language } from '$lib/stores/language';
 import Page from './+page.svelte';
 
 /**
@@ -11,9 +13,15 @@ import Page from './+page.svelte';
  * liste par lots revient entière au retour arrière (P11).
  */
 
+const adresse = vi.hoisted(() => ({ courante: 'http://localhost/categories/17' }));
 vi.mock('$app/stores', async () => {
   const { readable } = await import('svelte/store');
-  return { page: readable({ url: new URL('http://localhost/categories/17'), state: {}, params: { id: '17' } }) };
+  return {
+    page: {
+      subscribe: (f: (v: unknown) => void) =>
+        readable({ url: new URL(adresse.courante), state: {}, params: { id: '17' } }).subscribe(f),
+    },
+  };
 });
 vi.mock('$app/navigation', () => ({ afterNavigate: vi.fn(), goto: vi.fn() }));
 vi.mock('$lib/components/SiteHeader.svelte', () => ({ default: () => {} }));
@@ -21,7 +29,12 @@ vi.mock('$lib/components/SiteFooter.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/components/MetaSeo.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/components/ChatFab.svelte', () => ({ default: () => {} }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.mocked(goto).mockClear();
+  adresse.courante = 'http://localhost/categories/17';
+  language.set({ current: 'fr' });
+});
 
 function lot(n: number): LigneAffichee[] {
   return Array.from({ length: 20 }, (_, i) => ({
@@ -91,5 +104,34 @@ describe('/categories/<id> : le snapshot de la page', () => {
     await tick();
     expect(retour.container.querySelectorAll('ul[role="list"] > li')).toHaveLength(40);
     defilement.mockRestore();
+  });
+});
+
+describe('/categories/<id> : la langue de l\'utilisateur par défaut', () => {
+  it('sans ?lang, la liste passe dans la langue choisie sur le site', async () => {
+    language.set({ current: 'en' });
+    render(Page, { props: { data: donnees(1) } });
+    await tick();
+    expect(goto).toHaveBeenCalledTimes(1);
+    const [cible, options] = vi.mocked(goto).mock.calls[0];
+    expect(String(cible)).toBe('/categories/17?lang=en');
+    // Remplace l'entrée : le retour arrière ne ramène pas à la liste mêlée.
+    expect(options).toMatchObject({ replaceState: true });
+  });
+
+  it('« Toutes les langues » choisi explicitement (?lang=all) est respecté', async () => {
+    language.set({ current: 'en' });
+    adresse.courante = 'http://localhost/categories/17?lang=all';
+    render(Page, { props: { data: donnees(1) } });
+    await tick();
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('une langue déjà dans l\'adresse est respectée', async () => {
+    language.set({ current: 'en' });
+    adresse.courante = 'http://localhost/categories/17?lang=fr';
+    render(Page, { props: { data: { ...donnees(1), lang: 'fr' as const } } });
+    await tick();
+    expect(goto).not.toHaveBeenCalled();
   });
 });

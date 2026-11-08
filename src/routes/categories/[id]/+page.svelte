@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { language, tr } from "$lib/stores/language";
@@ -64,10 +65,12 @@
    * { lang: … }`, que la prop `filtres` de ListeDeTextes
    * (Record<string, string>) refuse.
    */
-  function filtresDeLangue(lang: string): Record<string, string> {
-    return lang === "all" ? {} : { lang };
+  function filtresDeLangue(lang: string, explicite: boolean): Record<string, string> {
+    return lang === "all" && !explicite ? {} : { lang };
   }
-  $: filtres = filtresDeLangue(data.lang);
+  // « Toutes » choisi par l'utilisateur s'écrit `?lang=all` : sans cela, le
+  // lot suivant (ou un retour sur la page) repasserait dans sa langue.
+  $: filtres = filtresDeLangue(data.lang, $page.url.searchParams.has("lang"));
   $: chemin = `/categories/${data.categorie.id}`;
 
   /**
@@ -78,8 +81,24 @@
   function surChoixDeLangue(event: Event) {
     const valeur = (event.currentTarget as HTMLSelectElement).value;
     const langue: FiltreLangue = valeur === "fr" || valeur === "en" ? valeur : "all";
-    goto(adresseDuLot(chemin, langue === "all" ? {} : { lang: langue }, 1), { keepFocus: true, noScroll: true });
+    goto(adresseDuLot(chemin, { lang: langue }, 1), { keepFocus: true, noScroll: true });
   }
+
+  /**
+   * LA LANGUE DE L'UTILISATEUR PAR DÉFAUT. Une adresse sans `?lang=` montre la
+   * liste dans la langue choisie sur le site. Elle vit dans le navigateur
+   * (localStorage), et la page est en cache chez Vercel avec `lang` et `page`
+   * seuls dans la clé : le serveur ne peut pas la connaître. La page nue reste
+   * donc « toutes langues » pour les robots, et le navigateur bascule dès le
+   * montage, en remplaçant l'entrée d'historique. Une langue déjà dans
+   * l'adresse, `all` compris, est un choix : on n'y touche pas.
+   */
+  onMount(() => {
+    if ($page.url.searchParams.has("lang")) return;
+    goto(adresseDuLot(chemin, { lang: $language.current }, data.page), {
+      replaceState: true, keepFocus: true, noScroll: true,
+    });
+  });
 
   // Une langue filtrée ou un lot suivant n'entre pas dans l'index, comme sur
   // /laws : la canonique désigne déjà la page nue, et les liens restent suivis.
