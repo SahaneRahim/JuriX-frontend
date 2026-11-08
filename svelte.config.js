@@ -38,7 +38,7 @@ const config = {
      */
     inlineStyleThreshold: 256 * 1024,
     adapter: adapter({
-      runtime: 'nodejs22.x',
+      runtime: 'nodejs24.x',
       // Région des fonctions : fra1 (Francfort). L'API tourne chez Railway en
       // EU West (Amsterdam) et la base chez Neon à Francfort (confirmé le
       // 28/10/2026) : chaque rendu non mis en cache appelle l'API, à quelques

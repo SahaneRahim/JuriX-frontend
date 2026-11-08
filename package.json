@@ -50,7 +50,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=22.20"
+    "node": "24.x"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
