@@ -223,7 +223,7 @@ describe('la génération', () => {
     // La durée mesurée avec mistral-large-4 (essai réel du 04/11 : 121,7 et
     // 124,4 s côté client), et non plus « 30 à 90 secondes ».
     expect(attente).toHaveTextContent('environ deux minutes (120 à 125 secondes mesurées)');
-    expect(attente).toHaveTextContent('200 secondes');
+    expect(attente).toHaveTextContent('215 secondes');
     // Le focus ne tombe pas sur <body> : il est sur « Arrêter ».
     expect(document.activeElement).toBe(within(attente).getByRole('button', { name: 'Arrêter' }));
     // Le bouton qui fermerait le panneau est masqué pendant l'attente.
@@ -323,7 +323,7 @@ describe('la génération', () => {
     expect(ecran.queryByTestId('blog-generation-erreur')).toBeNull();
   });
 
-  it('délai du client : « plus long que d’habitude » passé 130 s (pas avant : 120 à 125 s mesurées), abandon à 200 s', async () => {
+  it('délai du client : « plus long que d’habitude » passé 160 s (pas avant : 120 à 125 s mesurées, 160 s au pire prévu), abandon à 215 s', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
     routes['GET /blog/admin/all'] = () => json([]);
     routes['POST /blog/generate'] = sansReponse;
@@ -339,16 +339,16 @@ describe('la génération', () => {
     await vi.advanceTimersByTimeAsync(2_000);
     expect(ecran.getByTestId('blog-generation-en-cours')).not.toHaveTextContent('Rédaction du brouillon…');
     expect(ecran.getByTestId('blog-generation-en-cours')).toHaveTextContent('contrôle IA de chaque phrase…');
-    await vi.advanceTimersByTimeAsync(104_000);
-    // 125 s : la durée habituelle d'une génération et de son contrôle.
+    await vi.advanceTimersByTimeAsync(138_000);
+    // 159 s : encore dans le pire prévu d'une génération et de son contrôle (20 + 140 s).
     expect(ecran.getByTestId('blog-generation-en-cours')).not.toHaveTextContent('Plus long que d’habitude');
-    await vi.advanceTimersByTimeAsync(6_000);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(ecran.getByTestId('blog-generation-en-cours')).toHaveTextContent('Plus long que d’habitude');
-    expect(ecran.getByTestId('blog-chrono')).toHaveTextContent('2:11');
-    await vi.advanceTimersByTimeAsync(69_000);
+    expect(ecran.getByTestId('blog-chrono')).toHaveTextContent('2:41');
+    await vi.advanceTimersByTimeAsync(54_000);
     await tick();
     expect(ecran.queryByTestId('blog-generation-en-cours')).toBeNull();
-    expect(ecran.getByTestId('blog-generation-erreur')).toHaveTextContent('Pas de réponse du serveur au bout de 200 secondes');
+    expect(ecran.getByTestId('blog-generation-erreur')).toHaveTextContent('Pas de réponse du serveur au bout de 215 secondes');
   });
 });
 
@@ -1898,7 +1898,7 @@ describe('décision du 04/11 : une règle « À vérifier » ou « Hors des sour
 });
 
 describe('l’attente d’un contrôle seul, mesurée avec mistral-large-4 (40 à 105 s)', () => {
-  it('l’annonce et l’aide le disent ; « plus long que d’habitude » passé 110 s ; le client abandonne à 175 s', async () => {
+  it('l’annonce et l’aide le disent ; « plus long que d’habitude » passé 140 s ; le client abandonne à 190 s', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
     brancherLeServeur(BROUILLON);
     routes['POST /blog/12/controle'] = sansReponse;
@@ -1913,13 +1913,13 @@ describe('l’attente d’un contrôle seul, mesurée avec mistral-large-4 (40 �
     await vi.advanceTimersByTimeAsync(0);
     expect(within(fenetre).getByTestId('blog-fenetre-statut')).toHaveTextContent('Contrôle IA lancé. Il prend en général 40 à 105 secondes.');
     const controle = within(fenetre).getByTestId('blog-controle');
-    expect(controle).toHaveTextContent('comptez 40 à 105 secondes. Sans réponse au bout de 175 secondes, le contrôle s’arrête.');
-    await vi.advanceTimersByTimeAsync(105_000);
+    expect(controle).toHaveTextContent('comptez 40 à 105 secondes. Sans réponse au bout de 190 secondes, le contrôle s’arrête.');
+    await vi.advanceTimersByTimeAsync(139_000);
     expect(within(fenetre).queryByTestId('blog-controle-long')).toBeNull();
-    await vi.advanceTimersByTimeAsync(6_000);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(within(fenetre).getByTestId('blog-controle-long')).toHaveTextContent('Plus long que d’habitude');
-    await vi.advanceTimersByTimeAsync(64_000);
+    await vi.advanceTimersByTimeAsync(49_000);
     await tick();
-    expect(await within(fenetre).findByRole('alert')).toHaveTextContent('Pas de réponse du serveur au bout de 175 secondes : le contrôle IA a été abandonné.');
+    expect(await within(fenetre).findByRole('alert')).toHaveTextContent('Pas de réponse du serveur au bout de 190 secondes : le contrôle IA a été abandonné.');
   });
 });

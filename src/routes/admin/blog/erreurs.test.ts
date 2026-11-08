@@ -229,7 +229,7 @@ describe('messageDErreur : jamais « [object Object] » ni « Failed to fetch »
   it('sans réponse : réseau, délai du client, arrêt demandé', () => {
     expect(messageDErreur(erreurDExecution(new TypeError('Failed to fetch')), fr)).toMatch(/n’a pas pu être joint/);
     const abandon = new DOMException('The operation was aborted.', 'AbortError');
-    expect(messageDErreur(erreurDExecution(abandon, 'delai'), fr)).toMatch(/au bout de 200 secondes/);
+    expect(messageDErreur(erreurDExecution(abandon, 'delai'), fr)).toMatch(/au bout de 215 secondes/);
     expect(messageDErreur(erreurDExecution(abandon, 'admin'), fr)).toMatch(/Génération arrêtée/);
     expect(messageDErreur(erreurDExecution(new Error('?')), fr)).toBe('Réponse inattendue du serveur. Actualisez la liste.');
     expect(messageDErreur(erreurDExecution(new TypeError('Failed to fetch')), en)).toMatch(/could not be reached/);
@@ -255,12 +255,12 @@ describe('avenant du tour 7 : les phrases de règle à confirmer, et des attente
     expect(messageDErreur(perimee, en)).toMatch(/your ticks or confirmations were for the previous one\.$/);
   });
 
-  it('les délais du client dépassent ceux du serveur (150 s, 120 s), et les textes disent les mêmes nombres', () => {
-    // Le serveur : 150 s pour une génération et son contrôle, 120 s pour un
-    // contrôle seul (DELAI_CONTROLE_S). Le client attend 10 s de plus : la
+  it('les délais du client dépassent ceux du serveur (205 s, 180 s), et les textes disent les mêmes nombres', () => {
+    // Le serveur : 205 s pour une génération et son contrôle, 180 s pour un
+    // contrôle seul (DELAI_CONTROLE_S, plafond de 15 500 jetons du 08/11). Le client attend 10 s de plus : la
     // phrase du serveur (504 « délai ») arrive avant la sienne.
-    expect(DELAI_DE_GENERATION_MS).toBe(200_000);
-    expect(DELAI_DU_CONTROLE_MS).toBe(175_000);
+    expect(DELAI_DE_GENERATION_MS).toBe(215_000);
+    expect(DELAI_DU_CONTROLE_MS).toBe(190_000);
     for (const traduire of [fr, en]) {
       expect(traduire('admin.blog.waitHint')).toContain(String(DELAI_DE_GENERATION_MS / 1000));
       expect(traduire('admin.blog.check.waitHint')).toContain(String(DELAI_DU_CONTROLE_MS / 1000));
@@ -274,10 +274,11 @@ describe('avenant du tour 7 : les phrases de règle à confirmer, et des attente
     expect(en('admin.blog.check.waitHint')).toContain('40 to 105 seconds');
     expect(fr('admin.blog.check.announceStart')).toContain('40 à 105 secondes');
     expect(en('admin.blog.check.announceStart')).toContain('40 to 105 seconds');
-    // « Plus long que d'habitude » après le plus long mesuré, avant l'abandon.
-    expect(ATTENTE_LONGUE_DE_GENERATION_S).toBeGreaterThan(125);
+    // « Plus long que d'habitude » après le plus long mesuré et l'appel au pire prévu (140 s),
+    // avant l'abandon.
+    expect(ATTENTE_LONGUE_DE_GENERATION_S).toBeGreaterThanOrEqual(20 + 140);
     expect(ATTENTE_LONGUE_DE_GENERATION_S * 1000).toBeLessThan(DELAI_DE_GENERATION_MS);
-    expect(ATTENTE_LONGUE_DU_CONTROLE_S).toBeGreaterThan(105);
+    expect(ATTENTE_LONGUE_DU_CONTROLE_S).toBeGreaterThanOrEqual(140);
     expect(ATTENTE_LONGUE_DU_CONTROLE_S * 1000).toBeLessThan(DELAI_DU_CONTROLE_MS);
   });
 

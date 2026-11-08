@@ -70,7 +70,7 @@
    * « Publier » dit combien il en manque ; un autre contrôle les refait
    * depuis le serveur, sans jamais passer une confirmation d'une phrase à une
    * autre (`confirmationsApresUnAutreControle`). Le contrôle seul attend
-   * 175 s au plus (`DELAI_DU_CONTROLE_MS`) : 40 à 105 s mesurées.
+   * 190 s au plus (`DELAI_DU_CONTROLE_MS`) : 40 à 105 s mesurées.
    * Un article publié dans la base mais CACHÉ du public (non publiable) se
    * reprend comme un brouillon : « Enregistrer le brouillon » le garde hors
    * ligne, « Publier » le remet en ligne. « Retirer du site » et « Publier
@@ -732,7 +732,7 @@
    * l'enregistrer le retirerait du site : le bouton dit d'abord de le
    * retirer. Sans sources, le bouton dit de les reconstruire d'abord. Pendant
    * l'attente, le formulaire est figé et le temps écoulé s'affiche ; le
-   * client abandonne au bout de 175 s (`DELAI_DU_CONTROLE_MS`, 10 s après le
+   * client abandonne au bout de 190 s (`DELAI_DU_CONTROLE_MS`, 10 s après le
    * serveur). Un échec ne perd rien (contrat) :
    * l'erreur s'affiche et l'article est relu, le serveur faisant foi sur ce
    * qu'il garde du contrôle.

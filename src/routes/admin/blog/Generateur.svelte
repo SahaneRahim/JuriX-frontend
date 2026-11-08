@@ -9,8 +9,8 @@
    * temps écoulé, annonce la durée mesurée (environ deux minutes, contrôle IA
    * par mistral-large-4 compris : 121,7 et 124,4 s à l'essai réel du 04/11),
    * et dit quand c'est plus long que d'habitude
-   * (`ATTENTE_LONGUE_DE_GENERATION_S`). Le client abandonne à 200 s
-   * (`DELAI_DE_GENERATION_MS`), au-delà du délai du serveur (190 s, code
+   * (`ATTENTE_LONGUE_DE_GENERATION_S`). Le client abandonne à 215 s
+   * (`DELAI_DE_GENERATION_MS`), au-delà du délai du serveur (205 s, code
    * `delai`) : sans borne, une API figée laissait la roue tourner
    * indéfiniment.
    *

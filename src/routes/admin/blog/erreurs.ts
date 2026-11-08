@@ -91,13 +91,16 @@ export interface ErreurDuBlog {
 
 /**
  * Délai du client pour une génération et son contrôle automatique : au-delà
- * du délai du serveur (190 s pour les deux, code `delai`). Mesuré avec
+ * du délai du serveur (205 s pour les deux, code `delai`). Mesuré avec
  * mistral-large-4 pour le contrôle (essai réel du 04/11) : 121,7 et 124,4 s
- * côté client ; le panneau dit « plus long que d'habitude » passé
- * `ATTENTE_LONGUE_DE_GENERATION_S`.
+ * côté client. Le 08/11, le plafond de sortie du contrôle est passé de 14 000
+ * à 15 500 jetons (deux appels coupés à 14 000) : son appel prend jusqu'à
+ * 140 s au pire prévu (114 jetons par seconde, le plus lent mesuré). Le
+ * panneau dit « plus long que d'habitude » passé
+ * `ATTENTE_LONGUE_DE_GENERATION_S` : 20 s de rédaction et cet appel au pire.
  */
-export const DELAI_DE_GENERATION_MS = 200_000;
-export const ATTENTE_LONGUE_DE_GENERATION_S = 130;
+export const DELAI_DE_GENERATION_MS = 215_000;
+export const ATTENTE_LONGUE_DE_GENERATION_S = 160;
 
 /**
  * Passé ce délai, le panneau de génération parle du contrôle et non plus de la
@@ -110,21 +113,22 @@ export const FIN_PROBABLE_DE_LA_REDACTION_S = 20;
 
 /**
  * Délai du client pour un contrôle IA seul (`POST /blog/{id}/controle`) : au-delà
- * du délai du serveur (`DELAI_CONTROLE_S`, 165 s, code `delai`), avec la même
- * marge de 10 s que la génération et les sources. POURQUOI pas 200 s comme la
+ * du délai du serveur (`DELAI_CONTROLE_S`, 180 s, code `delai`), avec la même
+ * marge de 10 s que la génération et les sources. POURQUOI pas 215 s comme la
  * génération (jusqu'au tour 6) : un contrôle seul n'a pas de rédaction avant
  * lui ; mesuré avec mistral-large-4, 40 à 105 s pour un article en un appel.
- * Passé `ATTENTE_LONGUE_DU_CONTROLE_S`, la fenêtre dit « plus long que
+ * Passé `ATTENTE_LONGUE_DU_CONTROLE_S` (140 s, l'appel au pire prévu au
+ * plafond de 15 500 jetons du 08/11), la fenêtre dit « plus long que
  * d'habitude ».
  */
-export const DELAI_DU_CONTROLE_MS = 175_000;
-export const ATTENTE_LONGUE_DU_CONTROLE_S = 110;
+export const DELAI_DU_CONTROLE_MS = 190_000;
+export const ATTENTE_LONGUE_DU_CONTROLE_S = 140;
 
 /**
  * Délai du client pour reconstruire les sources : la recherche de la
  * génération, sans le modèle (2,6 à 3,8 s mesurées le 30/10 sur jurix_dev).
  * Au-delà du délai du serveur (`DELAI_SOURCES_S`, 60 s, code `delai`, « rien
- * n'est changé »), comme pour la génération (190 s, puis 200 côté client) :
+ * n'est changé »), comme pour la génération (205 s, puis 215 côté client) :
  * à 60 s des deux côtés, le client abandonnait parfois au moment où le
  * serveur répondait, et sa phrase remplaçait celle, plus exacte, du serveur.
  */
