@@ -38,6 +38,7 @@
     ConversationSummary,
     ProgressionDuChat,
     SourceCitee,
+    ContactInstitution,
     TexteConsulte,
   } from "$lib/types";
   import { afterNavigate, pushState, replaceState } from "$app/navigation";
@@ -58,6 +59,7 @@
   import Icone from "$lib/components/Icone.svelte";
   import BalanceAnimee from "$lib/components/BalanceAnimee.svelte";
   import BarreDesArticlesCites from "$lib/components/chat/BarreDesArticlesCites.svelte";
+  import ContactsDeLaReponse from "$lib/components/chat/ContactsDeLaReponse.svelte";
   import EtatDeLaReponse from "$lib/components/chat/EtatDeLaReponse.svelte";
   import QuestionDuProfil from "$lib/components/chat/QuestionDuProfil.svelte";
   import PanneauDesPreuves from "$lib/components/chat/PanneauDesPreuves.svelte";
@@ -1434,6 +1436,26 @@
         : t("chat.errorServer");
   }
 
+  /** Messages dont le choix du destinataire d'un courrier est ouvert. */
+  let courrierOuvert: Record<string, boolean> = {};
+
+  /**
+   * Destinataires proposés pour un courrier : les institutions que la réponse
+   * nomme (une seule délégation régionale, sous un nom générique), puis un
+   * avocat et l'employeur.
+   */
+  function destinatairesDuCourrier(message: ChatMessage): string[] {
+    const noms: string[] = [];
+    for (const c of message.citations?.contacts ?? []) {
+      const nom = c.region ? t("chat.letter.inspection") : c.nom;
+      if (!noms.includes(nom)) noms.push(nom);
+    }
+    for (const autre of [t("chat.letter.lawyer"), t("chat.letter.employer")]) {
+      if (!noms.includes(autre)) noms.push(autre);
+    }
+    return noms;
+  }
+
   /**
    * Les quatre listes de la nouvelle API, tirées du dernier événement, ou
    * `undefined` sur l'ancienne (aucune d'elles) : la réponse s'affiche alors
@@ -1441,8 +1463,8 @@
    * écartée plutôt que de faire échouer l'affichage.
    */
   function listesDuFlux(evenement: EvenementDeFlux): CitationsDeLaReponse | undefined {
-    const { citations, citations_introuvables, articles_cites, textes_consultes_non_cites } = evenement;
-    if (![citations, citations_introuvables, articles_cites, textes_consultes_non_cites].some(Array.isArray)) {
+    const { citations, citations_introuvables, articles_cites, textes_consultes_non_cites, contacts } = evenement;
+    if (![citations, citations_introuvables, articles_cites, textes_consultes_non_cites, contacts].some(Array.isArray)) {
       return undefined;
     }
     const avecTexte = <T extends { law_id?: unknown }>(liste: T[] | undefined): T[] =>
@@ -1454,6 +1476,10 @@
       citations_introuvables: Array.isArray(citations_introuvables) ? citations_introuvables : [],
       articles_cites: avecTexte<SourceCitee>(articles_cites),
       textes_consultes_non_cites: avecTexte<TexteConsulte>(textes_consultes_non_cites),
+      contacts: (Array.isArray(contacts) ? contacts : []).filter(
+        (c): c is ContactInstitution =>
+          typeof c === "object" && c !== null && typeof c.id === "string" && typeof c.nom === "string",
+      ),
     };
   }
 
@@ -2418,7 +2444,48 @@
                         </ul>
                       </div>
                     {/if}
+
+                    {#if message.id !== idEnFlux}
+                      <ContactsDeLaReponse contacts={message.citations?.contacts ?? []} />
+                    {/if}
                   </div>
+
+                  {#if message.id !== idEnFlux && !message.arretee && message.citations}
+                    <!-- Rédiger un courrier (08/11/2026) : à l'institution
+                         nommée, à un avocat, à l'employeur. La demande part
+                         comme une question : le chat s'appuie sur la
+                         conversation et les articles déjà cités. -->
+                    <div class="mt-2" data-testid="chat-letter">
+                      <button
+                        type="button"
+                        data-testid="chat-letter-toggle"
+                        aria-expanded={Boolean(courrierOuvert[message.id])}
+                        on:click={() => (courrierOuvert = { ...courrierOuvert, [message.id]: !courrierOuvert[message.id] })}
+                        class="-mx-2 inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950 dark:text-white dark:decoration-zinc-600"
+                      >
+                        <Icone nom="mail" class="text-base" />{t("chat.letter.write")}
+                      </button>
+                      {#if courrierOuvert[message.id]}
+                        <ul class="mt-1 flex flex-wrap gap-2">
+                          {#each destinatairesDuCourrier(message) as destinataire (destinataire)}
+                            <li>
+                              <button
+                                type="button"
+                                data-testid="chat-letter-recipient"
+                                disabled={envoiEnCours || questionEnAttente !== null}
+                                on:click={(event) => {
+                                  courrierOuvert = { ...courrierOuvert, [message.id]: false };
+                                  envoyerDepuis(event, t("chat.letter.ask").replace("{dest}", destinataire));
+                                }}
+                                class="min-h-11 rounded-full border border-zinc-300 px-3 text-sm text-zinc-900 hover:border-zinc-950 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-white sm:min-h-9"
+                                >{destinataire}</button
+                              >
+                            </li>
+                          {/each}
+                        </ul>
+                      {/if}
+                    </div>
+                  {/if}
 
                   {#if message.arretee}
                     <!-- Arrêtée en cours de route (P4) : le texte reçu reste,

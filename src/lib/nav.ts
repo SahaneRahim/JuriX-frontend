@@ -80,6 +80,7 @@ export const FOOTER_LINKS: readonly NavLink[] = [
   // lien secondaire de `/laws` : le pied de page le garde, en plus de la loupe
   // (palette Ctrl K) de l'en-tête.
   { href: '/search', key: 'nav.search', isActive: (p) => p.startsWith('/search') },
+  { href: '/annuaire', key: 'nav.annuaire', isActive: (p) => p.startsWith('/annuaire') },
   { href: '/about', key: 'nav.about', isActive: (p) => p === '/about' },
 ] as const;
 

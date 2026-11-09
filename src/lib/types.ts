@@ -965,11 +965,31 @@ export interface TexteConsulte {
 }
 
 /** Les quatre listes du dernier événement et de `RAGResponse` ; absentes de l'ancienne API. */
+/**
+ * Fiche de l'annuaire d'une institution (API, app/services/annuaire.py) :
+ * jamais écrite par le modèle, toujours avec sa source et sa date.
+ */
+export interface ContactInstitution {
+  id: string;
+  theme: string;
+  nom: string;
+  region?: string | null;
+  ville?: string | null;
+  telephones: string[];
+  email?: string | null;
+  site?: string | null;
+  adresse?: string | null;
+  note?: string | null;
+  source: { titre: string; url: string; date: string };
+}
+
 export interface CitationsDeLaReponse {
   citations?: CitationPositionnee[];
   citations_introuvables?: CitationIntrouvable[];
   articles_cites?: SourceCitee[];
   textes_consultes_non_cites?: TexteConsulte[];
+  /** Institutions vers lesquelles la réponse renvoie (annuaire). */
+  contacts?: ContactInstitution[];
 }
 
 /** Étapes du chat avant le premier mot, dans cet ordre ; `redaction` manque quand rien n'est trouvé. */

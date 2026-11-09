@@ -49,8 +49,8 @@ describe('NAV_LINKS : les quatre liens de l’en-tête', () => {
 });
 
 describe('FOOTER_LINKS : tous les liens du site', () => {
-  it('l’accueil en tête, les quatre de l’en-tête, puis Recherche et À propos', () => {
-    expect(hrefs(FOOTER_LINKS)).toEqual(['/', '/chat', '/laws', '/compare', '/blog', '/search', '/about']);
+  it('l’accueil en tête, les quatre de l’en-tête, puis Recherche, Contacts utiles et À propos', () => {
+    expect(hrefs(FOOTER_LINKS)).toEqual(['/', '/chat', '/laws', '/compare', '/blog', '/search', '/annuaire', '/about']);
     expect(FOOTER_LINKS[0]).toBe(LIEN_ACCUEIL);
   });
 
